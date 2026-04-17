@@ -133,7 +133,10 @@ class InstanceDatabaseService:
     ) -> dict:
         """
         连接引擎拉取数据库列表，自动同步到 instance_database 表。
-        只新增不存在的，不删除已有的（防止误删除）。
+        与当前连接用户的真实可见范围保持一致：
+        - 新可见的新增
+        - 仍可见的更新时间
+        - 当前已不可见的旧记录删除
         返回同步结果统计。
         """
         inst_result = await db.execute(
@@ -178,32 +181,32 @@ class InstanceDatabaseService:
 
         # 查已有记录
         existing_result = await db.execute(
-            select(InstanceDatabase.db_name).where(InstanceDatabase.instance_id == instance_id)
+            select(InstanceDatabase).where(InstanceDatabase.instance_id == instance_id)
         )
-        existing_names = {r[0] for r in existing_result}
+        existing_rows = existing_result.scalars().all()
+        existing_by_name = {row.db_name: row for row in existing_rows}
+        visible_names = {db_name for db_name in db_list if db_name}
 
         added = 0
-        skipped = 0
+        updated = 0
+        removed = 0
+
+        for db_name, existing in existing_by_name.items():
+            if db_name not in visible_names:
+                await db.delete(existing)
+                removed += 1
+
         for db_name in db_list:
             if not db_name:
                 continue
-            if db_name in existing_names:
-                existing_result = await db.execute(
-                    select(InstanceDatabase).where(
-                        and_(
-                            InstanceDatabase.instance_id == instance_id,
-                            InstanceDatabase.db_name == db_name,
-                        )
-                    )
-                )
-                existing = existing_result.scalar_one_or_none()
-                if existing:
-                    existing.sync_at = now
-                    # 兼容旧版本曾将部分库/Schema 自动置为“系统库（默认禁用）”
-                    if existing.remark == "系统库（默认禁用）":
-                        existing.remark = ""
-                        existing.is_active = True
-                skipped += 1
+            existing = existing_by_name.get(db_name)
+            if existing:
+                existing.sync_at = now
+                # 兼容旧版本曾将部分库/Schema 自动置为“系统库（默认禁用）”
+                if existing.remark == "系统库（默认禁用）":
+                    existing.remark = ""
+                    existing.is_active = True
+                updated += 1
             else:
                 db.add(
                     InstanceDatabase(
@@ -218,12 +221,17 @@ class InstanceDatabaseService:
 
         await db.commit()
         logger.info(
-            "instance_db_synced: instance=%s added=%d skipped=%d", instance_id, added, skipped
+            "instance_db_synced: instance=%s added=%d updated=%d removed=%d",
+            instance_id,
+            added,
+            updated,
+            removed,
         )
         return {
             "success": True,
-            "message": f"同步完成：新增 {added} 个，跳过 {skipped} 个",
+            "message": f"同步完成：新增 {added} 个，更新 {updated} 个，移除 {removed} 个",
             "added": added,
-            "skipped": skipped,
+            "updated": updated,
+            "removed": removed,
             "total": len(db_list),
         }

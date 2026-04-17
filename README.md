@@ -123,6 +123,9 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - 停用资源组不能再被用户组新关联，前端与后端双重拦截
 - 用户组列表新增“关联资源组”列，资源组列表直接展示关联用户组标签
 - 用户组列表新增“组长 / 上级组”列，列表信息与表单配置口径一致
+- 实例管理中的“从实例自动同步”改为全量对齐当前连接用户真实可见的数据库/Schema，不再保留本次已不可见的旧记录
+- Oracle 实例同步遵循统一规则：高权限账号可同步更多 Schema，普通 Schema 用户仅同步自己当前真实可见的 Schema
+- 实例如果仍被资源组关联，删除时会被后端拒绝，并明确提示“请到资源组管理中移除该实例后再删除”
 - 浏览器标题统一为 `矢 准 数 据`
 - 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示

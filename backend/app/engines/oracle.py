@@ -93,10 +93,10 @@ class OracleEngine:
         if rs.is_success:
             return rs
 
-        logger.info("oracle_fallback_all_users: %s", rs.error)
+        logger.info("oracle_fallback_visible_schemas: %s", rs.error)
         fallback_sql = """
         SELECT username
-        FROM all_users
+        FROM user_users
         ORDER BY username
         """
         return await asyncio.to_thread(self._run_query_sync, fallback_sql, None)

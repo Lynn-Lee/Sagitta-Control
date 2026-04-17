@@ -183,7 +183,7 @@ class InstanceService:
         if inst.resource_groups:
             rg_names = "、".join(rg.group_name_cn or rg.group_name for rg in inst.resource_groups)
             raise ConflictException(
-                f"实例已被资源组 {rg_names} 关联，请先取消关联后再删除"
+                f"实例已被资源组 {rg_names} 关联，请到资源组管理中移除该实例后再删除"
             )
         # 软删除（标记为 inactive）
         inst.is_active = False

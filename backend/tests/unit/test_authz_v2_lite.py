@@ -2,6 +2,7 @@
 v2-lite 权限体系单元测试。
 """
 
+from types import MethodType
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,6 +10,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.exceptions import AppException
+from app.engines.models import ResultSet
+from app.engines.oracle import OracleEngine
 from app.schemas.approval_flow import ApprovalFlowNodeCreate
 from app.schemas.query import PrivApplyRequest
 from app.services.monitor import MonitorService
@@ -163,3 +166,42 @@ class TestManagerResolution:
             await UserService._resolve_manager_id(db, "ghost", "未知主管")
 
         assert "直属上级不存在" in exc_info.value.message
+
+
+class TestOracleSchemaDiscovery:
+    @pytest.mark.asyncio
+    async def test_oracle_prefers_dba_users_for_privileged_account(self):
+        engine = OracleEngine.__new__(OracleEngine)
+
+        def fake_run_query_sync(self, sql: str, params=None):
+            assert "FROM dba_users" in sql
+            return ResultSet(rows=[("PDBADMIN",), ("SAGITTA",)])
+
+        engine._run_query_sync = MethodType(fake_run_query_sync, engine)
+
+        rs = await engine.get_all_databases()
+
+        assert rs.is_success
+        assert rs.rows == [("PDBADMIN",), ("SAGITTA",)]
+
+    @pytest.mark.asyncio
+    async def test_oracle_falls_back_to_current_user_visible_owners_only(self):
+        engine = OracleEngine.__new__(OracleEngine)
+        calls: list[str] = []
+
+        def fake_run_query_sync(self, sql: str, params=None):
+            calls.append(" ".join(sql.split()))
+            if "FROM dba_users" in sql:
+                return ResultSet(error="ORA-00942: table or view does not exist")
+            assert "FROM user_users" in sql
+            assert "FROM all_tables" in sql
+            assert "ALL_USERS" not in sql
+            return ResultSet(rows=[("SAGITTA",), ("APP_AUDIT",)])
+
+        engine._run_query_sync = MethodType(fake_run_query_sync, engine)
+
+        rs = await engine.get_all_databases()
+
+        assert rs.is_success
+        assert rs.rows == [("SAGITTA",), ("APP_AUDIT",)]
+        assert len(calls) == 2

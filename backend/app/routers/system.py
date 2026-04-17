@@ -517,6 +517,7 @@ async def list_resource_groups(
                     "is_active": inst.is_active,
                 }
                 for inst in rg.instances
+                if inst.is_active
             ]
             if rg.instances
             else []

@@ -75,7 +75,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
 
   const columns: ColumnsType<any> = [
     {
-      title: dbLabel + '名称', dataIndex: 'db_name', width: 290,
+      title: dbLabel + '名称', dataIndex: 'db_name', width: 360,
       render: (v: string, r: any) => (
         <Space size={6} style={{ display: 'inline-flex', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
           <Tag color="blue" style={{ fontFamily: 'monospace' }}>{v}</Tag>
@@ -83,7 +83,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         </Space>
       ),
     },
-    { title: '备注', dataIndex: 'remark', width: 160, ellipsis: true,
+    { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true, align: 'left',
       render: (v: string) => v || <Text type="secondary">—</Text> },
     {
       title: '状态', dataIndex: 'is_active', width: 90,
@@ -142,7 +142,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         loading={isLoading}
         size="small"
         tableLayout="fixed"
-        scroll={{ x: 760 }}
+        scroll={{ x: 820 }}
         pagination={{ pageSize: 20, showSizeChanger: false }}
       />
 

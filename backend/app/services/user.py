@@ -975,7 +975,10 @@ class ResourceGroupService:
         await db.flush()
         if data.instance_ids:
             valid_instance_ids = await db.execute(
-                select(Instance.id).where(Instance.id.in_(data.instance_ids))
+                select(Instance.id).where(
+                    Instance.id.in_(data.instance_ids),
+                    Instance.is_active,
+                )
             )
             for instance_id in valid_instance_ids.scalars().all():
                 await db.execute(
@@ -1022,7 +1025,10 @@ class ResourceGroupService:
                 )
             )
             valid_instance_ids = await db.execute(
-                select(Instance.id).where(Instance.id.in_(data.instance_ids))
+                select(Instance.id).where(
+                    Instance.id.in_(data.instance_ids),
+                    Instance.is_active,
+                )
             )
             for instance_id in valid_instance_ids.scalars().all():
                 await db.execute(
