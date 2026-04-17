@@ -4,14 +4,16 @@ from __future__ import annotations
 import logging
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
 from app.models.instance import Instance
 from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPrivilegeApply
-from app.models.query import QueryLog
+from app.models.query import QueryLog, QueryPrivilegeApply
+from app.models.role import UserGroup
+from app.models.user import ResourceGroup, Users
 from app.models.workflow import SqlWorkflow
 from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
 
@@ -225,6 +227,289 @@ class MonitorService:
 
 
 class DashboardService:
+    @staticmethod
+    async def _resolve_query_scope(db: AsyncSession, user: dict) -> dict:
+        if user.get("is_superuser") or user.get("role") == "dba":
+            return {"mode": "global", "label": "全量数据", "user_ids": None, "instance_ids": None}
+
+        if user.get("role") == "dba_group":
+            user_rg_ids = user.get("resource_groups", [])
+            if not user_rg_ids:
+                return {"mode": "instance_scope", "label": "权限实例范围", "user_ids": None, "instance_ids": []}
+
+            result = await db.execute(
+                select(Instance.id)
+                .join(Instance.resource_groups.of_type(ResourceGroup))
+                .where(and_(Instance.is_active.is_(True), ResourceGroup.id.in_(user_rg_ids)))
+                .distinct()
+            )
+            return {
+                "mode": "instance_scope",
+                "label": "权限实例范围",
+                "user_ids": None,
+                "instance_ids": list(result.scalars().all()),
+            }
+
+        leader_groups = await db.execute(
+            select(UserGroup)
+            .options(selectinload(UserGroup.members))
+            .where(and_(UserGroup.leader_id == user["id"], UserGroup.is_active.is_(True)))
+        )
+        groups = leader_groups.scalars().all()
+        if groups:
+            user_ids = {user["id"]}
+            for group in groups:
+                user_ids.update(member.id for member in group.members if member.is_active)
+            return {
+                "mode": "group",
+                "label": "组内数据",
+                "user_ids": sorted(user_ids),
+                "instance_ids": None,
+            }
+
+        return {"mode": "self", "label": "我的数据", "user_ids": [user["id"]], "instance_ids": None}
+
+    @staticmethod
+    def _apply_query_scope(stmt, scope: dict):
+        if scope["mode"] in {"self", "group"}:
+            user_ids = scope.get("user_ids") or []
+            if not user_ids:
+                return stmt.where(QueryLog.user_id == -1)
+            return stmt.where(QueryLog.user_id.in_(user_ids))
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(QueryLog.instance_id == -1)
+            return stmt.where(QueryLog.instance_id.in_(instance_ids))
+        return stmt
+
+    @staticmethod
+    def _apply_query_apply_scope(stmt, scope: dict):
+        if scope["mode"] in {"self", "group"}:
+            user_ids = scope.get("user_ids") or []
+            if not user_ids:
+                return stmt.where(QueryPrivilegeApply.user_id == -1)
+            return stmt.where(QueryPrivilegeApply.user_id.in_(user_ids))
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(QueryPrivilegeApply.instance_id == -1)
+            return stmt.where(QueryPrivilegeApply.instance_id.in_(instance_ids))
+        return stmt
+
+    @staticmethod
+    async def get_query_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:
+        now = datetime.now(UTC)
+        period_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        scope = await DashboardService._resolve_query_scope(db, user)
+
+        async def scalar(stmt) -> int:
+            return int((await db.execute(stmt)).scalar() or 0)
+
+        period_query_stmt = DashboardService._apply_query_scope(
+            select(QueryLog).where(QueryLog.created_at >= period_start),
+            scope,
+        )
+        period_query_subq = period_query_stmt.subquery()
+        period_query_count = await scalar(select(func.count()).select_from(period_query_subq))
+        period_query_user_count = await scalar(select(func.count(distinct(period_query_subq.c.user_id))))
+
+        period_masked_subq = DashboardService._apply_query_scope(
+            select(QueryLog).where(
+                and_(QueryLog.created_at >= period_start, QueryLog.masking.is_(True))
+            ),
+            scope,
+        ).subquery()
+        period_masked_count = await scalar(select(func.count()).select_from(period_masked_subq))
+
+        query_failure_subq = DashboardService._apply_query_scope(
+            select(QueryLog).where(
+                and_(QueryLog.created_at >= period_start, QueryLog.priv_check.is_(False))
+            ),
+            scope,
+        ).subquery()
+        query_failure_count = await scalar(select(func.count()).select_from(query_failure_subq))
+
+        apply_failure_subq = DashboardService._apply_query_apply_scope(
+            select(QueryPrivilegeApply).where(
+                and_(QueryPrivilegeApply.updated_at >= period_start, QueryPrivilegeApply.status == 2)
+            ),
+            scope,
+        ).subquery()
+        apply_failure_count = await scalar(select(func.count()).select_from(apply_failure_subq))
+
+        approved_apply_subq = DashboardService._apply_query_apply_scope(
+            select(QueryPrivilegeApply).where(
+                and_(QueryPrivilegeApply.updated_at >= period_start, QueryPrivilegeApply.status == 1)
+            ),
+            scope,
+        ).subquery()
+        approved_query_priv_apply_count = await scalar(select(func.count()).select_from(approved_apply_subq))
+
+        pending_apply_subq = DashboardService._apply_query_apply_scope(
+            select(QueryPrivilegeApply).where(QueryPrivilegeApply.status == 0),
+            scope,
+        ).subquery()
+        pending_query_priv_apply_count = await scalar(select(func.count()).select_from(pending_apply_subq))
+
+        trend_stmt = DashboardService._apply_query_scope(
+            select(
+                func.date(QueryLog.created_at).label("d"),
+                func.count().label("query_count"),
+                func.count(distinct(QueryLog.user_id)).label("query_user_count"),
+            ).where(QueryLog.created_at >= period_start),
+            scope,
+        ).group_by(func.date(QueryLog.created_at)).order_by(func.date(QueryLog.created_at))
+        trend_rows = (await db.execute(trend_stmt)).all()
+        trend_map = {
+            str(row.d): {
+                "query_count": int(row.query_count or 0),
+                "query_user_count": int(row.query_user_count or 0),
+            }
+            for row in trend_rows
+        }
+        dates: list[str] = []
+        query_count: list[int] = []
+        query_user_count: list[int] = []
+        for offset in range(days):
+            day = period_start.date() + timedelta(days=offset)
+            day_key = day.isoformat()
+            dates.append(day_key)
+            query_count.append(trend_map.get(day_key, {}).get("query_count", 0))
+            query_user_count.append(trend_map.get(day_key, {}).get("query_user_count", 0))
+
+        query_failure_stmt = DashboardService._apply_query_scope(
+            select(
+                func.date(QueryLog.created_at).label("d"),
+                func.count().label("failure_count"),
+            ).where(
+                and_(QueryLog.created_at >= period_start, QueryLog.priv_check.is_(False))
+            ),
+            scope,
+        ).group_by(func.date(QueryLog.created_at))
+        query_failure_rows = (await db.execute(query_failure_stmt)).all()
+        query_failure_map = {str(row.d): int(row.failure_count or 0) for row in query_failure_rows}
+
+        masked_stmt = DashboardService._apply_query_scope(
+            select(
+                func.date(QueryLog.created_at).label("d"),
+                func.count().label("masked_count"),
+            ).where(
+                and_(QueryLog.created_at >= period_start, QueryLog.masking.is_(True))
+            ),
+            scope,
+        ).group_by(func.date(QueryLog.created_at))
+        masked_rows = (await db.execute(masked_stmt)).all()
+        masked_map = {str(row.d): int(row.masked_count or 0) for row in masked_rows}
+
+        approved_stmt = DashboardService._apply_query_apply_scope(
+            select(
+                func.date(QueryPrivilegeApply.updated_at).label("d"),
+                func.count().label("approved_count"),
+            ).where(
+                and_(QueryPrivilegeApply.updated_at >= period_start, QueryPrivilegeApply.status == 1)
+            ),
+            scope,
+        ).group_by(func.date(QueryPrivilegeApply.updated_at))
+        approved_rows = (await db.execute(approved_stmt)).all()
+        approved_map = {str(row.d): int(row.approved_count or 0) for row in approved_rows}
+
+        rejected_stmt = DashboardService._apply_query_apply_scope(
+            select(
+                func.date(QueryPrivilegeApply.updated_at).label("d"),
+                func.count().label("rejected_count"),
+            ).where(
+                and_(QueryPrivilegeApply.updated_at >= period_start, QueryPrivilegeApply.status == 2)
+            ),
+            scope,
+        ).group_by(func.date(QueryPrivilegeApply.updated_at))
+        rejected_rows = (await db.execute(rejected_stmt)).all()
+        rejected_map = {str(row.d): int(row.rejected_count or 0) for row in rejected_rows}
+
+        failure_count: list[int] = []
+        masked_count: list[int] = []
+        approved_count: list[int] = []
+        rejected_count: list[int] = []
+        pending_stock_count: list[int] = []
+        for day_key in dates:
+            failure_count.append(query_failure_map.get(day_key, 0) + rejected_map.get(day_key, 0))
+            masked_count.append(masked_map.get(day_key, 0))
+            approved_count.append(approved_map.get(day_key, 0))
+            rejected_count.append(rejected_map.get(day_key, 0))
+            day_end = datetime.fromisoformat(day_key).replace(tzinfo=UTC) + timedelta(days=1)
+            pending_stock_stmt = DashboardService._apply_query_apply_scope(
+                select(QueryPrivilegeApply).where(
+                    and_(
+                        QueryPrivilegeApply.created_at < day_end,
+                        (
+                            QueryPrivilegeApply.status == 0
+                        ) | (
+                            and_(
+                                QueryPrivilegeApply.status.in_([1, 2]),
+                                QueryPrivilegeApply.updated_at >= day_end,
+                            )
+                        ),
+                    )
+                ),
+                scope,
+            ).subquery()
+            pending_stock_count.append(
+                await scalar(select(func.count()).select_from(pending_stock_stmt))
+            )
+
+        top_stmt = DashboardService._apply_query_scope(
+            select(
+                QueryLog.user_id,
+                func.count().label("query_count"),
+            ).where(
+                and_(QueryLog.created_at >= period_start, QueryLog.user_id.is_not(None))
+            ),
+            scope,
+        ).group_by(QueryLog.user_id).order_by(func.count().desc()).limit(10)
+        top_rows = (await db.execute(top_stmt)).all()
+        top_user_ids = [row.user_id for row in top_rows if row.user_id is not None]
+        display_name_map: dict[int, str] = {}
+        if top_user_ids:
+            user_rows = await db.execute(
+                select(Users.id, Users.display_name, Users.username).where(Users.id.in_(top_user_ids))
+            )
+            for user_id, display_name, username in user_rows.all():
+                display_name_map[user_id] = display_name or username
+
+        return {
+            "scope": {
+                "mode": scope["mode"],
+                "label": scope["label"],
+            },
+            "cards": {
+                "period_query_count": period_query_count,
+                "period_query_user_count": period_query_user_count,
+                "period_failure_count": query_failure_count + apply_failure_count,
+                "period_masked_count": period_masked_count,
+                "pending_query_priv_apply_count": pending_query_priv_apply_count,
+                "approved_query_priv_apply_count": approved_query_priv_apply_count,
+                "rejected_query_priv_apply_count": apply_failure_count,
+            },
+            "trend": {
+                "range_label": f"最近{days}天",
+                "dates": dates,
+                "query_count": query_count,
+                "query_user_count": query_user_count,
+                "failure_count": failure_count,
+                "masked_count": masked_count,
+                "approved_count": approved_count,
+                "rejected_count": rejected_count,
+                "pending_stock_count": pending_stock_count,
+            },
+            "top_users": [
+                {
+                    "display_name": display_name_map.get(row.user_id, f"用户{row.user_id}"),
+                    "query_count": int(row.query_count or 0),
+                }
+                for row in top_rows
+                if row.user_id is not None
+            ],
+        }
 
     @staticmethod
     async def get_stats(db: AsyncSession, days: int = 30) -> dict:

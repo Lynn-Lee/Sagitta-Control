@@ -219,7 +219,7 @@ class TestCreateWorkflow:
             "sql_content": "UPDATE orders SET status = 1 WHERE id = 1;",
             "syntax_type": 2,
             "is_backup": True,
-            "flow_id": None,
+            "flow_id": 11,
         }
         payload.update(overrides)
         return WorkflowCreateRequest(**payload)
@@ -244,11 +244,15 @@ class TestCreateWorkflow:
         mock_engine.execute_check = AsyncMock(return_value=review_set)
         audit_service = MagicMock()
         audit_service.create_audit = AsyncMock()
+        nodes_snapshot = [{"order": 1, "node_id": 11, "node_name": "直属上级", "approver_type": "manager"}]
 
         operator = {"id": 7, "username": "dev1", "display_name": "研发一号", "resource_groups": [2, 5]}
 
         with patch("app.services.workflow.get_engine", return_value=mock_engine), patch(
             "app.services.workflow.AuditService", return_value=audit_service
+        ), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=nodes_snapshot),
         ):
             workflow = await WorkflowService.create(db, self._request(), operator)
 
@@ -256,6 +260,9 @@ class TestCreateWorkflow:
         assert workflow.group_name == "研发资源组"
         assert workflow.audit_auth_groups == "2"
         audit_service.create_audit.assert_awaited_once()
+        passed_snapshot = audit_service.create_audit.await_args.kwargs["nodes_snapshot"]
+        assert passed_snapshot[0]["applicant_id"] == 7
+        assert passed_snapshot[0]["applicant_name"] == "研发一号"
 
     @pytest.mark.asyncio
     async def test_create_rejects_explicit_group_outside_scope(self):
@@ -292,3 +299,14 @@ class TestCreateWorkflow:
 
         assert exc_info.value.code == 403
         assert "目标实例不在你的资源组访问范围内" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_create_requires_approval_flow(self):
+        with pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(
+                AsyncMock(),
+                self._request(flow_id=None),
+                {"id": 7, "username": "dev1", "display_name": "研发一号", "resource_groups": [2]},
+            )
+
+        assert exc_info.value.message == "请选择审批流"

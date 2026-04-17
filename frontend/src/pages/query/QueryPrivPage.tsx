@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs } from 'antd'
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip } from 'antd'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryApi } from '@/api/query'
+import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
@@ -26,24 +27,37 @@ export default function QueryPrivPage() {
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [scopeType, setScopeType] = useState<'database' | 'table'>('database')
   const [msgApi, msgCtx] = message.useMessage()
-  const isReviewer = user?.is_superuser || user?.permissions?.includes('query_review')
 
   // 我的权限列表
   const { data: privData } = useQuery({
-    queryKey: ['my-query-privs'],
+    queryKey: ['my-query-privs', user?.id],
     queryFn: () => queryApi.listPrivileges(),
+    refetchOnMount: 'always',
   })
 
   // 申请列表
   const { data: applyData } = useQuery({
-    queryKey: ['query-priv-applies'],
+    queryKey: ['query-priv-applies', user?.id],
     queryFn: () => queryApi.listApplies({ page_size: 50 }),
+    refetchOnMount: 'always',
+    refetchInterval: 5000,
+  })
+
+  const { data: auditData } = useQuery({
+    queryKey: ['query-priv-audit-records', user?.id],
+    queryFn: () => queryApi.listAuditRecords({ page_size: 50 }),
+    refetchOnMount: 'always',
+    refetchInterval: 5000,
   })
 
   // 实例、资源组
   const { data: instanceData } = useQuery({
     queryKey: ['instances-for-priv'],
     queryFn: () => instanceApi.list({ page_size: 200 }),
+  })
+  const { data: flowData } = useQuery({
+    queryKey: ['approval-flows-for-query-priv'],
+    queryFn: () => approvalFlowApi.list(),
   })
   const { data: dbData } = useQuery({
     queryKey: ['registered-dbs-priv', instanceId],
@@ -56,24 +70,39 @@ export default function QueryPrivPage() {
 
   const applyMut = useMutation({
     mutationFn: queryApi.applyPrivilege,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['query-priv-applies'] }); setApplyModalOpen(false); msgApi.success('申请已提交') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['query-priv-applies'] })
+      qc.invalidateQueries({ queryKey: ['query-priv-audit-records'] })
+      setApplyModalOpen(false)
+      msgApi.success('申请已提交')
+    },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '提交失败'),
   })
 
   const auditMut = useMutation({
     mutationFn: ({ apply_id, action }: any) => queryApi.auditApply(apply_id, { action }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['query-priv-applies'] }); msgApi.success('审批完成') },
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ['query-priv-applies'] })
+      qc.invalidateQueries({ queryKey: ['query-priv-audit-records'] })
+      qc.invalidateQueries({ queryKey: ['my-query-privs'] })
+      msgApi.success(res?.msg || '审批完成')
+    },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '审批失败'),
   })
 
   const handleApply = async () => {
     try {
       const values = await applyForm.validateFields()
+      if (!instanceId) {
+        msgApi.warning('请选择目标实例')
+        return
+      }
       applyMut.mutate({
         ...values,
         scope_type: values.scope_type,
         valid_date: values.valid_date.format('YYYY-MM-DD'),
         instance_id: instanceId,
+        flow_id: values.flow_id,
         priv_type: values.scope_type === 'table' ? 2 : 1,
       })
     } catch { /* validation */ }
@@ -101,12 +130,38 @@ export default function QueryPrivPage() {
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '标题', dataIndex: 'title', width: 220, ellipsis: true },
     {
-      title: '目标实例', dataIndex: 'instance_id', width: 180,
-      render: (instanceIdValue: number) => instanceNameMap.get(instanceIdValue) || `实例#${instanceIdValue}`,
+      title: '目标实例', dataIndex: 'instance_name', width: 180,
+      render: (instanceName: string, r: any) => instanceName || instanceNameMap.get(r.instance_id) || `实例#${r.instance_id}`,
     },
+    { title: '申请人', dataIndex: 'applicant_name', width: 120, render: (v: string, r: any) => v || r.applicant_username || '—' },
     { title: '申请数据库', dataIndex: 'db_name', width: 150, ellipsis: true },
     { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={v === 'table' ? 'purple' : 'blue'}>{v === 'table' ? '表级' : '库级'}</Tag> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string) => v || <Text type="secondary">全库</Text> },
+    { title: '行数限制', dataIndex: 'limit_num', width: 100 },
+    { title: '有效期', dataIndex: 'valid_date', width: 120 },
     { title: '申请理由', dataIndex: 'apply_reason', width: 220, ellipsis: true },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 150, ellipsis: true, render: (v: string) => v || '—' },
+    {
+      title: '审批链路',
+      dataIndex: 'approval_progress',
+      width: 320,
+      render: (v: string) => v ? (
+        <Tooltip title={v} placement="topLeft">
+          <Text
+            ellipsis={{ tooltip: false }}
+            style={{
+              display: 'inline-block',
+              maxWidth: 300,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {v}
+          </Text>
+        </Tooltip>
+      ) : '—',
+    },
     {
       title: '状态', dataIndex: 'status', width: 90,
       render: (v: number) => <Tag color={STATUS_MAP[v]?.color}>{STATUS_MAP[v]?.label}</Tag>,
@@ -115,18 +170,47 @@ export default function QueryPrivPage() {
       title: '提交时间', dataIndex: 'created_at', width: 140,
       render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
     },
-    isReviewer ? {
-      title: '操作', width: 130,
-      render: (_: any, r: any) => r.status === 0 ? (
-        <Space>
-          <Button size="small" type="primary" icon={<CheckOutlined />}
-            onClick={() => auditMut.mutate({ apply_id: r.id, action: 'pass' })}>通过</Button>
-          <Button size="small" danger icon={<CloseOutlined />}
-            onClick={() => auditMut.mutate({ apply_id: r.id, action: 'reject' })}>驳回</Button>
+    {
+      title: '审批操作',
+      width: 180,
+      render: (_: any, r: any) => r.can_audit ? (
+        <Space size={8} wrap>
+          <Button
+            size="small"
+            type="primary"
+            icon={<CheckOutlined />}
+            onClick={() => auditMut.mutate({ apply_id: r.id, action: 'pass' })}
+          >
+            通过
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<CloseOutlined />}
+            onClick={() => auditMut.mutate({ apply_id: r.id, action: 'reject' })}
+          >
+            驳回
+          </Button>
         </Space>
-      ) : null,
-    } : null,
-  ].filter(Boolean)
+      ) : <Text type="secondary">—</Text>,
+    },
+  ]
+
+  const auditColumns = [
+    ...applyColumns.filter((c: any) => !['申请理由', '提交时间'].includes(c.title)),
+    {
+      title: '最近审批节点', dataIndex: 'acted_node_name', width: 150,
+      render: (v: string) => v || '—',
+    },
+    {
+      title: '审批结果', dataIndex: 'acted_action', width: 100,
+      render: (v: string) => v ? <Tag color={v === '通过' ? 'success' : 'error'}>{v}</Tag> : '待审批',
+    },
+    {
+      title: '审批时间', dataIndex: 'acted_at', width: 170,
+      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
+    },
+  ]
 
   const tabItems = [
     {
@@ -142,7 +226,22 @@ export default function QueryPrivPage() {
       label: `申请记录（${applyData?.total ?? 0}）`,
       children: (
         <Table dataSource={applyData?.items} columns={applyColumns as any}
-          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1120 }} pagination={{ pageSize: 20 }} />
+          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1840 }} pagination={{ pageSize: 20 }} />
+      ),
+    },
+    {
+      key: 'audit-records',
+      label: `审批记录（${auditData?.total ?? 0}）`,
+      children: (
+        <Table
+          dataSource={auditData?.items}
+          columns={auditColumns as any}
+          rowKey="id"
+          size="small"
+          tableLayout="fixed"
+          scroll={{ x: 2100 }}
+          pagination={{ pageSize: 20 }}
+        />
       ),
     },
   ]
@@ -182,6 +281,13 @@ export default function QueryPrivPage() {
             <Select onChange={(v) => setScopeType(v)}>
               <Option value="database">库级授权</Option>
               <Option value="table">表级授权</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="flow_id" label="审批流" rules={[{ required: true, message: '请选择审批流' }]}>
+            <Select placeholder="选择审批流模板">
+              {(flowData?.items || flowData || []).map((flow: any) => (
+                <Option key={flow.id} value={flow.id}>{flow.name}</Option>
+              ))}
             </Select>
           </Form.Item>
           <Form.Item name="db_name" label="数据库" rules={[{ required: true }]}>

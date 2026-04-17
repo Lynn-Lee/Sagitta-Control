@@ -40,6 +40,16 @@ STATUS_DESC = {
 
 
 class WorkflowService:
+    @staticmethod
+    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict], applicant: dict) -> list[dict]:
+        result: list[dict] = []
+        for node in nodes_snapshot:
+            node_copy = dict(node)
+            if node_copy.get("approver_type") == "manager":
+                node_copy["applicant_id"] = applicant.get("id")
+                node_copy["applicant_name"] = applicant.get("display_name") or applicant.get("username")
+            result.append(node_copy)
+        return result
 
     @staticmethod
     def _fmt_workflow(wf: SqlWorkflow, instance_name: str = "") -> dict:
@@ -73,6 +83,8 @@ class WorkflowService:
         data: WorkflowCreateRequest,
         operator: dict,
     ) -> SqlWorkflow:
+        if data.flow_id is None:
+            raise AppException("请选择审批流", code=400)
         # 加载实例
         inst_result = await db.execute(
             select(Instance)
@@ -104,6 +116,7 @@ class WorkflowService:
         if data.flow_id:
             from app.services.approval_flow import ApprovalFlowService
             nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, data.flow_id)
+            nodes_snapshot = WorkflowService._decorate_snapshot_for_applicant(nodes_snapshot, operator)
 
         # 自动 SQL 预检查
         engine = get_engine(inst)

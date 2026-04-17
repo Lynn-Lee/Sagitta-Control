@@ -130,7 +130,7 @@
 
 ### Pack B — 可观测中心 ✅
 
-- Dashboard 统计（工单总数/执行成功/异常/各状态分布，自定义统计天数）
+- Dashboard 在线查询概览（7 个卡片、查询趋势、查询用户 Top 10、治理趋势、待审批库存趋势，按权限范围裁剪）
 - 监控配置管理（Prometheus Exporter 配置）
 - Prometheus + Grafana 集成
 - Alertmanager 告警管理

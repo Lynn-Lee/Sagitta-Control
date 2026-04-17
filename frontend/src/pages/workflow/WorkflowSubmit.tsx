@@ -5,6 +5,7 @@ import { RobotOutlined } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { instanceApi } from '@/api/instance'
+import { approvalFlowApi } from '@/api/approvalFlow'
 import { workflowApi } from '@/api/workflow'
 import apiClient from '@/api/client'
 import { formatDbTypeLabel } from '@/utils/dbType'
@@ -53,6 +54,10 @@ export default function WorkflowSubmit() {
     queryFn: () => instanceApi.listRegisteredDbs(instanceId!),
     enabled: !!instanceId,
   })
+  const { data: flowData } = useQuery({
+    queryKey: ['approval-flows-for-workflow'],
+    queryFn: () => approvalFlowApi.list(),
+  })
   const submitMut = useMutation({
     mutationFn: workflowApi.create,
     onSuccess: (data: { data: { id: number } }) => {
@@ -81,6 +86,10 @@ export default function WorkflowSubmit() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      if (!instanceId || !dbName) {
+        msgApi.warning('请先选择实例和数据库')
+        return
+      }
       if (!sql.trim()) { msgApi.warning('SQL 内容不能为空'); return }
       submitMut.mutate({ ...values, sql_content: sql, instance_id: instanceId, db_name: dbName })
     } catch { /* validation */ }
@@ -135,6 +144,13 @@ export default function WorkflowSubmit() {
               </Select>
             </Form.Item>
           </Space>
+          <Form.Item name="flow_id" label="审批流" rules={[{ required: true, message: '请选择审批流' }]}>
+            <Select placeholder="选择审批流模板">
+              {(flowData?.items || flowData || []).map((flow: any) => (
+                <Option key={flow.id} value={flow.id}>{flow.name}</Option>
+              ))}
+            </Select>
+          </Form.Item>
           <Alert
             type="info"
             showIcon

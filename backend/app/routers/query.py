@@ -3,10 +3,15 @@
 完整实现：执行查询、权限校验、数据脱敏、查询日志。
 """
 
+import csv
 import logging
+from io import BytesIO, StringIO
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query as QParam
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -36,30 +41,18 @@ async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
     return inst
 
 
-@router.post("/", summary="执行在线查询")
-async def execute_query(
+async def _run_query_with_permissions(
+    db: AsyncSession,
+    user: dict,
     data: QueryExecuteRequest,
-    user: dict = Depends(current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    执行在线查询，完整流程：
-    1. 加载实例
-    2. 查询权限校验（sqlglot 解析表引用，替代 goInception）
-    3. 引擎执行查询
-    4. 数据脱敏（sqlglot 解析列引用，支持所有方言）
-    5. 写入查询日志
-    """
-    # ── 1. 加载实例 ────────────────────────────────────────────
+) -> tuple[Instance, dict]:
     inst = await _load_instance(db, data.instance_id)
     engine = get_engine(inst)
 
-    # ── 2. SQL 前置检查 ────────────────────────────────────────
     check = engine.query_check(data.db_name, data.sql)
     if check.get("msg") and check.get("syntax_error") is not False and check.get("syntax_error"):
         raise HTTPException(400, f"SQL 语法错误：{check['msg']}")
 
-    # ── 3. 查询权限校验 ────────────────────────────────────────
     passed, reason = await QueryPrivService.check_query_priv(
         db=db,
         user=user,
@@ -70,7 +63,6 @@ async def execute_query(
     if not passed:
         raise HTTPException(403, reason)
 
-    # ── 3.5 数据库禁用校验（非超管）─────────────────────────────────
     if not user.get("is_superuser", False):
         inst_db_result = await db.execute(
             select(InstanceDatabase).where(
@@ -82,21 +74,28 @@ async def execute_query(
         if not inst_db_result.scalar_one_or_none():
             raise HTTPException(403, f"数据库 {data.db_name} 已禁用或未注册，不可查询")
 
-    # ── 4. 注入 LIMIT ──────────────────────────────────────────
-    safe_sql = engine.filter_sql(data.sql, data.limit_num)
+    effective_limit = await QueryPrivService.get_effective_query_limit(
+        db=db,
+        user=user,
+        instance=inst,
+        db_name=data.db_name,
+        sql=data.sql,
+        requested_limit=data.limit_num,
+    )
+    safe_sql = engine.filter_sql(data.sql, effective_limit)
 
-    # ── 5. 执行查询 ────────────────────────────────────────────
     resultset = await engine.query(
         db_name=data.db_name,
         sql=safe_sql,
-        limit_num=data.limit_num,
+        limit_num=effective_limit,
     )
-
     if resultset.error:
         raise HTTPException(400, f"查询执行失败：{resultset.error}")
 
-    # ── 6. 数据脱敏（sqlglot，支持所有方言）────────────────────
-    # 从数据库加载适用于此实例和数据库的脱敏规则
+    if effective_limit > 0 and len(resultset.rows) > effective_limit:
+        resultset.rows = resultset.rows[:effective_limit]
+        resultset.affected_rows = len(resultset.rows)
+
     active_rules = await MaskingRuleService.get_rules_for_instance(
         db, data.instance_id, data.db_name
     )
@@ -104,7 +103,6 @@ async def execute_query(
     masked_result = masking_svc.mask_result(resultset, data.sql, inst.db_type)
     is_masked = masked_result is not resultset
 
-    # ── 7. 写查询日志（异步，不阻塞响应）─────────────────────
     try:
         await QueryPrivService.write_log(
             db=db,
@@ -121,8 +119,6 @@ async def execute_query(
     except Exception as e:
         logger.warning("write_query_log failed: %s", str(e))
 
-    # ── 8. 返回结果 ────────────────────────────────────────────
-    # 将 tuple 行转为 list（JSON 序列化友好）
     rows_as_list = []
     for row in masked_result.rows:
         if isinstance(row, (tuple, list)):
@@ -137,7 +133,7 @@ async def execute_query(
         else:
             rows_as_list.append([str(row)])
 
-    return {
+    return inst, {
         "column_list": masked_result.column_list,
         "rows": rows_as_list,
         "affected_rows": masked_result.affected_rows,
@@ -145,6 +141,71 @@ async def execute_query(
         "is_masked": is_masked,
         "error": "",
     }
+
+
+def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, str, str]:
+    headers = ["row_num", *(result.get("column_list") or [])]
+    rows = [
+        [idx + 1, *row]
+        for idx, row in enumerate(result.get("rows") or [])
+    ]
+
+    fmt = export_format.lower()
+    if fmt == "csv":
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        return (
+            output.getvalue().encode("utf-8-sig"),
+            "text/csv; charset=utf-8",
+            "query_result.csv",
+        )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "QueryResult"
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    content = BytesIO()
+    wb.save(content)
+    return (
+        content.getvalue(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "query_result.xlsx",
+    )
+
+
+@router.post("/", summary="执行在线查询")
+async def execute_query(
+    data: QueryExecuteRequest,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    执行在线查询，完整流程：
+    1. 加载实例
+    2. 查询权限校验（sqlglot 解析表引用，替代 goInception）
+    3. 引擎执行查询
+    4. 数据脱敏（sqlglot 解析列引用，支持所有方言）
+    5. 写入查询日志
+    """
+    _, result = await _run_query_with_permissions(db=db, user=user, data=data)
+    return result
+
+
+@router.post("/export/", summary="导出在线查询结果")
+async def export_query_result(
+    data: QueryExecuteRequest,
+    export_format: str = QParam("xlsx", pattern="^(xlsx|csv)$"),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _, result = await _run_query_with_permissions(db=db, user=user, data=data)
+    content, media_type, filename = _build_query_export_file(result, export_format)
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
 
 
 @router.post("/access-check/", summary="查询权限排查")

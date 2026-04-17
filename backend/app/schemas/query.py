@@ -11,7 +11,7 @@ class QueryExecuteRequest(BaseModel):
     instance_id: int
     db_name: str
     sql: str = Field(..., min_length=1, max_length=50000)
-    limit_num: int = Field(default=100, ge=1, le=10000)
+    limit_num: int = Field(default=100, ge=1, le=100000)
 
     @field_validator("sql")
     @classmethod
@@ -55,6 +55,7 @@ class PrivApplyRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=50)
     instance_id: int
     group_id: int | None = None
+    flow_id: int | None = None
     db_name: str
     table_name: str = ""
     scope_type: Literal["database", "table"] = "database"
@@ -84,6 +85,10 @@ class PrivApplyItem(BaseModel):
     id: int
     title: str
     instance_id: int
+    instance_name: str | None = None
+    flow_id: int | None = None
+    applicant_name: str | None = None
+    applicant_username: str | None = None
     db_name: str
     table_name: str
     scope_type: str
@@ -92,6 +97,12 @@ class PrivApplyItem(BaseModel):
     priv_type: int
     apply_reason: str
     status: int
+    current_node_name: str | None = None
+    approval_progress: str | None = None
+    acted_node_name: str | None = None
+    acted_action: str | None = None
+    acted_at: str | None = None
+    can_audit: bool = False
     created_at: str
 
     model_config = {"from_attributes": True}

@@ -32,6 +32,25 @@ export const queryApi = {
     limit_num?: number
   }) => apiClient.post<QueryAccessExplanation>('/query/access-check/', data).then(r => r.data),
 
+  exportResult: async (
+    data: {
+      instance_id: number
+      db_name: string
+      sql: string
+      limit_num?: number
+    },
+    exportFormat: 'xlsx' | 'csv',
+  ) => {
+    const response = await apiClient.post('/query/export/', data, {
+      params: { export_format: exportFormat },
+      responseType: 'blob',
+    })
+    return {
+      blob: response.data as Blob,
+      contentDisposition: response.headers['content-disposition'] as string | undefined,
+    }
+  },
+
   getLogs: (params?: {
     instance_id?: number
     page?: number
@@ -49,6 +68,7 @@ export const queryApi = {
     title: string
     instance_id: number
     group_id?: number
+    flow_id?: number
     db_name: string
     table_name?: string
     scope_type?: 'database' | 'table'
@@ -60,6 +80,9 @@ export const queryApi = {
 
   listApplies: (params?: { status?: number; page?: number; page_size?: number }) =>
     apiClient.get('/query/privileges/applies/', { params }).then(r => r.data),
+
+  listAuditRecords: (params?: { status?: number; page?: number; page_size?: number }) =>
+    apiClient.get('/query/privileges/audit-records/', { params }).then(r => r.data),
 
   auditApply: (apply_id: number, data: { action: 'pass' | 'reject'; remark?: string }) =>
     apiClient.post('/query/privileges/audit/', data, { params: { apply_id } }).then(r => r.data),

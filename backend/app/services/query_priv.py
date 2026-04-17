@@ -6,8 +6,9 @@ v2-lite: 资源访问范围由 UserGroup -> ResourceGroup -> Instance 决定，
 
 from __future__ import annotations
 
+import json
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AppException, NotFoundException
 from app.models.instance import Instance
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
+from app.models.workflow import AuditStatus
 from app.services.masking import extract_table_refs
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,72 @@ logger = logging.getLogger(__name__)
 
 class QueryPrivService:
     """查询权限校验与管理。"""
+
+    @staticmethod
+    def _safe_load_nodes(raw: str) -> list[dict]:
+        try:
+            return json.loads(raw or "[]")
+        except Exception:
+            return []
+
+    @staticmethod
+    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict], applicant: dict) -> list[dict]:
+        result: list[dict] = []
+        for node in nodes_snapshot:
+            node_copy = dict(node)
+            if node_copy.get("approver_type") == "manager":
+                node_copy["applicant_id"] = applicant.get("id")
+                node_copy["applicant_name"] = applicant.get("display_name") or applicant.get("username")
+            result.append(node_copy)
+        return result
+
+    @staticmethod
+    def _get_current_pending_node(apply: QueryPrivilegeApply) -> dict | None:
+        nodes = json.loads(apply.audit_auth_groups_info or "[]")
+        return next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
+
+    @staticmethod
+    async def _check_apply_approver_permission(
+        db: AsyncSession,
+        operator: dict,
+        node: dict,
+    ) -> None:
+        if operator.get("is_superuser"):
+            return
+
+        approver_type = node.get("approver_type", "any_reviewer")
+        approver_ids: list[int] = node.get("approver_ids", [])
+
+        if approver_type == "any_reviewer":
+            if "query_review" not in operator.get("permissions", []):
+                raise AppException(
+                    f"您没有节点「{node.get('node_name', '')}」的查询审批权限",
+                    code=403,
+                )
+        elif approver_type == "users":
+            if operator.get("id") not in approver_ids:
+                raise AppException(
+                    f"您不在节点「{node.get('node_name', '')}」的审批人列表中",
+                    code=403,
+                )
+        elif approver_type == "manager":
+            applicant_id = node.get("applicant_id")
+            if not applicant_id:
+                raise AppException("无法确认申请人，不能校验直属上级审批权限", code=403)
+            from app.models.user import Users
+
+            result = await db.execute(select(Users).where(Users.id == applicant_id))
+            applicant = result.scalar_one_or_none()
+            if not applicant or applicant.manager_id != operator.get("id"):
+                raise AppException(
+                    f"您不是申请人「{node.get('applicant_name', '')}」的直属上级",
+                    code=403,
+                )
+        else:
+            raise AppException(
+                f"审批节点类型「{approver_type}」不在当前 v2-lite 首发范围内，请调整审批流模板",
+                code=400,
+            )
 
     @staticmethod
     def user_has_instance_access(user: dict, instance: Instance) -> bool:
@@ -171,6 +239,59 @@ class QueryPrivService:
         return {"allowed": allowed, "reason": reason, "layer": layer}
 
     @staticmethod
+    async def get_effective_query_limit(
+        db: AsyncSession,
+        user: dict,
+        instance: Instance,
+        db_name: str,
+        sql: str,
+        requested_limit: int,
+    ) -> int:
+        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+            return requested_limit
+
+        async def _latest_limit(scope: str, schema: str, table: str = "") -> int | None:
+            stmt = (
+                select(QueryPrivilege)
+                .where(
+                    and_(
+                        QueryPrivilege.user_id == user["id"],
+                        QueryPrivilege.user_group_id.is_(None),
+                        QueryPrivilege.instance_id == instance.id,
+                        QueryPrivilege.scope_type == scope,
+                        QueryPrivilege.db_name == schema,
+                        QueryPrivilege.valid_date >= date.today(),
+                        QueryPrivilege.is_deleted == 0,
+                    )
+                )
+                .order_by(QueryPrivilege.created_at.desc(), QueryPrivilege.id.desc())
+            )
+            if scope == "table":
+                stmt = stmt.where(QueryPrivilege.table_name == table)
+            result = await db.execute(stmt)
+            privilege = result.scalars().first()
+            return privilege.limit_num if privilege else None
+
+        table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        if not table_refs:
+            db_limit = await _latest_limit("database", db_name)
+            return min(requested_limit, db_limit) if db_limit is not None else requested_limit
+
+        effective_limits: list[int] = []
+        for ref in table_refs:
+            schema = ref.get("schema", db_name) or db_name
+            table = ref.get("name", "")
+            if not table:
+                continue
+            table_limit = await _latest_limit("table", schema, table)
+            if table_limit is None:
+                table_limit = await _latest_limit("database", schema)
+            if table_limit is not None:
+                effective_limits.append(table_limit)
+
+        return min([requested_limit, *effective_limits]) if effective_limits else requested_limit
+
+    @staticmethod
     async def list_my_privileges(
         db: AsyncSession, user_id: int, instance_id: int | None = None
     ) -> list[QueryPrivilege]:
@@ -194,6 +315,7 @@ class QueryPrivService:
         user_id: int,
         instance_id: int,
         group_id: int | None,
+        flow_id: int | None,
         db_name: str,
         table_name: str,
         valid_date: date,
@@ -207,12 +329,23 @@ class QueryPrivService:
     ) -> QueryPrivilegeApply:
         if user is None:
             raise AppException("缺少申请用户上下文", code=400)
+        if flow_id is None:
+            raise AppException("请选择审批流", code=400)
         normalized_scope_type, normalized_priv_type = QueryPrivService._normalize_scope_type(
             scope_type, table_name
         )
         resolved_group_id = await QueryPrivService._resolve_apply_group_id(
             db, user=user, instance_id=instance_id, group_id=group_id
         )
+        audit_groups_value = audit_auth_groups
+        audit_groups_info = ""
+        if flow_id:
+            from app.services.approval_flow import ApprovalFlowService
+
+            nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, flow_id)
+            nodes_snapshot = QueryPrivService._decorate_snapshot_for_applicant(nodes_snapshot, user)
+            audit_groups_value = ",".join(str(node["node_id"]) for node in nodes_snapshot)
+            audit_groups_info = json.dumps(nodes_snapshot, ensure_ascii=False)
 
         apply = QueryPrivilegeApply(
             title=title,
@@ -226,10 +359,12 @@ class QueryPrivService:
             table_name=table_name or "",
             valid_date=valid_date,
             limit_num=limit_num,
-            priv_type=normalized_priv_type if priv_type not in (1, 2) else normalized_priv_type,
+            priv_type=normalized_priv_type,
             apply_reason=apply_reason,
             status=0,
-            audit_auth_groups=audit_auth_groups,
+            audit_auth_groups=audit_groups_value,
+            flow_id=flow_id,
+            audit_auth_groups_info=audit_groups_info,
         )
         db.add(apply)
         await db.commit()
@@ -246,6 +381,7 @@ class QueryPrivService:
     async def list_applies(
         db: AsyncSession,
         user_id: int | None = None,
+        auditor: dict | None = None,
         status: int | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -259,9 +395,78 @@ class QueryPrivService:
         total_q = await db.execute(select(func.count()).select_from(query.subquery()))
         total = total_q.scalar_one()
         query = query.order_by(QueryPrivilegeApply.created_at.desc())
-        query = query.offset((page - 1) * page_size).limit(page_size)
         result = await db.execute(query)
-        return total, list(result.scalars().all())
+        items = list(result.scalars().all())
+
+        if auditor is not None and user_id is None and not auditor.get("is_superuser"):
+            authorized_items: list[QueryPrivilegeApply] = []
+            for apply in items:
+                if apply.status != 0:
+                    continue
+                if apply.flow_id and apply.audit_auth_groups_info:
+                    current_node = QueryPrivService._get_current_pending_node(apply)
+                    if not current_node:
+                        continue
+                    try:
+                        await QueryPrivService._check_apply_approver_permission(db, auditor, current_node)
+                        authorized_items.append(apply)
+                    except AppException:
+                        continue
+                elif "query_review" in auditor.get("permissions", []):
+                    authorized_items.append(apply)
+            items = authorized_items
+            total = len(items)
+
+        items = items[(page - 1) * page_size : page * page_size]
+        return total, items
+
+    @staticmethod
+    async def list_audit_records(
+        db: AsyncSession,
+        auditor: dict,
+        status: int | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[int, list[QueryPrivilegeApply], set[int]]:
+        query = select(QueryPrivilegeApply)
+        if status is not None:
+            query = query.where(QueryPrivilegeApply.status == status)
+        query = query.order_by(QueryPrivilegeApply.created_at.desc())
+        result = await db.execute(query)
+        all_items = list(result.scalars().all())
+
+        username = auditor.get("username")
+        matched: list[QueryPrivilegeApply] = []
+        can_audit_ids: set[int] = set()
+
+        for apply in all_items:
+            if not apply.audit_auth_groups_info:
+                if apply.status == 0 and (
+                    auditor.get("is_superuser") or "query_review" in auditor.get("permissions", [])
+                ):
+                    matched.append(apply)
+                    can_audit_ids.add(apply.id)
+                continue
+
+            nodes = json.loads(apply.audit_auth_groups_info or "[]")
+            acted_by_me = any(node.get("operator") == username for node in nodes)
+            current_node = QueryPrivService._get_current_pending_node(apply)
+
+            if current_node:
+                try:
+                    await QueryPrivService._check_apply_approver_permission(db, auditor, current_node)
+                    matched.append(apply)
+                    can_audit_ids.add(apply.id)
+                    continue
+                except AppException:
+                    pass
+
+            if acted_by_me:
+                matched.append(apply)
+
+        total = len(matched)
+        items = matched[(page - 1) * page_size : page * page_size]
+        return total, items, can_audit_ids
 
     @staticmethod
     async def audit_apply(
@@ -280,7 +485,31 @@ class QueryPrivService:
         if apply.status != 0:
             raise AppException("该申请已审批，不能重复操作", code=400)
 
+        if apply.flow_id and apply.audit_auth_groups_info:
+            current_node = QueryPrivService._get_current_pending_node(apply)
+            if not current_node:
+                raise AppException("该申请审批链已完成，不能重复审批", code=400)
+            await QueryPrivService._check_apply_approver_permission(db, auditor, current_node)
+        elif not auditor.get("is_superuser") and "query_review" not in auditor.get("permissions", []):
+            raise AppException("您没有查询权限审批能力", code=403)
+
         if action == "pass":
+            if apply.flow_id and apply.audit_auth_groups_info:
+                nodes = json.loads(apply.audit_auth_groups_info or "[]")
+                current_node = next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
+                if not current_node:
+                    raise AppException("该申请审批链已完成，不能重复审批", code=400)
+                current_node["status"] = AuditStatus.PASSED
+                current_node["operator"] = auditor.get("username")
+                current_node["operator_display"] = auditor.get("display_name") or auditor.get("username")
+                current_node["operated_at"] = datetime.now(UTC).isoformat()
+                next_pending = next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
+                apply.audit_auth_groups_info = json.dumps(nodes, ensure_ascii=False)
+                if next_pending:
+                    await db.commit()
+                    await db.refresh(apply)
+                    return apply
+
             apply.status = 1
             normalized_scope_type, normalized_priv_type = QueryPrivService._normalize_scope_type(
                 apply.scope_type, apply.table_name
@@ -300,6 +529,15 @@ class QueryPrivService:
             )
             db.add(priv)
         elif action == "reject":
+            if apply.flow_id and apply.audit_auth_groups_info:
+                nodes = json.loads(apply.audit_auth_groups_info or "[]")
+                current_node = next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
+                if current_node:
+                    current_node["status"] = AuditStatus.REJECTED
+                    current_node["operator"] = auditor.get("username")
+                    current_node["operator_display"] = auditor.get("display_name") or auditor.get("username")
+                    current_node["operated_at"] = datetime.now(UTC).isoformat()
+                    apply.audit_auth_groups_info = json.dumps(nodes, ensure_ascii=False)
             apply.status = 2
         else:
             raise AppException("action 必须是 pass 或 reject", code=400)

@@ -2,6 +2,7 @@
 v2-lite 权限体系单元测试。
 """
 
+from datetime import date
 from types import MethodType
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -115,6 +116,65 @@ class TestQueryPrivilegeHelpers:
     def test_database_scope_normalizes_to_database_priv(self):
         assert QueryPrivService._normalize_scope_type("database", "") == ("database", 1)
 
+    @pytest.mark.asyncio
+    async def test_effective_query_limit_uses_stricter_table_privilege_limit(self):
+        db = AsyncMock()
+        table_result = MagicMock()
+        table_result.scalars.return_value.first.return_value = SimpleNamespace(limit_num=1000)
+        db.execute = AsyncMock(return_value=table_result)
+
+        effective_limit = await QueryPrivService.get_effective_query_limit(
+            db=db,
+            user={"id": 7, "permissions": [], "is_superuser": False},
+            instance=SimpleNamespace(id=9, db_type="mysql"),
+            db_name="analytics",
+            sql="SELECT * FROM orders",
+            requested_limit=2000,
+        )
+
+        assert effective_limit == 1000
+
+    @pytest.mark.asyncio
+    async def test_effective_query_limit_prefers_latest_table_over_database_scope(self):
+        db = AsyncMock()
+        table_result = MagicMock()
+        table_result.scalars.return_value.first.return_value = SimpleNamespace(limit_num=500)
+        db.execute = AsyncMock(return_value=table_result)
+
+        effective_limit = await QueryPrivService.get_effective_query_limit(
+            db=db,
+            user={"id": 7, "permissions": [], "is_superuser": False},
+            instance=SimpleNamespace(id=9, db_type="mysql"),
+            db_name="analytics",
+            sql="SELECT * FROM orders",
+            requested_limit=2000,
+        )
+
+        assert effective_limit == 500
+
+    @pytest.mark.asyncio
+    async def test_apply_privilege_requires_approval_flow(self):
+        with pytest.raises(AppException) as exc_info:
+            await QueryPrivService.apply_privilege(
+                db=AsyncMock(),
+                user_id=7,
+                instance_id=1,
+                group_id=None,
+                flow_id=None,
+                db_name="analytics",
+                table_name="orders",
+                valid_date=date(2099, 1, 1),
+                limit_num=100,
+                priv_type=2,
+                apply_reason="排查问题",
+                audit_auth_groups="",
+                title="表权限申请",
+                scope_type="table",
+                user={"id": 7, "username": "dev1"},
+            )
+
+        assert exc_info.value.message == "请选择审批流"
+
 
 class TestManagerResolution:
     @pytest.mark.asyncio
@@ -185,7 +245,7 @@ class TestOracleSchemaDiscovery:
         assert rs.rows == [("PDBADMIN",), ("SAGITTA",)]
 
     @pytest.mark.asyncio
-    async def test_oracle_falls_back_to_current_user_visible_owners_only(self):
+    async def test_oracle_falls_back_to_current_user_schema_only(self):
         engine = OracleEngine.__new__(OracleEngine)
         calls: list[str] = []
 
@@ -194,14 +254,13 @@ class TestOracleSchemaDiscovery:
             if "FROM dba_users" in sql:
                 return ResultSet(error="ORA-00942: table or view does not exist")
             assert "FROM user_users" in sql
-            assert "FROM all_tables" in sql
             assert "ALL_USERS" not in sql
-            return ResultSet(rows=[("SAGITTA",), ("APP_AUDIT",)])
+            return ResultSet(rows=[("SAGITTA",)])
 
         engine._run_query_sync = MethodType(fake_run_query_sync, engine)
 
         rs = await engine.get_all_databases()
 
         assert rs.is_success
-        assert rs.rows == [("SAGITTA",), ("APP_AUDIT",)]
+        assert rs.rows == [("SAGITTA",)]
         assert len(calls) == 2

@@ -102,7 +102,7 @@ async def get_workflow(
     return await WorkflowService.get_detail(db, workflow_id)
 
 
-@router.post("/{workflow_id}/audit/", summary="审核工单", dependencies=[Depends(require_perm("sql_review"))])
+@router.post("/{workflow_id}/audit/", summary="审核工单")
 async def audit_workflow(
     workflow_id: int,
     data: WorkflowAuditRequest,

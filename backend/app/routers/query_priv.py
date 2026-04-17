@@ -5,15 +5,120 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi import Query as QParam
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
+from app.models.instance import Instance
+from app.models.user import Users
 from app.schemas.query import AuditPrivRequest, PrivApplyRequest
 from app.services.query_priv import QueryPrivService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _load_name_maps(db: AsyncSession, applies: list) -> tuple[dict[int, str], dict[int, dict]]:
+    instance_ids = sorted({a.instance_id for a in applies if a.instance_id})
+    user_ids = sorted({a.user_id for a in applies if a.user_id})
+
+    instance_name_map: dict[int, str] = {}
+    user_map: dict[int, dict] = {}
+
+    if instance_ids:
+        result = await db.execute(
+            select(Instance.id, Instance.instance_name).where(Instance.id.in_(instance_ids))
+        )
+        instance_name_map = {row.id: row.instance_name for row in result.all()}
+
+    if user_ids:
+        result = await db.execute(
+            select(Users.id, Users.username, Users.display_name).where(Users.id.in_(user_ids))
+        )
+        user_map = {
+            row.id: {
+                "username": row.username,
+                "display_name": row.display_name,
+            }
+            for row in result.all()
+        }
+
+    return instance_name_map, user_map
+
+
+def _build_approval_progress(apply, user_map: dict[int, dict]) -> str | None:
+    applicant = user_map.get(apply.user_id or 0, {})
+    applicant_name = applicant.get("display_name") or applicant.get("username")
+    if not apply.audit_auth_groups_info:
+        return applicant_name or None
+
+    nodes = QueryPrivService._safe_load_nodes(apply.audit_auth_groups_info)
+    parts: list[str] = []
+    if applicant_name:
+        parts.append(applicant_name)
+    for node in nodes:
+        operator = node.get("operator_display") or node.get("operator")
+        if operator:
+            parts.append(str(operator))
+        elif node.get("status") == 0:
+            parts.append(f"{node.get('node_name', '待审批')}（待审批）")
+    return " -> ".join(parts) if parts else None
+
+
+def _extract_latest_action(apply, username: str) -> tuple[str | None, str | None, str | None]:
+    if not apply.audit_auth_groups_info:
+        return None, None, None
+    nodes = QueryPrivService._safe_load_nodes(apply.audit_auth_groups_info)
+    acted_nodes = [node for node in nodes if node.get("operator") == username]
+    if not acted_nodes:
+        return None, None, None
+    latest_node = acted_nodes[-1]
+    action = "通过" if latest_node.get("status") == 1 else "驳回" if latest_node.get("status") == 2 else "—"
+    return latest_node.get("node_name"), action, latest_node.get("operated_at")
+
+
+def _serialize_apply_items(
+    applies: list,
+    *,
+    can_audit_ids: set[int],
+    instance_name_map: dict[int, str],
+    user_map: dict[int, dict],
+    operator_username: str,
+) -> list[dict]:
+    items: list[dict] = []
+    for apply in applies:
+        applicant = user_map.get(apply.user_id or 0, {})
+        acted_node_name, acted_action, acted_at = _extract_latest_action(apply, operator_username)
+        items.append(
+            {
+                "id": apply.id,
+                "title": apply.title,
+                "instance_id": apply.instance_id,
+                "instance_name": instance_name_map.get(apply.instance_id, f"实例#{apply.instance_id}"),
+                "flow_id": apply.flow_id,
+                "applicant_name": applicant.get("display_name") or applicant.get("username"),
+                "applicant_username": applicant.get("username"),
+                "db_name": apply.db_name,
+                "table_name": apply.table_name,
+                "scope_type": apply.scope_type,
+                "valid_date": apply.valid_date.isoformat(),
+                "limit_num": apply.limit_num,
+                "priv_type": apply.priv_type,
+                "apply_reason": apply.apply_reason,
+                "status": apply.status,
+                "current_node_name": (
+                    QueryPrivService._get_current_pending_node(apply) or {}
+                ).get("node_name") if apply.status == 0 and apply.audit_auth_groups_info else None,
+                "approval_progress": _build_approval_progress(apply, user_map),
+                "acted_node_name": acted_node_name,
+                "acted_action": acted_action,
+                "acted_at": acted_at,
+                "can_audit": apply.id in can_audit_ids,
+                "created_at": apply.created_at.isoformat() if apply.created_at else "",
+            }
+        )
+    return items
 
 
 @router.get("/privileges/", summary="我的查询权限列表")
@@ -30,6 +135,7 @@ async def list_my_privileges(
             {
                 "id": p.id,
                 "instance_id": p.instance_id,
+                "instance_name": None,
                 "db_name": p.db_name,
                 "table_name": p.table_name,
                 "scope_type": p.scope_type,
@@ -54,6 +160,7 @@ async def apply_privilege(
         user_id=user["id"],
         instance_id=data.instance_id,
         group_id=data.group_id,
+        flow_id=data.flow_id,
         db_name=data.db_name,
         table_name=data.table_name,
         valid_date=data.valid_date,
@@ -76,43 +183,58 @@ async def list_applies(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # 普通用户只看自己的，审核员看所有待审核的
-    if user.get("is_superuser") or "query_review" in user.get("permissions", []):
-        uid = None
-    else:
-        uid = user["id"]
-
     total, applies = await QueryPrivService.list_applies(
-        db, user_id=uid, status=status, page=page, page_size=page_size
+        db, user_id=user["id"], auditor=None, status=status, page=page, page_size=page_size
     )
+    instance_name_map, user_map = await _load_name_maps(db, applies)
+
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": [
-            {
-                "id": a.id,
-                "title": a.title,
-                "instance_id": a.instance_id,
-                "db_name": a.db_name,
-                "table_name": a.table_name,
-                "scope_type": a.scope_type,
-                "valid_date": a.valid_date.isoformat(),
-                "limit_num": a.limit_num,
-                "priv_type": a.priv_type,
-                "apply_reason": a.apply_reason,
-                "status": a.status,
-                "created_at": a.created_at.isoformat() if a.created_at else "",
-            }
-            for a in applies
-        ],
+        "items": _serialize_apply_items(
+            applies,
+            can_audit_ids=set(),
+            instance_name_map=instance_name_map,
+            user_map=user_map,
+            operator_username=user.get("username", ""),
+        ),
+    }
+
+
+@router.get("/privileges/audit-records/", summary="查询权限审批记录")
+async def list_audit_records(
+    status: int | None = None,
+    page: int = QParam(1, ge=1),
+    page_size: int = QParam(20, ge=1, le=100),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, applies, can_audit_ids = await QueryPrivService.list_audit_records(
+        db=db,
+        auditor=user,
+        status=status,
+        page=page,
+        page_size=page_size,
+    )
+    instance_name_map, user_map = await _load_name_maps(db, applies)
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": _serialize_apply_items(
+            applies,
+            can_audit_ids=can_audit_ids,
+            instance_name_map=instance_name_map,
+            user_map=user_map,
+            operator_username=user.get("username", ""),
+        ),
     }
 
 
 @router.post(
     "/privileges/audit/",
     summary="审批查询权限申请",
-    dependencies=[Depends(require_perm("query_review"))],
 )
 async def audit_apply(
     apply_id: int,
@@ -127,7 +249,14 @@ async def audit_apply(
         action=data.action,
         remark=data.remark,
     )
-    msg = "已通过" if data.action == "pass" else "已驳回"
+    if data.action == "pass":
+        msg = "审批通过"
+        if apply.status == 0:
+            current_node = QueryPrivService._get_current_pending_node(apply)
+            if current_node:
+                msg = f"已流转到下一审批节点：{current_node.get('node_name', '')}"
+    else:
+        msg = "已驳回"
     return {"status": 0, "msg": msg, "data": {"apply_id": apply.id, "status": apply.status}}
 
 

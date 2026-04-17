@@ -49,7 +49,7 @@ export const workflowApi = {
   }) => apiClient.get('/workflow/', { params }).then(r => r.data),
 
   create: (data: {
-    workflow_name: string; group_id?: number; instance_id: number
+    workflow_name: string; group_id?: number; flow_id?: number; instance_id: number
     db_name: string; sql_content: string; syntax_type?: number; is_backup?: boolean
   }) => apiClient.post<WorkflowCreateResponse>('/workflow/', data).then(r => r.data),
 

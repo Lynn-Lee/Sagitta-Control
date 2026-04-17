@@ -129,12 +129,24 @@ class QueryPrivilegeApply(BaseModel):
     # 复用 AuditStatus: 0待审 1通过 2驳回 3取消
     status: Mapped[int] = mapped_column(Integer, default=0, comment="审批状态")
     audit_auth_groups: Mapped[str] = mapped_column(String(255), default="", comment="审批链")
+    flow_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("approval_flow.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="审批流模板ID",
+    )
+    audit_auth_groups_info: Mapped[str] = mapped_column(
+        Text,
+        default="",
+        comment="审批链详情JSON",
+    )
 
     __table_args__ = (
         Index("ix_qpa_user", "user_id"),
         Index("ix_qpa_status", "status"),
         Index("ix_qpa_user_group", "user_group_id"),
         Index("ix_qpa_scope_type", "scope_type"),
+        Index("ix_qpa_flow_id", "flow_id"),
     )
 
 
