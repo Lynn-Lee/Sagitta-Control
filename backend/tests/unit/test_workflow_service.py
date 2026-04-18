@@ -2,6 +2,8 @@
 工单服务单元测试（Pack G）。
 覆盖状态流转、格式化、SQL 校验逻辑（通过 mock 避免真实 DB 依赖）。
 """
+import json
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -114,6 +116,260 @@ class TestFmtWorkflow:
         wf = self._make_workflow()
         result = WorkflowService._fmt_workflow(wf, "my-mysql-instance")
         assert result.get("instance_name") == "my-mysql-instance"
+
+
+class TestWorkflowHelpers:
+    def test_build_audit_chain_text_uses_node_names_while_pending(self):
+        nodes = [
+            {"order": 1, "node_name": "直属领导审批", "status": 1},
+            {"order": 2, "node_name": "资源组 DBA 审批", "status": 0},
+        ]
+
+        result = WorkflowService._build_audit_chain_text(
+            nodes,
+            WorkflowStatus.PENDING_REVIEW,
+        )
+
+        assert result == "直属领导审批 -> 资源组 DBA 审批"
+
+    def test_build_audit_chain_text_uses_operator_display_names_after_review(self):
+        nodes = [
+            {"order": 1, "node_name": "直属领导审批", "operator": "leader_1"},
+            {"order": 2, "node_name": "资源组 DBA 审批", "operator": "dba_1"},
+        ]
+
+        result = WorkflowService._build_audit_chain_text(
+            nodes,
+            WorkflowStatus.FINISH,
+            {"leader_1": "直属领导", "dba_1": "资源组 DBA"},
+        )
+
+        assert result == "直属领导 -> 资源组 DBA"
+
+    def test_build_audit_chain_text_returns_dash_when_no_operator_finished(self):
+        result = WorkflowService._build_audit_chain_text(
+            [{"order": 1, "node_name": "直属领导审批"}],
+            WorkflowStatus.FINISH,
+        )
+        assert result == "—"
+
+    def test_get_current_node_name_only_for_pending_review(self):
+        nodes = [{"node_name": "第 1 级审批", "status": 0}]
+
+        assert WorkflowService._get_current_node_name(nodes, WorkflowStatus.PENDING_REVIEW) == "第 1 级审批"
+        assert WorkflowService._get_current_node_name(nodes, WorkflowStatus.FINISH) == "—"
+
+    def test_decorate_snapshot_for_applicant_only_applies_to_manager_nodes(self):
+        nodes_snapshot = [
+            {"order": 1, "approver_type": "manager", "node_name": "直属领导审批"},
+            {"order": 2, "approver_type": "users", "node_name": "指定人员审批"},
+        ]
+
+        decorated = WorkflowService._decorate_snapshot_for_applicant(
+            nodes_snapshot,
+            {"id": 7, "username": "liuyang", "display_name": "刘洋"},
+        )
+
+        assert decorated[0]["applicant_id"] == 7
+        assert decorated[0]["applicant_name"] == "刘洋"
+        assert "applicant_id" not in decorated[1]
+
+
+class TestWorkflowListingAndDetail:
+    def _make_workflow(self, **overrides):
+        wf = SimpleNamespace(
+            id=5,
+            workflow_name="删除线上错误数据",
+            group_id=1,
+            group_name="技术组",
+            instance_id=8,
+            db_name="ump_testdb",
+            syntax_type=2,
+            is_backup=True,
+            engineer="00311624",
+            engineer_display="刘洋",
+            status=WorkflowStatus.PENDING_REVIEW,
+            audit_auth_groups="1",
+            run_date_start=None,
+            run_date_end=None,
+            finish_time=None,
+            created_at=datetime(2026, 4, 18, tzinfo=UTC),
+            content=None,
+        )
+        for key, value in overrides.items():
+            setattr(wf, key, value)
+        return wf
+
+    @pytest.mark.asyncio
+    async def test_list_workflows_audit_view_formats_current_node_and_chain(self):
+        db = AsyncMock()
+        wf = self._make_workflow()
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 1
+        data_result = MagicMock()
+        data_result.all.return_value = [(wf, "MySQL-技术组")]
+        audit_nodes = [
+            {"order": 1, "node_name": "直属领导审批", "status": 0, "operator": "yanjiabao"},
+            {"order": 2, "node_name": "资源组 DBA 审批", "status": 0},
+        ]
+        audit_result = MagicMock()
+        audit_result.scalars.return_value.all.return_value = [
+            SimpleNamespace(workflow_id=5, audit_auth_groups_info=json.dumps(audit_nodes, ensure_ascii=False))
+        ]
+        user_result = MagicMock()
+        user_result.all.return_value = [("yanjiabao", "闫家宝")]
+        db.execute = AsyncMock(side_effect=[count_result, data_result, audit_result, user_result])
+
+        with patch("app.services.audit.AuditService.get_pending_workflow_ids_for_user", AsyncMock(return_value={5})), patch(
+            "app.services.audit.AuditService.get_audited_workflow_ids_for_user",
+            AsyncMock(return_value=set()),
+        ):
+            total, items = await WorkflowService.list_workflows(
+                db,
+                {"id": 2, "username": "yanjiabao", "is_superuser": False},
+                view="audit",
+            )
+
+        assert total == 1
+        assert items[0]["instance_name"] == "MySQL-技术组"
+        assert items[0]["current_node_name"] == "直属领导审批"
+        assert items[0]["audit_chain_text"] == "直属领导审批 -> 资源组 DBA 审批"
+
+    @pytest.mark.asyncio
+    async def test_get_detail_sets_can_audit_for_current_approver(self):
+        db = AsyncMock()
+        wf = self._make_workflow(content=SimpleNamespace(sql_content="delete from t", review_content="[]", execute_result=""))
+        row_result = MagicMock()
+        row_result.first.return_value = (wf, "MySQL-技术组")
+        db.execute = AsyncMock(return_value=row_result)
+        audit_info = {
+            "nodes": [
+                {"order": 1, "node_name": "直属领导审批", "status": 0, "approver_type": "manager"},
+            ]
+        }
+
+        with patch("app.services.audit.AuditService.get_audit_info", AsyncMock(return_value=audit_info)), patch(
+            "app.services.audit.AuditService.get_audit_logs", AsyncMock(return_value=[])
+        ), patch(
+            "app.services.audit.AuditService._check_approver_permission", AsyncMock(return_value=None)
+        ):
+            detail = await WorkflowService.get_detail(
+                db,
+                5,
+                {"id": 2, "username": "yanjiabao", "permissions": [], "is_superuser": False},
+            )
+
+        assert detail["sql_content"] == "delete from t"
+        assert detail["can_audit"] is True
+        assert detail["can_execute"] is False
+        assert detail["can_cancel"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_detail_allows_engineer_to_cancel_before_finish(self):
+        db = AsyncMock()
+        wf = self._make_workflow(
+            engineer="liuyang",
+            status=WorkflowStatus.TIMING_TASK,
+            content=SimpleNamespace(sql_content="delete from t", review_content="[]", execute_result=""),
+        )
+        row_result = MagicMock()
+        row_result.first.return_value = (wf, "MySQL-技术组")
+        db.execute = AsyncMock(return_value=row_result)
+
+        with patch("app.services.audit.AuditService.get_audit_info", AsyncMock(return_value={"nodes": []})), patch(
+            "app.services.audit.AuditService.get_audit_logs", AsyncMock(return_value=[])
+        ):
+            detail = await WorkflowService.get_detail(
+                db,
+                5,
+                {"id": 7, "username": "liuyang", "permissions": [], "is_superuser": False},
+            )
+
+        assert detail["can_audit"] is False
+        assert detail["can_cancel"] is True
+
+
+class TestWorkflowExecuteSync:
+    @pytest.mark.asyncio
+    async def test_execute_sync_marks_missing_instance_as_exception(self):
+        db = AsyncMock()
+        wf = SimpleNamespace(
+            id=10,
+            instance_id=8,
+            db_name="ump_testdb",
+            content=SimpleNamespace(sql_content="delete from t", execute_result=None),
+            status=WorkflowStatus.REVIEW_PASS,
+            finish_time=None,
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result)
+
+        await WorkflowService._execute_sync(db, wf, {"id": 1, "username": "admin"})
+
+        assert wf.status == WorkflowStatus.EXCEPTION
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_sync_success_writes_finish_status_and_log(self):
+        db = AsyncMock()
+        wf = SimpleNamespace(
+            id=10,
+            instance_id=8,
+            db_name="ump_testdb",
+            content=SimpleNamespace(sql_content="delete from t", execute_result=None),
+            status=WorkflowStatus.REVIEW_PASS,
+            finish_time=None,
+        )
+        instance = SimpleNamespace(id=8)
+        audit = SimpleNamespace(id=99)
+        db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=instance)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=audit)),
+            ]
+        )
+        engine = SimpleNamespace(execute=AsyncMock(return_value=SimpleNamespace(error="")))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.workflow.AuditService._write_log",
+            AsyncMock(),
+        ) as write_log_mock:
+            await WorkflowService._execute_sync(db, wf, {"id": 1, "username": "admin"})
+
+        assert wf.status == WorkflowStatus.FINISH
+        assert wf.finish_time is not None
+        assert wf.content.execute_result == '{"success": true, "error": ""}'
+        assert db.commit.await_count == 2
+        write_log_mock.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_sync_records_engine_errors(self):
+        db = AsyncMock()
+        wf = SimpleNamespace(
+            id=10,
+            instance_id=8,
+            db_name="ump_testdb",
+            content=SimpleNamespace(sql_content="delete from t", execute_result=None),
+            status=WorkflowStatus.REVIEW_PASS,
+            finish_time=None,
+        )
+        instance = SimpleNamespace(id=8)
+        db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=instance)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+            ]
+        )
+        engine = SimpleNamespace(execute=AsyncMock(side_effect=RuntimeError("exec failed")))
+
+        with patch("app.services.workflow.get_engine", return_value=engine):
+            await WorkflowService._execute_sync(db, wf, {"id": 1, "username": "admin"})
+
+        assert wf.status == WorkflowStatus.EXCEPTION
+        assert wf.finish_time is not None
+        assert wf.content.execute_result == '{"error": "exec failed"}'
+        assert db.commit.await_count == 2
 
 
 class TestCheckSql:
