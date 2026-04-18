@@ -126,7 +126,7 @@ class QueryPrivService:
                 )
             )
         )
-        return result.scalar_one_or_none() is not None
+        return result.scalars().first() is not None
 
     @staticmethod
     async def _has_table_priv(
@@ -150,7 +150,7 @@ class QueryPrivService:
                 )
             )
         )
-        return result.scalar_one_or_none() is not None
+        return result.scalars().first() is not None
 
     @staticmethod
     async def _resolve_apply_group_id(

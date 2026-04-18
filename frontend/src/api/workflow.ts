@@ -12,6 +12,8 @@ export interface WorkflowItem {
   status: number
   status_desc: string
   created_at: string
+  current_node_name?: string
+  audit_chain_text?: string
 }
 
 export interface WorkflowCreateResponse {
@@ -37,6 +39,7 @@ export interface WorkflowCheckResponse {
 
 export const workflowApi = {
   list: (params?: {
+    view?: 'mine' | 'audit' | 'execute'
     status?: number
     instance_id?: number
     search?: string

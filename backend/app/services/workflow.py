@@ -7,13 +7,14 @@ import json
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, NotFoundException
 from app.engines.registry import get_engine
 from app.models.instance import Instance
+from app.models.user import Users
 from app.models.workflow import (
     SqlWorkflow,
     SqlWorkflowContent,
@@ -38,8 +39,46 @@ STATUS_DESC = {
     9: "自动审核不通过",  # 系统自动拒绝（预留，与人工驳回区分）
 }
 
+EXECUTION_RECORD_STATUSES = (
+    WorkflowStatus.REVIEW_PASS,
+    WorkflowStatus.TIMING_TASK,
+    WorkflowStatus.QUEUING,
+    WorkflowStatus.EXECUTING,
+    WorkflowStatus.FINISH,
+    WorkflowStatus.EXCEPTION,
+)
+
 
 class WorkflowService:
+    @staticmethod
+    def _build_audit_chain_text(
+        nodes: list[dict],
+        workflow_status: int,
+        operator_display_map: dict[str, str] | None = None,
+    ) -> str:
+        if not nodes:
+            return "—"
+        if workflow_status == WorkflowStatus.PENDING_REVIEW:
+            return " -> ".join(
+                str(node.get("node_name") or f"第{node.get('order', '?')}级审批") for node in nodes
+            )
+
+        operator_display_map = operator_display_map or {}
+        actor_chain: list[str] = []
+        for node in nodes:
+            operator = (node.get("operator") or "").strip()
+            if operator:
+                actor_chain.append(operator_display_map.get(operator, operator))
+
+        return " -> ".join(actor_chain) if actor_chain else "—"
+
+    @staticmethod
+    def _get_current_node_name(nodes: list[dict], workflow_status: int) -> str:
+        if workflow_status != WorkflowStatus.PENDING_REVIEW:
+            return "—"
+        current_node = next((node for node in nodes if node.get("status") == 0), None)
+        return current_node.get("node_name", "—") if current_node else "—"
+
     @staticmethod
     def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict], applicant: dict) -> list[dict]:
         result: list[dict] = []
@@ -73,6 +112,8 @@ class WorkflowService:
             "run_date_end": wf.run_date_end.isoformat() if wf.run_date_end else None,
             "finish_time": wf.finish_time.isoformat() if wf.finish_time else None,
             "created_at": wf.created_at.isoformat() if wf.created_at else "",
+            "current_node_name": "—",
+            "audit_chain_text": "—",
         }
 
     # ── 创建工单 ──────────────────────────────────────────────
@@ -176,6 +217,7 @@ class WorkflowService:
     async def list_workflows(
         db: AsyncSession,
         user: dict,
+        view: str = "mine",
         status: int | None = None,
         instance_id: int | None = None,
         search: str | None = None,
@@ -195,9 +237,24 @@ class WorkflowService:
         # ── 构建通用 WHERE 条件列表 ────────────────────────────
         conditions = []
 
-        # 权限控制：非超管、非审核员只能看自己的工单
-        if not user.get("is_superuser") and "sql_review" not in user.get("permissions", []):
+        from app.services.audit import AuditService
+
+        if view == "mine":
             conditions.append(SqlWorkflow.engineer_id == user["id"])
+        elif view == "audit":
+            pending_ids = await AuditService.get_pending_workflow_ids_for_user(db, user)
+            audited_ids = await AuditService.get_audited_workflow_ids_for_user(db, user)
+            related_ids = pending_ids | audited_ids
+            if related_ids:
+                conditions.append(SqlWorkflow.id.in_(related_ids))
+            else:
+                conditions.append(SqlWorkflow.id == -1)
+        elif view == "execute":
+            conditions.append(SqlWorkflow.status.in_(EXECUTION_RECORD_STATUSES))
+            if not user.get("is_superuser") and "sql_execute" not in user.get("permissions", []):
+                conditions.append(SqlWorkflow.engineer_id == user["id"])
+        else:
+            raise AppException("不支持的工单视图类型", code=400)
 
         if status is not None:
             conditions.append(SqlWorkflow.status == status)
@@ -254,12 +311,50 @@ class WorkflowService:
 
         result = await db.execute(data_stmt)
         rows = result.all()
-        return total, [WorkflowService._fmt_workflow(wf, inst_name or "") for wf, inst_name in rows]
+        workflow_ids = [wf.id for wf, _ in rows]
+
+        audit_map: dict[int, WorkflowAudit] = {}
+        if workflow_ids:
+            audit_rows = await db.execute(
+                select(WorkflowAudit).where(WorkflowAudit.workflow_id.in_(workflow_ids))
+            )
+            audit_map = {audit.workflow_id: audit for audit in audit_rows.scalars().all()}
+
+        operator_display_map: dict[str, str] = {}
+        operator_usernames = {
+            str(node.get("operator")).strip()
+            for audit in audit_map.values()
+            for node in json.loads(audit.audit_auth_groups_info or "[]")
+            if node.get("operator")
+        }
+        if operator_usernames:
+            user_rows = await db.execute(
+                select(Users.username, Users.display_name).where(Users.username.in_(operator_usernames))
+            )
+            operator_display_map = {
+                username: (display_name or username)
+                for username, display_name in user_rows.all()
+            }
+
+        items: list[dict] = []
+        for wf, inst_name in rows:
+            item = WorkflowService._fmt_workflow(wf, inst_name or "")
+            audit = audit_map.get(wf.id)
+            if audit and audit.audit_auth_groups_info:
+                nodes = json.loads(audit.audit_auth_groups_info or "[]")
+                item["current_node_name"] = WorkflowService._get_current_node_name(nodes, wf.status)
+                item["audit_chain_text"] = WorkflowService._build_audit_chain_text(
+                    nodes,
+                    wf.status,
+                    operator_display_map,
+                )
+            items.append(item)
+        return total, items
 
         # ── 工单详情 ──────────────────────────────────────────────
 
     @staticmethod
-    async def get_detail(db: AsyncSession, workflow_id: int) -> dict:
+    async def get_detail(db: AsyncSession, workflow_id: int, user: dict) -> dict:
         result = await db.execute(
             select(SqlWorkflow, Instance.instance_name)
             .outerjoin(Instance, SqlWorkflow.instance_id == Instance.id)
@@ -281,7 +376,41 @@ class WorkflowService:
             detail["review_content"] = ""
             detail["execute_result"] = ""
 
+        audit_info = await AuditService.get_audit_info(db, workflow_id)
         detail["audit_logs"] = await AuditService.get_audit_logs(db, workflow_id)
+        detail["audit_info"] = audit_info
+
+        current_node = None
+        if audit_info:
+            current_node = next(
+                (node for node in audit_info.get("nodes", []) if node.get("status") == 0),
+                None,
+            )
+
+        can_audit = False
+        if wf.status == WorkflowStatus.PENDING_REVIEW and current_node is not None:
+            try:
+                await AuditService._check_approver_permission(db, user, current_node)
+                can_audit = True
+            except AppException:
+                can_audit = False
+
+        can_execute = (
+            wf.status == WorkflowStatus.REVIEW_PASS
+            and (user.get("is_superuser") or "sql_execute" in user.get("permissions", []))
+        )
+        can_cancel = (
+            wf.status in (
+                WorkflowStatus.PENDING_REVIEW,
+                WorkflowStatus.AUTO_REVIEW_FAIL,
+                WorkflowStatus.REVIEW_PASS,
+                WorkflowStatus.TIMING_TASK,
+            )
+            and (user.get("is_superuser") or user.get("username") == wf.engineer)
+        )
+        detail["can_audit"] = can_audit
+        detail["can_execute"] = can_execute
+        detail["can_cancel"] = can_cancel
         return detail
 
     # ── 执行工单 ──────────────────────────────────────────────

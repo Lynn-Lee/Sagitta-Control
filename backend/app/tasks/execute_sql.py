@@ -28,6 +28,7 @@ def execute_workflow_task(self, workflow_id: int, operator_id: int):
 
 async def _execute_async(workflow_id: int, operator_id: int):
     """异步执行逻辑。"""
+    import app.models  # noqa: F401  # 预加载全部模型，确保 metadata 中包含审批流等外键目标表
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import selectinload, sessionmaker

@@ -3,6 +3,7 @@ import { CheckOutlined, CloseOutlined, PlayCircleOutlined, StopOutlined } from '
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
+import { useAuthStore } from '@/store/auth'
 
 const { Title, Text } = Typography
 
@@ -17,10 +18,14 @@ export default function WorkflowDetail() {
   const qc = useQueryClient()
   const [msgApi, msgCtx] = message.useMessage()
   const wfId = Number(id)
+  const user = useAuthStore((s) => s.user)
 
   const { data: wf, isLoading } = useQuery({
-    queryKey: ['workflow', wfId],
+    queryKey: ['workflow', wfId, user?.id ?? user?.username ?? 'anonymous'],
     queryFn: () => workflowApi.get(wfId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
     refetchInterval: (query) => (query.state.data?.status === 5 ? 2000 : false),
   })
 
@@ -55,18 +60,18 @@ export default function WorkflowDetail() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <Title level={2} style={{ margin: 0 }}>工单详情 #{wfId}</Title>
         <Space>
-          {wf.status === 0 && <>
+          {wf.can_audit && <>
             <Button type="primary" icon={<CheckOutlined />} loading={auditMut.isPending}
               onClick={() => auditMut.mutate({ action: 'pass' })}>审批通过</Button>
             <Button danger icon={<CloseOutlined />} loading={auditMut.isPending}
               onClick={() => auditMut.mutate({ action: 'reject', remark: '驳回' })}>驳回</Button>
           </>}
-          {wf.status === 2 && (
+          {wf.can_execute && (
             <Popconfirm title="确认立即执行此工单？" onConfirm={() => executeMut.mutate()} okText="执行" cancelText="取消">
               <Button type="primary" icon={<PlayCircleOutlined />} loading={executeMut.isPending}>立即执行</Button>
             </Popconfirm>
           )}
-          {[0, 2, 3].includes(wf.status) && (
+          {wf.can_cancel && (
             <Popconfirm title="确认取消此工单？" onConfirm={() => cancelMut.mutate()} okText="取消工单" cancelText="返回">
               <Button icon={<StopOutlined />}>取消工单</Button>
             </Popconfirm>

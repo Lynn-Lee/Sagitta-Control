@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Button, Card, DatePicker, Input, InputNumber, Select,
-  Space, Table, Tag, Typography, Tooltip,
+  Space, Table, Tabs, Tag, Typography, Tooltip,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -21,8 +21,95 @@ const STATUS_COLOR: Record<number, string> = {
   4: 'default', 5: 'processing', 6: 'success', 7: 'error', 8: 'default',
 }
 
+const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth = 350) =>
+  (name: string, r: any) => (
+    <Tooltip title={name}>
+      <a
+        onClick={() => navigate(`/workflow/${r.id}`)}
+        style={{
+          fontWeight: 500,
+          display: 'inline-block',
+          maxWidth,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {name}
+      </a>
+    </Tooltip>
+  )
+
+const renderInstance = (_: unknown, r: any) => (
+  <Text style={{ fontSize: 12, fontWeight: 500 }}>
+    {r.instance_name || <Text type="secondary">ID:{r.instance_id}</Text>}
+  </Text>
+)
+
+const renderDbName = (v?: string) =>
+  v ? <Text style={{ fontSize: 12 }}>{v}</Text> : <Text type="secondary">—</Text>
+
+const renderAuditChain = (v?: string, maxWidth = 420) => (
+  <Tooltip title={v || '—'}>
+    <Text
+      style={{
+        fontSize: 12,
+        color: '#5f6470',
+        display: 'inline-block',
+        maxWidth,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}
+    >
+      {v || '—'}
+    </Text>
+  </Tooltip>
+)
+
+const renderCurrentNode = (v: string | undefined, r: any) => {
+  const currentNode = r.status === 0 ? (v || '—') : '—'
+  if (currentNode === '—') return <Text type="secondary">—</Text>
+  return (
+    <Tooltip title={currentNode}>
+      <Tag
+        color="processing"
+        style={{
+          maxWidth: 160,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          borderRadius: 999,
+          fontWeight: 500,
+          display: 'inline-block',
+          textAlign: 'center',
+        }}
+      >
+        {currentNode}
+      </Tag>
+    </Tooltip>
+  )
+}
+
+const renderStatus = (s: number, r: any) => (
+  <Tag
+    color={STATUS_COLOR[s]}
+    style={{
+      minWidth: 72,
+      textAlign: 'center',
+      borderRadius: 999,
+      fontWeight: 500,
+    }}
+  >
+    {r.status_desc}
+  </Tag>
+)
+
+const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
+
 export default function WorkflowList() {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<'mine' | 'audit' | 'execute'>('mine')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<number | undefined>()
   const [instanceFilter, setInstanceFilter] = useState<number | undefined>()
@@ -37,6 +124,7 @@ export default function WorkflowList() {
   })
 
   const queryParams = {
+    view: activeTab,
     search: search || undefined,
     status: statusFilter,
     instance_id: instanceFilter,
@@ -58,53 +146,77 @@ export default function WorkflowList() {
     setEngineerFilter(''); setDbNameFilter(''); setDateRange(null); setPage(1)
   }
 
-  const columns: ColumnsType<any> = [
-    {
-      title: 'ID', dataIndex: 'id', width: 65,
-      render: (id) => (
-        <a onClick={() => navigate(`/workflow/${id}`)}
-          style={{ fontFamily: 'monospace', color: '#1558A8' }}>#{id}</a>
-      ),
-    },
-    {
-      title: '工单名称', dataIndex: 'workflow_name', ellipsis: true, minWidth: 160,
-      render: (name, r) => (
-        <Tooltip title={name}>
-          <a onClick={() => navigate(`/workflow/${r.id}`)} style={{ fontWeight: 500 }}>{name}</a>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '目标实例', key: 'instance', width: 180,
-      render: (_, r) => (
-        <Text style={{ fontSize: 12, fontWeight: 500 }}>
-          {r.instance_name || <Text type="secondary">ID:{r.instance_id}</Text>}
-        </Text>
-      ),
-    },
-    {
-      title: '数据库', dataIndex: 'db_name', width: 140, ellipsis: true,
-      render: (v) => v ? <Text style={{ fontSize: 12 }}>{v}</Text> : <Text type="secondary">—</Text>,
-    },
-    {
-      title: '提交人', key: 'engineer', width: 140,
-      render: (_, r) => r.engineer_display || r.engineer,
-    },
-    {
-      title: '状态', dataIndex: 'status', width: 110,
-      render: (s, r) => <Tag color={STATUS_COLOR[s]}>{r.status_desc}</Tag>,
-    },
-    {
-      title: '提交时间', dataIndex: 'created_at', width: 150,
-      render: v => v ? dayjs(v).format('MM-DD HH:mm') : '—',
-    },
-    {
-      title: '操作', width: 65, fixed: 'right',
-      render: (_, r) => (
-        <Button size="small" type="link" onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
-      ),
-    },
+  const idColumn: ColumnsType<any>[number] = {
+    title: 'ID', dataIndex: 'id', width: 65,
+    render: (id) => (
+      <a onClick={() => navigate(`/workflow/${id}`)}
+        style={{ fontFamily: 'monospace', color: '#1558A8' }}>#{id}</a>
+    ),
+  }
+
+  const detailColumn: ColumnsType<any>[number] = {
+    title: '操作', width: 88, fixed: 'right',
+    render: (_, r) => (
+      <Button size="small" type="link" onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
+    ),
+  }
+
+  const mineColumns: ColumnsType<any> = [
+    idColumn,
+    { title: '工单名称', dataIndex: 'workflow_name', width: 430, render: renderWorkflowName(navigate, 400) },
+    { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 440, ellipsis: true, render: (v) => renderAuditChain(v, 410) },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: true, render: renderCurrentNode },
+    { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
+    detailColumn,
   ]
+
+  const auditColumns: ColumnsType<any> = [
+    idColumn,
+    { title: '申请人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
+    { title: '工单名称', dataIndex: 'workflow_name', width: 380, render: renderWorkflowName(navigate, 350) },
+    { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: true, render: renderCurrentNode },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 470, ellipsis: true, render: (v) => renderAuditChain(v, 440) },
+    { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
+    detailColumn,
+  ]
+
+  const executeColumns: ColumnsType<any> = [
+    idColumn,
+    { title: '工单名称', dataIndex: 'workflow_name', width: 340, render: renderWorkflowName(navigate, 310) },
+    { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '提交人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
+    { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
+    {
+      title: '完成时间',
+      dataIndex: 'finish_time',
+      width: 170,
+      render: renderDate,
+    },
+    {
+      title: '提交时间',
+      dataIndex: 'created_at',
+      width: 170,
+      render: renderDate,
+    },
+    detailColumn,
+  ]
+
+  const columns =
+    activeTab === 'audit'
+      ? auditColumns
+      : activeTab === 'execute'
+        ? executeColumns
+        : mineColumns
+
+  const engineerPlaceholder =
+    activeTab === 'audit' ? '申请人' : '提交人'
 
   return (
     <div>
@@ -121,6 +233,19 @@ export default function WorkflowList() {
       {/* 查询条件 */}
       <Card style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
         styles={{ body: { padding: '12px 16px' } }}>
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => {
+            setActiveTab(key as 'mine' | 'audit' | 'execute')
+            setPage(1)
+          }}
+          items={[
+            { key: 'mine', label: '我的工单' },
+            { key: 'audit', label: '审批记录' },
+            { key: 'execute', label: '执行记录' },
+          ]}
+          style={{ marginBottom: 8 }}
+        />
         <Space wrap size={[8, 8]}>
           <Input
             placeholder="工单名称"
@@ -171,7 +296,7 @@ export default function WorkflowList() {
             onChange={e => { setDbNameFilter(e.target.value); setPage(1) }}
           />
           <Input
-            placeholder="提交人"
+            placeholder={engineerPlaceholder}
             allowClear
             style={{ width: 110 }}
             value={engineerFilter}
@@ -199,7 +324,7 @@ export default function WorkflowList() {
           rowKey="id"
           loading={isLoading}
           tableLayout="fixed"
-          scroll={{ x: 980 }}
+          scroll={{ x: activeTab === 'audit' ? 1980 : activeTab === 'execute' ? 1580 : 1840 }}
           pagination={{
             total: data?.total,
             current: page,

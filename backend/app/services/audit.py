@@ -384,6 +384,62 @@ class AuditService:
     # ── 待审批工单（按节点权限过滤）────────────────────────────
 
     @staticmethod
+    async def get_pending_workflow_ids_for_user(
+        db: AsyncSession,
+        user: dict,
+    ) -> set[int]:
+        """
+        返回当前用户有权限审批的待审批工单 ID 集合。
+        供工单列表把“我提交的工单”和“待我审批的工单”并集展示使用。
+        """
+        from app.models.instance import Instance
+
+        stmt = (
+            select(SqlWorkflow, WorkflowAudit, Instance.instance_name)
+            .join(WorkflowAudit, WorkflowAudit.workflow_id == SqlWorkflow.id)
+            .outerjoin(Instance, SqlWorkflow.instance_id == Instance.id)
+            .where(SqlWorkflow.status == WorkflowStatus.PENDING_REVIEW)
+            .order_by(SqlWorkflow.created_at.desc())
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+
+        authorized_ids: set[int] = set()
+        for workflow, audit, _inst_name in rows:
+            groups_info = json.loads(audit.audit_auth_groups_info or "[]")
+            current_node = next(
+                (g for g in groups_info if g.get("status") == AuditStatus.PENDING),
+                None,
+            )
+            if current_node is None:
+                continue
+
+            try:
+                await AuditService._check_approver_permission(db, user, current_node)
+                authorized_ids.add(workflow.id)
+            except AppException:
+                continue
+
+        return authorized_ids
+
+    @staticmethod
+    async def get_audited_workflow_ids_for_user(
+        db: AsyncSession,
+        user: dict,
+    ) -> set[int]:
+        """
+        返回当前用户已经审批过的工单 ID 集合。
+        仅统计真正的审批动作（pass / reject），不包含 submit/cancel/execute。
+        """
+        audit_rows = await db.execute(
+            select(WorkflowAudit.workflow_id)
+            .join(WorkflowLog, WorkflowLog.audit_id == WorkflowAudit.id)
+            .where(WorkflowLog.operator_id == user.get("id"))
+            .where(WorkflowLog.operation_type.in_((OP_PASS, OP_REJECT)))
+        )
+        return set(audit_rows.scalars().all())
+
+    @staticmethod
     async def get_pending_for_user(
         db: AsyncSession,
         user: dict,
@@ -408,8 +464,11 @@ class AuditService:
         result = await db.execute(stmt)
         rows = result.all()
 
+        authorized_ids = await AuditService.get_pending_workflow_ids_for_user(db, user)
         authorized = []
         for workflow, audit, inst_name in rows:
+            if workflow.id not in authorized_ids:
+                continue
             groups_info = json.loads(audit.audit_auth_groups_info or "[]")
             current_node = next(
                 (g for g in groups_info if g.get("status") == AuditStatus.PENDING),
@@ -417,13 +476,7 @@ class AuditService:
             )
             if current_node is None:
                 continue
-
-            # 检查当前用户是否有权限审批该节点
-            try:
-                await AuditService._check_approver_permission(db, user, current_node)
-                authorized.append((workflow, inst_name, current_node))
-            except AppException:
-                continue
+            authorized.append((workflow, inst_name, current_node))
 
         total = len(authorized)
         paginated = authorized[(page - 1) * page_size : page * page_size]
@@ -444,6 +497,8 @@ class AuditService:
 
     @staticmethod
     async def get_audit_logs(db: AsyncSession, workflow_id: int) -> list[dict]:
+        from app.models.user import Users
+
         result = await db.execute(
             select(WorkflowAudit).where(WorkflowAudit.workflow_id == workflow_id)
         )
@@ -456,14 +511,25 @@ class AuditService:
             .where(WorkflowLog.audit_id == audit.id)
             .order_by(WorkflowLog.created_at)
         )
+        logs = logs_result.scalars().all()
+        operator_ids = [log.operator_id for log in logs if log.operator_id]
+        user_map: dict[int, Users] = {}
+        if operator_ids:
+            users_result = await db.execute(select(Users).where(Users.id.in_(operator_ids)))
+            user_map = {user.id: user for user in users_result.scalars().all()}
+
         return [
             {
-                "operator": log.operator,
+                "operator": (
+                    user_map[log.operator_id].display_name
+                    if log.operator_id in user_map and user_map[log.operator_id].display_name
+                    else log.operator
+                ),
                 "operation_type": log.operation_type,
                 "remark": log.remark,
                 "created_at": log.created_at.isoformat() if log.created_at else "",
             }
-            for log in logs_result.scalars().all()
+            for log in logs
         ]
 
     @staticmethod
@@ -483,6 +549,11 @@ class AuditService:
                     "order": n.get("order"),
                     "node_name": n.get("node_name"),
                     "approver_type": n.get("approver_type"),
+                    "approver_ids": n.get("approver_ids"),
+                    "approver_group_id": n.get("approver_group_id"),
+                    "approver_role_id": n.get("approver_role_id"),
+                    "applicant_id": n.get("applicant_id"),
+                    "applicant_name": n.get("applicant_name"),
                     "status": n.get("status"),
                     "operator": n.get("operator"),
                     "operated_at": n.get("operated_at"),

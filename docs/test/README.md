@@ -14,7 +14,7 @@
 | [Sprint 0 — 基础设施](./sprint0_infrastructure_test.md) | Sprint 0 | 10 | Docker 服务启动、健康检查、数据库连接、Celery |
 | [Sprint 1 — 认证与实例](./sprint1_auth_user_instance_test.md) | Sprint 1 | 19 | 登录认证、JWT、2FA、用户 CRUD、实例管理、资源组 |
 | [Sprint 2 — 查询引擎](./sprint2_query_engine_test.md) | Sprint 2 | 13 | 多引擎查询、DDL/DML 拦截、行数限制、查询权限申请 |
-| [Pack A — SQL 工单](./pack_a_workflow_test.md) | Pack A (S3+S4) | 15 | 工单提交/审批/执行、9 种状态流转、运维工具 |
+| [Pack A — SQL 工单](./pack_a_workflow_test.md) | Pack A (S3+S4) | 20 | 工单提交/审批/执行、三标签列表、审批按钮可见性、9 种状态流转、运维工具 |
 | [Pack B — 可观测中心](./pack_b_observability_test.md) | Pack B (S5+S6) | 13 | Dashboard 在线查询概览、Prometheus、Grafana、Alertmanager |
 | [Pack C1 — 系统管理](./pack_c1_system_admin_test.md) | Pack C1 | 16 | 系统配置（7组）、审计日志、资源组、个人设置 |
 | [Pack C2 — 数据库注册](./pack_c2_instance_database_test.md) | Pack C2 | 10 | 手动添加/引擎同步、启停用、类型字段适配 |

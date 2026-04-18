@@ -112,6 +112,10 @@
 - AuditV2 审批流（支持多级审批）
 - Celery 异步执行，WebSocket 实时进度推送
 - SQL 预检查（sqlglot 解析，无需 goInception）
+- 工单列表已拆分为 `我的工单 / 审批记录 / 执行记录` 三标签
+- 工单详情按钮按 `can_audit / can_execute / can_cancel` 能力字段显示，审批人无需手动刷新即可看到审批按钮
+- 工单列表中的审批链路、当前节点、状态列已按视角与状态做统一展示
+- 审批日志中的操作人优先显示用户显示名
 
 **工单模板（Pack D）**
 - 模板 CRUD（公开/私有），使用次数统计
@@ -131,6 +135,7 @@
 ### Pack B — 可观测中心 ✅
 
 - Dashboard 在线查询概览（7 个卡片、查询趋势、查询用户 Top 10、治理趋势、待审批库存趋势，按权限范围裁剪）
+- 在线查询结果区支持自适应高度、分页、`row_num` 行号列、当前页/全部结果导出
 - 监控配置管理（Prometheus Exporter 配置）
 - Prometheus + Grafana 集成
 - Alertmanager 告警管理
