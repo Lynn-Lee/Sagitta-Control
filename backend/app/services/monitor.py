@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import and_, distinct, func, select
+from sqlalchemy import and_, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,8 +14,9 @@ from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPr
 from app.models.query import QueryLog, QueryPrivilegeApply
 from app.models.role import UserGroup
 from app.models.user import ResourceGroup, Users
-from app.models.workflow import SqlWorkflow
+from app.models.workflow import SqlWorkflow, WorkflowAudit, WorkflowLog, WorkflowStatus
 from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
+from app.services.audit import OP_CANCEL, OP_PASS, OP_REJECT
 
 logger = logging.getLogger(__name__)
 
@@ -508,6 +509,387 @@ class DashboardService:
                 }
                 for row in top_rows
                 if row.user_id is not None
+            ],
+        }
+
+    @staticmethod
+    async def _resolve_workflow_scope(db: AsyncSession, user: dict) -> dict:
+        if user.get("is_superuser") or user.get("role") == "dba":
+            return {"mode": "global", "label": "全量数据", "user_ids": None, "instance_ids": None}
+
+        if user.get("role") == "dba_group":
+            user_rg_ids = user.get("resource_groups", [])
+            if not user_rg_ids:
+                return {"mode": "instance_scope", "label": "权限实例范围", "user_ids": None, "instance_ids": []}
+
+            result = await db.execute(
+                select(Instance.id)
+                .join(Instance.resource_groups.of_type(ResourceGroup))
+                .where(and_(Instance.is_active.is_(True), ResourceGroup.id.in_(user_rg_ids)))
+                .distinct()
+            )
+            return {
+                "mode": "instance_scope",
+                "label": "权限实例范围",
+                "user_ids": None,
+                "instance_ids": list(result.scalars().all()),
+            }
+
+        leader_groups = await db.execute(
+            select(UserGroup)
+            .options(selectinload(UserGroup.members))
+            .where(and_(UserGroup.leader_id == user["id"], UserGroup.is_active.is_(True)))
+        )
+        groups = leader_groups.scalars().all()
+        if groups:
+            user_ids = {user["id"]}
+            for group in groups:
+                user_ids.update(member.id for member in group.members if member.is_active)
+            return {
+                "mode": "group",
+                "label": "组内数据",
+                "user_ids": sorted(user_ids),
+                "instance_ids": None,
+            }
+
+        return {"mode": "self", "label": "我的数据", "user_ids": [user["id"]], "instance_ids": None}
+
+    @staticmethod
+    def _apply_workflow_scope(stmt, scope: dict):
+        if scope["mode"] in {"self", "group"}:
+            user_ids = scope.get("user_ids") or []
+            if not user_ids:
+                return stmt.where(SqlWorkflow.engineer_id == -1)
+            return stmt.where(SqlWorkflow.engineer_id.in_(user_ids))
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(SqlWorkflow.instance_id == -1)
+            return stmt.where(SqlWorkflow.instance_id.in_(instance_ids))
+        return stmt
+
+    @staticmethod
+    def _apply_workflow_log_scope(stmt, scope: dict):
+        if scope["mode"] in {"self", "group"}:
+            user_ids = scope.get("user_ids") or []
+            if not user_ids:
+                return stmt.where(SqlWorkflow.engineer_id == -1)
+            return stmt.where(SqlWorkflow.engineer_id.in_(user_ids))
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(SqlWorkflow.instance_id == -1)
+            return stmt.where(SqlWorkflow.instance_id.in_(instance_ids))
+        return stmt
+
+    @staticmethod
+    async def get_workflow_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:
+        now = datetime.now(UTC)
+        period_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        scope = await DashboardService._resolve_workflow_scope(db, user)
+
+        async def scalar(stmt) -> int:
+            return int((await db.execute(stmt)).scalar() or 0)
+
+        def workflow_stmt(*conditions):
+            stmt = select(SqlWorkflow)
+            stmt = DashboardService._apply_workflow_scope(stmt, scope)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+            return stmt
+
+        def workflow_log_stmt(*conditions):
+            stmt = (
+                select(WorkflowLog, SqlWorkflow)
+                .join(WorkflowAudit, WorkflowLog.audit_id == WorkflowAudit.id)
+                .join(SqlWorkflow, WorkflowAudit.workflow_id == SqlWorkflow.id)
+            )
+            stmt = DashboardService._apply_workflow_log_scope(stmt, scope)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+            return stmt
+
+        period_submit_subq = workflow_stmt(SqlWorkflow.created_at >= period_start).subquery()
+        today_submit_count = await scalar(select(func.count()).select_from(period_submit_subq))
+
+        period_approved_subq = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_PASS,
+            WorkflowLog.remark.like("全部审批通过%"),
+        ).with_only_columns(
+            SqlWorkflow.id.label("workflow_id"),
+            WorkflowLog.created_at.label("created_at"),
+        ).subquery()
+        today_approved_count = await scalar(select(func.count(distinct(period_approved_subq.c.workflow_id))).select_from(period_approved_subq))
+
+        period_rejected_subq = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_REJECT,
+        ).with_only_columns(
+            SqlWorkflow.id.label("workflow_id"),
+            WorkflowLog.created_at.label("created_at"),
+        ).subquery()
+        today_rejected_count = await scalar(select(func.count(distinct(period_rejected_subq.c.workflow_id))).select_from(period_rejected_subq))
+
+        pending_subq = workflow_stmt(SqlWorkflow.status == WorkflowStatus.PENDING_REVIEW).subquery()
+        pending_count = await scalar(select(func.count()).select_from(pending_subq))
+
+        queued_subq = workflow_stmt(SqlWorkflow.status == WorkflowStatus.QUEUING).subquery()
+        queued_count = await scalar(select(func.count()).select_from(queued_subq))
+
+        running_subq = workflow_stmt(SqlWorkflow.status == WorkflowStatus.EXECUTING).subquery()
+        running_count = await scalar(select(func.count()).select_from(running_subq))
+
+        execute_success_subq = workflow_stmt(
+            SqlWorkflow.finish_time >= period_start,
+            SqlWorkflow.status == WorkflowStatus.FINISH,
+        ).subquery()
+        today_execute_success_count = await scalar(select(func.count()).select_from(execute_success_subq))
+
+        execute_failed_subq = workflow_stmt(
+            SqlWorkflow.finish_time >= period_start,
+            SqlWorkflow.status == WorkflowStatus.EXCEPTION,
+        ).subquery()
+        today_execute_failed_count = await scalar(select(func.count()).select_from(execute_failed_subq))
+
+        cancel_subq = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_CANCEL,
+        ).with_only_columns(
+            SqlWorkflow.id.label("workflow_id"),
+            WorkflowLog.created_at.label("created_at"),
+        ).subquery()
+        today_cancel_count = await scalar(select(func.count(distinct(cancel_subq.c.workflow_id))).select_from(cancel_subq))
+
+        finished_ids: set[int] = set()
+        for subq in (execute_success_subq, execute_failed_subq):
+            ids = await db.execute(select(distinct(subq.c.id)))
+            finished_ids.update(ids.scalars().all())
+        for subq in (cancel_subq, period_rejected_subq):
+            ids = await db.execute(select(distinct(subq.c.workflow_id)))
+            finished_ids.update(ids.scalars().all())
+        today_finished_count = len(finished_ids)
+
+        submit_trend_stmt = workflow_stmt(
+            SqlWorkflow.created_at >= period_start,
+        ).with_only_columns(
+            func.date(SqlWorkflow.created_at).label("d"),
+            func.count().label("submit_count"),
+        ).group_by(func.date(SqlWorkflow.created_at)).order_by(func.date(SqlWorkflow.created_at))
+        submit_trend_rows = (await db.execute(submit_trend_stmt)).all()
+        submit_trend_map = {str(row.d): int(row.submit_count or 0) for row in submit_trend_rows}
+
+        approved_trend_stmt = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_PASS,
+            WorkflowLog.remark.like("全部审批通过%"),
+        ).with_only_columns(
+            func.date(WorkflowLog.created_at).label("d"),
+            func.count(distinct(SqlWorkflow.id)).label("approved_count"),
+        ).group_by(func.date(WorkflowLog.created_at))
+        approved_trend_rows = (await db.execute(approved_trend_stmt)).all()
+        approved_trend_map = {str(row.d): int(row.approved_count or 0) for row in approved_trend_rows}
+
+        rejected_trend_stmt = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_REJECT,
+        ).with_only_columns(
+            func.date(WorkflowLog.created_at).label("d"),
+            func.count(distinct(SqlWorkflow.id)).label("rejected_count"),
+        ).group_by(func.date(WorkflowLog.created_at))
+        rejected_trend_rows = (await db.execute(rejected_trend_stmt)).all()
+        rejected_trend_map = {str(row.d): int(row.rejected_count or 0) for row in rejected_trend_rows}
+
+        cancel_trend_stmt = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type == OP_CANCEL,
+        ).with_only_columns(
+            func.date(WorkflowLog.created_at).label("d"),
+            func.count(distinct(SqlWorkflow.id)).label("cancel_count"),
+        ).group_by(func.date(WorkflowLog.created_at))
+        cancel_trend_rows = (await db.execute(cancel_trend_stmt)).all()
+        cancel_trend_map = {str(row.d): int(row.cancel_count or 0) for row in cancel_trend_rows}
+
+        execute_success_trend_stmt = workflow_stmt(
+            SqlWorkflow.finish_time >= period_start,
+            SqlWorkflow.status == WorkflowStatus.FINISH,
+        ).with_only_columns(
+            func.date(SqlWorkflow.finish_time).label("d"),
+            func.count().label("success_count"),
+        ).group_by(func.date(SqlWorkflow.finish_time))
+        execute_success_trend_rows = (await db.execute(execute_success_trend_stmt)).all()
+        execute_success_trend_map = {str(row.d): int(row.success_count or 0) for row in execute_success_trend_rows}
+
+        execute_failed_trend_stmt = workflow_stmt(
+            SqlWorkflow.finish_time >= period_start,
+            SqlWorkflow.status == WorkflowStatus.EXCEPTION,
+        ).with_only_columns(
+            func.date(SqlWorkflow.finish_time).label("d"),
+            func.count().label("failed_count"),
+        ).group_by(func.date(SqlWorkflow.finish_time))
+        execute_failed_trend_rows = (await db.execute(execute_failed_trend_stmt)).all()
+        execute_failed_trend_map = {str(row.d): int(row.failed_count or 0) for row in execute_failed_trend_rows}
+
+        dates: list[str] = []
+        submit_count: list[int] = []
+        approved_count: list[int] = []
+        rejected_count: list[int] = []
+        cancel_count: list[int] = []
+        execute_failed_count: list[int] = []
+        queued_stock_count: list[int] = []
+        running_stock_count: list[int] = []
+        execute_success_count: list[int] = []
+        pending_stock_count: list[int] = []
+
+        for offset in range(days):
+            day = period_start.date() + timedelta(days=offset)
+            day_key = day.isoformat()
+            day_end = datetime.fromisoformat(day_key).replace(tzinfo=UTC) + timedelta(days=1)
+            dates.append(day_key)
+            submit_count.append(submit_trend_map.get(day_key, 0))
+            approved_count.append(approved_trend_map.get(day_key, 0))
+            rejected_count.append(rejected_trend_map.get(day_key, 0))
+            cancel_count.append(cancel_trend_map.get(day_key, 0))
+            execute_failed_count.append(execute_failed_trend_map.get(day_key, 0))
+            execute_success_count.append(execute_success_trend_map.get(day_key, 0))
+
+            pending_stock_stmt = workflow_stmt(
+                SqlWorkflow.created_at < day_end,
+                or_(
+                    SqlWorkflow.status == WorkflowStatus.PENDING_REVIEW,
+                    and_(
+                        SqlWorkflow.status != WorkflowStatus.PENDING_REVIEW,
+                        SqlWorkflow.updated_at >= day_end,
+                    ),
+                ),
+            ).subquery()
+            pending_stock_count.append(await scalar(select(func.count()).select_from(pending_stock_stmt)))
+
+            queued_stock_stmt = workflow_stmt(
+                SqlWorkflow.status == WorkflowStatus.QUEUING,
+                SqlWorkflow.created_at < day_end,
+            ).subquery()
+            queued_stock_count.append(await scalar(select(func.count()).select_from(queued_stock_stmt)))
+
+            running_stock_stmt = workflow_stmt(
+                SqlWorkflow.status == WorkflowStatus.EXECUTING,
+                SqlWorkflow.created_at < day_end,
+            ).subquery()
+            running_stock_count.append(await scalar(select(func.count()).select_from(running_stock_stmt)))
+
+        top_submitter_stmt = workflow_stmt(
+            SqlWorkflow.created_at >= period_start,
+        ).with_only_columns(
+            SqlWorkflow.engineer_id,
+            func.count().label("count"),
+        ).group_by(SqlWorkflow.engineer_id).order_by(func.count().desc()).limit(10)
+        top_submitter_rows = (await db.execute(top_submitter_stmt)).all()
+        submitter_ids = [row.engineer_id for row in top_submitter_rows if row.engineer_id is not None]
+        user_map: dict[int, str] = {}
+        if submitter_ids:
+            user_rows = await db.execute(
+                select(Users.id, Users.display_name, Users.username).where(Users.id.in_(submitter_ids))
+            )
+            user_map = {user_id: (display_name or username) for user_id, display_name, username in user_rows.all()}
+
+        top_instance_stmt = workflow_stmt(
+            SqlWorkflow.created_at >= period_start,
+        ).join(Instance, SqlWorkflow.instance_id == Instance.id).with_only_columns(
+            Instance.instance_name,
+            func.count().label("count"),
+        ).group_by(Instance.instance_name).order_by(func.count().desc()).limit(10)
+        top_instance_rows = (await db.execute(top_instance_stmt)).all()
+
+        top_database_stmt = workflow_stmt(
+            SqlWorkflow.created_at >= period_start,
+        ).with_only_columns(
+            SqlWorkflow.db_name,
+            func.count().label("count"),
+        ).group_by(SqlWorkflow.db_name).order_by(func.count().desc()).limit(10)
+        top_database_rows = (await db.execute(top_database_stmt)).all()
+
+        top_approver_stmt = workflow_log_stmt(
+            WorkflowLog.created_at >= period_start,
+            WorkflowLog.operation_type.in_((OP_PASS, OP_REJECT)),
+        ).with_only_columns(
+            WorkflowLog.operator_id,
+            func.count().label("count"),
+        ).group_by(WorkflowLog.operator_id).order_by(func.count().desc()).limit(10)
+        top_approver_rows = (await db.execute(top_approver_stmt)).all()
+        approver_ids = [row.operator_id for row in top_approver_rows if row.operator_id is not None]
+        if approver_ids:
+            approver_rows = await db.execute(
+                select(Users.id, Users.display_name, Users.username).where(Users.id.in_(approver_ids))
+            )
+            for user_id, display_name, username in approver_rows.all():
+                user_map[user_id] = display_name or username
+
+        top_execute_instance_stmt = workflow_stmt(
+            SqlWorkflow.finish_time >= period_start,
+            SqlWorkflow.status.in_((WorkflowStatus.FINISH, WorkflowStatus.EXCEPTION)),
+        ).join(Instance, SqlWorkflow.instance_id == Instance.id).with_only_columns(
+            Instance.instance_name,
+            func.count().label("count"),
+        ).group_by(Instance.instance_name).order_by(func.count().desc()).limit(10)
+        top_execute_instance_rows = (await db.execute(top_execute_instance_stmt)).all()
+
+        return {
+            "scope": {
+                "mode": scope["mode"],
+                "label": scope["label"],
+            },
+            "cards": {
+                "today_submit_count": today_submit_count,
+                "today_approved_count": today_approved_count,
+                "today_rejected_count": today_rejected_count,
+                "pending_count": pending_count,
+                "queued_count": queued_count,
+                "running_count": running_count,
+                "today_execute_success_count": today_execute_success_count,
+                "today_execute_failed_count": today_execute_failed_count,
+                "today_cancel_count": today_cancel_count,
+                "today_finished_count": today_finished_count,
+            },
+            "submit_trend": {
+                "dates": dates,
+                "submit_count": submit_count,
+                "approved_count": approved_count,
+            },
+            "governance_trend": {
+                "dates": dates,
+                "rejected_count": rejected_count,
+                "cancel_count": cancel_count,
+                "execute_failed_count": execute_failed_count,
+            },
+            "execute_trend": {
+                "dates": dates,
+                "queued_count": queued_stock_count,
+                "running_count": running_stock_count,
+                "success_count": execute_success_count,
+            },
+            "pending_stock_trend": {
+                "dates": dates,
+                "pending_count": pending_stock_count,
+            },
+            "top_submitters": [
+                {"display_name": user_map.get(row.engineer_id, f"用户{row.engineer_id}"), "count": int(row.count or 0)}
+                for row in top_submitter_rows if row.engineer_id is not None
+            ],
+            "top_instances": [
+                {"instance_name": row.instance_name or "未知实例", "count": int(row.count or 0)}
+                for row in top_instance_rows
+            ],
+            "top_databases": [
+                {"db_name": row.db_name or "未知数据库", "count": int(row.count or 0)}
+                for row in top_database_rows
+            ],
+            "top_approvers": [
+                {"display_name": user_map.get(row.operator_id, f"用户{row.operator_id}"), "count": int(row.count or 0)}
+                for row in top_approver_rows if row.operator_id is not None
+            ],
+            "top_execute_instances": [
+                {"instance_name": row.instance_name or "未知实例", "count": int(row.count or 0)}
+                for row in top_execute_instance_rows
             ],
         }
 

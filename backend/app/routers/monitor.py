@@ -58,6 +58,15 @@ async def query_overview(
     return await DashboardService.get_query_overview(db, user=user, days=days)
 
 
+@router.get("/dashboard/workflow-overview/", summary="SQL 工单概览")
+async def workflow_overview(
+    days: int = QParam(7, ge=1, le=365, description="展示最近 N 天，默认7天"),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await DashboardService.get_workflow_overview(db, user=user, days=days)
+
+
 # ── 采集配置 ──────────────────────────────────────────────────
 
 @router.get("/configs/", summary="采集配置列表", dependencies=[Depends(require_perm("monitor_config_manage"))])
