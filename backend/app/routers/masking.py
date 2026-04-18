@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
-from app.services.masking_rule import RULE_TYPES, MaskingRuleService, WorkflowTemplateService
+from app.services.masking_rule import (
+    RULE_TYPES,
+    WORKFLOW_TEMPLATE_CATEGORIES,
+    MaskingRuleService,
+    WorkflowTemplateService,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -98,15 +103,40 @@ async def preview_masking(
 @template_router.get("/", summary="工单模板列表")
 async def list_templates(
     search: str | None = None,
+    category: str | None = None,
+    visibility: str | None = None,
+    is_active: bool | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
     user=Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     total, items = await WorkflowTemplateService.list_templates(
-        db, user=user, search=search, page=page, page_size=page_size,
+        db,
+        user=user,
+        search=search,
+        category=category,
+        visibility=visibility,
+        is_active=is_active,
+        page=page,
+        page_size=page_size,
     )
     return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@template_router.get("/categories/", summary="工单模板分类")
+async def list_template_categories(_user=Depends(current_user)):
+    return {"items": WORKFLOW_TEMPLATE_CATEGORIES}
+
+
+@template_router.get("/{tmpl_id}/", summary="工单模板详情")
+async def get_template(
+    tmpl_id: int,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await WorkflowTemplateService.get_template(db, tmpl_id, user)
+    return {"data": data}
 
 
 @template_router.post("/", summary="创建工单模板")
@@ -147,3 +177,13 @@ async def use_template(
 ):
     t = await WorkflowTemplateService.use_template(db, tmpl_id)
     return {"status": 0, "data": WorkflowTemplateService.fmt(t)}
+
+
+@template_router.post("/{tmpl_id}/clone/", summary="复制工单模板")
+async def clone_template(
+    tmpl_id: int,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    t = await WorkflowTemplateService.clone_template(db, tmpl_id, user)
+    return {"status": 0, "msg": "模板复制成功", "data": {"id": t.id}}

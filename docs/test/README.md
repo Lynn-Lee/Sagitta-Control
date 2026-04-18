@@ -18,7 +18,7 @@
 | [Pack B — 可观测中心](./pack_b_observability_test.md) | Pack B (S5+S6) | 20 | Dashboard 在线查询概览、Dashboard SQL 工单概览、Dashboard 实例与库概览、Prometheus、Grafana、Alertmanager |
 | [Pack C1 — 系统管理](./pack_c1_system_admin_test.md) | Pack C1 | 16 | 系统配置（7组）、审计日志、资源组、个人设置 |
 | [Pack C2 — 数据库注册](./pack_c2_instance_database_test.md) | Pack C2 | 10 | 手动添加/引擎同步、启停用、类型字段适配 |
-| [Pack D — 数据安全](./pack_d_data_security_test.md) | Pack D | 14 | 脱敏规则（7种）、数据字典、工单模板、AI Text2SQL |
+| [Pack D — 数据安全](./pack_d_data_security_test.md) | Pack D | 14 | 脱敏规则（7种）、数据字典、SQL 工单模板、AI Text2SQL |
 | [Pack E — 引擎与归档](./pack_e_engines_archive_test.md) | Pack E | 17 | 多引擎验证、数据归档（purge/dest）、回滚辅助、通知服务 |
 | [Pack F — 第三方登录](./pack_f_third_party_auth_test.md) | Pack F | 17 | LDAP、钉钉/飞书/企微 OAuth2、CAS、CSRF 防护 |
 | [Pack G — 质量保障](./pack_g_quality_assurance_test.md) | Pack G | 19 | 单元测试 152 个、集成测试 36 个、Locust 压测、安全扫描 |

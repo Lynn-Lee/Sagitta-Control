@@ -57,16 +57,22 @@ class WorkflowTemplate(BaseModel):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     template_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="模板名称")
+    category: Mapped[str] = mapped_column(String(30), default="other", comment="模板分类")
     description: Mapped[str] = mapped_column(String(200), default="", comment="模板说明")
+    scene_desc: Mapped[str] = mapped_column(String(300), default="", comment="适用场景")
+    risk_hint: Mapped[str] = mapped_column(String(300), default="", comment="风险提示")
+    rollback_hint: Mapped[str] = mapped_column(String(300), default="", comment="回滚建议")
 
     # 默认关联的实例和数据库（提交工单时自动填充）
     instance_id: Mapped[int | None] = mapped_column(Integer, comment="默认实例ID")
     db_name: Mapped[str] = mapped_column(String(64), default="", comment="默认数据库名")
+    flow_id: Mapped[int | None] = mapped_column(Integer, comment="默认审批流ID")
 
     sql_content: Mapped[str] = mapped_column(Text, nullable=False, comment="SQL 模板内容")
     syntax_type: Mapped[int] = mapped_column(Integer, default=0, comment="SQL类型 0未知 1DDL 2DML")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")
 
-    # 可见范围：public=所有人可用 private=仅创建人
+    # 可见范围：public=全局模板 private=个人模板
     visibility: Mapped[str] = mapped_column(String(10), default="public", comment="可见范围")
     created_by: Mapped[str] = mapped_column(String(30), default="", comment="创建人")
     created_by_id: Mapped[int] = mapped_column(Integer, default=0, comment="创建人ID")
@@ -77,5 +83,7 @@ class WorkflowTemplate(BaseModel):
     __table_args__ = (
         Index("ix_tmpl_created_by", "created_by_id"),
         Index("ix_tmpl_visibility", "visibility"),
+        Index("ix_tmpl_category", "category"),
+        Index("ix_tmpl_active", "is_active"),
         Index("ix_tmpl_tenant", "tenant_id"),
     )

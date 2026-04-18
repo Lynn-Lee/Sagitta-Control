@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, NotFoundException
+from app.models.approval_flow import ApprovalFlow
 from app.models.masking import MaskingRule, WorkflowTemplate
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,16 @@ RULE_TYPES = [
     {"value": "name",    "label": "姓名",   "example": "张**",               "desc": "保留姓氏"},
     {"value": "address", "label": "地址",   "example": "北京市朝阳区***",    "desc": "保留前6个字符"},
     {"value": "regex",   "label": "自定义正则", "example": "",               "desc": "使用自定义正则表达式"},
+]
+
+WORKFLOW_TEMPLATE_CATEGORIES = [
+    {"value": "cleanup", "label": "数据清理"},
+    {"value": "repair", "label": "数据修复"},
+    {"value": "index", "label": "索引变更"},
+    {"value": "schema", "label": "表结构变更"},
+    {"value": "inspection", "label": "巡检查询"},
+    {"value": "readonly", "label": "只读分析"},
+    {"value": "other", "label": "其他"},
 ]
 
 
@@ -170,21 +181,47 @@ class MaskingRuleService:
 # ═══════════════════════════════════════════════════════════
 
 class WorkflowTemplateService:
+    @staticmethod
+    def _can_manage_public_template(operator: dict) -> bool:
+        if operator.get("is_superuser"):
+            return True
+        permissions = set(operator.get("permissions") or [])
+        return bool({"sql_review", "sql_execute"} & permissions)
 
     @staticmethod
-    def fmt(t: WorkflowTemplate) -> dict:
+    async def _flow_name_map(db: AsyncSession, flow_ids: list[int]) -> dict[int, str]:
+        if not flow_ids:
+            return {}
+        rows = (
+            await db.execute(
+                select(ApprovalFlow.id, ApprovalFlow.name).where(ApprovalFlow.id.in_(flow_ids))
+            )
+        ).all()
+        return {row[0]: row[1] for row in rows}
+
+    @staticmethod
+    def fmt(t: WorkflowTemplate, flow_name: str = "") -> dict:
         return {
             "id": t.id,
             "template_name": t.template_name,
+            "category": t.category,
             "description": t.description,
+            "scene_desc": t.scene_desc,
+            "risk_hint": t.risk_hint,
+            "rollback_hint": t.rollback_hint,
             "instance_id": t.instance_id,
             "db_name": t.db_name,
+            "flow_id": t.flow_id,
+            "flow_name": flow_name,
             "sql_content": t.sql_content,
             "syntax_type": t.syntax_type,
+            "is_active": t.is_active,
             "visibility": t.visibility,
             "created_by": t.created_by,
+            "created_by_id": t.created_by_id,
             "use_count": t.use_count,
             "created_at": t.created_at.isoformat() if t.created_at else "",
+            "updated_at": t.updated_at.isoformat() if t.updated_at else "",
         }
 
     @staticmethod
@@ -192,6 +229,9 @@ class WorkflowTemplateService:
         db: AsyncSession,
         user: dict,
         search: str | None = None,
+        category: str | None = None,
+        visibility: str | None = None,
+        is_active: bool | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[int, list[dict]]:
@@ -203,30 +243,70 @@ class WorkflowTemplateService:
         )
         conditions = [visibility_cond]
         if search:
-            conditions.append(WorkflowTemplate.template_name.ilike(f"%{search}%"))
+            conditions.append(
+                WorkflowTemplate.template_name.ilike(f"%{search}%")
+                | WorkflowTemplate.description.ilike(f"%{search}%")
+            )
+        if category:
+            conditions.append(WorkflowTemplate.category == category)
+        if visibility:
+            conditions.append(WorkflowTemplate.visibility == visibility)
+        if is_active is not None:
+            conditions.append(WorkflowTemplate.is_active == is_active)
 
         count_stmt = select(func.count()).select_from(WorkflowTemplate).where(and_(*conditions))
         data_stmt = select(WorkflowTemplate).where(and_(*conditions))
 
         total = (await db.execute(count_stmt)).scalar_one()
         data_stmt = data_stmt.order_by(
+            WorkflowTemplate.is_active.desc(),
             WorkflowTemplate.use_count.desc(),
             WorkflowTemplate.created_at.desc(),
         ).offset((page - 1) * page_size).limit(page_size)
 
         rows = (await db.execute(data_stmt)).scalars().all()
-        return total, [WorkflowTemplateService.fmt(t) for t in rows]
+        flow_map = await WorkflowTemplateService._flow_name_map(
+            db, [t.flow_id for t in rows if t.flow_id]
+        )
+        return total, [WorkflowTemplateService.fmt(t, flow_map.get(t.flow_id or 0, "")) for t in rows]
+
+    @staticmethod
+    async def get_template(db: AsyncSession, tmpl_id: int, user: dict) -> dict:
+        user_id = user.get("id", 0)
+        result = await db.execute(
+            select(WorkflowTemplate).where(
+                WorkflowTemplate.id == tmpl_id,
+                (WorkflowTemplate.visibility == "public")
+                | (WorkflowTemplate.created_by_id == user_id),
+            )
+        )
+        t = result.scalar_one_or_none()
+        if not t:
+            raise NotFoundException(f"模板 ID={tmpl_id} 不存在")
+        flow_map = await WorkflowTemplateService._flow_name_map(
+            db, [t.flow_id] if t.flow_id else []
+        )
+        return WorkflowTemplateService.fmt(t, flow_map.get(t.flow_id or 0, ""))
 
     @staticmethod
     async def create_template(db: AsyncSession, data: dict, operator: dict) -> WorkflowTemplate:
+        visibility = data.get("visibility", "public")
+        if visibility == "public" and not WorkflowTemplateService._can_manage_public_template(operator):
+            raise AppException("仅 DBA 或超级管理员可创建全局模板", code=403)
         t = WorkflowTemplate(
             template_name=data["template_name"],
+            category=data.get("category", "other"),
             description=data.get("description", ""),
+            scene_desc=data.get("scene_desc", ""),
+            risk_hint=data.get("risk_hint", ""),
+            rollback_hint=data.get("rollback_hint", ""),
             instance_id=data.get("instance_id"),
             db_name=data.get("db_name", ""),
+            flow_id=data.get("flow_id"),
             sql_content=data["sql_content"],
             syntax_type=data.get("syntax_type", 0),
-            visibility=data.get("visibility", "public"),
+            is_active=data.get("is_active", True),
+            visibility=visibility,
             created_by=operator.get("username", ""),
             created_by_id=operator.get("id", 0),
         )
@@ -244,8 +324,16 @@ class WorkflowTemplateService:
         # 只有创建者或超管可修改
         if not operator.get("is_superuser") and t.created_by_id != operator.get("id"):
             raise AppException("无权修改此模板", code=403)
-        for field in ["template_name", "description", "instance_id", "db_name",
-                      "sql_content", "syntax_type", "visibility"]:
+        if (
+            data.get("visibility") == "public"
+            and not WorkflowTemplateService._can_manage_public_template(operator)
+        ):
+            raise AppException("仅 DBA 或超级管理员可将模板设为全局模板", code=403)
+        for field in [
+            "template_name", "category", "description", "scene_desc", "risk_hint",
+            "rollback_hint", "instance_id", "db_name", "flow_id",
+            "sql_content", "syntax_type", "visibility", "is_active",
+        ]:
             if field in data:
                 setattr(t, field, data[field])
         await db.commit()
@@ -270,7 +358,35 @@ class WorkflowTemplateService:
         t = result.scalar_one_or_none()
         if not t:
             raise NotFoundException(f"模板 ID={tmpl_id} 不存在")
+        if not t.is_active:
+            raise AppException("模板已停用，无法继续使用", code=400)
         t.use_count += 1
         await db.commit()
         await db.refresh(t)
         return t
+
+    @staticmethod
+    async def clone_template(db: AsyncSession, tmpl_id: int, operator: dict) -> WorkflowTemplate:
+        data = await WorkflowTemplateService.get_template(db, tmpl_id, operator)
+        cloned = WorkflowTemplate(
+            template_name=f"{data['template_name']}-副本",
+            category=data.get("category", "other"),
+            description=data.get("description", ""),
+            scene_desc=data.get("scene_desc", ""),
+            risk_hint=data.get("risk_hint", ""),
+            rollback_hint=data.get("rollback_hint", ""),
+            instance_id=data.get("instance_id"),
+            db_name=data.get("db_name", ""),
+            flow_id=data.get("flow_id"),
+            sql_content=data.get("sql_content", ""),
+            syntax_type=data.get("syntax_type", 0),
+            is_active=True,
+            visibility="private",
+            created_by=operator.get("username", ""),
+            created_by_id=operator.get("id", 0),
+            use_count=0,
+        )
+        db.add(cloned)
+        await db.commit()
+        await db.refresh(cloned)
+        return cloned

@@ -11,7 +11,7 @@ SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效
 
 - **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，所有敏感字段 Fernet/AES 加密存储
 - **全面**：支持 11 种数据库引擎（MySQL / PostgreSQL / Oracle / MongoDB / Redis / ClickHouse 等）
-- **高效**：AI Text2SQL + 工单模板 + 自定义审批流，全异步 Celery 执行不阻塞
+- **高效**：AI Text2SQL + SQL 工单模板 + 自定义审批流，全异步 Celery 执行不阻塞
 - **可观测**：内建 Prometheus + Grafana 监控，全流程操作审计
 - **可解释权限**：v2-lite 权限体系已落地，权限拒绝可定位到身份 / 资源范围 / 数据授权层
 
@@ -68,7 +68,7 @@ SagittaDB/
 | Pack A | SQL 工单全流程 + 运维工具 | ✅ 100% |
 | Pack B | 可观测中心 + 迁移脚本 | ✅ 100% |
 | Pack C | 系统配置、审计日志、资源组、数据库注册 | ✅ 100% |
-| Pack D | 数据脱敏、数据字典、工单模板、AI Text2SQL | ✅ 100% |
+| Pack D | 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL | ✅ 100% |
 | Pack E | 多引擎补全、数据归档、SQL 回滚、通知服务 | 🔧 85% |
 | 品牌升级 | SagittaDB 品牌 UI 全面更新 | ✅ 100% |
 | Pack F | 第三方登录（LDAP/钉钉/飞书/企微/CAS） | ✅ 100% |

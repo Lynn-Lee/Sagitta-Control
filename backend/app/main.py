@@ -20,6 +20,7 @@ from app.routers import (
     binlog,
     diagnostic,
     instance,
+    masking,
     monitor,
     optimize,
     query,
@@ -80,6 +81,7 @@ app.include_router(monitor.router,    prefix=f"{API_V1}/monitor",    tags=["可�
 app.include_router(system.router,     prefix=f"{API_V1}/system",     tags=["系统管理"])
 app.include_router(ai.router,            prefix=f"{API_V1}/ai",             tags=["AI 能力"])
 app.include_router(approval_flow.router, prefix=f"{API_V1}/approval-flows",  tags=["审批流管理"])
+app.include_router(masking.template_router, prefix=f"{API_V1}/workflow-templates", tags=["工单模板"])
 
 from app.routers.monitor import sd_router  # noqa: E402
 
