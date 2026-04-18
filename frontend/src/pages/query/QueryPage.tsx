@@ -167,11 +167,14 @@ export default function QueryPage() {
     ),
   ]
 
-  const resultRows = result?.rows.map((row, i) => ({
-    key: i,
-    __rowNo: i + 1,
-    ...Object.fromEntries(row.map((v: any, j: number) => [j, v])),
-  })) ?? []
+  const resultRows = useMemo(
+    () => result?.rows.map((row, i) => ({
+      key: i,
+      __rowNo: i + 1,
+      ...Object.fromEntries(row.map((v: any, j: number) => [j, v])),
+    })) ?? [],
+    [result?.rows],
+  )
 
   const currentPageRows = useMemo(
     () => resultRows.slice((resultPage - 1) * resultPageSize, resultPage * resultPageSize),

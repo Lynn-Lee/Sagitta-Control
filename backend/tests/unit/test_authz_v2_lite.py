@@ -3,8 +3,7 @@ v2-lite 权限体系单元测试。
 """
 
 from datetime import date
-from types import MethodType
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

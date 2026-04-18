@@ -3,8 +3,8 @@
 新增模型后记得在这里 import。
 """
 
-from app.models.base import Base, BaseModel  # noqa: F401
 from app.models.approval_flow import ApprovalFlow, ApprovalFlowNode  # noqa: F401
+from app.models.base import Base, BaseModel  # noqa: F401
 from app.models.instance import Instance, InstanceDatabase, InstanceTag, SshTunnel  # noqa: F401
 from app.models.masking import MaskingRule, WorkflowTemplate  # noqa: F401
 from app.models.monitor import (  # noqa: F401

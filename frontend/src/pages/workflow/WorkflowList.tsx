@@ -163,11 +163,11 @@ export default function WorkflowList() {
 
   const mineColumns: ColumnsType<any> = [
     idColumn,
-    { title: '工单名称', dataIndex: 'workflow_name', width: 430, render: renderWorkflowName(navigate, 400) },
+    { title: '工单名称', dataIndex: 'workflow_name', width: 290, render: renderWorkflowName(navigate, 260) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
-    { title: '审批链路', dataIndex: 'audit_chain_text', width: 440, ellipsis: true, render: (v) => renderAuditChain(v, 410) },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
     { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: true, render: renderCurrentNode },
     { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
     detailColumn,
@@ -176,12 +176,12 @@ export default function WorkflowList() {
   const auditColumns: ColumnsType<any> = [
     idColumn,
     { title: '申请人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
-    { title: '工单名称', dataIndex: 'workflow_name', width: 380, render: renderWorkflowName(navigate, 350) },
+    { title: '工单名称', dataIndex: 'workflow_name', width: 255, render: renderWorkflowName(navigate, 225) },
     { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: true, render: renderCurrentNode },
-    { title: '审批链路', dataIndex: 'audit_chain_text', width: 470, ellipsis: true, render: (v) => renderAuditChain(v, 440) },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
     { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
     detailColumn,
   ]
@@ -324,7 +324,7 @@ export default function WorkflowList() {
           rowKey="id"
           loading={isLoading}
           tableLayout="fixed"
-          scroll={{ x: activeTab === 'audit' ? 1980 : activeTab === 'execute' ? 1580 : 1840 }}
+          scroll={{ x: activeTab === 'audit' ? 1680 : activeTab === 'execute' ? 1580 : 1540 }}
           pagination={{
             total: data?.total,
             current: page,

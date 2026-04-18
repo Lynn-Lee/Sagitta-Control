@@ -2,6 +2,7 @@
 SQL 工单异步执行 Celery 任务（Sprint 3）。
 """
 import asyncio
+import importlib
 import json
 import logging
 from datetime import UTC, datetime
@@ -28,7 +29,6 @@ def execute_workflow_task(self, workflow_id: int, operator_id: int):
 
 async def _execute_async(workflow_id: int, operator_id: int):
     """异步执行逻辑。"""
-    import app.models  # noqa: F401  # 预加载全部模型，确保 metadata 中包含审批流等外键目标表
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import selectinload, sessionmaker
@@ -39,6 +39,8 @@ async def _execute_async(workflow_id: int, operator_id: int):
     from app.models.user import Users
     from app.models.workflow import SqlWorkflow, WorkflowAudit, WorkflowStatus
     from app.services.audit import OP_EXECUTE, AuditService
+
+    importlib.import_module("app.models")  # 预加载全部模型，确保 metadata 中包含审批流等外键目标表
 
     engine = create_async_engine(settings.DATABASE_URL)
     async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
