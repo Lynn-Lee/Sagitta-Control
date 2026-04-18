@@ -255,7 +255,7 @@ export default function DashboardPage() {
   const queryCards = [
     { title: `${queryDays}天查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: '#1558A8' },
     { title: `${queryDays}天查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: '#722ed1' },
-    { title: `${queryDays}天失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: '#f5222d' },
+    { title: `${queryDays}天治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: '#f5222d' },
     { title: `${queryDays}天命中脱敏次数`, value: queryOverview?.cards?.period_masked_count ?? 0, icon: <SafetyCertificateOutlined />, color: '#13c2c2' },
     { title: '待审批查询权限申请数', value: queryOverview?.cards?.pending_query_priv_apply_count ?? 0, icon: <LockOutlined />, color: '#fa8c16' },
     { title: `${queryDays}天已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
@@ -298,6 +298,11 @@ export default function DashboardPage() {
           />
         }
       >
+        <div style={{ marginBottom: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            统计按当前用户可见的查询业务范围聚合；治理失败次数包含查询执行失败，以及查询权限申请/审批失败。
+          </Text>
+        </div>
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           {queryCards.map(card => (
             <Col key={card.title} xs={24} sm={12} lg={8} xl={6}>
@@ -367,7 +372,7 @@ export default function DashboardPage() {
                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="failure_count" stroke={QUERY_GOVERNANCE_COLORS.failure} name="失败次数" strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="failure_count" stroke={QUERY_GOVERNANCE_COLORS.failure} name="治理失败次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="masked_count" stroke={QUERY_GOVERNANCE_COLORS.masked} name="命中脱敏次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="approved_count" stroke={QUERY_GOVERNANCE_COLORS.approved} name="已通过申请数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="rejected_count" stroke={QUERY_GOVERNANCE_COLORS.rejected} name="已驳回申请数" strokeWidth={2} dot={{ r: 2 }} />
@@ -422,6 +427,11 @@ export default function DashboardPage() {
           />
         }
       >
+        <div style={{ marginBottom: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            统计按当前用户可见的工单业务范围聚合；审批相关排行展示的是当前范围内工单涉及的审批处理情况，不等同于当前登录人的个人审批工作量。
+          </Text>
+        </div>
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           {workflowCards.map(card => (
             <Col key={card.title} xs={24} sm={12} lg={8} xl={6}>
@@ -598,7 +608,7 @@ export default function DashboardPage() {
             </Card>
           </Col>
           <Col xs={24} lg={8}>
-            <Card title="审批人处理 Top 10" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <Card title="工单相关审批人 Top 10" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
               {workflowOverview?.top_approvers?.length ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
                   <BarChart data={buildTopChartData(workflowOverview.top_approvers, 'count')} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }} barSize={18}>
