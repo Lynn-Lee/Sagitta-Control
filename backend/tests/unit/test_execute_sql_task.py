@@ -1,3 +1,4 @@
+import importlib
 import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -23,8 +24,8 @@ sys.modules.setdefault(
     SimpleNamespace(Celery=_FakeCelery),
 )
 
-from app.models.workflow import WorkflowStatus
-from app.tasks import execute_sql as execute_sql_task_module
+WorkflowStatus = importlib.import_module("app.models.workflow").WorkflowStatus
+execute_sql_task_module = importlib.import_module("app.tasks.execute_sql")
 
 
 class _AsyncSessionContext:
@@ -56,9 +57,12 @@ class TestExecuteWorkflowTask:
             execute_sql_task_module.asyncio,
             "run",
             side_effect=RuntimeError("boom"),
-        ), patch.object(execute_sql_task_module, "_execute_async", MagicMock(return_value="coroutine")):
-            with pytest.raises(RuntimeError, match="boom"):
-                execute_sql_task_module.execute_workflow_task(None, 12, 34)
+        ), patch.object(
+            execute_sql_task_module,
+            "_execute_async",
+            MagicMock(return_value="coroutine"),
+        ), pytest.raises(RuntimeError, match="boom"):
+            execute_sql_task_module.execute_workflow_task(None, 12, 34)
 
 
 class TestExecuteAsync:
