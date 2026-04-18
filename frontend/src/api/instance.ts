@@ -20,9 +20,16 @@ export interface InstanceDatabase {
   db_name_label: string
 }
 
+export interface InstanceListResponse {
+  total: number
+  page: number
+  page_size: number
+  items: InstanceItem[]
+}
+
 export const instanceApi = {
   list: (params?: { search?: string; db_type?: string; page?: number; page_size?: number }) =>
-    apiClient.get('/instances/', { params }).then(r => r.data),
+    apiClient.get<InstanceListResponse>('/instances/', { params }).then(r => r.data),
 
   get: (id: number) =>
     apiClient.get(`/instances/${id}/`).then(r => r.data),

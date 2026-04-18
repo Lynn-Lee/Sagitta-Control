@@ -28,9 +28,16 @@ export interface ApprovalFlowListItem {
   node_count: number
 }
 
+export interface ApprovalFlowListResponse {
+  total: number
+  page: number
+  page_size: number
+  items: ApprovalFlowListItem[]
+}
+
 export const approvalFlowApi = {
   list: (params?: { search?: string; page?: number; page_size?: number }) =>
-    apiClient.get('/approval-flows/', { params }).then(r => r.data),
+    apiClient.get<ApprovalFlowListResponse>('/approval-flows/', { params }).then(r => r.data),
 
   get: (id: number) =>
     apiClient.get(`/approval-flows/${id}/`).then(r => r.data.data),
