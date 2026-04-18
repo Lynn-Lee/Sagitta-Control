@@ -15,7 +15,7 @@
 | [Sprint 1 — 认证与实例](./sprint1_auth_user_instance_test.md) | Sprint 1 | 19 | 登录认证、JWT、2FA、用户 CRUD、实例管理、资源组 |
 | [Sprint 2 — 查询引擎](./sprint2_query_engine_test.md) | Sprint 2 | 13 | 多引擎查询、DDL/DML 拦截、行数限制、查询权限申请 |
 | [Pack A — SQL 工单](./pack_a_workflow_test.md) | Pack A (S3+S4) | 20 | 工单提交/审批/执行、三标签列表、审批按钮可见性、9 种状态流转、运维工具 |
-| [Pack B — 可观测中心](./pack_b_observability_test.md) | Pack B (S5+S6) | 18 | Dashboard 在线查询概览、Dashboard SQL 工单概览、Prometheus、Grafana、Alertmanager |
+| [Pack B — 可观测中心](./pack_b_observability_test.md) | Pack B (S5+S6) | 20 | Dashboard 在线查询概览、Dashboard SQL 工单概览、Dashboard 实例与库概览、Prometheus、Grafana、Alertmanager |
 | [Pack C1 — 系统管理](./pack_c1_system_admin_test.md) | Pack C1 | 16 | 系统配置（7组）、审计日志、资源组、个人设置 |
 | [Pack C2 — 数据库注册](./pack_c2_instance_database_test.md) | Pack C2 | 10 | 手动添加/引擎同步、启停用、类型字段适配 |
 | [Pack D — 数据安全](./pack_d_data_security_test.md) | Pack D | 14 | 脱敏规则（7种）、数据字典、工单模板、AI Text2SQL |
@@ -26,7 +26,7 @@
 | [v2-lite 权限本地验证清单](./v2_lite_auth_local_validation.md) | v2-lite auth | 20+ | 本地快速验证角色、资源范围、查询授权、审批流 |
 | [v2-lite 权限完整验证文档](./v2_lite_auth_full_validation.md) | v2-lite auth | 30+ | 完整验证角色、资源组、用户组、状态变更、查询权限、审批流、监控范围 |
 
-**总用例数：182+ 个**
+**总用例数：184+ 个**
 
 ---
 
@@ -38,7 +38,7 @@
 | Sprint 1 | 19 | | | 19 | — |
 | Sprint 2 | 13 | | | 13 | — |
 | Pack A | 15 | | | 15 | — |
-| Pack B | 13 | | | 13 | — |
+| Pack B | 20 | | | 20 | — |
 | Pack C1 | 16 | | | 16 | — |
 | Pack C2 | 10 | | | 10 | — |
 | Pack D | 14 | | | 14 | — |

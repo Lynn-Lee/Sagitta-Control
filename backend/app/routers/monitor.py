@@ -67,6 +67,14 @@ async def workflow_overview(
     return await DashboardService.get_workflow_overview(db, user=user, days=days)
 
 
+@router.get("/dashboard/instance-overview/", summary="实例与库概览")
+async def instance_overview(
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await DashboardService.get_instance_overview(db, user=user)
+
+
 # ── 采集配置 ──────────────────────────────────────────────────
 
 @router.get("/configs/", summary="采集配置列表", dependencies=[Depends(require_perm("monitor_config_manage"))])

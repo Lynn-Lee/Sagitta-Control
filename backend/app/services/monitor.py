@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
-from app.models.instance import Instance
+from app.models.instance import Instance, InstanceDatabase
 from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPrivilegeApply
 from app.models.query import QueryLog, QueryPrivilegeApply
 from app.models.role import UserGroup
@@ -228,6 +228,45 @@ class MonitorService:
 
 
 class DashboardService:
+    @staticmethod
+    async def _resolve_instance_scope(db: AsyncSession, user: dict) -> dict:
+        if user.get("is_superuser") or user.get("role") in {"dba", "superadmin"}:
+            return {"mode": "global", "label": "全量资源", "instance_ids": None}
+
+        user_rg_ids = user.get("resource_groups", [])
+        if not user_rg_ids:
+            return {"mode": "instance_scope", "label": "可见资源范围", "instance_ids": []}
+
+        result = await db.execute(
+            select(Instance.id)
+            .join(Instance.resource_groups.of_type(ResourceGroup))
+            .where(and_(Instance.is_active.is_(True), ResourceGroup.id.in_(user_rg_ids)))
+            .distinct()
+        )
+        return {
+            "mode": "instance_scope",
+            "label": "可见资源范围",
+            "instance_ids": list(result.scalars().all()),
+        }
+
+    @staticmethod
+    def _apply_instance_scope(stmt, scope: dict):
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(Instance.id == -1)
+            return stmt.where(Instance.id.in_(instance_ids))
+        return stmt
+
+    @staticmethod
+    def _apply_instance_database_scope(stmt, scope: dict):
+        if scope["mode"] == "instance_scope":
+            instance_ids = scope.get("instance_ids") or []
+            if not instance_ids:
+                return stmt.where(InstanceDatabase.instance_id == -1)
+            return stmt.where(InstanceDatabase.instance_id.in_(instance_ids))
+        return stmt
+
     @staticmethod
     async def _resolve_query_scope(db: AsyncSession, user: dict) -> dict:
         if user.get("is_superuser") or user.get("role") == "dba":
@@ -510,6 +549,83 @@ class DashboardService:
                 for row in top_rows
                 if row.user_id is not None
             ],
+        }
+
+    @staticmethod
+    async def get_instance_overview(db: AsyncSession, user: dict) -> dict:
+        scope = await DashboardService._resolve_instance_scope(db, user)
+
+        async def scalar(stmt) -> int:
+            return int((await db.execute(stmt)).scalar() or 0)
+
+        instance_stmt = DashboardService._apply_instance_scope(
+            select(Instance).where(Instance.is_active.is_(True)),
+            scope,
+        )
+        instance_subq = instance_stmt.subquery()
+        visible_instance_count = await scalar(select(func.count()).select_from(instance_subq))
+
+        db_stmt = DashboardService._apply_instance_database_scope(select(InstanceDatabase), scope)
+        db_subq = db_stmt.subquery()
+        synced_database_count = await scalar(select(func.count()).select_from(db_subq))
+
+        enabled_db_subq = DashboardService._apply_instance_database_scope(
+            select(InstanceDatabase).where(InstanceDatabase.is_active.is_(True)),
+            scope,
+        ).subquery()
+        enabled_database_count = await scalar(select(func.count()).select_from(enabled_db_subq))
+
+        disabled_db_subq = DashboardService._apply_instance_database_scope(
+            select(InstanceDatabase).where(InstanceDatabase.is_active.is_(False)),
+            scope,
+        ).subquery()
+        disabled_database_count = await scalar(select(func.count()).select_from(disabled_db_subq))
+
+        type_stmt = DashboardService._apply_instance_scope(
+            select(Instance.db_type, func.count().label("count")).where(Instance.is_active.is_(True)),
+            scope,
+        ).group_by(Instance.db_type).order_by(func.count().desc(), Instance.db_type)
+        type_rows = (await db.execute(type_stmt)).all()
+
+        active_instance_subq = DashboardService._apply_instance_scope(
+            select(Instance).where(Instance.is_active.is_(True)),
+            scope,
+        ).subquery()
+        enabled_instance_count = await scalar(select(func.count()).select_from(active_instance_subq))
+
+        disabled_instance_subq = DashboardService._apply_instance_scope(
+            select(Instance).where(Instance.is_active.is_(False)),
+            scope,
+        ).subquery()
+        disabled_instance_count = await scalar(select(func.count()).select_from(disabled_instance_subq))
+
+        status_items = [
+            {"label": "已启用库/Schema", "count": enabled_database_count},
+            {"label": "已禁用库/Schema", "count": disabled_database_count},
+        ]
+
+        instance_status_items = [
+            {"label": "已启用实例", "count": enabled_instance_count},
+            {"label": "已禁用实例", "count": disabled_instance_count},
+        ]
+
+        return {
+            "scope": {
+                "mode": scope["mode"],
+                "label": scope["label"],
+            },
+            "cards": {
+                "visible_instance_count": visible_instance_count,
+                "synced_database_count": synced_database_count,
+                "enabled_database_count": enabled_database_count,
+                "disabled_database_count": disabled_database_count,
+            },
+            "instance_type_distribution": [
+                {"db_type": row.db_type, "count": int(row.count or 0)}
+                for row in type_rows
+            ],
+            "instance_status_distribution": instance_status_items,
+            "database_status_distribution": status_items,
         }
 
     @staticmethod

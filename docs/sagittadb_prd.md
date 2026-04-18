@@ -323,7 +323,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 #### 2.6.1 Dashboard
 
-- 一期同时上线“在线查询概览”和“SQL 工单概览”两个模块
+- 一期同时上线“在线查询概览”“SQL 工单概览”“实例与库概览”三个模块
 - Dashboard 数据按当前登录用户权限范围裁剪：
   - 普通用户：仅看自己
   - 组长：仅看自己和直接管理用户组成员
@@ -348,6 +348,11 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
   - 执行失败工单数
   - 取消工单数
   - 已完成工单总数
+- 实例与库概览包含 4 个卡片：
+  - 可见实例数
+  - 已同步库/Schema数
+  - 已启用库/Schema数
+  - 已禁用库/Schema数
 - 时间范围统一作用于每个 Dashboard 模块内部，支持：
   - 7 天
   - 14 天
@@ -369,6 +374,11 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
   - 热点数据库 Top 10
   - 工单相关审批人 Top 10
   - 执行实例 Top 10
+- 实例与库图表区包含：
+  - 实例类型分布
+  - 实例状态分布
+  - 库/Schema 状态分布
+  - 实例类型展示名统一使用规范命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 在线查询中的“治理失败次数”统计口径包括：
   - 查询执行失败
   - 查询权限申请失败
