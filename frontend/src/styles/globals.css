@@ -144,6 +144,24 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   border-color: rgba(255, 255, 255, 0.10);
 }
 
+/* 系统配置页 Tab 导航 */
+.system-config-tabs .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
+.system-config-tabs .ant-tabs-nav-wrap {
+  flex-wrap: nowrap;
+}
+
+.system-config-tabs .ant-tabs-tab {
+  padding-inline: 6px;
+}
+
+.system-config-tabs .ant-tabs-tab-btn {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* 通用动画 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

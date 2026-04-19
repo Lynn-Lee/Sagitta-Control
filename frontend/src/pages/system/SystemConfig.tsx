@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Alert, Button, Card, Divider, Form, Input,
-  message, Space, Switch, Tabs, Typography, Grid,
+  message, Space, Switch, Tabs, Typography, Grid, Tooltip,
 } from 'antd'
 import { ApiOutlined, SaveOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -13,6 +13,18 @@ import TableEmptyState from '@/components/common/TableEmptyState'
 const { Text } = Typography
 const { useBreakpoint } = Grid
 
+const tabLabelStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  whiteSpace: 'nowrap',
+}
+
+const CompactTabLabel = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <Tooltip title={title}>
+    <span style={tabLabelStyle}>{children}</span>
+  </Tooltip>
+)
+
 // 平台图标：与登录页保持一致，使用 public/icons/ 官方矢量图
 const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
   <img src={src} alt={alt} width={14} height={14}
@@ -20,14 +32,15 @@ const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
 )
 
 const GROUP_LABEL: Record<string, React.ReactNode> = {
-  basic:    <span>⚙️ 基础设置</span>,
-  mail:     <span>📧 邮件通知</span>,
-  dingtalk: <span><PlatformImg src="/icons/dingtalk.svg" alt="钉钉" />钉钉通知</span>,
-  wecom:    <span><PlatformImg src="/icons/wecom.svg"    alt="企微" />企业微信通知</span>,
-  feishu:   <span><PlatformImg src="/icons/feishu.svg"   alt="飞书" />飞书通知</span>,
-  ldap:     <span><PlatformImg src="/icons/ldap.svg"     alt="LDAP" />LDAP 认证</span>,
-  ai:       <span>🤖 AI 功能</span>,
-  cas:      <span><PlatformImg src="/icons/cas.svg" alt="CAS" />CAS SSO</span>,
+  basic:    <CompactTabLabel title="基础设置">⚙️ 基础</CompactTabLabel>,
+  mail:     <CompactTabLabel title="邮件通知">📧 邮件</CompactTabLabel>,
+  dingtalk: <CompactTabLabel title="钉钉通知"><PlatformImg src="/icons/dingtalk.svg" alt="钉钉" />钉钉</CompactTabLabel>,
+  wecom:    <CompactTabLabel title="企业微信通知"><PlatformImg src="/icons/wecom.svg" alt="企微" />企微</CompactTabLabel>,
+  feishu:   <CompactTabLabel title="飞书通知"><PlatformImg src="/icons/feishu.svg" alt="飞书" />飞书</CompactTabLabel>,
+  ldap:     <CompactTabLabel title="LDAP 认证"><PlatformImg src="/icons/ldap.svg" alt="LDAP" />LDAP</CompactTabLabel>,
+  cas:      <CompactTabLabel title="CAS SSO"><PlatformImg src="/icons/cas.svg" alt="CAS" />CAS</CompactTabLabel>,
+  sms:      <CompactTabLabel title="短信验证码">⚙️ 短信</CompactTabLabel>,
+  ai:       <CompactTabLabel title="AI 功能">🤖 AI</CompactTabLabel>,
 }
 
 function TestButton({ label, onTest }: { label: string; onTest: () => Promise<any> }) {
@@ -195,11 +208,15 @@ export default function SystemConfig() {
 
   const tabItems = Object.entries(groups).map(([key, label]) => ({
     key,
-    label: GROUP_LABEL[key] ?? <span>⚙️ {label as string}</span>,
-    children: configs[key]?.length ? (
-      <ConfigGroup group={key} items={configs[key]} form={form} />
-    ) : (
-      <TableEmptyState title="暂无配置项" />
+    label: GROUP_LABEL[key] ?? <CompactTabLabel title={label as string}>⚙️ {label as string}</CompactTabLabel>,
+    children: (
+      <div style={{ maxWidth: 760 }}>
+        {configs[key]?.length ? (
+          <ConfigGroup group={key} items={configs[key]} form={form} />
+        ) : (
+          <TableEmptyState title="暂无配置项" />
+        )}
+      </div>
     ),
   }))
 
@@ -222,8 +239,12 @@ export default function SystemConfig() {
         {isLoading ? (
           <SectionLoading text="加载配置中..." />
         ) : (
-          <Form form={form} layout="vertical" style={{ maxWidth: 680 }}>
-            <Tabs items={tabItems} tabBarGutter={4} />
+          <Form form={form} layout="vertical" style={{ width: '100%' }}>
+            <Tabs
+              className="system-config-tabs"
+              items={tabItems}
+              tabBarGutter={2}
+            />
           </Form>
         )}
       </Card>
