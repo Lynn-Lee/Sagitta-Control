@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # 引擎注册表：db_type → 引擎类（延迟导入，避免循环依赖）
 _REGISTRY: dict[str, str] = {
     "mysql":         "app.engines.mysql:MysqlEngine",
+    "tidb":          "app.engines.mysql:MysqlEngine",
     "pgsql":         "app.engines.pgsql:PgSQLEngine",
     "oracle":        "app.engines.oracle:OracleEngine",
     "mongo":         "app.engines.mongo:MongoEngine",

@@ -134,6 +134,101 @@ class OracleEngine:
             return []
         return [{"table_name": row[0]} for row in rs.rows]
 
+    async def get_table_constraints(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        sql = """
+        SELECT
+            c.constraint_name,
+            c.constraint_type,
+            LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
+            MAX(ref.table_name) AS referenced_table_name,
+            LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names
+        FROM all_constraints c
+        JOIN all_cons_columns cols
+          ON c.owner = cols.owner
+         AND c.constraint_name = cols.constraint_name
+        LEFT JOIN all_constraints ref
+          ON c.r_owner = ref.owner
+         AND c.r_constraint_name = ref.constraint_name
+        LEFT JOIN all_cons_columns ref_cols
+          ON ref.owner = ref_cols.owner
+         AND ref.constraint_name = ref_cols.constraint_name
+         AND cols.position = ref_cols.position
+        WHERE c.owner = :owner
+          AND c.table_name = :table_name
+          AND c.constraint_type IN ('P', 'U', 'R', 'C')
+        GROUP BY c.constraint_name, c.constraint_type
+        ORDER BY
+          CASE c.constraint_type
+            WHEN 'P' THEN 1
+            WHEN 'U' THEN 2
+            WHEN 'R' THEN 3
+            WHEN 'C' THEN 4
+            ELSE 9
+          END,
+          c.constraint_name
+        """
+        rs = await asyncio.to_thread(
+            self._run_query_sync,
+            sql,
+            {"owner": db_name.upper(), "table_name": tb_name.upper()},
+        )
+        if rs.is_success:
+            mapping = {"P": "PRIMARY KEY", "U": "UNIQUE", "R": "FOREIGN KEY", "C": "CHECK"}
+            normalized_rows = []
+            for row in rs.rows:
+                row_dict = dict(zip(rs.column_list, row, strict=False))
+                row_dict["CONSTRAINT_TYPE"] = mapping.get(
+                    str(row_dict.get("CONSTRAINT_TYPE", "")),
+                    str(row_dict.get("CONSTRAINT_TYPE", "")),
+                )
+                normalized_rows.append(row_dict)
+            rs.rows = normalized_rows
+        return rs
+
+    async def get_table_indexes(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        sql = """
+        SELECT
+            i.index_name,
+            CASE
+              WHEN i.uniqueness = 'UNIQUE' THEN 'UNIQUE INDEX'
+              ELSE 'INDEX'
+            END AS index_type,
+            LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.column_position) AS column_names,
+            CASE
+              WHEN COUNT(*) > 1 THEN 'YES'
+              ELSE 'NO'
+            END AS is_composite,
+            COALESCE(MAX(com.comments), '') AS index_comment
+        FROM all_indexes i
+        JOIN all_ind_columns cols
+          ON i.owner = cols.index_owner
+         AND i.index_name = cols.index_name
+         AND i.table_name = cols.table_name
+        LEFT JOIN all_ind_comments com
+          ON i.owner = com.index_owner
+         AND i.index_name = com.index_name
+         AND i.table_name = com.table_name
+        WHERE i.table_owner = :owner
+          AND i.table_name = :table_name
+        GROUP BY i.index_name, i.uniqueness
+        ORDER BY
+          CASE
+            WHEN i.index_name LIKE 'PK_%' THEN 1
+            WHEN i.uniqueness = 'UNIQUE' THEN 2
+            ELSE 3
+          END,
+          i.index_name
+        """
+        return await asyncio.to_thread(
+            self._run_query_sync,
+            sql,
+            {"owner": db_name.upper(), "table_name": tb_name.upper()},
+        )
+
     def query_check(self, db_name: str, sql: str) -> dict:
         result = {"msg": "", "has_star": False, "syntax_error": False}
         try:

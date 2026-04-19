@@ -63,6 +63,18 @@ class EngineProtocol(Protocol):
         """获取数据库所有表的元数据（用于数据字典）。"""
         ...
 
+    async def get_table_constraints(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        """获取表级约束元数据（主键/唯一键/外键等）。"""
+        return ResultSet()
+
+    async def get_table_indexes(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        """获取表索引元数据（普通索引/联合索引/唯一索引等）。"""
+        return ResultSet()
+
     # ── 查询 ──────────────────────────────────────────────────
 
     def query_check(self, db_name: str, sql: str) -> dict[str, Any]:

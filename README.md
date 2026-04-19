@@ -87,6 +87,14 @@ SagittaDB/
 产品需求文档请见 [docs/sagittadb_prd.md](docs/sagittadb_prd.md)
 权限设计与收敛方案请见 [docs/sagittadba_auth_redesign_v2.md](docs/sagittadba_auth_redesign_v2.md)
 
+## 数据字典近况
+
+- 数据字典已从“字段浏览”扩展为“字段 + 表约束 + 索引信息”三块联动展示。
+- 当前关系型数据库优先支持：`MySQL / TiDB / PostgreSQL / Oracle / MSSQL`。
+- 表字段详情页已针对长默认值、长注释做了单行省略、悬浮查看与横向滚动优化，避免长文本挤压列名换行。
+- 后端新增了统一元数据归一化层，前端无需按数据库类型分别适配约束/索引字段名。
+- 这条链路已补齐引擎 SQL、服务层、API 路由、前端渲染四层单测。
+
 ## 权限体系（v2-lite）
 
 当前权限体系采用 5 层职责拆分：

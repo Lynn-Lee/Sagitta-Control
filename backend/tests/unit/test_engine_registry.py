@@ -22,6 +22,7 @@ class TestEngineRegistry:
     def test_supported_engines_list(self):
         engines = supported_engines()
         assert "mysql" in engines
+        assert "tidb" in engines
         assert "pgsql" in engines
         assert "mongo" in engines
         assert "redis" in engines
@@ -38,6 +39,16 @@ class TestEngineRegistry:
         instance = MockInstance("mongo")
         engine = get_engine(instance)
         assert engine.db_type == "mongo"
+
+    def test_get_tidb_engine(self):
+        instance = MockInstance("tidb")
+        engine = get_engine(instance)
+        assert engine.name == "MysqlEngine"
+
+    def test_get_mssql_engine(self):
+        instance = MockInstance("mssql")
+        engine = get_engine(instance)
+        assert engine.db_type == "mssql"
 
     def test_unsupported_db_type_raises(self):
         instance = MockInstance("nonexistent_db")

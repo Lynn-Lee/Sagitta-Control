@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +27,82 @@ logger = logging.getLogger(__name__)
 
 
 class InstanceService:
+    @staticmethod
+    def _normalize_column_row(
+        row: dict[str, Any] | tuple[Any, ...] | list[Any],
+        cols: list[str],
+    ) -> dict[str, Any]:
+        if isinstance(row, dict):
+            raw = row
+        else:
+            raw = dict(zip(cols, row, strict=False))
+
+        lowered = {str(key).lower(): value for key, value in raw.items()}
+        normalized = {
+            "column_name": lowered.get("column_name") or lowered.get("name") or "",
+            "column_type": (
+                lowered.get("column_type")
+                or lowered.get("data_type")
+                or lowered.get("type")
+                or ""
+            ),
+            "is_nullable": (
+                lowered.get("is_nullable")
+                or lowered.get("nullable")
+                or "YES"
+            ),
+            "column_default": (
+                lowered.get("column_default")
+                if "column_default" in lowered
+                else lowered.get("data_default", lowered.get("default_expression"))
+            ),
+            "column_comment": (
+                lowered.get("column_comment")
+                or lowered.get("comment")
+                or ""
+            ),
+            "column_key": lowered.get("column_key") or lowered.get("key") or "",
+        }
+        return normalized
+
+    @staticmethod
+    def _normalize_constraint_row(
+        row: dict[str, Any] | tuple[Any, ...] | list[Any],
+        cols: list[str],
+    ) -> dict[str, Any]:
+        if isinstance(row, dict):
+            raw = row
+        else:
+            raw = dict(zip(cols, row, strict=False))
+
+        lowered = {str(key).lower(): value for key, value in raw.items()}
+        return {
+            "constraint_name": lowered.get("constraint_name") or "",
+            "constraint_type": lowered.get("constraint_type") or "",
+            "column_names": lowered.get("column_names") or "",
+            "referenced_table_name": lowered.get("referenced_table_name") or "",
+            "referenced_column_names": lowered.get("referenced_column_names") or "",
+        }
+
+    @staticmethod
+    def _normalize_index_row(
+        row: dict[str, Any] | tuple[Any, ...] | list[Any],
+        cols: list[str],
+    ) -> dict[str, Any]:
+        if isinstance(row, dict):
+            raw = row
+        else:
+            raw = dict(zip(cols, row, strict=False))
+
+        lowered = {str(key).lower(): value for key, value in raw.items()}
+        return {
+            "index_name": lowered.get("index_name") or "",
+            "index_type": lowered.get("index_type") or "",
+            "column_names": lowered.get("column_names") or "",
+            "is_composite": lowered.get("is_composite") or "NO",
+            "index_comment": lowered.get("index_comment") or "",
+        }
+
     @staticmethod
     async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
         result = await db.execute(
@@ -244,10 +321,39 @@ class InstanceService:
         if not rs.is_success:
             raise Exception(f"获取列信息失败：{rs.error}")
         cols = rs.column_list or []
-        return [
-            dict(zip(cols, row, strict=False)) if isinstance(row, (tuple, list)) else row
-            for row in rs.rows
-        ]
+        return [InstanceService._normalize_column_row(row, cols) for row in rs.rows]
+
+    @staticmethod
+    async def get_constraints(
+        db: AsyncSession, instance_id: int, db_name: str, tb_name: str
+    ) -> list[dict]:
+        inst = await InstanceService._load_instance(db, instance_id)
+        engine = get_engine(inst)
+        getter = getattr(engine, "get_table_constraints", None)
+        if getter is None:
+            return []
+
+        rs = await getter(db_name=db_name, tb_name=tb_name)
+        if not rs.is_success:
+            raise Exception(f"获取约束信息失败：{rs.error}")
+        cols = rs.column_list or []
+        return [InstanceService._normalize_constraint_row(row, cols) for row in rs.rows]
+
+    @staticmethod
+    async def get_indexes(
+        db: AsyncSession, instance_id: int, db_name: str, tb_name: str
+    ) -> list[dict]:
+        inst = await InstanceService._load_instance(db, instance_id)
+        engine = get_engine(inst)
+        getter = getattr(engine, "get_table_indexes", None)
+        if getter is None:
+            return []
+
+        rs = await getter(db_name=db_name, tb_name=tb_name)
+        if not rs.is_success:
+            raise Exception(f"获取索引信息失败：{rs.error}")
+        cols = rs.column_list or []
+        return [InstanceService._normalize_index_row(row, cols) for row in rs.rows]
 
     @staticmethod
     async def get_variables(db: AsyncSession, instance_id: int) -> list[dict]:

@@ -123,6 +123,72 @@ class MysqlEngine:
         sql = f"SHOW CREATE TABLE `{db_safe}`.`{tb_safe}`"
         return await self.query(db_name=db_name, sql=sql, limit_num=0)
 
+    async def get_table_constraints(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        sql = (
+            "SELECT "
+            "tc.CONSTRAINT_NAME AS constraint_name, "
+            "tc.CONSTRAINT_TYPE AS constraint_type, "
+            "GROUP_CONCAT(kcu.COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION SEPARATOR ', ') AS column_names, "
+            "MAX(kcu.REFERENCED_TABLE_NAME) AS referenced_table_name, "
+            "GROUP_CONCAT(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION SEPARATOR ', ') AS referenced_column_names "
+            "FROM information_schema.TABLE_CONSTRAINTS tc "
+            "LEFT JOIN information_schema.KEY_COLUMN_USAGE kcu "
+            "  ON tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA "
+            " AND tc.TABLE_NAME = kcu.TABLE_NAME "
+            " AND tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME "
+            "WHERE tc.TABLE_SCHEMA = %(db)s AND tc.TABLE_NAME = %(tb)s "
+            "GROUP BY tc.CONSTRAINT_NAME, tc.CONSTRAINT_TYPE "
+            "ORDER BY "
+            "  CASE tc.CONSTRAINT_TYPE "
+            "    WHEN 'PRIMARY KEY' THEN 1 "
+            "    WHEN 'UNIQUE' THEN 2 "
+            "    WHEN 'FOREIGN KEY' THEN 3 "
+            "    WHEN 'CHECK' THEN 4 "
+            "    ELSE 9 "
+            "  END, "
+            "  tc.CONSTRAINT_NAME"
+        )
+        return await self.query(
+            db_name=db_name,
+            sql=sql,
+            parameters={"db": db_name, "tb": tb_name},
+            limit_num=0,
+        )
+
+    async def get_table_indexes(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        sql = (
+            "SELECT "
+            "s.INDEX_NAME AS index_name, "
+            "CASE "
+            "  WHEN s.INDEX_NAME = 'PRIMARY' THEN 'PRIMARY KEY INDEX' "
+            "  WHEN s.NON_UNIQUE = 0 THEN 'UNIQUE INDEX' "
+            "  ELSE 'INDEX' "
+            "END AS index_type, "
+            "GROUP_CONCAT(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX SEPARATOR ', ') AS column_names, "
+            "CASE WHEN COUNT(*) > 1 THEN 'YES' ELSE 'NO' END AS is_composite, "
+            "COALESCE(MAX(s.INDEX_COMMENT), '') AS index_comment "
+            "FROM information_schema.STATISTICS s "
+            "WHERE s.TABLE_SCHEMA = %(db)s AND s.TABLE_NAME = %(tb)s "
+            "GROUP BY s.INDEX_NAME, s.NON_UNIQUE "
+            "ORDER BY "
+            "  CASE "
+            "    WHEN s.INDEX_NAME = 'PRIMARY' THEN 1 "
+            "    WHEN s.NON_UNIQUE = 0 THEN 2 "
+            "    ELSE 3 "
+            "  END, "
+            "  s.INDEX_NAME"
+        )
+        return await self.query(
+            db_name=db_name,
+            sql=sql,
+            parameters={"db": db_name, "tb": tb_name},
+            limit_num=0,
+        )
+
     async def get_tables_metas_data(
         self, db_name: str, **kwargs: Any
     ) -> list[dict[str, Any]]:

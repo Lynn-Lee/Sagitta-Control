@@ -46,6 +46,7 @@ dependencies = [
     "aioredis~=2.0",
     "clickhouse-driver~=0.2.7",
     "oracledb~=2.2",
+    "python-tds~=1.16",
     "elasticsearch[async]~=8.12",
     "cassandra-driver~=3.29",
     # OpenTelemetry 可观测性

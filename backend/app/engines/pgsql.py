@@ -116,6 +116,69 @@ class PgSQLEngine:
         cols = rs.column_list
         return [dict(zip(cols, row, strict=False)) for row in rs.rows]
 
+    async def get_table_constraints(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        schema = kwargs.get("schema", "public")
+        sql = """SELECT
+                    tc.constraint_name,
+                    tc.constraint_type,
+                    string_agg(kcu.column_name, ', ' ORDER BY kcu.ordinal_position) AS column_names,
+                    MAX(ccu.table_name) AS referenced_table_name,
+                    string_agg(ccu.column_name, ', ' ORDER BY kcu.ordinal_position) AS referenced_column_names
+                 FROM information_schema.table_constraints tc
+                 LEFT JOIN information_schema.key_column_usage kcu
+                   ON tc.constraint_catalog = kcu.constraint_catalog
+                  AND tc.constraint_schema = kcu.constraint_schema
+                  AND tc.constraint_name = kcu.constraint_name
+                  AND tc.table_name = kcu.table_name
+                 LEFT JOIN information_schema.constraint_column_usage ccu
+                   ON tc.constraint_catalog = ccu.constraint_catalog
+                  AND tc.constraint_schema = ccu.constraint_schema
+                  AND tc.constraint_name = ccu.constraint_name
+                 WHERE tc.table_schema = $1 AND tc.table_name = $2
+                 GROUP BY tc.constraint_name, tc.constraint_type
+                 ORDER BY
+                   CASE tc.constraint_type
+                     WHEN 'PRIMARY KEY' THEN 1
+                     WHEN 'UNIQUE' THEN 2
+                     WHEN 'FOREIGN KEY' THEN 3
+                     WHEN 'CHECK' THEN 4
+                     ELSE 9
+                   END,
+                   tc.constraint_name"""
+        return await self._raw_query(db_name=db_name, sql=sql, args=[schema, tb_name])
+
+    async def get_table_indexes(
+        self, db_name: str, tb_name: str, **kwargs: Any
+    ) -> ResultSet:
+        schema = kwargs.get("schema", "public")
+        sql = r"""SELECT
+                    indexname AS index_name,
+                    CASE
+                      WHEN indexdef ILIKE '%% unique index %%' THEN 'UNIQUE INDEX'
+                      ELSE 'INDEX'
+                    END AS index_type,
+                    COALESCE(
+                      substring(indexdef FROM '\((.*)\)'),
+                      ''
+                    ) AS column_names,
+                    CASE
+                      WHEN position(',' in COALESCE(substring(indexdef FROM '\((.*)\)'), '')) > 0 THEN 'YES'
+                      ELSE 'NO'
+                    END AS is_composite,
+                    '' AS index_comment
+                 FROM pg_indexes
+                 WHERE schemaname = $1 AND tablename = $2
+                 ORDER BY
+                   CASE
+                     WHEN indexname = $2 || '_pkey' THEN 1
+                     WHEN indexdef ILIKE '%% unique index %%' THEN 2
+                     ELSE 3
+                   END,
+                   indexname"""
+        return await self._raw_query(db_name=db_name, sql=sql, args=[schema, tb_name])
+
     # ── 查询 ──────────────────────────────────────────────────
 
     def query_check(self, db_name: str, sql: str) -> dict[str, Any]:

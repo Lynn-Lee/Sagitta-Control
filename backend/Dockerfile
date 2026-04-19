@@ -39,6 +39,7 @@ RUN pip install --no-cache-dir \
     "aiomysql>=0.2.0" \
     "clickhouse-connect>=0.7.0" \
     "oracledb>=2.2.0" \
+    "python-tds>=1.16.0" \
     "pymongo>=4.6.0" \
     "motor>=3.3.0" \
     "structlog>=24.1.0" \

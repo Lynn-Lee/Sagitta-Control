@@ -176,7 +176,7 @@
 | 功能 | 状态 |
 |---|---|
 | 数据脱敏规则管理页面（实时预览） | ✅ |
-| 数据字典（三级浏览：实例→库→表→字段） | ✅ |
+| 数据字典（实例→库→表→字段 / 约束 / 索引） | ✅ |
 | 工单模板（个人/全局、从模板创建、保存为模板、默认模板） | ✅ |
 | AI Text2SQL（Claude API，多方言适配） | ✅ |
 
@@ -186,15 +186,22 @@
 | 引擎 | 状态 | 说明 |
 |---|---|---|
 | MySQL | ✅ | 完整实现 |
-| PostgreSQL | ✅ | 完整实现 |
-| Oracle | ✅ | 骨架已有，需真实环境验证 |
+| PostgreSQL | ✅ | 完整实现（含数据字典列/约束/索引） |
+| Oracle | ✅ | 数据字典列/约束/索引已实现，需真实环境验证 |
 | MongoDB | ✅ | 完整实现（含 processlist / metrics） |
 | Redis | ✅ | 白名单安全控制，16 数据库，INFO 指标 |
 | ClickHouse | ✅ | clickhouse-connect HTTP 协议 |
 | Elasticsearch | 🔧 | 骨架已有 |
-| MSSQL | 🔧 | 骨架已有 |
+| MSSQL | ✅ | 数据字典最小可用实现已补齐，需真实环境验证 |
 | Cassandra | 🔧 | 骨架已有 |
 | Doris | 🔧 | 骨架已有 |
+
+**数据字典能力补充**
+- 字段信息：列名、数据类型、可空、默认值、注释
+- 表约束：主键、唯一键、外键、引用表/列
+- 索引信息：主键索引、唯一索引、普通索引、是否联合索引、索引列
+- 当前关系型数据库优先支持：`MySQL / TiDB / PostgreSQL / Oracle / MSSQL`
+- TiDB 复用 MySQL 元数据实现；Doris / Cassandra / Elasticsearch 仍待补齐或验证
 
 **数据归档**
 - 全数据库支持矩阵（不支持的返回明确提示）
@@ -329,6 +336,10 @@
 - `tests/unit/test_auth.py`：密码哈希/JWT/字段加密/Schema 校验/密码安全策略（27 个测试）
 - `tests/unit/test_masking.py`：sqlglot 列提取/表引用/脱敏规则（17 个测试）
 - `tests/unit/test_engine_registry.py`：引擎注册表（已有）
+- `tests/unit/test_data_dict_relational.py`：关系型数据库数据字典归一化（MySQL/TiDB/PostgreSQL/Oracle/MSSQL）
+- `tests/unit/test_data_dict_sql_generation.py`：关系型数据库数据字典 SQL 生成层
+- `tests/unit/test_instance_router_data_dict.py`：数据字典 API 路由（columns/constraints/indexes）
+- `tests/unit/test_instance_service.py`：数据字典服务层归一化与兼容字段映射
 - `tests/unit/test_mysql_engine.py`：MySQL 引擎（已有）
 - `tests/unit/test_mongo_engine.py`：MongoDB 引擎（已有）
 - `tests/unit/test_ldap_auth.py`：LDAP 认证服务（5 个测试）
@@ -357,6 +368,12 @@
 **其他质量基础设施**
 - `.coveragerc`：配置覆盖率报告（分支覆盖，排除 migrations/main.py）
 - `ci.yml` 更新：单元测试覆盖率门限 35%，集成测试独立阶段，Docker 构建验证
+
+**数据字典测试补强**
+- 引擎 SQL 生成层：校验各数据库命中的系统视图与关键字段
+- 服务层：统一归一化 `columns / constraints / indexes`
+- 路由层：覆盖 `/instances/{id}/columns`、`/constraints`、`/indexes`
+- 前端：`DataDictPage` 渲染字段、约束、索引三块内容
 
 ### Pack H — 生产就绪 ✅
 

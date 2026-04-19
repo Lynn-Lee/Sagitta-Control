@@ -176,6 +176,32 @@ async def get_columns(
     return {"columns": columns}
 
 
+@router.get("/{instance_id}/constraints/", summary="获取表约束信息")
+async def get_constraints(
+    instance_id: int,
+    db_name: str = Query(...),
+    tb_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(current_user),
+):
+    await _ensure_instance_access(db, user, instance_id)
+    constraints = await InstanceService.get_constraints(db, instance_id, db_name, tb_name)
+    return {"constraints": constraints}
+
+
+@router.get("/{instance_id}/indexes/", summary="获取表索引信息")
+async def get_indexes(
+    instance_id: int,
+    db_name: str = Query(...),
+    tb_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(current_user),
+):
+    await _ensure_instance_access(db, user, instance_id)
+    indexes = await InstanceService.get_indexes(db, instance_id, db_name, tb_name)
+    return {"indexes": indexes}
+
+
 @router.get("/{instance_id}/params/", summary="实例参数列表")
 async def get_params(
     instance_id: int,
