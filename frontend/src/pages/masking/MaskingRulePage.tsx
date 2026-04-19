@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import {
-  Alert, Button, Card, Form, Input, InputNumber, Modal, Popconfirm,
+  Alert, Button, Form, Input, InputNumber, Modal, Popconfirm,
   Select, Space, Switch, Table, Tag, Typography, message,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 const RULE_TYPE_COLORS: Record<string, string> = {
@@ -151,22 +154,20 @@ export default function MaskingRulePage() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Space direction="vertical" size={0}>
-          <Title level={2} style={{ margin: 0 }}>数据脱敏规则</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            规则生效于在线查询结果，支持手机号/邮箱/银行卡/身份证/姓名/地址/自定义正则
-          </Text>
-        </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button>
-      </div>
+      <PageHeader
+        title="数据脱敏规则"
+        meta="规则生效于在线查询结果，支持手机号、邮箱、银行卡、身份证、姓名、地址和自定义正则"
+        marginBottom={20}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button>}
+      />
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+      <SectionCard bodyPadding={0} marginBottom={0}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无脱敏规则" /> }}
           tableLayout="fixed"
           scroll={{ x: 980 }}
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />
-      </Card>
+      </SectionCard>
 
       <Modal title={editId ? '编辑脱敏规则' : '新建脱敏规则'} open={modalOpen}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}

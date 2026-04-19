@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Button, Card, Select, Space, Table, Tag, Typography, message, Alert } from 'antd'
+import { Button, Select, Space, Table, Tag, message } from 'antd'
 import { BulbOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import Editor from '@monaco-editor/react'
 import { useQuery } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title } = Typography
 const { Option } = Select
 
 const LEVEL_COLOR: Record<string, string> = { error: 'error', warning: 'warning', info: 'processing', ok: 'success' }
@@ -53,8 +54,12 @@ export default function OptimizePage() {
   return (
     <div>
       {msgCtx}
-      <Title level={2} style={{ margin: '0 0 20px' }}>SQL 优化</Title>
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }} styles={{ body: { padding: '12px 16px' } }}>
+      <PageHeader
+        title="SQL 优化"
+        meta="分析 SQL 风险并生成优化建议与 EXPLAIN 结果"
+        marginBottom={20}
+      />
+      <SectionCard bodyPadding="12px 16px">
         <Space wrap>
           <Select placeholder="选择实例" style={{ minWidth: 220, maxWidth: 360 }} onChange={(v) => { setInstanceId(v); setDbName('') }} showSearch optionFilterProp="label" popupMatchSelectWidth={false}>
             {instanceData?.items?.map((i: any) => <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}><Tag color="blue">{formatDbTypeLabel(i.db_type)}</Tag> {i.instance_name}</Option>)}
@@ -69,13 +74,13 @@ export default function OptimizePage() {
           <Button icon={<BulbOutlined />} onClick={handleAdvice} loading={loading} disabled={!instanceId}>优化建议</Button>
           <Button icon={<PlayCircleOutlined />} onClick={handleExplain} loading={loading} disabled={!instanceId || !dbName}>EXPLAIN 分析</Button>
         </Space>
-      </Card>
-      <Card title="SQL 输入" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }} styles={{ body: { padding: 0 } }}>
+      </SectionCard>
+      <SectionCard title="SQL 输入" bodyPadding={0}>
         <Editor height="180px" defaultLanguage="sql" value={sql} onChange={(v) => setSql(v || '')}
           options={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, minimap: { enabled: false }, padding: { top: 12 } }} />
-      </Card>
+      </SectionCard>
       {advices.length > 0 && (
-        <Card title="优化建议" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }} styles={{ body: { padding: 0 } }}>
+        <SectionCard title="优化建议" bodyPadding={0}>
           <Table
             dataSource={advices.map((r, i) => ({ key: i, ...r }))}
             columns={adviceCols}
@@ -85,16 +90,16 @@ export default function OptimizePage() {
             pagination={false}
             locale={{ emptyText: '暂无优化建议' }}
           />
-        </Card>
+        </SectionCard>
       )}
       {explainResult && (
-        <Card title={`EXPLAIN 结果（${formatDbTypeLabel(explainResult.db_type)}）`} style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+        <SectionCard title={`EXPLAIN 结果（${formatDbTypeLabel(explainResult.db_type)}）`} bodyPadding={0} marginBottom={0}>
           <Table
             dataSource={(explainResult.rows || []).map((r: any[], i: number) => ({ key: i, ...Object.fromEntries((explainResult.column_list || []).map((c: string, j: number) => [c, r[j]])) }))}
             columns={(explainResult.column_list || []).map((c: string) => ({ title: c, dataIndex: c, key: c, ellipsis: true, width: 140 }))}
             size="small" tableLayout="fixed" scroll={{ x: 'max-content' }} pagination={false}
             locale={{ emptyText: '暂无 EXPLAIN 结果' }} />
-        </Card>
+        </SectionCard>
       )}
     </div>
   )

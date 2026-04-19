@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Alert, Button, Card, Col, Divider, Form, Input, QRCode, Row, Space, Steps, Tag, Typography, message } from 'antd'
+import { Alert, Button, Col, Divider, Form, Input, QRCode, Row, Space, Steps, Tag, Typography, message } from 'antd'
 import { LockOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/auth'
 import { authApi } from '@/api/auth'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
@@ -43,14 +45,17 @@ export default function ProfilePage() {
   return (
     <div>
       {msgCtx}
-      <Title level={2} style={{ marginBottom: 24 }}>个人设置</Title>
+      <PageHeader
+        title="个人设置"
+        meta="查看账号信息、修改密码并管理二步验证"
+        marginBottom={24}
+      />
 
       <Row gutter={[20, 20]}>
         {/* 左列：个人信息 + 修改密码 */}
         <Col xs={24} md={12}>
           {/* 个人信息卡片 */}
-          <Card title={<Space><UserOutlined />基本信息</Space>}
-            style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 20 }}>
+          <SectionCard title={<Space><UserOutlined />基本信息</Space>} marginBottom={20}>
             <Space direction="vertical" size={12} style={{ width: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text type="secondary">用户名</Text>
@@ -81,11 +86,10 @@ export default function ProfilePage() {
                 </Tag>
               </div>
             </Space>
-          </Card>
+          </SectionCard>
 
           {/* 修改密码 */}
-          <Card title={<Space><LockOutlined />修改密码</Space>}
-            style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+          <SectionCard title={<Space><LockOutlined />修改密码</Space>} marginBottom={0}>
             <Form form={pwForm} layout="vertical" onFinish={v => changePwMut.mutate(v)}>
               <Form.Item name="old_password" label="当前密码"
                 rules={[{ required: true, message: '请输入当前密码' }]}>
@@ -112,13 +116,12 @@ export default function ProfilePage() {
                 修改密码
               </Button>
             </Form>
-          </Card>
+          </SectionCard>
         </Col>
 
         {/* 右列：2FA 设置 */}
         <Col xs={24} md={12}>
-          <Card title={<Space><SafetyCertificateOutlined />二步验证（2FA）</Space>}
-            style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+          <SectionCard title={<Space><SafetyCertificateOutlined />二步验证（2FA）</Space>} marginBottom={0}>
 
             {user?.totp_enabled ? (
               // 已开启 2FA — 显示关闭入口
@@ -183,7 +186,7 @@ export default function ProfilePage() {
                 />
               </Space>
             )}
-          </Card>
+          </SectionCard>
         </Col>
       </Row>
     </div>

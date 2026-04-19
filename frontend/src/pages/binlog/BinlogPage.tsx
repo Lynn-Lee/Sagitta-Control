@@ -5,14 +5,17 @@ import {
 } from 'antd'
 import {
   BugOutlined, CodeOutlined, FileTextOutlined,
-  RollbackOutlined, SearchOutlined, ToolOutlined,
+  RollbackOutlined, ToolOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import SectionLoading from '@/components/common/SectionLoading'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text, Paragraph } = Typography
+const { Text, Paragraph } = Typography
 const { Option } = Select
 const { TextArea } = Input
 
@@ -323,6 +326,7 @@ export default function BinlogPage() {
                   </Space>
                 </Card>
               )}
+              {!dbGuide && <SectionLoading text="加载回滚方案中..." compact />}
             </Col>
           </Row>
         </div>
@@ -333,15 +337,14 @@ export default function BinlogPage() {
   return (
     <div>
       {msgCtx}
-      <div style={{ marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>SQL 回滚辅助</Title>
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          基于 sqlglot 生成逆向 SQL 模板，MySQL/TiDB 支持 my2sql Binlog 回滚命令生成
-        </Text>
-      </div>
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+      <PageHeader
+        title="SQL 回滚辅助"
+        meta="基于 sqlglot 生成逆向 SQL 模板，MySQL/TiDB 支持 my2sql Binlog 回滚命令生成"
+        marginBottom={20}
+      />
+      <SectionCard marginBottom={0}>
         <Tabs items={tabItems} defaultActiveKey="reverse" />
-      </Card>
+      </SectionCard>
     </div>
   )
 }

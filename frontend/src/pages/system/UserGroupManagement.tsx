@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import {
-  Button, Card, Col, Form, Input, Modal, Row, Select, Space, Switch, Table, Tag, Transfer, message,
+  Button, Card, Col, Form, Input, Modal, Row, Select, Space, Switch, Table, Tag, Transfer, message, Grid,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userGroupApi, userApi, resourceGroupApi } from '@/api/system'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
+
+const { useBreakpoint } = Grid
 
 const UserGroupManagement: React.FC = () => {
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [modalOpen, setModalOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
@@ -199,19 +206,22 @@ const UserGroupManagement: React.FC = () => {
   return (
     <>
       {contextHolder}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>用户组管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建用户组</Button>
-      </div>
+      <PageHeader
+        title="用户组管理"
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+            style={isMobile ? { width: '100%' } : undefined}>新建用户组</Button>
+        )}
+      />
 
-      <Card style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+      <FilterCard marginBottom={16}>
         <Input.Search
           placeholder="搜索用户组标识或中文名"
           allowClear
           onSearch={setSearch}
-          style={{ maxWidth: 400 }}
+          style={{ width: isMobile ? '100%' : 400, maxWidth: '100%' }}
         />
-      </Card>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table
@@ -219,6 +229,7 @@ const UserGroupManagement: React.FC = () => {
           columns={columns}
           dataSource={filtered}
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无用户组数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1180 }}
           pagination={false}

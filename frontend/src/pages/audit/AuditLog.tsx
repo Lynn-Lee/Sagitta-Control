@@ -1,13 +1,17 @@
 import { useState } from 'react'
-import { Button, Card, DatePicker, Input, Select, Space, Table, Tag, Typography } from 'antd'
+import { Button, Card, DatePicker, Input, Select, Space, Table, Tag, Typography, Grid } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import apiClient from '@/api/client'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 const { RangePicker } = DatePicker
+const { useBreakpoint } = Grid
 
 const RESULT_COLOR: Record<string, string> = { success: 'success', fail: 'error' }
 const MODULE_COLOR: Record<string, string> = {
@@ -16,6 +20,8 @@ const MODULE_COLOR: Record<string, string> = {
 }
 
 export default function AuditLog() {
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [username, setUsername] = useState('')
   const [module, setModule] = useState<string | undefined>()
   const [action, setAction] = useState('')
@@ -43,6 +49,8 @@ export default function AuditLog() {
     setUsername(''); setModule(undefined); setAction('')
     setResult(undefined); setDateRange(null); setPage(1)
   }
+
+  const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
 
   const columns = [
     {
@@ -75,36 +83,31 @@ export default function AuditLog() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Space align="center">
-          <Title level={2} style={{ margin: 0 }}>审计日志</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>共 {data?.total ?? 0} 条</Text>
-        </Space>
-      </div>
+      <PageHeader title="审计日志" meta={`共 ${data?.total ?? 0} 条`} />
 
-      <Card style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
-        <Space wrap size={[8, 8]}>
-          <Input placeholder="操作人" allowClear style={{ width: 120 }}
+      <FilterCard>
+        <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
+          <Input placeholder="操作人" allowClear style={{ width: filterWidth(120) }}
             value={username} onChange={e => { setUsername(e.target.value); setPage(1) }} />
-          <Select placeholder="模块" allowClear style={{ width: 110 }}
+          <Select placeholder="模块" allowClear style={{ width: filterWidth(110) }}
             value={module} onChange={v => { setModule(v); setPage(1) }}>
             {(data?.modules || ['auth','workflow','query','instance','user','system','monitor'])
               .map((m: string) => <Option key={m} value={m}>{m}</Option>)}
           </Select>
-          <Input placeholder="操作类型" allowClear style={{ width: 140 }}
+          <Input placeholder="操作类型" allowClear style={{ width: filterWidth(140) }}
             value={action} onChange={e => { setAction(e.target.value); setPage(1) }} />
-          <Select placeholder="结果" allowClear style={{ width: 90 }}
+          <Select placeholder="结果" allowClear style={{ width: filterWidth(90) }}
             value={result} onChange={v => { setResult(v); setPage(1) }}>
             <Option value="success">成功</Option>
             <Option value="fail">失败</Option>
           </Select>
-          <RangePicker style={{ width: 230 }}
+          <RangePicker style={{ width: filterWidth(230) }}
             onChange={(_, strs) => { setDateRange(strs[0] ? [strs[0], strs[1]] : null); setPage(1) }} />
-          <Button onClick={handleReset}>重置</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
+          <Button onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()}
+            style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
         </Space>
-      </Card>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
         styles={{ body: { padding: 0 } }}>
@@ -113,6 +116,7 @@ export default function AuditLog() {
           columns={columns}
           rowKey="id"
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无审计日志" /> }}
           size="small"
           tableLayout="fixed"
           scroll={{ x: 1100 }}

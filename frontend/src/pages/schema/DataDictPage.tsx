@@ -8,9 +8,13 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import SectionLoading from '@/components/common/SectionLoading'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 export default function DataDictPage() {
@@ -78,11 +82,10 @@ export default function DataDictPage() {
   return (
     <div>
       {msgCtx}
-      <Title level={2} style={{ marginBottom: 20 }}>数据字典</Title>
+      <PageHeader title="数据字典" marginBottom={20} />
 
       {/* 选择条件 */}
-      <Card style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
+      <FilterCard marginBottom={16}>
         <Space wrap>
           <Select placeholder="选择实例" style={{ minWidth: 220, maxWidth: 360 }} value={instanceId}
             popupMatchSelectWidth={false}
@@ -113,7 +116,7 @@ export default function DataDictPage() {
             </Text>
           )}
         </Space>
-      </Card>
+      </FilterCard>
 
       {dbName && (
         <Row gutter={16}>
@@ -123,15 +126,21 @@ export default function DataDictPage() {
               style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
               styles={{ body: { padding: 0, maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' } }}>
               {tableLoading ? (
-                <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>
+                <SectionLoading text="加载表结构中..." compact />
               ) : (
-                <Tree
-                  treeData={treeData}
-                  selectedKeys={selectedTable ? [selectedTable] : []}
-                  onSelect={(keys) => setSelectedTable(keys[0] as string || '')}
-                  style={{ padding: '8px 0' }}
-                  blockNode
-                />
+                tables.length ? (
+                  <Tree
+                    treeData={treeData}
+                    selectedKeys={selectedTable ? [selectedTable] : []}
+                    onSelect={(keys) => setSelectedTable(keys[0] as string || '')}
+                    style={{ padding: '8px 0' }}
+                    blockNode
+                  />
+                ) : (
+                  <div style={{ padding: 32 }}>
+                    <TableEmptyState title="当前数据库下暂无表" />
+                  </div>
+                )
               )}
             </Card>
           </Col>
@@ -153,6 +162,7 @@ export default function DataDictPage() {
                   dataSource={columns.map((c, i) => ({ key: i, ...c }))}
                   columns={colTableCols}
                   loading={colLoading}
+                  locale={{ emptyText: <TableEmptyState title="暂无字段信息" /> }}
                   size="small"
                   tableLayout="fixed"
                   scroll={{ x: 780 }}

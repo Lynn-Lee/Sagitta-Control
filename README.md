@@ -155,6 +155,10 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - 浏览器标题统一为 `矢 准 数 据`
 - 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示
+- 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持菜单高亮
+- 登录页、在线查询页、Dashboard 等首批高频页面已完成响应式与信息语义修正
+- 前端已补齐共享 UI 骨架：`PageHeader / FilterCard / TableEmptyState / SectionLoading / SectionCard`
+- 列表页、详情页、工具页和半配置页已开始统一到同一套页头、区块卡片、空态与加载态结构
 
 ## 开发指南
 

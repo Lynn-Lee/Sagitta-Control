@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Button, Card, DatePicker, Input, InputNumber, Select,
-  Space, Table, Tabs, Tag, Typography, Tooltip,
+  Space, Table, Tabs, Tag, Typography, Tooltip, Grid,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -9,12 +9,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
 import { instanceApi } from '@/api/instance'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import dayjs from 'dayjs'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 const { RangePicker } = DatePicker
+const { useBreakpoint } = Grid
 
 const STATUS_COLOR: Record<number, string> = {
   0: 'processing', 1: 'error', 2: 'success', 3: 'warning',
@@ -109,6 +113,8 @@ const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
 
 export default function WorkflowList() {
   const navigate = useNavigate()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [activeTab, setActiveTab] = useState<'mine' | 'audit' | 'execute'>('mine')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<number | undefined>()
@@ -218,21 +224,23 @@ export default function WorkflowList() {
   const engineerPlaceholder =
     activeTab === 'audit' ? '申请人' : '提交人'
 
+  const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Space align="center">
-          <Title level={2} style={{ margin: 0 }}>SQL 工单</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>共 {data?.total ?? 0} 个</Text>
-        </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflow/submit')}>
-          提交工单
-        </Button>
-      </div>
+      <PageHeader
+        title="SQL 工单"
+        meta={`共 ${data?.total ?? 0} 个`}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflow/submit')}
+          style={isMobile ? { width: '100%' } : undefined}>
+            提交工单
+          </Button>
+        )}
+      />
 
       {/* 查询条件 */}
-      <Card style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
+      <FilterCard>
         <Tabs
           activeKey={activeTab}
           onChange={(key) => {
@@ -246,19 +254,19 @@ export default function WorkflowList() {
           ]}
           style={{ marginBottom: 8 }}
         />
-        <Space wrap size={[8, 8]}>
+        <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
           <Input
             placeholder="工单名称"
             allowClear
             prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
-            style={{ width: 180 }}
+            style={{ width: filterWidth(180) }}
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
           />
           <Select
             placeholder="状态"
             allowClear
-            style={{ width: 120 }}
+            style={{ width: filterWidth(120) }}
             value={statusFilter}
             onChange={v => { setStatusFilter(v); setPage(1) }}
           >
@@ -275,7 +283,7 @@ export default function WorkflowList() {
           <Select
             placeholder="目标实例"
             allowClear
-            style={{ width: 190 }}
+            style={{ width: filterWidth(190) }}
             value={instanceFilter}
             onChange={v => { setInstanceFilter(v); setPage(1) }}
             showSearch
@@ -291,28 +299,29 @@ export default function WorkflowList() {
           <Input
             placeholder="数据库名"
             allowClear
-            style={{ width: 130 }}
+            style={{ width: filterWidth(130) }}
             value={dbNameFilter}
             onChange={e => { setDbNameFilter(e.target.value); setPage(1) }}
           />
           <Input
             placeholder={engineerPlaceholder}
             allowClear
-            style={{ width: 110 }}
+            style={{ width: filterWidth(110) }}
             value={engineerFilter}
             onChange={e => { setEngineerFilter(e.target.value); setPage(1) }}
           />
           <RangePicker
-            style={{ width: 230 }}
+            style={{ width: filterWidth(230) }}
             onChange={(_, strs) => {
               setDateRange(strs[0] ? [strs[0], strs[1]] : null)
               setPage(1)
             }}
           />
-          <Button onClick={handleReset}>重置</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
+          <Button onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()}
+            style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
         </Space>
-      </Card>
+      </FilterCard>
 
       <Card
         style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
@@ -323,6 +332,7 @@ export default function WorkflowList() {
           columns={columns}
           rowKey="id"
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
           scroll={{ x: activeTab === 'audit' ? 1680 : activeTab === 'execute' ? 1580 : 1540 }}
           pagination={{

@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip } from 'antd'
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryApi } from '@/api/query'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
+import PageHeader from '@/components/common/PageHeader'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import dayjs from 'dayjs'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
+const { useBreakpoint } = Grid
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
   0: { label: '待审核', color: 'processing' },
@@ -22,6 +24,8 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
 export default function QueryPrivPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [applyModalOpen, setApplyModalOpen] = useState(false)
   const [applyForm] = Form.useForm()
   const [instanceId, setInstanceId] = useState<number | undefined>()
@@ -249,12 +253,16 @@ export default function QueryPrivPage() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>查询权限</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { applyForm.resetFields(); setScopeType('database'); setApplyModalOpen(true) }}>
-          申请查询权限
-        </Button>
-      </div>
+      <PageHeader
+        title="查询权限"
+        marginBottom={20}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { applyForm.resetFields(); setScopeType('database'); setApplyModalOpen(true) }}
+            style={isMobile ? { width: '100%' } : undefined}>
+            申请查询权限
+          </Button>
+        )}
+      />
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Tabs items={tabItems} />

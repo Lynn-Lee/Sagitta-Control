@@ -1,14 +1,20 @@
-import { Card, Typography } from 'antd'
-const { Title } = Typography
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import TableEmptyState from '@/components/common/TableEmptyState'
+
 export default function MonitorDetail() {
   return (
     <div>
-      <Title level={2} style={{ marginBottom: 24 }}>MonitorDetail</Title>
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
-        <div style={{ padding: 48, textAlign: 'center', color: '#AEAEB2' }}>
-          MonitorDetail — Sprint 1/2/3 实现
+      <PageHeader
+        title="监控详情"
+        meta="指标详情页正在分阶段完善中"
+        marginBottom={24}
+      />
+      <SectionCard marginBottom={0}>
+        <div style={{ padding: 24 }}>
+          <TableEmptyState title="监控详情能力将在后续迭代中开放" />
         </div>
-      </Card>
+      </SectionCard>
     </div>
   )
 }

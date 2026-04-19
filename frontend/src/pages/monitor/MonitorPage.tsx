@@ -1,17 +1,22 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Typography, message, Grid } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
+const { useBreakpoint } = Grid
 
 const EXPORTER_TYPES = ['mysqld_exporter', 'postgres_exporter', 'redis_exporter', 'mongodb_exporter', 'elasticsearch_exporter', 'clickhouse_exporter']
 
 export default function MonitorPage() {
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [modalOpen, setModalOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form] = Form.useForm()
@@ -78,12 +83,19 @@ export default function MonitorPage() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>可观测中心</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建采集配置</Button>
-      </div>
+      <PageHeader
+        title="可观测中心"
+        marginBottom={20}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+            style={isMobile ? { width: '100%' } : undefined}>
+            新建采集配置
+          </Button>
+        )}
+      />
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无采集配置" /> }}
           tableLayout="fixed"
           scroll={{ x: 920 }}
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />

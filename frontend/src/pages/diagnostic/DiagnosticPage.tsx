@@ -4,9 +4,12 @@ import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 export default function DiagnosticPage() {
@@ -61,9 +64,8 @@ export default function DiagnosticPage() {
   return (
     <div>
       {msgCtx}
-      <Title level={2} style={{ margin: '0 0 20px' }}>会话管理</Title>
-      <Card style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
+      <PageHeader title="会话管理" marginBottom={20} />
+      <FilterCard marginBottom={16}>
         <Space>
           <Select placeholder="选择实例" style={{ width: 220 }} onChange={setInstanceId} showSearch optionFilterProp="label">
             {instanceData?.items?.map((i: any) => (
@@ -75,10 +77,11 @@ export default function DiagnosticPage() {
           <Button icon={<ReloadOutlined />} onClick={() => refetch()} disabled={!instanceId}>刷新（5s自动）</Button>
           <Text type="secondary" style={{ fontSize: 12 }}>共 {processData?.total ?? 0} 个活跃会话</Text>
         </Space>
-      </Card>
+      </FilterCard>
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
         <Table dataSource={rows} columns={columns} loading={isLoading}
           size="small" tableLayout="fixed" scroll={{ x: 'max-content' }}
+          locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无活跃会话' : '请先选择实例'} /> }}
           pagination={{ pageSize: 50, showSizeChanger: false }} />
       </Card>
     </div>

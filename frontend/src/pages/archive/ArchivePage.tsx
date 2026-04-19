@@ -1,24 +1,22 @@
 import { useState } from 'react'
 import {
-  Alert, Button, Card, Col, Divider, Form, Input, InputNumber,
-  Modal, Row, Select, Space, Steps, Switch, Table, Tag, Typography, message,
+  Alert, Button, Card, Col, Form, Input, InputNumber,
+  Modal, Row, Select, Space, Steps, Table, Tag, Typography, message,
 } from 'antd'
 import {
-  DeleteOutlined, ExperimentOutlined, PlayCircleOutlined,
+  ExperimentOutlined, PlayCircleOutlined,
   QuestionCircleOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import SectionLoading from '@/components/common/SectionLoading'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text, Paragraph } = Typography
+const { Text, Paragraph } = Typography
 const { Option } = Select
-
-const MODE_COLORS: Record<string, string> = { purge: 'red', dest: 'blue' }
-const DB_SUPPORT_COLORS: Record<string, string> = {
-  true: 'success', false: 'default',
-}
 
 interface ArchiveSupportResponse {
   support: Record<string, { purge: boolean; dest: boolean; reason: string }>
@@ -138,15 +136,16 @@ export default function ArchivePage() {
   return (
     <div>
       {msgCtx}
-      <Title level={2} style={{ marginBottom: 4 }}>数据归档</Title>
-      <Text type="secondary" style={{ fontSize: 13 }}>
-        分批删除或迁移历史数据，默认先估算影响范围，确认后再执行
-      </Text>
+      <PageHeader
+        title="数据归档"
+        meta="分批删除或迁移历史数据，默认先估算影响范围，确认后再执行"
+        marginBottom={20}
+      />
 
-      <Row gutter={16} style={{ marginTop: 20 }}>
+      <Row gutter={16}>
         {/* 左侧：操作面板 */}
         <Col xs={24} lg={14}>
-          <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}>
+          <SectionCard>
             <Steps current={step} size="small" style={{ marginBottom: 24 }}
               items={[
                 { title: '配置归档参数' },
@@ -283,20 +282,22 @@ export default function ArchivePage() {
                 )}
               </Space>
             </Form>
-          </Card>
+          </SectionCard>
         </Col>
 
         {/* 右侧：支持矩阵 */}
         <Col xs={24} lg={10}>
-          <Card title={<Space><QuestionCircleOutlined />各数据库归档支持情况</Space>}
-            style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-            styles={{ body: { padding: 0 } }}>
-            <Table dataSource={supportRows} columns={supportCols}
-              size="small" tableLayout="fixed" scroll={{ x: 760 }} pagination={false}
-              locale={{ emptyText: '暂无归档支持矩阵数据' }}
-              rowClassName={(r) => r.purge || r.dest ? '' : 'opacity-50'}
-            />
-          </Card>
+          <SectionCard title={<Space><QuestionCircleOutlined />各数据库归档支持情况</Space>} bodyPadding={0} marginBottom={0}>
+            {supportData ? (
+              <Table dataSource={supportRows} columns={supportCols}
+                size="small" tableLayout="fixed" scroll={{ x: 760 }} pagination={false}
+                locale={{ emptyText: '暂无归档支持矩阵数据' }}
+                rowClassName={(r) => r.purge || r.dest ? '' : 'opacity-50'}
+              />
+            ) : (
+              <SectionLoading text="加载归档支持矩阵中..." compact />
+            )}
+          </SectionCard>
         </Col>
       </Row>
 

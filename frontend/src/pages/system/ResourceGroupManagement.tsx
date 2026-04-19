@@ -1,18 +1,24 @@
 import { useState } from 'react'
 import {
   Button, Card, Form, Input, Modal, Popconfirm,
-  Select, Space, Switch, Table, Tag, Transfer, Typography, message,
+  Select, Space, Switch, Table, Tag, Transfer, Typography, message, Grid,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, DatabaseOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import { resourceGroupApi, userGroupApi } from '@/api/system'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text } = Typography
+const { Text } = Typography
+const { useBreakpoint } = Grid
 
 export default function ResourceGroupManagement() {
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [modalOpen, setModalOpen] = useState(false)
   const [memberModalOpen, setMemberModalOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
@@ -211,20 +217,24 @@ export default function ResourceGroupManagement() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>资源组管理</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建资源组</Button>
-      </div>
+      <PageHeader
+        title="资源组管理"
+        marginBottom={20}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+            style={isMobile ? { width: '100%' } : undefined}>新建资源组</Button>
+        )}
+      />
 
-      <Card style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
-        <Input.Search placeholder="搜索资源组名称" allowClear style={{ width: 260 }}
+      <FilterCard>
+        <Input.Search placeholder="搜索资源组名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
           onSearch={setSearch} onChange={e => !e.target.value && setSearch('')} />
-      </Card>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
         styles={{ body: { padding: 0 } }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无资源组数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1080 }}
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />

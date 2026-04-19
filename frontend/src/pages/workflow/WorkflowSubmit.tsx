@@ -7,6 +7,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { instanceApi, type InstanceDatabase, type InstanceItem } from '@/api/instance'
 import { approvalFlowApi, type ApprovalFlowListItem } from '@/api/approvalFlow'
 import { workflowApi } from '@/api/workflow'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
 import { formatDbTypeLabel } from '@/utils/dbType'
@@ -280,18 +282,21 @@ export default function WorkflowSubmit() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>提交 SQL 工单</Title>
-        <Space>
+      <PageHeader
+        title="提交 SQL 工单"
+        actions={
+          <Space wrap>
           <Button icon={<CopyOutlined />} onClick={() => setTemplatePickerOpen(true)}>
             从模板创建
           </Button>
           <Button icon={<SaveOutlined />} onClick={handleOpenSaveTemplate}>
             保存为模板
           </Button>
-        </Space>
-      </div>
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}>
+          </Space>
+        }
+        marginBottom={20}
+      />
+      <SectionCard>
         <Form form={form} layout="vertical">
           <Form.Item name="workflow_name" label="工单名称" rules={[{ required: true }]}>
             <Input placeholder="简明描述本次变更内容" />
@@ -341,12 +346,11 @@ export default function WorkflowSubmit() {
             style={{ marginTop: 4 }}
           />
         </Form>
-      </Card>
+      </SectionCard>
 
-      <Card title="SQL 内容" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}
-        styles={{ body: { padding: 0 } }}
+      <SectionCard title="SQL 内容" bodyPadding={0}
         extra={
-          <Space>
+          <Space wrap>
             <Button size="small" icon={<RobotOutlined />} onClick={() => setAiModalOpen(true)}>
               AI 生成 SQL
             </Button>
@@ -356,14 +360,13 @@ export default function WorkflowSubmit() {
         <Editor height="300px" defaultLanguage="sql" value={sql}
           onChange={(v) => setSql(v || '')}
           options={{ fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, minimap: { enabled: false }, padding: { top: 12 } }} />
-      </Card>
+      </SectionCard>
 
       {checkResults.length > 0 && (
-        <Card title="预检查结果" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}
-          styles={{ body: { padding: 0 } }}>
+        <SectionCard title="预检查结果" bodyPadding={0}>
           <Table dataSource={checkResults} columns={checkColumns} rowKey="id" size="small"
             tableLayout="fixed" scroll={{ x: 900 }} pagination={false} />
-        </Card>
+        </SectionCard>
       )}
 
       <Space>

@@ -147,6 +147,7 @@ export default function LoginPage() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
+      padding: '32px 16px 24px',
       fontFamily: "'Inter', 'Noto Sans SC', sans-serif",
       position: 'relative',
       overflow: 'hidden',
@@ -189,7 +190,8 @@ export default function LoginPage() {
       {/* 登录卡片 */}
       <div style={{
         position: 'relative', zIndex: 2,
-        width: 420,
+        width: '100%',
+        maxWidth: 420,
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(79,70,229,0.22)',
         borderRadius: 20,
@@ -360,7 +362,11 @@ export default function LoginPage() {
               其他登录方式
             </Divider>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))',
+              gap: 8,
+            }}>
               {/* LDAP — 紫蓝 #5E7CE0 */}
               <OAuthBtn
                 icon={<PlatformIcon src="/icons/ldap.svg" alt="LDAP" />}
@@ -402,7 +408,8 @@ export default function LoginPage() {
 
       {/* 底部版本号 */}
       <div style={{
-        position: 'absolute', bottom: 24,
+        position: 'relative',
+        marginTop: 24,
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11, color: 'rgba(255,255,255,0.13)',
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',

@@ -63,6 +63,10 @@ npm run build
 - Dashboard 实例与库概览模块包含 4 个卡片、实例类型分布、实例状态分布、库-Schema 状态分布；实例类型展示名统一为 `MySQL / PostgreSQL / Oracle / TiDB / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - Dashboard 中审批相关排行反映的是“当前权限范围内业务对象涉及的审批处理情况”，不等同于当前登录人的个人审批待办/已办工作量
 - 在线查询结果区支持自适应浏览器高度、`row_num` 行号列、分页与每页条数切换，以及当前页/全部结果导出
+- 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持侧边菜单高亮
+- 登录页已适配窄屏窗口，登录卡片、第三方登录区和底部说明不会再发生横向溢出或遮挡
+- 列表页、详情页与工具页正在统一到共享 UI 骨架：`PageHeader / FilterCard / TableEmptyState / SectionLoading / SectionCard`
+- 在线查询、脱敏规则、归档、SQL 优化、SQL 回滚辅助等工具页已完成统一页头、区块卡片和空态/加载态收敛
 
 ## 目录说明
 
@@ -76,7 +80,7 @@ src/
 ├── types/           TypeScript 类型定义
 ├── utils/           工具函数（时间、格式化、Prometheus step 等）
 ├── components/
-│   ├── common/      通用组件（AuthGuard、ErrorBoundary 等）
+│   ├── common/      通用组件（AuthGuard、PageHeader、FilterCard、SectionCard 等）
 │   ├── layout/      布局组件（MainLayout、Header、Sider）
 │   ├── editor/      SQL 编辑器（Monaco 封装）
 │   └── monitor/     可观测中心组件（指标卡、趋势图等）
@@ -103,6 +107,19 @@ src/
 - **间距**：8px 基础网格
 
 所有 Ant Design 5 Token 已在 `src/main.tsx` 中统一配置。
+
+### 本轮 UI 收敛补充
+
+- `MainLayout`：桌面侧栏 + 移动端抽屉双模式，内容区内边距随断点自适应
+- `QueryPage`：查询结果表格只渲染当前页数据，结果区支持统一导出、权限排查与自适应高度
+- `LoginPage`：登录卡片支持窄屏自适应，OAuth 按钮区改为可换行布局
+- `DashboardPage`：统计卡片文案与后端真实聚合语义对齐
+- 公共骨架组件：
+  - `PageHeader`：统一页面标题、说明文案和右侧操作区
+  - `FilterCard`：统一筛选区卡片边框、圆角和内边距
+  - `TableEmptyState`：统一表格空状态文案与呈现
+  - `SectionLoading`：统一区块级加载占位
+  - `SectionCard`：统一详情页、工具页、表单页的内容卡片
 
 ## 整体进度（v1.0-GA 基线 + v2-lite 权限收敛）
 

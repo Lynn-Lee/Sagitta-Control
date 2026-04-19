@@ -32,9 +32,10 @@ import {
 } from 'recharts'
 
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 const RANGE_OPTIONS = [7, 14, 30, 60]
@@ -200,6 +201,8 @@ export default function DashboardPage() {
   const [queryDaysInput, setQueryDaysInput] = useState<number>(7)
   const [workflowDays, setWorkflowDays] = useState<number>(7)
   const [workflowDaysInput, setWorkflowDaysInput] = useState<number>(7)
+  const queryRangeLabel = `近${queryDays}天`
+  const workflowRangeLabel = `近${workflowDays}天`
 
   const { data: queryOverview } = useQuery<OverviewResponse>({
     queryKey: ['dashboard-query-overview', queryDays],
@@ -271,26 +274,26 @@ export default function DashboardPage() {
   }, [workflowOverview])
 
   const queryCards = [
-    { title: `${queryDays}天查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: '#1558A8' },
-    { title: `${queryDays}天查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: '#722ed1' },
-    { title: `${queryDays}天治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: '#f5222d' },
-    { title: `${queryDays}天命中脱敏次数`, value: queryOverview?.cards?.period_masked_count ?? 0, icon: <SafetyCertificateOutlined />, color: '#13c2c2' },
+    { title: `${queryRangeLabel}查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: '#1558A8' },
+    { title: `${queryRangeLabel}查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: '#722ed1' },
+    { title: `${queryRangeLabel}治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: '#f5222d' },
+    { title: `${queryRangeLabel}命中脱敏次数`, value: queryOverview?.cards?.period_masked_count ?? 0, icon: <SafetyCertificateOutlined />, color: '#13c2c2' },
     { title: '待审批查询权限申请数', value: queryOverview?.cards?.pending_query_priv_apply_count ?? 0, icon: <LockOutlined />, color: '#fa8c16' },
-    { title: `${queryDays}天已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
-    { title: `${queryDays}天已驳回查询权限申请数`, value: queryOverview?.cards?.rejected_query_priv_apply_count ?? 0, icon: <CloseCircleOutlined />, color: '#ff4d4f' },
+    { title: `${queryRangeLabel}已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
+    { title: `${queryRangeLabel}已驳回查询权限申请数`, value: queryOverview?.cards?.rejected_query_priv_apply_count ?? 0, icon: <CloseCircleOutlined />, color: '#ff4d4f' },
   ]
 
   const workflowCards = [
-    { title: `${workflowDays}天提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: '#1558A8' },
-    { title: `${workflowDays}天审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
-    { title: `${workflowDays}天审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: '#fa8c16' },
+    { title: `${workflowRangeLabel}提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: '#1558A8' },
+    { title: `${workflowRangeLabel}审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
+    { title: `${workflowRangeLabel}审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: '#fa8c16' },
     { title: '待审批工单数', value: workflowOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: '#722ed1' },
     { title: '队列中工单数', value: workflowOverview?.cards?.queued_count ?? 0, icon: <ClockCircleOutlined />, color: '#722ed1' },
     { title: '执行中工单数', value: workflowOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: '#1677FF' },
-    { title: `${workflowDays}天执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: '#13C2C2' },
-    { title: `${workflowDays}天执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: '#E53935' },
-    { title: `${workflowDays}天取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: '#A0A0A0' },
-    { title: `${workflowDays}天完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: '#2F54EB' },
+    { title: `${workflowRangeLabel}执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: '#13C2C2' },
+    { title: `${workflowRangeLabel}执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: '#E53935' },
+    { title: `${workflowRangeLabel}取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: '#A0A0A0' },
+    { title: `${workflowRangeLabel}完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: '#2F54EB' },
   ]
 
   const instanceCards = [
@@ -304,11 +307,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          Dashboard
-        </Title>
-      </div>
+      <PageHeader title="Dashboard" marginBottom={20} />
 
       <Card
         title="在线查询概览"

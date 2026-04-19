@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import {
-  Button, Card, Dropdown, InputNumber, Select, Space, Spin, Table, Tag, Typography, message, Alert,
+  Button, Dropdown, InputNumber, Select, Space, Table, Tag, Typography, message, Alert,
 } from 'antd'
 import {
   PlayCircleOutlined, ClearOutlined, HistoryOutlined, ClockCircleOutlined, DownloadOutlined,
@@ -9,6 +9,10 @@ import Editor from '@monaco-editor/react'
 import { useQuery } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import { queryApi, type QueryAccessExplanation, type QueryResult } from '@/api/query'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import SectionLoading from '@/components/common/SectionLoading'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text } = Typography
@@ -250,8 +254,13 @@ export default function QueryPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {msgCtx}
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
+      <PageHeader
+        title="在线查询"
+        meta="选择实例和数据库后执行 SQL，支持结果导出、权限排查和脱敏提示"
+        marginBottom={4}
+      />
+
+      <SectionCard bodyPadding="12px 16px">
         <Space wrap>
           <Select placeholder="选择实例" style={{ minWidth: 220, maxWidth: 360 }}
             popupMatchSelectWidth={false}
@@ -286,16 +295,15 @@ export default function QueryPage() {
           </Button>
           <Button icon={<ClearOutlined />} onClick={() => { setSql(''); setResult(null) }}>清空</Button>
         </Space>
-      </Card>
+      </SectionCard>
 
-      <Card title="SQL 编辑器" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}>
+      <SectionCard title="SQL 编辑器" bodyPadding={0}>
         <Editor height="200px" defaultLanguage="sql" value={sql}
           onChange={(v) => setSql(v || '')} options={EDITOR_OPTIONS} />
-      </Card>
+      </SectionCard>
 
       <div ref={resultCardRef}>
-      <Card
+      <SectionCard
         title={result ? (
           <Space>
             <HistoryOutlined /><span>查询结果</span>
@@ -330,8 +338,9 @@ export default function QueryPage() {
             </Dropdown>
           </Space>
         ) : null}
-        style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}>
+        bodyPadding={0}
+        marginBottom={0}
+      >
         {accessExplanation && !result && !executing && (
           <Alert
             type="warning"
@@ -341,14 +350,15 @@ export default function QueryPage() {
             style={{ margin: 16, borderRadius: 8 }}
           />
         )}
-        {executing && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spin tip="执行中..." /></div>}
+        {executing && <SectionLoading text="执行中..." compact />}
         {result && !executing && (
           result.error
             ? <Alert type="error" showIcon message="执行失败" description={result.error} style={{ margin: 16, borderRadius: 8 }} />
             : <Table
-                dataSource={resultRows}
+                dataSource={currentPageRows}
                 columns={resultColumns}
                 size="small"
+                locale={{ emptyText: <TableEmptyState title="暂无查询结果" /> }}
                 scroll={{ x: 'max-content', y: resultTableHeight }}
                 pagination={{
                   current: resultPage,
@@ -363,9 +373,11 @@ export default function QueryPage() {
                 }} />
         )}
         {!result && !executing && !accessExplanation && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#AEAEB2' }}>选择实例和数据库，输入 SQL 后点击执行</div>
+          <div style={{ padding: 32 }}>
+            <TableEmptyState title="选择实例和数据库，输入 SQL 后点击执行" />
+          </div>
         )}
-      </Card>
+      </SectionCard>
       </div>
     </div>
   )

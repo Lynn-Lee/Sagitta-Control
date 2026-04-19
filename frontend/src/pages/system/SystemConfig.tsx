@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import {
   Alert, Button, Card, Divider, Form, Input,
-  message, Space, Switch, Tabs, Typography,
+  message, Space, Switch, Tabs, Typography, Grid,
 } from 'antd'
 import { ApiOutlined, SaveOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/api/client'
+import PageHeader from '@/components/common/PageHeader'
+import SectionLoading from '@/components/common/SectionLoading'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
+const { useBreakpoint } = Grid
 
 // 平台图标：与登录页保持一致，使用 public/icons/ 官方矢量图
 const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
@@ -140,6 +144,8 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
 }
 
 export default function SystemConfig() {
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
   const qc = useQueryClient()
@@ -193,24 +199,28 @@ export default function SystemConfig() {
     children: configs[key]?.length ? (
       <ConfigGroup group={key} items={configs[key]} form={form} />
     ) : (
-      <Text type="secondary">暂无配置项</Text>
+      <TableEmptyState title="暂无配置项" />
     ),
   }))
 
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>系统配置</Title>
-        <Button type="primary" icon={<SaveOutlined />} loading={saveMut.isPending}
-          onClick={() => form.validateFields().then(v => saveMut.mutate(v))}>
-          保存所有配置
-        </Button>
-      </div>
+      <PageHeader
+        title="系统配置"
+        marginBottom={20}
+        actions={(
+          <Button type="primary" icon={<SaveOutlined />} loading={saveMut.isPending}
+            onClick={() => form.validateFields().then(v => saveMut.mutate(v))}
+            style={isMobile ? { width: '100%' } : undefined}>
+            保存所有配置
+          </Button>
+        )}
+      />
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         {isLoading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#AEAEB2' }}>加载配置中...</div>
+          <SectionLoading text="加载配置中..." />
         ) : (
           <Form form={form} layout="vertical" style={{ maxWidth: 680 }}>
             <Tabs items={tabItems} tabBarGutter={4} />

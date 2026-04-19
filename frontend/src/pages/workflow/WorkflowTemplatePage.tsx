@@ -34,6 +34,9 @@ import {
   type WorkflowTemplatePayload,
   workflowTemplateApi,
 } from '@/api/workflowTemplate'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
@@ -360,15 +363,13 @@ export default function WorkflowTemplatePage() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>工单模板</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建模板</Button>
-      </div>
+      <PageHeader
+        title="工单模板"
+        marginBottom={20}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建模板</Button>}
+      />
 
-      <Card
-        style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}
-      >
+      <FilterCard>
         <Input.Search
           placeholder="搜索模板名称或描述"
           allowClear
@@ -376,7 +377,7 @@ export default function WorkflowTemplatePage() {
           onSearch={setSearch}
           onChange={(e) => !e.target.value && setSearch('')}
         />
-      </Card>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
         <Table
@@ -384,6 +385,7 @@ export default function WorkflowTemplatePage() {
           columns={columns}
           rowKey="id"
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无工单模板" /> }}
           tableLayout="fixed"
           scroll={{ x: 1700 }}
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }}

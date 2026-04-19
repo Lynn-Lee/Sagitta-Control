@@ -1,8 +1,11 @@
-import { Button, Card, Descriptions, Space, Steps, Table, Tag, Typography, message, Popconfirm } from 'antd'
+import { Button, Descriptions, Space, Table, Tag, Typography, message, Popconfirm } from 'antd'
 import { CheckOutlined, CloseOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
+import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
+import SectionLoading from '@/components/common/SectionLoading'
 import { useAuthStore } from '@/store/auth'
 
 const { Title, Text } = Typography
@@ -45,7 +48,7 @@ export default function WorkflowDetail() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['workflow', wfId] }); msgApi.success('工单已取消') },
   })
 
-  if (isLoading || !wf) return <div style={{ padding: 40 }}>加载中...</div>
+  if (isLoading || !wf) return <SectionLoading text="加载工单详情中..." />
 
   const logColumns = [
     { title: '操作人', dataIndex: 'operator', width: 120 },
@@ -57,9 +60,10 @@ export default function WorkflowDetail() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>工单详情 #{wfId}</Title>
-        <Space>
+      <PageHeader
+        title={`工单详情 #${wfId}`}
+        actions={
+          <Space wrap>
           {wf.can_audit && <>
             <Button type="primary" icon={<CheckOutlined />} loading={auditMut.isPending}
               onClick={() => auditMut.mutate({ action: 'pass' })}>审批通过</Button>
@@ -77,10 +81,12 @@ export default function WorkflowDetail() {
             </Popconfirm>
           )}
           <Button onClick={() => navigate('/workflow')}>返回列表</Button>
-        </Space>
-      </div>
+          </Space>
+        }
+        marginBottom={20}
+      />
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}>
+      <SectionCard>
         <Descriptions column={3} size="small">
           <Descriptions.Item label="工单名称">{wf.workflow_name}</Descriptions.Item>
           <Descriptions.Item label="状态">
@@ -98,31 +104,29 @@ export default function WorkflowDetail() {
           <Descriptions.Item label="提交时间">{wf.created_at ? new Date(wf.created_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
           <Descriptions.Item label="完成时间">{wf.finish_time ? new Date(wf.finish_time).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
         </Descriptions>
-      </Card>
+      </SectionCard>
 
-      <Card title="SQL 内容" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}
-        styles={{ body: { padding: 0 } }}>
+      <SectionCard title="SQL 内容" bodyPadding={0}>
         <pre style={{ padding: 16, margin: 0, fontFamily: '"JetBrains Mono", monospace', fontSize: 13,
           background: '#1e1e1e', color: '#d4d4d4', borderRadius: '0 0 12px 12px', overflowX: 'auto',
           maxHeight: 400 }}>
           {wf.sql_content || '（无 SQL 内容）'}
         </pre>
-      </Card>
+      </SectionCard>
 
       {wf.execute_result && (
-        <Card title="执行结果" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 16 }}>
+        <SectionCard title="执行结果">
           <pre style={{ margin: 0, fontSize: 13, fontFamily: 'monospace' }}>
             {typeof wf.execute_result === 'string' ? wf.execute_result : JSON.stringify(wf.execute_result, null, 2)}
           </pre>
-        </Card>
+        </SectionCard>
       )}
 
       {wf.audit_logs?.length > 0 && (
-        <Card title="审批日志" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-          styles={{ body: { padding: 0 } }}>
+        <SectionCard title="审批日志" marginBottom={0} bodyPadding={0}>
           <Table dataSource={wf.audit_logs} columns={logColumns} rowKey={(r, i) => String(i)}
             size="small" tableLayout="fixed" scroll={{ x: 760 }} pagination={false} />
-        </Card>
+        </SectionCard>
       )}
     </div>
   )

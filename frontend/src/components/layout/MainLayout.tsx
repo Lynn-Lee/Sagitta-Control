@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip, Drawer, Grid } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   DashboardOutlined, FileTextOutlined, SearchOutlined, MonitorOutlined,
@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
+const { useBreakpoint } = Grid
 
 // SagittaDB Logo SVG
 const SagittaLogo = ({ size = 28, color = '#165DFF' }: { size?: number; color?: string }) => (
@@ -77,10 +78,14 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [menuOpenKeys, setMenuOpenKeys] = useState<string[]>([])
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
   const hasPermission = useAuthStore((s) => s.hasPermission)
+  const screens = useBreakpoint()
+  const isMobile = !screens.lg
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -91,7 +96,15 @@ export default function MainLayout() {
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true, onClick: handleLogout },
   ]
 
-  const selectedKeys = [location.pathname]
+  const selectedMenuKey = useMemo(() => {
+    const leafKeys = NAV_ITEMS.flatMap((item) => item.children?.map((child) => child.key as string) ?? [item.key as string])
+      .filter((key) => !key.endsWith('-group'))
+      .sort((a, b) => b.length - a.length)
+
+    return leafKeys.find((key) => location.pathname === key || location.pathname.startsWith(`${key}/`)) || '/dashboard'
+  }, [location.pathname])
+
+  const selectedKeys = [selectedMenuKey]
   const visibleNavItems = NAV_ITEMS
     .filter((item) => !item.permission || hasPermission(item.permission))
     .map((item) => {
@@ -101,15 +114,46 @@ export default function MainLayout() {
         children: item.children.filter(Boolean),
       }
     })
-  const defaultOpenKeys = ['workflow-group', 'query-group', 'ops-group', 'system-group']
+  const openKeys = useMemo(() => {
+    const parent = NAV_ITEMS.find((item) => item.children?.some((child) => child.key === selectedMenuKey))
+    return parent ? [parent.key as string] : []
+  }, [selectedMenuKey])
   const initials = (user?.display_name || user?.username || 'S')[0].toUpperCase()
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    setMenuOpenKeys(openKeys)
+  }, [openKeys])
+
+  const menuNode = (
+    <Menu
+      mode="inline"
+      items={visibleNavItems}
+      selectedKeys={selectedKeys}
+      openKeys={menuOpenKeys}
+      onOpenChange={(keys) => setMenuOpenKeys(keys as string[])}
+      onClick={({ key }) => {
+        navigate(key)
+        if (isMobile) setMobileNavOpen(false)
+      }}
+      style={{
+        border: 'none',
+        paddingTop: 8,
+        paddingBottom: 16,
+        fontSize: 13,
+      }}
+    />
+  )
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {/* ── Header ────────────────────────────────────────────── */}
       <Header style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
-        height: 56, padding: '0 16px 0 0',
+        height: 56, padding: isMobile ? '0 12px 0 0' : '0 16px 0 0',
         background: '#0F172A',
         borderBottom: '1px solid rgba(22,93,255,0.12)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -117,8 +161,14 @@ export default function MainLayout() {
         {/* 左侧：折叠按钮 + Logo */}
         <Space size={0}>
           <Button type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
+            icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
+            onClick={() => {
+              if (isMobile) {
+                setMobileNavOpen(true)
+                return
+              }
+              setCollapsed(!collapsed)
+            }}
             style={{ color: 'rgba(255,255,255,0.65)', width: 56, height: 56, borderRadius: 0 }}
           />
           <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
@@ -165,70 +215,74 @@ export default function MainLayout() {
               }}>
                 {initials}
               </Avatar>
-              <Text style={{
-                color: 'rgba(255,255,255,0.8)',
-                fontSize: 13,
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 500,
-              }}>
-                {user?.display_name || user?.username || '用户'}
-              </Text>
+              {!isMobile && (
+                <Text style={{
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: 13,
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 500,
+                  maxWidth: 160,
+                }} ellipsis>
+                  {user?.display_name || user?.username || '用户'}
+                </Text>
+              )}
             </Space>
           </Dropdown>
         </Space>
       </Header>
 
       <Layout style={{ marginTop: 56 }}>
-        {/* ── Sider ─────────────────────────────────────────────── */}
-        <Sider
-          collapsible collapsed={collapsed} onCollapse={setCollapsed}
-          theme="light" width={216}
-          style={{
-            position: 'fixed', left: 0, top: 56, bottom: 0,
-            height: 'calc(100vh - 56px)',
-            borderRight: '1px solid #E5E6EB',
-            overflow: 'auto', zIndex: 100,
-            background: '#FFFFFF',
-          }}
-          trigger={null}
-        >
-          <Menu
-            mode="inline"
-            items={visibleNavItems}
-            selectedKeys={selectedKeys}
-            defaultOpenKeys={defaultOpenKeys}
-            onClick={({ key }) => navigate(key)}
+        {!isMobile && (
+          <Sider
+            collapsible collapsed={collapsed} onCollapse={setCollapsed}
+            theme="light" width={216}
             style={{
-              border: 'none',
-              paddingTop: 8,
-              paddingBottom: 16,
-              fontSize: 13,
+              position: 'fixed', left: 0, top: 56, bottom: 0,
+              height: 'calc(100vh - 56px)',
+              borderRight: '1px solid #E5E6EB',
+              overflow: 'auto', zIndex: 100,
+              background: '#FFFFFF',
             }}
-          />
-          {/* Sider 底部版本号 */}
-          {!collapsed && (
-            <div style={{
-              padding: '12px 16px',
-              borderTop: '1px solid #F0F1F5',
-              marginTop: 8,
-            }}>
-              <Text style={{
-                fontSize: 10,
-                fontFamily: "'JetBrains Mono', monospace",
-                color: '#C9CDD4',
-                letterSpacing: '0.5px',
+            trigger={null}
+          >
+            {menuNode}
+            {!collapsed && (
+              <div style={{
+                padding: '12px 16px',
+                borderTop: '1px solid #F0F1F5',
+                marginTop: 8,
               }}>
-                全引擎兼容 · 全流程可观测
-              </Text>
-            </div>
-          )}
-        </Sider>
+                <Text style={{
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: '#C9CDD4',
+                  letterSpacing: '0.5px',
+                }}>
+                  全引擎兼容 · 全流程可观测
+                </Text>
+              </div>
+            )}
+          </Sider>
+        )}
+
+        {isMobile && (
+          <Drawer
+            title="导航"
+            placement="left"
+            open={mobileNavOpen}
+            onClose={() => setMobileNavOpen(false)}
+            width={280}
+            styles={{ body: { padding: 0 } }}
+          >
+            {menuNode}
+          </Drawer>
+        )}
 
         {/* ── Content ───────────────────────────────────────────── */}
         <Content style={{
-          marginLeft: collapsed ? 80 : 216,
+          marginLeft: isMobile ? 0 : (collapsed ? 80 : 216),
           transition: 'margin-left 0.2s',
-          padding: 24,
+          padding: isMobile ? 16 : 24,
           minHeight: 'calc(100vh - 56px)',
           background: '#F2F3F5',
         }}>

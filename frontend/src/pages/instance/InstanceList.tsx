@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Button, Card, Form, Input, InputNumber, Modal, Popconfirm,
-  Select, Space, Table, Tabs, Tag, Tooltip, Typography, message, Switch, Alert,
+  Select, Space, Table, Tabs, Tag, Tooltip, Typography, message, Switch, Alert, Grid,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -11,10 +11,14 @@ import {
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi, type InstanceItem } from '@/api/instance'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
+const { useBreakpoint } = Grid
 
 const DB_TYPE_COLORS: Record<string, string> = {
   mysql: 'blue', pgsql: 'geekblue', oracle: 'red', mongo: 'green',
@@ -140,6 +144,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         columns={columns}
         rowKey="id"
         loading={isLoading}
+        locale={{ emptyText: <TableEmptyState title="暂无实例数据" /> }}
         size="small"
         tableLayout="fixed"
         scroll={{ x: 820 }}
@@ -178,6 +183,8 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
 // ── 主组件 ─────────────────────────────────────────────────
 export default function InstanceList() {
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [modalOpen, setModalOpen] = useState(false)
   const [dbModalOpen, setDbModalOpen] = useState(false)
   const [selectedInstance, setSelectedInstance] = useState<InstanceItem | null>(null)
@@ -296,21 +303,26 @@ export default function InstanceList() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={2} style={{ margin: 0 }}>实例管理</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建实例</Button>
-      </div>
+      <PageHeader
+        title="实例管理"
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+          style={isMobile ? { width: '100%' } : undefined}>
+            新建实例
+          </Button>
+        )}
+      />
 
-      <Card style={{ marginBottom: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: '12px 16px' } }}>
-        <Input.Search placeholder="搜索实例名称" allowClear style={{ width: 260 }}
+      <FilterCard>
+        <Input.Search placeholder="搜索实例名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
           onSearch={setSearch} onChange={e => !e.target.value && setSearch('')} />
-      </Card>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
         styles={{ body: { padding: 0 } }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id"
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无实例数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1080 }}
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />

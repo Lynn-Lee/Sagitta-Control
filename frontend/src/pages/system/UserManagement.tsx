@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, Upload, message, Grid } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userApi, roleApi, userGroupApi } from '@/api/system'
+import FilterCard from '@/components/common/FilterCard'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Dragger } = Upload
+const { useBreakpoint } = Grid
 
 type ImportErrorRow = {
   row: number
@@ -62,6 +66,8 @@ function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: string[]
 
 export default function UserManagement() {
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.lg
   const [modalOpen, setModalOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importResultOpen, setImportResultOpen] = useState(false)
@@ -263,6 +269,8 @@ export default function UserManagement() {
     setTitles([])
     setStatuses([])
   }
+
+  const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
   const handleExport = (exportFormat: 'xlsx' | 'csv') => {
     if (exportScope === 'selected' && !selectedRowKeys.length) {
       msgApi.warning('当前导出范围为“勾选结果”，请先勾选要导出的用户')
@@ -385,13 +393,16 @@ export default function UserManagement() {
   return (
     <div>
       {msgCtx}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={2} style={{ margin: 0 }}>用户管理</Title>
-        <Space>
+      <PageHeader
+        title="用户管理"
+        marginBottom={20}
+        actions={(
+          <Space wrap size={[8, 8]} style={isMobile ? { display: 'flex', width: '100%' } : undefined}>
           <Button
             icon={<DownloadOutlined />}
             loading={exportMut.isPending}
             onClick={() => handleExport('xlsx')}
+            style={isMobile ? { flex: 1 } : undefined}
           >
             导出 Excel
           </Button>
@@ -399,19 +410,22 @@ export default function UserManagement() {
             icon={<DownloadOutlined />}
             loading={exportMut.isPending}
             onClick={() => handleExport('csv')}
+            style={isMobile ? { flex: 1 } : undefined}
           >
             导出 CSV
           </Button>
-          <Button icon={<UploadOutlined />} onClick={openImport}>导入用户</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => void openCreate()}>新建用户</Button>
-        </Space>
-      </div>
-      <Card style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: '12px 16px' } }}>
+          <Button icon={<UploadOutlined />} onClick={openImport} style={isMobile ? { flex: 1 } : undefined}>导入用户</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => void openCreate()}
+            style={isMobile ? { flex: 1 } : undefined}>新建用户</Button>
+          </Space>
+        )}
+      />
+      <FilterCard marginBottom={16}>
         <Space wrap size={[12, 12]} style={{ display: 'flex' }}>
           <Input.Search
             placeholder="搜索用户名 / 显示名 / 邮箱 / 电话号码"
             allowClear
-            style={{ width: 320 }}
+            style={{ width: filterWidth(320) }}
             value={search}
             onSearch={handleSearch}
             onChange={e => {
@@ -427,7 +441,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="角色"
-            style={{ width: 180 }}
+            style={{ width: filterWidth(180) }}
             options={roleOptions}
             value={roleIds}
             onChange={(value) => handleFilterChange(setRoleIds, value)}
@@ -436,7 +450,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="用户组"
-            style={{ width: 200 }}
+            style={{ width: filterWidth(200) }}
             options={groupOptions}
             value={userGroupIds}
             onChange={(value) => handleFilterChange(setUserGroupIds, value)}
@@ -445,7 +459,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="部门"
-            style={{ width: 180 }}
+            style={{ width: filterWidth(180) }}
             options={departmentOptions}
             value={departments}
             onChange={(value) => handleFilterChange(setDepartments, value)}
@@ -454,7 +468,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="职位"
-            style={{ width: 180 }}
+            style={{ width: filterWidth(180) }}
             options={titleOptions}
             value={titles}
             onChange={(value) => handleFilterChange(setTitles, value)}
@@ -463,13 +477,13 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="状态"
-            style={{ width: 160 }}
+            style={{ width: filterWidth(160) }}
             options={statusOptions}
             value={statuses}
             onChange={(value) => handleFilterChange(setStatuses, value)}
           />
           <Select
-            style={{ width: 180 }}
+            style={{ width: filterWidth(180) }}
             options={[
               { value: 'filtered', label: '导出当前筛选结果' },
               { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
@@ -477,10 +491,14 @@ export default function UserManagement() {
             value={exportScope}
             onChange={setExportScope}
           />
-          <Button onClick={resetFilters}>重置筛选</Button>
+          <Button onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>重置筛选</Button>
         </Space>
         <div style={{ marginTop: 12 }}>
-          <Space wrap size={[8, 8]} style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Space wrap size={[8, 8]} style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'flex-start' : 'center',
+          }}>
             <Space wrap size={[8, 8]}>
               {activeFilterTags.length ? (
                 activeFilterTags.map((item) => (
@@ -507,9 +525,10 @@ export default function UserManagement() {
             </Text>
           </Space>
         </div>
-      </Card>
+      </FilterCard>
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无用户数据" /> }}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys.map((key) => Number(key))),
@@ -663,7 +682,7 @@ export default function UserManagement() {
             size="small"
             tableLayout="fixed"
             scroll={{ x: 760 }}
-            locale={{ emptyText: '本次导入没有失败记录' }}
+            locale={{ emptyText: <TableEmptyState title="本次导入没有失败记录" /> }}
           />
         ) : (
           <Text type="secondary">本次导入没有失败记录。</Text>

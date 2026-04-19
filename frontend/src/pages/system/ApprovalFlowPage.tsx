@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Button, Card, Col, Drawer, Form, Input, Popconfirm,
-  Row, Select, Space, Table, Tag, Tooltip, Typography, message,
+  Row, Select, Space, Table, Tag, Tooltip, Typography, message, Grid,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, StopOutlined,
@@ -10,8 +10,11 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { approvalFlowApi, type ApprovalFlowNode } from '@/api/approvalFlow'
 import { userApi } from '@/api/system'
+import PageHeader from '@/components/common/PageHeader'
+import TableEmptyState from '@/components/common/TableEmptyState'
 
-const { Title, Text } = Typography
+const { Text } = Typography
+const { useBreakpoint } = Grid
 
 const APPROVER_TYPE_LABELS: Record<string, string> = {
   users:        '指定用户',
@@ -27,6 +30,8 @@ const APPROVER_TYPE_COLORS: Record<string, string> = {
 
 export default function ApprovalFlowPage() {
   const qc = useQueryClient()
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
   const [drawerOpen, setDrawerOpen]   = useState(false)
   const [editId, setEditId]           = useState<number | null>(null)
   const [search, setSearch]           = useState('')
@@ -186,25 +191,26 @@ export default function ApprovalFlowPage() {
   const isSaving = createMut.isPending || updateMut.isPending
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       {msgCtx}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
-        <Col><Title level={4} style={{ margin: 0 }}>审批流管理</Title></Col>
-        <Col>
-          <Space>
+      <PageHeader
+        title="审批流管理"
+        actions={(
+          <Space wrap size={[8, 8]} style={isMobile ? { display: 'flex', width: '100%' } : undefined}>
             <Input.Search
               placeholder="搜索审批流名称"
               allowClear
-              style={{ width: 220 }}
+              style={{ width: isMobile ? '100%' : 220 }}
               onSearch={v => setSearch(v)}
               onChange={e => !e.target.value && setSearch('')}
             />
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+              style={isMobile ? { width: '100%' } : undefined}>
               新建审批流
             </Button>
           </Space>
-        </Col>
-      </Row>
+        )}
+      />
 
       <Card bordered={false} bodyStyle={{ padding: 0 }}>
         <Table
@@ -212,6 +218,7 @@ export default function ApprovalFlowPage() {
           columns={columns}
           dataSource={data?.items || []}
           loading={isLoading}
+          locale={{ emptyText: <TableEmptyState title="暂无审批流数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1100 }}
           pagination={{ pageSize: 20, showSizeChanger: false, showTotal: t => `共 ${t} 条` }}
