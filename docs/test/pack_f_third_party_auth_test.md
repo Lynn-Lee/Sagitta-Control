@@ -4,7 +4,7 @@
 > **对应计划：** Pack F — 第三方登录集成（LDAP 企业目录 + 4 种 OAuth2/CAS）
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** Sprint 1 测试通过，各平台应用已创建并获得相应 AppKey/Secret
-> **测试账号：** admin / Admin@2024!
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密）
 
 ---
 

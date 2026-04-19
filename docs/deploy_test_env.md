@@ -88,7 +88,7 @@ docker compose exec backend alembic upgrade head
 curl -X POST http://localhost:8000/api/v1/system/init/
 ```
 
-输出 `{"status": 0}` 表示成功，默认管理员账号：**admin / Admin@2024!**
+输出 `{"status": 0}` 表示成功，默认管理员账号：**admin / Admin@2024!**。首次使用默认密码登录会进入强制改密流程，改密成功后需要使用新密码重新登录。
 
 ### 步骤 6：验证服务
 
@@ -260,9 +260,9 @@ docker compose exec backend alembic upgrade head
 # 查看所有表
 docker compose exec postgres psql -U sagitta -d sagittadb -c "\dt"
 
-# 重置 admin 密码（忘记密码时）
-NEW_HASH=$(docker compose exec backend python -c "from app.core.security import hash_password; print(hash_password('Admin@2024!'))" | tail -1)
-docker compose exec postgres psql -U sagitta -d sagittadb -c "UPDATE sql_users SET password='$NEW_HASH' WHERE username='admin';"
+# 重置 admin 密码（忘记密码时，示例密码满足长度、数字、大小写字母和特殊字符要求）
+NEW_HASH=$(docker compose exec backend python -c "from app.core.security import hash_password; print(hash_password('Admin@2026A'))" | tail -1)
+docker compose exec postgres psql -U sagitta -d sagittadb -c "UPDATE sql_users SET password='$NEW_HASH', password_changed_at=NOW() WHERE username='admin';"
 ```
 
 ---
@@ -341,7 +341,7 @@ locust -f tests/perf/locustfile.py --host http://localhost:8000
 
 测试环境首次部署后，建议按下面顺序准备数据：
 
-1. 初始化系统，确认 `admin / Admin@2024!` 可登录
+1. 初始化系统，使用 `admin / Admin@2024!` 触发首次强制改密，并确认新密码可登录
 2. 创建基础角色与测试用户：
    - `dev_user`
    - `group_dba_user`

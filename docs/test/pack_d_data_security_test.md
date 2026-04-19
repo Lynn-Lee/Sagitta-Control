@@ -4,7 +4,7 @@
 > **对应计划：** Pack D — 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** Sprint 1~2、Pack A 测试通过，至少有一个可连接实例
-> **测试账号：** admin / Admin@2024!
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密）
 
 ---
 

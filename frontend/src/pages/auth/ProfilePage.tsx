@@ -17,6 +17,14 @@ export default function ProfilePage() {
   const [totpCode, setTotpCode] = useState('')
   const [disableCode, setDisableCode] = useState('')
   const [msgApi, msgCtx] = message.useMessage()
+  const passwordRules = [
+    { required: true, message: '请输入新密码' },
+    { min: 8, message: '密码长度不能少于 8 位' },
+    { pattern: /[A-Z]/, message: '密码必须包含至少 1 个大写字母' },
+    { pattern: /[a-z]/, message: '密码必须包含至少 1 个小写字母' },
+    { pattern: /\d/, message: '密码必须包含至少 1 个数字' },
+    { pattern: /[^A-Za-z0-9]/, message: '密码必须包含至少 1 个特殊字符' },
+  ]
 
   // ── 修改密码 ──────────────────────────────────────────────
   const changePwMut = useMutation({
@@ -85,6 +93,15 @@ export default function ProfilePage() {
                   {user?.totp_enabled ? '已开启' : '未开启'}
                 </Tag>
               </div>
+              <Divider style={{ margin: '4px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text type="secondary">密码有效期</Text>
+                <Tag color={user?.password_expiring_soon ? 'warning' : 'success'}>
+                  {user?.password_expiring_soon
+                    ? `${user?.days_until_password_expiry ?? 0} 天后到期`
+                    : '正常'}
+                </Tag>
+              </div>
             </Space>
           </SectionCard>
 
@@ -96,7 +113,7 @@ export default function ProfilePage() {
                 <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
               </Form.Item>
               <Form.Item name="new_password" label="新密码"
-                rules={[{ required: true, min: 8, message: '新密码不能少于 8 位' }]}>
+                rules={passwordRules}>
                 <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
               </Form.Item>
               <Form.Item name="confirm_password" label="确认新密码"

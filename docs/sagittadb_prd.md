@@ -568,7 +568,8 @@ PostgreSQL(:5432)  Redis(:6379)   Celery Worker
 | Pack E | 多引擎补全、数据归档、SQL 回滚辅助、通知服务 |
 | 品牌升级 | SagittaDB 品牌 UI 全面更新 |
 | Pack F | LDAP + 钉钉/飞书/企微/CAS 第三方登录全部完成 |
-| Pack G | 质量保障：单元测试 152 个、集成测试、性能测试、安全扫描 CI |
+| Pack G | 质量保障：单元测试 159 个、集成测试、性能测试、安全扫描 CI |
+| 密码安全策略 | 本地用户密码复杂度、默认/弱/过期密码强制改密、30 天轮换和到期前 7 天提醒 |
 | Pack H | 生产就绪：Helm Chart（K8s）、GHCR 镜像发布、备份脚本、多环境配置 |
 | Security Hardening | Token 黑名单 fail-close、生产环境 SECRET_KEY 强制校验、Text2SQL 服务分层、依赖版本收紧 |
 | 多级审批流 | 管理员自定义多节点审批流（指定用户 / 资源组 / 任意审批员），工单快照机制，前端审批流管理页面 |

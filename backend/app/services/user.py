@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import logging
+from datetime import UTC, datetime
 from io import BytesIO, StringIO
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, validate_password_strength, verify_password
 from app.models.instance import Instance
 from app.models.role import UserGroup, group_resource_group, role_permission, user_group_member
 from app.models.user import Permission, ResourceGroup, Users, instance_resource_group
@@ -101,7 +102,7 @@ USER_IMPORT_TEMPLATE_EXAMPLE = {
     "user_groups": "开发组;默认组用户组",
     "is_active": "true",
     "is_superuser": "false",
-    "password": "ChangeMe@2026",
+    "password": "Sagitta@2026A",
 }
 
 USER_IMPORT_FIELD_DOCS = [
@@ -186,8 +187,8 @@ USER_IMPORT_FIELD_DOCS = [
     {
         "field": "password",
         "required": "否",
-        "description": "仅创建新用户时使用；留空则使用导入弹窗填写的默认密码，至少 8 位。",
-        "example": "ChangeMe@2026",
+        "description": "仅创建新用户时使用；留空则使用导入弹窗填写的默认密码。密码至少 8 位，且必须同时包含数字、大写字母、小写字母和特殊字符。",
+        "example": "Sagitta@2026A",
     },
 ]
 
@@ -330,6 +331,7 @@ class UserService:
             employee_id=data.employee_id,
             department=data.department,
             title=data.title,
+            password_changed_at=datetime.now(UTC),
         )
         db.add(user)
         await db.flush()
@@ -414,6 +416,7 @@ class UserService:
 
             raise AppException("原密码错误", code=400)
         user.password = hash_password(new_password)
+        user.password_changed_at = datetime.now(UTC)
         await db.commit()
 
     @staticmethod
@@ -689,8 +692,10 @@ class UserService:
         suffix = Path(filename or "").suffix.lower()
         if suffix not in {".csv", ".xlsx"}:
             raise AppException("仅支持导入 .csv 或 .xlsx 文件", code=400)
-        if len(default_password) < 8:
-            raise AppException("默认密码长度不能少于 8 位", code=400)
+        try:
+            validate_password_strength(default_password)
+        except ValueError as exc:
+            raise AppException(str(exc), code=400) from exc
 
         import_headers, rows = UserService._parse_user_import_rows(content, suffix)
         if not rows:

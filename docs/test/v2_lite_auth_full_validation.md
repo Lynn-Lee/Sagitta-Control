@@ -42,7 +42,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 
 ### 3. 默认管理员
 
-- `admin / Admin@2024!`
+- `admin / Admin@2024!`（默认密码会触发强制改密，请先完成改密再继续完整验证）
 
 ### 4. 已通过的基础校验
 
@@ -619,6 +619,8 @@ curl -X POST http://localhost:8000/api/v1/auth/login/ \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"Admin@2024!"}'
 ```
+
+若返回 `password_change_required=true`，先按返回的 `password_change_token` 调用强制改密接口，之后再使用新密码获取正式 Token。
 
 ### 查询权限排查
 

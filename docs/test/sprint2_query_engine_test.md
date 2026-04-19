@@ -4,7 +4,7 @@
 > **对应计划：** Sprint 2 — 引擎层抽象、在线查询、查询权限申请
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** Sprint 1 测试通过，已创建至少一个可用数据库实例
-> **测试账号：** admin / Admin@2024!（及已授权 query_query 权限的普通用户）
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密；及已授权 query_query 权限的普通用户）
 
 ---
 

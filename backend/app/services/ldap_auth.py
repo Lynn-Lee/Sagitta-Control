@@ -11,6 +11,7 @@ LDAP 认证服务（Pack F-P0）。
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,6 +205,7 @@ class LdapAuthService:
                 employee_id=employee_id,
                 department=department,
                 title=title,
+                password_changed_at=datetime.now(UTC),
             )
             db.add(user)
             logger.info("ldap_user_provisioned: %s", username)

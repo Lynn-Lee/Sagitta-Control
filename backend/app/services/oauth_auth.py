@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import logging
 import urllib.parse
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import select
@@ -57,6 +58,7 @@ async def _provision_oauth_user(
             auth_type=auth_type,
             external_id=external_id,
             is_active=True,
+            password_changed_at=datetime.now(UTC),
         )
         db.add(user)
         logger.info("oauth_user_provisioned: provider=%s username=%s", auth_type, username)

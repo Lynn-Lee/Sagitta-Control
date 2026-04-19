@@ -22,6 +22,8 @@ export interface UserInfo {
   title?: string
   employee_id?: string
   tenant_id: number
+  password_expiring_soon?: boolean
+  days_until_password_expiry?: number
 }
 
 interface AuthState {

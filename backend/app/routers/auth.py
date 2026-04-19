@@ -5,6 +5,7 @@
 import logging
 import time
 import uuid
+from datetime import UTC, datetime
 from urllib.parse import quote as urllib_quote
 from urllib.parse import urlencode as urllib_urlencode
 
@@ -18,14 +19,20 @@ from app.core.database import get_db
 from app.core.deps import current_user, oauth2_scheme
 from app.core.security import (
     create_access_token,
+    create_password_change_token,
     create_refresh_token,
     decode_token,
     decrypt_field,
     encrypt_field,
+    get_login_password_change_reasons,
+    get_password_days_until_expiry,
+    hash_password,
+    is_password_expiring_soon,
     verify_password,
 )
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForceChangePasswordRequest,
     LdapLoginRequest,
     LoginRequest,
     RefreshRequest,
@@ -62,6 +69,20 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
+
+    password_change_reasons = get_login_password_change_reasons(
+        data.password,
+        user.password_changed_at,
+    )
+    if password_change_reasons:
+        logger.info("user_login_password_change_required: %s", user.username)
+        return TokenResponse(
+            password_change_required=True,
+            password_change_token=create_password_change_token(
+                {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
+            ),
+            password_change_reasons=password_change_reasons,
+        )
 
     payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
     if user.totp_enabled:
@@ -209,6 +230,8 @@ async def get_me(user=Depends(current_user), db: AsyncSession = Depends(get_db))
         "resource_groups": user.get("resource_groups", []),
         "user_groups": user.get("user_groups", []),
         "tenant_id": db_user.tenant_id,
+        "password_expiring_soon": is_password_expiring_soon(db_user.password_changed_at),
+        "days_until_password_expiry": get_password_days_until_expiry(db_user.password_changed_at),
     }
 
 
@@ -218,6 +241,25 @@ async def change_password(
 ):
     await UserService.change_password(db, user["id"], data.old_password, data.new_password)
     return {"status": 0, "msg": "密码已修改，请重新登录"}
+
+
+@router.post("/password/change-required/", summary="强制修改密码")
+async def force_change_password(data: ForceChangePasswordRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        payload = decode_token(data.password_change_token)
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="改密凭证无效或已过期") from e
+    if payload.get("type") != "password_change":
+        raise HTTPException(status_code=401, detail="非法的改密凭证")
+
+    user = await UserService.get_by_id(db, int(payload["sub"]))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+
+    user.password = hash_password(data.new_password)
+    user.password_changed_at = datetime.now(UTC)
+    await db.commit()
+    return {"status": 0, "msg": "密码已修改，请使用新密码重新登录"}
 
 
 # ── 短信验证码登录（v2）──────────────────────────────────────────

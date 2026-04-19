@@ -4,7 +4,7 @@
 > **对应计划：** Pack H — Helm Chart（K8s）、生产 Docker Compose、数据库备份、CI/CD 升级
 > **测试环境：** 本地 Docker Compose + Kubernetes（可选）+ GitHub Actions
 > **前置条件：** Docker Compose 环境运行正常，kubectl + Helm 已安装（K8s 测试）
-> **测试账号：** admin / Admin@2024!
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密）
 
 ---
 

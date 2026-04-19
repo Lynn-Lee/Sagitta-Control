@@ -239,7 +239,7 @@ def get_user_accessible_instances(user):
 
 | 方式 | 状态 | 说明 |
 |---|---|---|
-| 账号密码 | ✅ 已有 | bcrypt + SHA-256 双重哈希 |
+| 账号密码 | ✅ 已有 | bcrypt + SHA-256 双重哈希；默认/弱/过期密码强制改密 |
 | TOTP 两步验证 | ✅ 已有 | Google Authenticator 兼容 |
 | LDAP 认证 | ✅ 已有 | 三步验证（bind→搜索→re-bind），自动 provision |
 | 钉钉扫码 OAuth | ✅ 已有 | DingTalk New API v2，scope=openid |
@@ -247,6 +247,14 @@ def get_user_accessible_instances(user):
 | 企微扫码 OAuth | ✅ 已有 | WeCom qrConnect |
 | CAS 通用 SSO | ✅ 已有 | Keycloak / Okta / Azure AD，可配3个端点 |
 | **短信验证码** | 🆕 新增 | 对接阿里云/腾讯云 SMS |
+
+### 本地账号密码安全策略
+
+- 密码复杂度：至少 8 位，必须包含数字、大写字母、小写字母和特殊字符。
+- 登录校验：账号密码验证通过后继续检查默认密码、弱密码和密码过期状态；命中任一规则时不签发正式 access/refresh token，仅返回短效 `password_change` token。
+- 强制改密：用户通过 `/auth/password/change-required/` 设置合规新密码，成功后必须使用新密码重新登录。
+- 周期管理：`sql_users.password_changed_at` 记录最近一次改密时间，密码每 30 天必须修改一次，到期前 7 天通过 `/auth/me/` 返回提醒字段供前端展示。
+- 用户导入：批量导入默认密码示例为 `Sagitta@2026A`，与创建用户、个人改密和强制改密共用同一套复杂度规则。
 
 ### 短信验证码新增配置项（SystemConfig `sms` 组）
 

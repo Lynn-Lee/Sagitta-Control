@@ -12,7 +12,19 @@ async def _get_admin_headers(client: AsyncClient) -> dict[str, str]:
         "username": "admin", "password": "Admin@2024!",
     })
     assert resp.status_code == 200
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    data = resp.json()
+    if data.get("password_change_required"):
+        change_resp = await client.post("/api/v1/auth/password/change-required/", json={
+            "password_change_token": data["password_change_token"],
+            "new_password": "AdminReset@2026",
+        })
+        assert change_resp.status_code == 200
+        resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "AdminReset@2026",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+    return {"Authorization": f"Bearer {data['access_token']}"}
 
 
 _MYSQL_INSTANCE = {

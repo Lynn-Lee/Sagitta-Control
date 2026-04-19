@@ -138,6 +138,12 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .ant-steps-item-finish .ant-steps-item-icon { border-color: var(--color-primary) !important; }
 .ant-steps-item-process .ant-steps-item-icon { background: var(--color-primary) !important; border-color: var(--color-primary) !important; }
 
+/* Header 用户入口 */
+.header-user-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
 /* 通用动画 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

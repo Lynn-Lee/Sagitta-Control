@@ -2,7 +2,9 @@
 认证模块 Pydantic Schema。
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.security import validate_password_strength
 
 
 class LoginRequest(BaseModel):
@@ -11,9 +13,12 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: str | None = None
+    refresh_token: str | None = None
     token_type: str = "bearer"
+    password_change_required: bool = False
+    password_change_token: str | None = None
+    password_change_reasons: list[str] = Field(default_factory=list)
 
 
 class RefreshRequest(BaseModel):
@@ -31,9 +36,17 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("密码长度不能少于 8 位")
-        return v
+        return validate_password_strength(v)
+
+
+class ForceChangePasswordRequest(BaseModel):
+    password_change_token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
 
 
 class LdapLoginRequest(BaseModel):
@@ -69,5 +82,7 @@ class UserMeResponse(BaseModel):
     permissions: list[str]
     resource_groups: list[int]
     tenant_id: int
+    password_expiring_soon: bool = False
+    days_until_password_expiry: int = 0
 
     model_config = {"from_attributes": True}

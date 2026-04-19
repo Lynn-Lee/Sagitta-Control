@@ -28,6 +28,8 @@ type ImportResult = {
   errors: ImportErrorRow[]
 }
 
+const IMPORT_DEFAULT_PASSWORD = 'Sagitta@2026A'
+
 function extractFileName(contentDisposition?: string, fallback = 'users_export.xlsx') {
   if (!contentDisposition) return fallback
   const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
@@ -65,6 +67,15 @@ function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: string[]
 }
 
 export default function UserManagement() {
+  const passwordRules = [
+    { required: true, message: '请输入密码' },
+    { min: 8, message: '密码长度不能少于 8 位' },
+    { pattern: /[A-Z]/, message: '密码必须包含至少 1 个大写字母' },
+    { pattern: /[a-z]/, message: '密码必须包含至少 1 个小写字母' },
+    { pattern: /\d/, message: '密码必须包含至少 1 个数字' },
+    { pattern: /[^A-Za-z0-9]/, message: '密码必须包含至少 1 个特殊字符' },
+  ]
+
   const qc = useQueryClient()
   const screens = useBreakpoint()
   const isMobile = !screens.lg
@@ -224,7 +235,7 @@ export default function UserManagement() {
   }
   const openImport = () => {
     setImportFile(null)
-    importForm.setFieldsValue({ defaultPassword: 'ChangeMe@2026' })
+    importForm.setFieldsValue({ defaultPassword: IMPORT_DEFAULT_PASSWORD })
     setImportOpen(true)
   }
   const handleImport = async () => {
@@ -557,7 +568,7 @@ export default function UserManagement() {
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input disabled={!!editId} /></Form.Item>
           <Form.Item name="display_name" label="显示名称"><Input /></Form.Item>
-          <Form.Item name="password" label="密码" rules={editId ? [] : [{ required: true, min: 8 }]}><Input.Password placeholder={editId ? '留空不修改' : '至少 8 位'} /></Form.Item>
+          <Form.Item name="password" label="密码" rules={editId ? [] : passwordRules}><Input.Password placeholder={editId ? '留空不修改' : '至少 8 位，含大小写字母、数字和特殊字符'} /></Form.Item>
           <Form.Item name="email" label="邮箱"><Input type="email" /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="role_id" label="角色">
@@ -588,10 +599,10 @@ export default function UserManagement() {
           <Form.Item
             name="defaultPassword"
             label="默认密码"
-            extra="当导入文件里没有 password 列或对应单元格为空时，将使用这个默认密码创建新用户。"
-            rules={[{ required: true, min: 8, message: '默认密码至少 8 位' }]}
+            extra="当导入文件里没有 password 列或对应单元格为空时，将使用这个默认密码创建新用户。系统已预置一个符合规则的默认密码，你也可以改成别的合规值。"
+            rules={passwordRules}
           >
-            <Input.Password placeholder="例如 ChangeMe@2026" />
+            <Input.Password placeholder={`例如 ${IMPORT_DEFAULT_PASSWORD}`} />
           </Form.Item>
           <Form.Item label="导入文件" required extra="支持 .xlsx 或 .csv。推荐优先下载 Excel 模板，模板内附带“字段说明”sheet，可直接查看每列填写规则和示例值。">
             <Dragger

@@ -4,6 +4,8 @@
 
 from pydantic import BaseModel, field_validator
 
+from app.core.security import validate_password_strength
+
 # ─── 用户 ─────────────────────────────────────────────────────
 
 
@@ -33,9 +35,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("密码长度不能少于 8 位")
-        return v
+        return validate_password_strength(v)
 
 
 class UserUpdate(BaseModel):

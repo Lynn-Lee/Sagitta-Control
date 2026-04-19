@@ -86,15 +86,21 @@ async def auth_headers(client: AsyncClient) -> dict[str, str]:
     """
     返回管理员 Authorization 头，供集成测试使用。
     """
-    resp = await client.post("/api/v1/auth/login/", json={
-        "username": "admin", "password": "Admin@2024!",
-    })
-    if resp.status_code == 200:
-        return {"Authorization": f"Bearer {resp.json()['access_token']}"}
-
     await client.post("/api/v1/system/init/")
     resp = await client.post("/api/v1/auth/login/", json={
         "username": "admin", "password": "Admin@2024!",
     })
     assert resp.status_code == 200, f"初始化后仍无法登录: {resp.text}"
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    data = resp.json()
+    if data.get("password_change_required"):
+        change_resp = await client.post("/api/v1/auth/password/change-required/", json={
+            "password_change_token": data["password_change_token"],
+            "new_password": "AdminReset@2026",
+        })
+        assert change_resp.status_code == 200, f"管理员改密失败: {change_resp.text}"
+        resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "AdminReset@2026",
+        })
+        assert resp.status_code == 200, f"管理员改密后登录失败: {resp.text}"
+        data = resp.json()
+    return {"Authorization": f"Bearer {data['access_token']}"}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip, Drawer, Grid } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip, Drawer, Grid, Alert } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   DashboardOutlined, FileTextOutlined, SearchOutlined, MonitorOutlined,
@@ -206,9 +206,26 @@ export default function MainLayout() {
             </Badge>
           </Tooltip>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-            <Space style={{ cursor: 'pointer', padding: '0 8px' }} size={8}>
+            <div
+              className="header-user-trigger"
+              style={{
+                cursor: 'pointer',
+                padding: '6px 10px',
+                minHeight: 40,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                whiteSpace: 'nowrap',
+                flexWrap: 'nowrap',
+                minWidth: 0,
+                borderRadius: 10,
+                transition: 'background 0.18s ease, border-color 0.18s ease',
+                border: '1px solid transparent',
+              }}
+            >
               <Avatar size={28} style={{
                 background: '#165DFF',
+                flex: '0 0 auto',
                 fontSize: 12,
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
@@ -216,17 +233,22 @@ export default function MainLayout() {
                 {initials}
               </Avatar>
               {!isMobile && (
-                <Text style={{
+                <span style={{
                   color: 'rgba(255,255,255,0.8)',
                   fontSize: 13,
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 500,
                   maxWidth: 160,
-                }} ellipsis>
+                  lineHeight: '28px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  display: 'block',
+                }}>
                   {user?.display_name || user?.username || '用户'}
-                </Text>
+                </span>
               )}
-            </Space>
+            </div>
           </Dropdown>
         </Space>
       </Header>
@@ -286,6 +308,21 @@ export default function MainLayout() {
           minHeight: 'calc(100vh - 56px)',
           background: '#F2F3F5',
         }}>
+          {user?.password_expiring_soon && (
+            <Alert
+              type="warning"
+              showIcon
+              closable
+              style={{ marginBottom: 16, borderRadius: 10 }}
+              message="密码即将到期"
+              description={`当前密码将在 ${user.days_until_password_expiry ?? 0} 天后到期，请尽快前往“个人设置”修改密码，避免影响登录。`}
+              action={
+                <Button size="small" type="primary" onClick={() => navigate('/profile')}>
+                  立即修改
+                </Button>
+              }
+            />
+          )}
           <div className="page-enter">
             <Outlet />
           </div>

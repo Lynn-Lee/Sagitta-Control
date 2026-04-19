@@ -27,6 +27,7 @@ from locust import HttpUser, TaskSet, between, task
 # ── 共享登录凭证 ──────────────────────────────────────────────
 
 ADMIN_CREDENTIALS = {"username": "admin", "password": "Admin@2024!"}
+RESET_ADMIN_PASSWORD = "AdminReset@2026"
 
 
 def _login(client) -> str | None:
@@ -38,7 +39,22 @@ def _login(client) -> str | None:
         name="POST /auth/login/",
     ) as resp:
         if resp.status_code == 200:
-            return resp.json().get("access_token")
+            data = resp.json()
+            if data.get("password_change_required"):
+                change_resp = client.post(
+                    "/api/v1/auth/password/change-required/",
+                    json={
+                        "password_change_token": data.get("password_change_token"),
+                        "new_password": RESET_ADMIN_PASSWORD,
+                    },
+                    name="POST /auth/password/change-required/",
+                )
+                if change_resp.status_code != 200:
+                    resp.failure(f"Force password change failed: {change_resp.status_code}")
+                    return None
+                ADMIN_CREDENTIALS["password"] = RESET_ADMIN_PASSWORD
+                return _login(client)
+            return data.get("access_token")
         resp.failure(f"Login failed: {resp.status_code}")
         return None
 

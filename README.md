@@ -9,7 +9,7 @@
 
 SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效地完成 SQL 审核上线、在线查询、慢日志分析、数据库监控等全流程数据库管理工作。
 
-- **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，所有敏感字段 Fernet/AES 加密存储
+- **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，敏感字段加密存储，并内置本地密码复杂度、默认密码强制改密和 30 天轮换策略
 - **全面**：支持 11 种数据库引擎（MySQL / PostgreSQL / Oracle / MongoDB / Redis / ClickHouse 等）
 - **高效**：AI Text2SQL + SQL 工单模板 + 自定义审批流，全异步 Celery 执行不阻塞
 - **可观测**：内建 Prometheus + Grafana 监控，全流程操作审计
@@ -78,6 +78,7 @@ SagittaDB/
 | 多级审批流 | v2-lite：`users / manager / any_reviewer` 已落地 | ✅ 100% |
 | 数据库权限管控 | is_active 启停控制、普通用户不可见禁用库、管理员标灰"已禁用" | ✅ 100% |
 | 授权体系 v2-lite | 角色权限、用户组资源范围、库/表级查询授权、权限排查接口 | ✅ 100% |
+| 密码安全策略 | 复杂度校验、默认/过期密码强制改密、到期前 7 天提醒、导入默认密码合规化 | ✅ 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ 100% |
 
 **总体完成度：100%（v1.0-GA）**
@@ -103,7 +104,9 @@ SagittaDB/
 - `dba_group` 不具备全局实例能力，只在所属资源组范围内工作
 - 查询权限只保留库级 / 表级，且必须先通过实例范围校验
 - 查询拒绝时可通过 `POST /api/v1/query/access-check/` 返回拒绝层级与原因
+- 本地账号密码登录会校验密码安全策略：至少 8 位，包含数字、大写字母、小写字母和特殊字符；默认密码、弱密码或超过 30 天未修改时，仅签发短效改密令牌并要求改密后重新登录；到期前 7 天在登录后全局提示
 - 用户管理支持 Excel / CSV 批量导入导出，导出文件可直接修改后回灌
+- 用户批量导入界面的默认密码示例已调整为 `Sagitta@2026A`，与系统密码复杂度保持一致
 - 用户管理页内支持统一筛选与直接导出：关键词（含电话号码）、角色、用户组、部门、职位、状态
 - SQL 工单提交页不再要求用户手动选择资源组，系统会按“用户组 → 资源组 → 实例”自动解析归属资源组
 - SQL 工单列表已拆分为 `我的工单 / 审批记录 / 执行记录` 三个标签页，不同标签按提交、审批、执行视角展示不同列集
@@ -139,6 +142,7 @@ SagittaDB/
 ```bash
 cd frontend && npm run typecheck
 cd backend && python3 -m compileall app
+cd backend && ./.venv/bin/python -m pytest tests/unit/test_auth.py
 cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 ```
 
@@ -153,6 +157,9 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - 实例如果仍被资源组关联，删除时会被后端拒绝，并明确提示“请到资源组管理中移除该实例后再删除”
 - 在线查询执行时会按当前有效查询权限真实限制返回最大行数；重复有效授权记录不再导致内部错误
 - 浏览器标题统一为 `矢 准 数 据`
+- 密码安全策略已下沉到所有本地用户：创建用户、批量导入、个人改密、登录强制改密都使用同一套复杂度规则；`password_changed_at` 支持 30 天过期与 7 天到期提醒
+- 登录页强制改密流程改为页内表单，提示文案会完整展示长度、数字、大小写字母、特殊字符和 30 天轮换要求
+- 顶部右侧用户入口已改为单行 flex 布局，头像/用户名不再换行；`index.html` 走 no-cache，避免强刷后仍命中旧前端资源
 - 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示
 - 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持菜单高亮

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Form, Input, Alert, Divider, Tooltip, Tag } from 'antd'
+import { Button, Form, Input, Alert, Divider, Tooltip, Tag, Modal, Typography } from 'antd'
 import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined,
 } from '@ant-design/icons'
@@ -36,11 +36,11 @@ const OAuthBtn = ({
   <Tooltip title={loading ? '正在跳转…' : `使用 ${label} 登录`} placement="top">
     <button onClick={onClick} disabled={loading} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-      padding: '10px 12px', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer',
+      padding: '10px 6px', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer',
       background: loading ? `${color}20` : 'rgba(255,255,255,0.04)',
       border: loading ? `1px solid ${color}60` : '1px solid rgba(255,255,255,0.08)',
       transition: 'all 0.2s',
-      flex: 1,
+      minWidth: 0,
       opacity: loading ? 0.7 : 1,
     }}
     onMouseEnter={e => {
@@ -73,9 +73,16 @@ const OAuthBtn = ({
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [loginForm] = Form.useForm()
+  const [forcePwForm] = Form.useForm()
   const { setTokens, setUser } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState('')
+  const [forceChangeMode, setForceChangeMode] = useState(false)
+  const [forceChangeLoading, setForceChangeLoading] = useState(false)
+  const [passwordChangeToken, setPasswordChangeToken] = useState('')
+  const [passwordChangeReasons, setPasswordChangeReasons] = useState<string[]>([])
+  const [pendingUsername, setPendingUsername] = useState('')
   const [error, setError] = useState(
     searchParams.get('oauth_error') ? decodeURIComponent(searchParams.get('oauth_error')!) : ''
   )
@@ -83,8 +90,41 @@ export default function LoginPage() {
   const method = searchParams.get('method')
   const isLdap = method === 'ldap'
 
-  const _doLogin = async (tokenData: { access_token: string; refresh_token: string }) => {
+  const passwordRules = [
+    { required: true, message: '请输入新密码' },
+    { min: 8, message: '密码长度不能少于 8 位' },
+    { pattern: /[A-Z]/, message: '密码必须包含至少 1 个大写字母' },
+    { pattern: /[a-z]/, message: '密码必须包含至少 1 个小写字母' },
+    { pattern: /\d/, message: '密码必须包含至少 1 个数字' },
+    { pattern: /[^A-Za-z0-9]/, message: '密码必须包含至少 1 个特殊字符' },
+  ]
+  const passwordRuleHints = [
+    '至少 8 位',
+    '必须包含至少 1 个数字',
+    '必须包含至少 1 个大写字母',
+    '必须包含至少 1 个小写字母',
+    '必须包含至少 1 个特殊字符',
+    '密码每 30 天必须修改一次',
+  ]
+
+  const _doLogin = async (
+    tokenData: { access_token?: string | null; refresh_token?: string | null; password_change_required?: boolean; password_change_token?: string | null; password_change_reasons?: string[] },
+    username?: string,
+  ) => {
+    if (tokenData.password_change_required) {
+      setPasswordChangeToken(tokenData.password_change_token || '')
+      setPasswordChangeReasons(tokenData.password_change_reasons || [])
+      setPendingUsername(username || '')
+      setForceChangeMode(true)
+      setError('')
+      forcePwForm.resetFields()
+      return
+    }
+
     const { access_token, refresh_token } = tokenData
+    if (!access_token || !refresh_token) {
+      throw new Error('登录响应缺少 token')
+    }
     const meRes = await apiClient.get('/auth/me/', {
       headers: { Authorization: `Bearer ${access_token}` },
     })
@@ -101,7 +141,7 @@ export default function LoginPage() {
         username: values.username,
         password: values.password,
       })
-      await _doLogin(tokenRes.data)
+      await _doLogin(tokenRes.data, values.username)
     } catch (e: any) {
       setError(e.response?.data?.detail || '用户名或密码错误')
     } finally {
@@ -136,6 +176,32 @@ export default function LoginPage() {
     } catch (e: any) {
       setError(e.response?.data?.detail || `${type} 登录暂不可用，请联系管理员开启`)
       setOauthLoading('')
+    }
+  }
+
+  const handleForceChangePassword = async (values: { new_password: string }) => {
+    if (!passwordChangeToken) {
+      setError('改密凭证已失效，请重新登录')
+      setForceChangeMode(false)
+      return
+    }
+    setForceChangeLoading(true)
+    setError('')
+    try {
+      const resp = await authApi.forceChangePassword(passwordChangeToken, values.new_password)
+      setForceChangeMode(false)
+      setPasswordChangeToken('')
+      setPasswordChangeReasons([])
+      loginForm.setFieldsValue({ username: pendingUsername, password: '' })
+      forcePwForm.resetFields()
+      Modal.success({
+        title: '密码修改成功',
+        content: resp.msg || '请使用新密码重新登录',
+      })
+    } catch (e: any) {
+      setError(e.response?.data?.detail || e.response?.data?.msg || '密码修改失败')
+    } finally {
+      setForceChangeLoading(false)
     }
   }
 
@@ -306,49 +372,144 @@ export default function LoginPage() {
         ) : (
           /* ── 本地登录表单 ── */
           <>
-            <Form onFinish={handleLogin} size="large" layout="vertical">
-              <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}
-                style={{ marginBottom: 14 }}>
-                <Input
-                  prefix={<UserOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
-                  placeholder="用户名"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8, color: '#FFFFFF', height: 46,
-                  }}
+            {forceChangeMode ? (
+              <>
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="首次登录安全校验"
+                  description={`账号 ${pendingUsername || ''} 必须先完成密码修改，修改成功后请使用新密码重新登录。`}
                 />
-              </Form.Item>
-              <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}
-                style={{ marginBottom: 22 }}>
-                <Input.Password
-                  prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
-                  placeholder="密码"
-                  iconRender={v => v
-                    ? <EyeTwoTone twoToneColor="#165DFF" />
-                    : <EyeInvisibleOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="新密码规则"
+                  description={
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {passwordRuleHints.map(rule => <li key={rule}>{rule}</li>)}
+                    </ul>
                   }
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8, color: '#FFFFFF', height: 46,
-                  }}
                 />
-              </Form.Item>
-              <Form.Item style={{ marginBottom: 0 }}>
-                <Button
-                  type="primary" htmlType="submit" loading={loading} block
-                  style={{
-                    height: 46, borderRadius: 8,
-                    background: '#165DFF', border: 'none',
-                    fontWeight: 600, fontSize: 15, letterSpacing: '1px',
-                    boxShadow: '0 4px 20px rgba(22,93,255,0.4)',
-                  }}
-                >
-                  登 录
-                </Button>
-              </Form.Item>
-            </Form>
+                {passwordChangeReasons.length > 0 && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="当前密码触发原因"
+                    description={
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {passwordChangeReasons.map(reason => <li key={reason}>{reason}</li>)}
+                      </ul>
+                    }
+                  />
+                )}
+                <Form form={forcePwForm} onFinish={handleForceChangePassword} size="large" layout="vertical">
+                  <Form.Item name="new_password" label="新密码" rules={passwordRules}
+                    style={{ marginBottom: 14 }}>
+                    <Input.Password
+                      prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                      placeholder="新密码"
+                      autoComplete="new-password"
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="confirm_password"
+                    label="确认新密码"
+                    dependencies={['new_password']}
+                    style={{ marginBottom: 22 }}
+                    rules={[
+                      { required: true, message: '请再次输入新密码' },
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          if (!value || getFieldValue('new_password') === value) return Promise.resolve()
+                          return Promise.reject(new Error('两次输入的密码不一致'))
+                        },
+                      }),
+                    ]}
+                  >
+                    <Input.Password
+                      prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                      placeholder="确认新密码"
+                      autoComplete="new-password"
+                    />
+                  </Form.Item>
+                  <Form.Item style={{ marginBottom: 10 }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={forceChangeLoading}
+                      block
+                      style={{
+                        height: 46, borderRadius: 8,
+                        background: '#165DFF', border: 'none',
+                        fontWeight: 600, fontSize: 15, letterSpacing: '1px',
+                        boxShadow: '0 4px 20px rgba(22,93,255,0.4)',
+                      }}
+                    >
+                      修改密码并返回登录
+                    </Button>
+                  </Form.Item>
+                  <Button
+                    block
+                    onClick={() => {
+                      setForceChangeMode(false)
+                      setPasswordChangeToken('')
+                      setPasswordChangeReasons([])
+                      forcePwForm.resetFields()
+                    }}
+                  >
+                    返回登录
+                  </Button>
+                </Form>
+              </>
+            ) : (
+              <Form form={loginForm} onFinish={handleLogin} size="large" layout="vertical">
+                <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}
+                  style={{ marginBottom: 14 }}>
+                  <Input
+                    prefix={<UserOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                    placeholder="用户名"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8, color: '#FFFFFF', height: 46,
+                    }}
+                  />
+                </Form.Item>
+                <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}
+                  style={{ marginBottom: 22 }}>
+                  <Input.Password
+                    prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                    placeholder="密码"
+                    autoComplete="current-password"
+                    iconRender={v => v
+                      ? <EyeTwoTone twoToneColor="#165DFF" />
+                      : <EyeInvisibleOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    }
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8, color: '#FFFFFF', height: 46,
+                    }}
+                  />
+                </Form.Item>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button
+                    type="primary" htmlType="submit" loading={loading} block
+                    style={{
+                      height: 46, borderRadius: 8,
+                      background: '#165DFF', border: 'none',
+                      fontWeight: 600, fontSize: 15, letterSpacing: '1px',
+                      boxShadow: '0 4px 20px rgba(22,93,255,0.4)',
+                    }}
+                  >
+                    登 录
+                  </Button>
+                </Form.Item>
+              </Form>
+            )}
 
             {/* ── 第三方登录 ── */}
             <Divider style={{
@@ -364,7 +525,7 @@ export default function LoginPage() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))',
+              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
               gap: 8,
             }}>
               {/* LDAP — 紫蓝 #5E7CE0 */}

@@ -4,7 +4,7 @@
 > **对应计划：** Pack A (Sprint 3+4) — SQL 工单全流程、审批流、运维工具
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** Sprint 1~2 测试通过，至少配置一个可用数据库实例
-> **测试账号：** admin / Admin@2024!（同时需要有 sql_submit、sql_review、sql_execute 权限的用户）
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密；同时需要有 sql_submit、sql_review、sql_execute 权限的用户）
 
 ---
 

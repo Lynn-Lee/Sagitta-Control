@@ -2,7 +2,7 @@
 
 > **项目路径：** `/Users/lynn/SynologyDrive/SynologyDrive/Code/SagittaDB`
 > **重构基准：** Archery v1.14.0
-> **文档版本：** v1.8 · 2026-04-12
+> **文档版本：** v1.9 · 2026-04-19
 > **状态说明：** ✅ 已完成并验证 · 🔧 已开发待测试 · 📋 待开发
 
 ---
@@ -44,6 +44,7 @@
 | 数据库权限管控 | is_active 启停控制、普通用户不可见禁用库、管理员标灰"已禁用" | ✅ | 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ | 100% |
 | 授权体系 v2-lite | 角色系统（superadmin/dba/dba_group/developer）、用户组/资源组职责拆分、库级/表级授权、直属上级审批 | ✅ | 100% |
+| 密码安全策略 | 本地账号复杂度、默认/过期密码强制改密、30 天轮换、到期前 7 天提醒 | ✅ | 100% |
 
 **总体完成度：100%（v1.0-GA），v2-lite 首发范围已完成并进入体验收口与持续验收阶段**
 
@@ -67,11 +68,17 @@
 - bcrypt + SHA-256 预处理密码哈希（规避 72 字节限制）
 - TOTP 双因素认证（2FA 开启/关闭/验证）
 - 密码修改接口
+- 本地账号统一密码安全规则：至少 8 位，必须包含数字、大写字母、小写字母和特殊字符
+- 登录时识别默认密码、弱密码和已超过 30 天未修改的密码；触发后仅返回短效 `password_change` 令牌，要求先完成改密再重新登录
+- `/auth/me/` 返回 `password_expiring_soon` 与 `days_until_password_expiry`，前端在到期前 7 天展示全局提醒
+- Alembic migration `0013_user_password_policy.py` 新增 `sql_users.password_changed_at`，用于密码周期管理
 
 **用户权限**
 - 用户 CRUD（创建/编辑/禁用/授权）
 - 15 种细粒度权限码（sql_submit / sql_review / instance_manage 等）
 - 超级管理员（is_superuser）跳过权限检查
+- 用户创建、批量导入、个人改密和强制改密共用同一套密码复杂度校验
+- 用户批量导入默认密码示例调整为 `Sagitta@2026A`，满足长度、数字、大小写字母和特殊字符规则
 
 **实例管理**
 - 11 种数据库类型支持（MySQL/PostgreSQL/Oracle/MongoDB/Redis/ClickHouse/Elasticsearch/OpenSearch/MSSQL/Cassandra/Doris/TiDB）
@@ -215,7 +222,9 @@
 - 字体：系统字体栈 → Inter + Noto Sans SC + JetBrains Mono
 - Logo：六边形矢标 SVG（明暗双版）
 - 登录页：深色 Hero 风格（背景光晕 + 网格纹理 + 磨砂玻璃卡片）
+- 登录页强制改密流程改为页内表单，规则提示与后端实际校验保持一致
 - 第三方登录入口：LDAP/CAS/钉钉/飞书/企微（Pack F 已完整接入）
+- 主布局顶部用户入口使用单行 flex 排版，头像、用户名和通知入口不再因宽度变化换行
 - Favicon 更新
 
 ### Pack F — 第三方登录集成 ✅
@@ -317,7 +326,7 @@
 ### Pack G — 质量保障 ✅
 
 **单元测试**
-- `tests/unit/test_auth.py`：密码哈希/JWT/字段加密/Schema 校验（20 个测试）
+- `tests/unit/test_auth.py`：密码哈希/JWT/字段加密/Schema 校验/密码安全策略（27 个测试）
 - `tests/unit/test_masking.py`：sqlglot 列提取/表引用/脱敏规则（17 个测试）
 - `tests/unit/test_engine_registry.py`：引擎注册表（已有）
 - `tests/unit/test_mysql_engine.py`：MySQL 引擎（已有）
@@ -328,7 +337,7 @@
 - `tests/unit/test_notify.py`：通知服务（14 个测试）— 钉钉/飞书/企微 mock HTTP
 - `tests/unit/test_system_config.py`：配置服务（15 个测试）— get_value/update_batch/敏感字段加密
 - `tests/unit/test_workflow_service.py`：工单服务（11 个测试）— 状态枚举/格式化/check_sql
-- **总计：152 个单元测试全部通过，覆盖率 37.2%（单元测试层）**
+- **总计：159 个单元测试全部通过，覆盖率 37.2%（单元测试层）**
 
 **集成测试**
 - `tests/integration/test_health.py`：健康检查端点
@@ -420,6 +429,7 @@
 | 决策 | 内容 |
 |---|---|
 | 密码哈希 | bcrypt 直接调用 + SHA-256 + base64 预处理（规避 72 字节限制） |
+| 本地密码策略 | 至少 8 位，必须包含数字、大写字母、小写字母和特殊字符；默认/弱/过期密码登录时强制改密；30 天轮换，到期前 7 天提醒 |
 | 字段加密 | Fernet 对称加密（cryptography 库） |
 | SQL 解析 | sqlglot 替代 goInception（支持 20+ 方言，零外部进程依赖） |
 | 工单状态 | 整数枚举 0-8（0=待审核，6=成功，7=异常，8=取消） |

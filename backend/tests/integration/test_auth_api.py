@@ -8,7 +8,7 @@ from httpx import AsyncClient
 # ── 辅助：初始化管理员 ────────────────────────────────────────
 
 async def _init_and_login(client: AsyncClient) -> tuple[str, str]:
-    """确保 admin 用户存在并返回 (access_token, refresh_token)。"""
+    """确保 admin 用户存在，并在强制改密后返回 (access_token, refresh_token)。"""
     # 先尝试初始化系统（幂等）
     await client.post("/api/v1/system/init/")
     resp = await client.post("/api/v1/auth/login/", json={
@@ -16,18 +16,62 @@ async def _init_and_login(client: AsyncClient) -> tuple[str, str]:
     })
     assert resp.status_code == 200, f"登录失败: {resp.text}"
     data = resp.json()
+    if data.get("password_change_required"):
+        change_resp = await client.post("/api/v1/auth/password/change-required/", json={
+            "password_change_token": data["password_change_token"],
+            "new_password": "AdminReset@2026",
+        })
+        assert change_resp.status_code == 200, f"强制改密失败: {change_resp.text}"
+        resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "AdminReset@2026",
+        })
+        assert resp.status_code == 200, f"改密后登录失败: {resp.text}"
+        data = resp.json()
     return data["access_token"], data["refresh_token"]
 
 
 # ── 登录 ─────────────────────────────────────────────────────
 
 class TestLogin:
+    @pytest.mark.asyncio
+    async def test_default_password_requires_change_before_tokens(self, client: AsyncClient):
+        await client.post("/api/v1/system/init/")
+        resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "Admin@2024!",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["password_change_required"] is True
+        assert data["access_token"] is None
+        assert data["refresh_token"] is None
+        assert data["password_change_token"]
 
     @pytest.mark.asyncio
     async def test_valid_credentials_return_tokens(self, client: AsyncClient):
         access, refresh = await _init_and_login(client)
         assert len(access) > 20
         assert len(refresh) > 20
+
+    @pytest.mark.asyncio
+    async def test_force_change_password_allows_relogin(self, client: AsyncClient):
+        await client.post("/api/v1/system/init/")
+        login_resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "Admin@2024!",
+        })
+        change_resp = await client.post("/api/v1/auth/password/change-required/", json={
+            "password_change_token": login_resp.json()["password_change_token"],
+            "new_password": "AdminReset@2026",
+        })
+        assert change_resp.status_code == 200
+
+        relogin_resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "AdminReset@2026",
+        })
+        assert relogin_resp.status_code == 200
+        relogin_data = relogin_resp.json()
+        assert relogin_data["password_change_required"] is False
+        assert relogin_data["access_token"]
+        assert relogin_data["refresh_token"]
 
     @pytest.mark.asyncio
     async def test_wrong_password_returns_401(self, client: AsyncClient):

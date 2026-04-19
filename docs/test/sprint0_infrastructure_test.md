@@ -4,7 +4,7 @@
 > **对应计划：** Sprint 0 — 项目骨架、基础设施
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** `docker compose up -d` 启动全部服务，`alembic upgrade head` 已执行
-> **测试账号：** admin / Admin@2024!
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密）
 
 ---
 
@@ -82,7 +82,7 @@
 | **用例编号** | TC-S0-005 |
 | **测试场景** | 前端通过 Nginx 转发 API 请求 |
 | **测试步骤** | 1. 浏览器访问 http://localhost/api/v1/auth/login/<br>2. 方法 POST，Body `{"username":"admin","password":"Admin@2024!"}` |
-| **预期结果** | 返回 HTTP 200，包含 access_token 和 refresh_token |
+| **预期结果** | 返回 HTTP 200；若仍为默认密码，则返回 `password_change_required=true` 和 `password_change_token`；完成强制改密后再次登录返回 access_token 和 refresh_token |
 | **实际结果** | |
 | **状态** | ⬜ 未测试 |
 

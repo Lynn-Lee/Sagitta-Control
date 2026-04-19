@@ -6,9 +6,12 @@ export interface LoginPayload {
 }
 
 export interface TokenResp {
-  access_token: string
-  refresh_token: string
+  access_token?: string | null
+  refresh_token?: string | null
   token_type: string
+  password_change_required?: boolean
+  password_change_token?: string | null
+  password_change_reasons?: string[]
 }
 
 export const authApi = {
@@ -29,6 +32,12 @@ export const authApi = {
 
   changePassword: (old_password: string, new_password: string) =>
     apiClient.post('/auth/password/change/', { old_password, new_password }).then(r => r.data),
+
+  forceChangePassword: (password_change_token: string, new_password: string) =>
+    apiClient.post('/auth/password/change-required/', {
+      password_change_token,
+      new_password,
+    }).then(r => r.data),
 
   setup2fa: () =>
     apiClient.post('/auth/2fa/setup/').then(r => r.data),

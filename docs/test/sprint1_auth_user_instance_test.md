@@ -4,7 +4,7 @@
 > **对应计划：** Sprint 1 — 认证、用户管理、实例管理
 > **测试环境：** http://localhost（前端）/ http://localhost:8000（后端）
 > **前置条件：** Sprint 0 测试通过，系统已初始化（`POST /api/v1/system/init/`）
-> **测试账号：** admin / Admin@2024!
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密，建议首登改为 `Admin@2026A` 后继续后续用例）
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 模块 | 覆盖内容 |
 |---|---|
-| 登录认证 | 账号密码登录、错误凭证拦截、Token 返回 |
+| 登录认证 | 账号密码登录、错误凭证拦截、Token 返回、默认/弱/过期密码强制改密 |
 | JWT Token | access_token 有效性、refresh_token 刷新 |
 | 双因素认证 | 2FA 开启流程、TOTP 验证 |
 | 用户管理 | 用户 CRUD、权限授权、账号禁用 |
@@ -23,14 +23,27 @@
 
 ## 一、登录认证测试
 
-### TC-S1-001 正确账号密码登录
+### TC-S1-001 默认密码首次登录强制改密
 
 | 项目 | 内容 |
 |---|---|
 | **用例编号** | TC-S1-001 |
-| **测试场景** | 使用正确账号密码登录，获取 JWT Token |
-| **测试步骤** | 1. 浏览器访问 http://localhost<br>2. 输入用户名 `admin`，密码 `Admin@2024!`<br>3. 点击登录 |
-| **预期结果** | 跳转至 Dashboard 首页，顶部显示"admin"用户名 |
+| **测试场景** | 使用默认管理员密码登录时必须先完成密码修改 |
+| **测试步骤** | 1. 浏览器访问 http://localhost<br>2. 输入用户名 `admin`，密码 `Admin@2024!`<br>3. 点击登录<br>4. 页面进入强制改密表单，输入新密码 `Admin@2026A` 并确认<br>5. 使用 `admin / Admin@2026A` 重新登录 |
+| **预期结果** | 第一次登录不签发正式 Token，并提示必须改密；改密成功后返回登录页，重新登录后跳转 Dashboard，顶部显示当前用户 |
+| **实际结果** | |
+| **状态** | ⬜ 未测试 |
+
+---
+
+### TC-S1-001A 密码复杂度规则校验
+
+| 项目 | 内容 |
+|---|---|
+| **用例编号** | TC-S1-001A |
+| **测试场景** | 新密码必须满足系统统一密码安全规则 |
+| **测试步骤** | 1. 进入强制改密或个人设置修改密码表单<br>2. 分别输入 `short1A!`、`password1!`、`Password!`、`Password1` 等不合规密码<br>3. 输入合规密码 `Admin@2026B` |
+| **预期结果** | 不合规密码分别提示长度、数字、大写字母、小写字母或特殊字符缺失；合规密码可提交成功 |
 | **实际结果** | |
 | **状态** | ⬜ 未测试 |
 
@@ -68,7 +81,7 @@
 |---|---|
 | **用例编号** | TC-S1-004 |
 | **测试场景** | 使用 refresh_token 换取新的 access_token |
-| **测试步骤** | 1. POST http://localhost:8000/api/v1/auth/login/ 获取 refresh_token<br>2. POST http://localhost:8000/api/v1/auth/token/refresh/ 传入 refresh_token |
+| **测试步骤** | 1. 使用已完成改密的账号 POST http://localhost:8000/api/v1/auth/login/ 获取 refresh_token<br>2. POST http://localhost:8000/api/v1/auth/token/refresh/ 传入 refresh_token |
 | **预期结果** | 返回新的 access_token 和 refresh_token，HTTP 200 |
 | **实际结果** | |
 | **状态** | ⬜ 未测试 |
@@ -95,7 +108,7 @@
 | **用例编号** | TC-S1-006 |
 | **测试场景** | 登录后 /me 接口返回完整用户信息 |
 | **测试步骤** | 1. 登录获取 access_token<br>2. GET http://localhost:8000/api/v1/auth/me/ 携带 Bearer Token |
-| **预期结果** | 返回 username=admin、is_superuser=true、permissions 列表、tenant_id=1 |
+| **预期结果** | 返回 username=admin、is_superuser=true、permissions 列表、tenant_id=1，并包含 `password_expiring_soon`、`days_until_password_expiry` 字段 |
 | **实际结果** | |
 | **状态** | ⬜ 未测试 |
 
@@ -176,7 +189,7 @@
 |---|---|
 | **用例编号** | TC-S1-012 |
 | **测试场景** | 个人设置中修改密码 |
-| **测试步骤** | 1. 登录后进入"个人设置"→"修改密码"<br>2. 输入当前密码 `Admin@2024!`<br>3. 输入新密码 `Admin@2024New!`，确认新密码<br>4. 提交 |
+| **测试步骤** | 1. 登录后进入"个人设置"→"修改密码"<br>2. 输入当前密码 `Admin@2026A`<br>3. 输入新密码 `Admin@2026B`，确认新密码<br>4. 提交 |
 | **预期结果** | 提示修改成功，使用新密码可正常登录 |
 | **实际结果** | |
 | **状态** | ⬜ 未测试 |
@@ -282,7 +295,7 @@
 
 | 总用例数 | 通过 | 失败 | 未测试 |
 |---|---|---|---|
-| 19 | 0 | 0 | 19 |
+| 20 | 0 | 0 | 20 |
 
 **测试人员：**
 **测试日期：**

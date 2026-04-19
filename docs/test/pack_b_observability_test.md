@@ -4,7 +4,7 @@
 > **对应计划：** Pack B (Sprint 5+6) — Dashboard 统计、监控配置、Prometheus + Grafana 集成
 > **测试环境：** http://localhost（前端）/ http://localhost:9090（Prometheus）/ http://localhost:3000（Grafana）
 > **前置条件：** Pack A 测试通过，有若干历史工单数据
-> **测试账号：** admin / Admin@2024!；Grafana: admin / admin
+> **测试账号：** admin / Admin@2024!（默认密码会触发强制改密）；Grafana: admin / admin
 
 ---
 
