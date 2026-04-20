@@ -210,6 +210,19 @@
 
 ---
 
+### TC-S2-015 PostgreSQL 非 public schema 表级权限
+
+| 项目 | 内容 |
+|---|---|
+| **用例编号** | TC-S2-015 |
+| **测试场景** | PostgreSQL 在线查询支持非 `public` schema 表级权限校验与执行 |
+| **测试步骤** | 1. 准备 PostgreSQL 数据库，确保目标表位于非 `public` schema（如 `tms.tk_order`）<br>2. 以普通用户申请该表查询权限；若该表名在库内唯一，可填 `tk_order`，若存在多个 schema 同名表，则填 `tms.tk_order`<br>3. 审批通过后进入在线查询执行 `select * from tk_order` 或 `select * from tms.tk_order` |
+| **预期结果** | 唯一表名场景下，系统可自动解析 schema 并执行成功；多 schema 同名表场景下，未显式写 `schema.table_name` 时应给出明确提示，要求按 `schema.table_name` 申请和查询 |
+| **实际结果** | ✅ 通过（2026-04-20 本地与生产验证） |
+| **状态** | ✅ 通过 |
+
+---
+
 ### TC-S2-015 普通用户查询禁用数据库返回 403
 
 | 项目 | 内容 |

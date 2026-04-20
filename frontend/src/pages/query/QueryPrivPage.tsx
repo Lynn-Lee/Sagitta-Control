@@ -315,7 +315,7 @@ export default function QueryPrivPage() {
             <Form.Item
               name="table_name"
               label="表名"
-              extra={isPgInstance ? 'PostgreSQL 非 public schema 表请填写 schema.table，例如 tms.tk_order' : undefined}
+              extra={isPgInstance ? 'PostgreSQL 非 public schema 表请填写 schema.table_name' : undefined}
               rules={[{ required: true, message: '请输入表名' }]}
             >
               <Input placeholder={isPgInstance ? '如 public.orders / tms.tk_order' : '如 orders / user_profile'} />

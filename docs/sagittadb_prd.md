@@ -261,6 +261,9 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - 有 `query_review` 权限的人审批
 - 权限有效期设置（按天）
 - 到期自动失效
+- PostgreSQL 在线查询支持非 `public` schema：
+  - 表名在目标数据库内唯一时，可直接申请和查询 `table_name`
+  - 同名表若存在于多个 schema，必须使用 `schema.table_name` 申请和查询
 
 ### 2.5 运维工具
 
