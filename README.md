@@ -169,6 +169,7 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - 登录页强制改密流程改为页内表单，提示文案会完整展示长度、数字、大小写字母、特殊字符和 30 天轮换要求
 - 顶部右侧用户入口已改为单行 flex 布局，头像/用户名不再换行；`index.html` 走 no-cache，避免强刷后仍命中旧前端资源
 - 左侧主导航与系统管理子菜单已切换为统一的自定义单色 SVG 图标，并继续跟随 Ant Design 的默认尺寸、颜色与选中态机制
+- `SQL 工单`、`在线查询`、`运维工具` 的子菜单图标也已切换为同一套自定义 SVG；其中“慢日志分析”图标已按视觉尺寸做过一次收紧校准，避免在侧栏中显得偏小
 - 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示
 - 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持菜单高亮
