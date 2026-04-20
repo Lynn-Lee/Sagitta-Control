@@ -294,7 +294,7 @@ export default function QueryPrivPage() {
           </Form.Item>
           <Form.Item name="flow_id" label="审批流" rules={[{ required: true, message: '请选择审批流' }]}>
             <Select placeholder="选择审批流模板">
-              {(flowData?.items || flowData || []).map((flow: any) => (
+              {(flowData?.items ?? []).map((flow: any) => (
                 <Option key={flow.id} value={flow.id}>{flow.name}</Option>
               ))}
             </Select>

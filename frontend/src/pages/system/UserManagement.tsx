@@ -199,7 +199,10 @@ export default function UserManagement() {
         msgApi.success(`导入完成：新增 ${data?.created ?? 0}，更新 ${data?.updated ?? 0}`)
       }
     },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '导入失败'),
+    onError: (e: any) => {
+      const detail = e.response?.data?.msg || e.response?.data?.detail || e.message || '导入失败'
+      msgApi.error(`导入失败：${detail}`)
+    },
   })
 
   const handleSubmit = async () => {
@@ -600,7 +603,7 @@ export default function UserManagement() {
           <Form.Item
             name="defaultPassword"
             label="默认密码"
-            extra="当导入文件里没有 password 列或对应单元格为空时，将使用这个默认密码创建新用户。系统已预置一个符合规则的默认密码，你也可以改成别的合规值。"
+            extra="当导入文件里没有 password 列或对应单元格为空时，将使用这个默认密码创建新用户。若要重置已存在用户密码，请在导入文件中显式提供 password 列和值。"
             rules={passwordRules}
           >
             <Input.Password placeholder={`例如 ${IMPORT_DEFAULT_PASSWORD}`} />

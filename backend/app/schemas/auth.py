@@ -19,6 +19,8 @@ class TokenResponse(BaseModel):
     password_change_required: bool = False
     password_change_token: str | None = None
     password_change_reasons: list[str] = Field(default_factory=list)
+    requires_2fa: bool = False
+    two_fa_token: str | None = None
 
 
 class RefreshRequest(BaseModel):
@@ -26,6 +28,11 @@ class RefreshRequest(BaseModel):
 
 
 class TwoFAVerifyRequest(BaseModel):
+    totp_code: str
+
+
+class LoginTwoFAVerifyRequest(BaseModel):
+    two_fa_token: str
     totp_code: str
 
 

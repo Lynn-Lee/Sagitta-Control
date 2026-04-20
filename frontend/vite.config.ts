@@ -2,6 +2,10 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
+const apiTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8000'
+const wsTarget = process.env.VITE_DEV_WS_TARGET || 'ws://localhost:8000'
+const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -10,14 +14,18 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    watch: {
+      usePolling,
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: apiTarget,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: wsTarget,
         ws: true,
         changeOrigin: true,
       },

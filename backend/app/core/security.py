@@ -16,6 +16,7 @@ from app.core.config import settings
 DEFAULT_PASSWORDS = {"Admin@2024!"}
 PASSWORD_EXPIRE_DAYS = 30
 PASSWORD_EXPIRY_WARNING_DAYS = 7
+INITIAL_PASSWORD_GRACE_SECONDS = 5
 
 # ─── 密码哈希 ─────────────────────────────────────────────────
 
@@ -100,13 +101,31 @@ def is_password_expiring_soon(password_changed_at: datetime | None, now: datetim
 def get_login_password_change_reasons(
     password: str,
     password_changed_at: datetime | None = None,
+    *,
+    force_change_on_first_login: bool = False,
 ) -> list[str]:
     reasons = get_password_policy_violations(password)
     if password in DEFAULT_PASSWORDS:
         reasons.insert(0, "当前密码为系统默认密码，必须先修改密码")
+    if force_change_on_first_login:
+        reasons.insert(0, "当前密码为系统分配的初始密码，首次登录必须先修改密码")
     if is_password_expired(password_changed_at):
         reasons.append(f"当前密码已超过 {PASSWORD_EXPIRE_DAYS} 天未修改，请先更新密码")
     return reasons
+
+
+def is_initial_password_state(
+    password_changed_at: datetime | None,
+    created_at: datetime | None,
+) -> bool:
+    """判断用户是否仍处于“创建后从未自行修改密码”的状态。"""
+    if password_changed_at is None or created_at is None:
+        return False
+    if password_changed_at.tzinfo is None:
+        password_changed_at = password_changed_at.replace(tzinfo=UTC)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    return abs((password_changed_at - created_at).total_seconds()) <= INITIAL_PASSWORD_GRACE_SECONDS
 
 
 # ─── JWT ──────────────────────────────────────────────────────

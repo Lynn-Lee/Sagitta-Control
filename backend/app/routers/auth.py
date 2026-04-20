@@ -27,12 +27,14 @@ from app.core.security import (
     get_login_password_change_reasons,
     get_password_days_until_expiry,
     hash_password,
+    is_initial_password_state,
     is_password_expiring_soon,
     verify_password,
 )
 from app.schemas.auth import (
     ChangePasswordRequest,
     ForceChangePasswordRequest,
+    LoginTwoFAVerifyRequest,
     LdapLoginRequest,
     LoginRequest,
     RefreshRequest,
@@ -48,6 +50,22 @@ from app.services.user import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _build_auth_payload(user) -> dict[str, int | str]:
+    return {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
+
+
+def _issue_login_tokens(user, *, verified_2fa: bool = False) -> TokenResponse:
+    payload = _build_auth_payload(user)
+    if verified_2fa:
+        payload["2fa_verified"] = True
+    return TokenResponse(
+        access_token=create_access_token(payload),
+        refresh_token=create_refresh_token(
+            {"sub": str(user.id), "tenant_id": user.tenant_id, "2fa_verified": verified_2fa}
+        ),
+    )
 
 
 async def get_redis():
@@ -73,6 +91,10 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     password_change_reasons = get_login_password_change_reasons(
         data.password,
         user.password_changed_at,
+        force_change_on_first_login=(
+            user.auth_type == "local"
+            and is_initial_password_state(user.password_changed_at, user.created_at)
+        ),
     )
     if password_change_reasons:
         logger.info("user_login_password_change_required: %s", user.username)
@@ -84,15 +106,15 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
             password_change_reasons=password_change_reasons,
         )
 
-    payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
     if user.totp_enabled:
-        payload["requires_2fa"] = True
+        logger.info("user_login_2fa_required: %s", user.username)
+        return TokenResponse(
+            requires_2fa=True,
+            two_fa_token=create_access_token({**_build_auth_payload(user), "requires_2fa": True}),
+        )
 
     logger.info("user_login")
-    return TokenResponse(
-        access_token=create_access_token(payload),
-        refresh_token=create_refresh_token({"sub": str(user.id), "tenant_id": user.tenant_id}),
-    )
+    return _issue_login_tokens(user)
 
 
 @router.post("/login/form/", response_model=TokenResponse, include_in_schema=False)
@@ -111,12 +133,13 @@ async def ldap_login(data: LdapLoginRequest, db: AsyncSession = Depends(get_db))
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
 
-    payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
     logger.info("ldap_user_login: %s", user.username)
-    return TokenResponse(
-        access_token=create_access_token(payload),
-        refresh_token=create_refresh_token({"sub": str(user.id), "tenant_id": user.tenant_id}),
-    )
+    if user.totp_enabled:
+        return TokenResponse(
+            requires_2fa=True,
+            two_fa_token=create_access_token({**_build_auth_payload(user), "requires_2fa": True}),
+        )
+    return _issue_login_tokens(user)
 
 
 @router.post("/token/refresh/", response_model=TokenResponse, summary="刷新 access_token")
@@ -132,13 +155,8 @@ async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
 
-    new_payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
-    if user.totp_enabled:
-        new_payload["requires_2fa"] = True
-    return TokenResponse(
-        access_token=create_access_token(new_payload),
-        refresh_token=create_refresh_token({"sub": str(user.id), "tenant_id": user.tenant_id}),
-    )
+    verified_2fa = bool(payload.get("2fa_verified"))
+    return _issue_login_tokens(user, verified_2fa=verified_2fa)
 
 
 @router.post("/logout/", summary="登出")
@@ -185,6 +203,32 @@ async def verify_2fa(
     db_user.totp_enabled = True
     await db.commit()
     return {"status": 0, "msg": "2FA 已启用"}
+
+
+@router.post("/2fa/login/verify/", response_model=TokenResponse, summary="登录二步验证")
+async def verify_login_2fa(data: LoginTwoFAVerifyRequest, db: AsyncSession = Depends(get_db)):
+    import pyotp
+
+    try:
+        payload = decode_token(data.two_fa_token)
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="二步验证凭证无效或已过期") from e
+
+    if payload.get("type") != "access" or not payload.get("requires_2fa"):
+        raise HTTPException(status_code=401, detail="非法的二步验证凭证")
+
+    user = await UserService.get_by_id(db, int(payload["sub"]))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+    if not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(status_code=400, detail="当前账号未开启二步验证")
+
+    secret = decrypt_field(user.totp_secret)
+    if not pyotp.TOTP(secret).verify(data.totp_code, valid_window=1):
+        raise HTTPException(status_code=400, detail="TOTP 验证码错误")
+
+    logger.info("user_login_2fa_verified: %s", user.username)
+    return _issue_login_tokens(user, verified_2fa=True)
 
 
 @router.post("/2fa/disable/", summary="禁用 2FA")
@@ -289,12 +333,13 @@ async def sms_login(data: SmsLoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
 
-    payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
     logger.info("sms_login: %s", user.username)
-    return TokenResponse(
-        access_token=create_access_token(payload),
-        refresh_token=create_refresh_token({"sub": str(user.id), "tenant_id": user.tenant_id}),
-    )
+    if user.totp_enabled:
+        return TokenResponse(
+            requires_2fa=True,
+            two_fa_token=create_access_token({**_build_auth_payload(user), "requires_2fa": True}),
+        )
+    return _issue_login_tokens(user)
 
 
 # ── 第三方 OAuth2 登录（Pack F）──────────────────────────────

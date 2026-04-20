@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import AuthGuard from '@/components/common/AuthGuard'
 import PermissionGuard from '@/components/common/PermissionGuard'
+import { useAuthStore } from '@/store/auth'
+import { getPostLoginPath } from '@/utils/postLogin'
 
 const LoginPage            = lazy(() => import('@/pages/auth/LoginPage'))
 const OAuthCallbackPage    = lazy(() => import('@/pages/auth/OAuthCallbackPage'))
@@ -39,6 +41,11 @@ const Loading = () => (
   </div>
 )
 
+function DefaultAuthedRoute() {
+  const user = useAuthStore((s) => s.user)
+  return <Navigate to={getPostLoginPath(user?.permissions || [])} replace />
+}
+
 export default function App() {
   return (
     <Suspense fallback={<Loading />}>
@@ -46,7 +53,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/" element={<AuthGuard><MainLayout /></AuthGuard>}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<DefaultAuthedRoute />} />
           <Route path="dashboard"            element={<PermissionGuard permission="menu_dashboard"><Dashboard /></PermissionGuard>} />
           <Route path="workflow"             element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowList /></PermissionGuard>} />
           <Route path="workflow/submit"      element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowSubmit /></PermissionGuard>} />
@@ -71,7 +78,7 @@ export default function App() {
           <Route path="masking"              element={<PermissionGuard permission="menu_system"><MaskingRulePage /></PermissionGuard>} />
           <Route path="audit"                element={<PermissionGuard permission="menu_audit"><AuditLog /></PermissionGuard>} />
           <Route path="profile"              element={<ProfilePage />} />
-          <Route path="*"                    element={<Navigate to="/dashboard" replace />} />
+          <Route path="*"                    element={<DefaultAuthedRoute />} />
         </Route>
       </Routes>
     </Suspense>

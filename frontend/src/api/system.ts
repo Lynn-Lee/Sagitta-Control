@@ -67,6 +67,7 @@ export const userApi = {
     formData.append('default_password', defaultPassword)
     return apiClient.post('/system/users/import/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 5 * 60 * 1000,
     }).then(r => r.data)
   },
 

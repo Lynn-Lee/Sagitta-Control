@@ -12,6 +12,8 @@ export interface TokenResp {
   password_change_required?: boolean
   password_change_token?: string | null
   password_change_reasons?: string[]
+  requires_2fa?: boolean
+  two_fa_token?: string | null
 }
 
 export const authApi = {
@@ -44,6 +46,9 @@ export const authApi = {
 
   verify2fa: (totp_code: string) =>
     apiClient.post('/auth/2fa/verify/', { totp_code }).then(r => r.data),
+
+  verifyLogin2fa: (two_fa_token: string, totp_code: string) =>
+    apiClient.post<TokenResp>('/auth/2fa/login/verify/', { two_fa_token, totp_code }).then(r => r.data),
 
   disable2fa: (totp_code: string) =>
     apiClient.post('/auth/2fa/disable/', { totp_code }).then(r => r.data),

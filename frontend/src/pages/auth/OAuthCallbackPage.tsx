@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Spin, Alert } from 'antd'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
+import { getPostLoginPath } from '@/utils/postLogin'
 
 export default function OAuthCallbackPage() {
   const navigate = useNavigate()
@@ -36,7 +37,7 @@ export default function OAuthCallbackPage() {
       .then(meRes => {
         setTokens(accessToken, refreshToken)
         setUser(meRes.data)
-        navigate('/dashboard', { replace: true })
+        navigate(getPostLoginPath(meRes.data.permissions || []), { replace: true })
       })
       .catch(() => {
         setErrMsg('获取用户信息失败，3 秒后返回登录页')

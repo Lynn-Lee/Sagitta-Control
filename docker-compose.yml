@@ -141,16 +141,21 @@ services:
 
   # ─── 前端 ────────────────────────────────────────────────────
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: node:20-alpine
     restart: unless-stopped
+    working_dir: /app
+    environment:
+      VITE_DEV_PROXY_TARGET: http://backend:8000
+      VITE_DEV_WS_TARGET: ws://backend:8000
+      CHOKIDAR_USEPOLLING: "true"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
-      - "80:80"
+      - "80:5173"
     depends_on:
       - backend
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
 
   # ─── Prometheus ──────────────────────────────────────────────
   prometheus:
@@ -193,3 +198,4 @@ volumes:
   prom_data:
   grafana_data:
   downloads:
+  frontend_node_modules:

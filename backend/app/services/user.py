@@ -261,6 +261,44 @@ class UserService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def _apply_user_update(
+        db: AsyncSession,
+        user: Users,
+        data: UserUpdate,
+    ) -> None:
+        if data.display_name is not None:
+            user.display_name = data.display_name
+        if data.email is not None:
+            user.email = data.email
+        if data.phone is not None:
+            user.phone = data.phone
+        if data.is_active is not None:
+            user.is_active = data.is_active
+        if data.is_superuser is not None:
+            user.is_superuser = data.is_superuser
+        if data.role_id is not None:
+            user.role_id = data.role_id if data.role_id else None
+        if data.manager_id is not None:
+            user.manager_id = data.manager_id if data.manager_id else None
+        if data.employee_id is not None:
+            user.employee_id = data.employee_id
+        if data.department is not None:
+            user.department = data.department
+        if data.title is not None:
+            user.title = data.title
+        if data.user_group_ids is not None:
+            await db.execute(
+                delete(user_group_member).where(user_group_member.c.user_id == user.id)
+            )
+            ugs_result = await db.execute(
+                select(UserGroup.id).where(UserGroup.id.in_(data.user_group_ids))
+            )
+            for group_id in ugs_result.scalars().all():
+                await db.execute(
+                    user_group_member.insert().values(user_id=user.id, group_id=group_id)
+                )
+
+    @staticmethod
     async def list_users(
         db: AsyncSession,
         page: int = 1,
@@ -313,7 +351,7 @@ class UserService:
         return total, list(result.scalars().all())
 
     @staticmethod
-    async def create_user(db: AsyncSession, data: UserCreate) -> Users:
+    async def create_user(db: AsyncSession, data: UserCreate, *, auto_commit: bool = True) -> Users:
         existing = await UserService.get_by_username(db, data.username)
         if existing:
             raise ConflictException(f"用户名 '{data.username}' 已存在")
@@ -345,51 +383,27 @@ class UserService:
                     user_group_member.insert().values(user_id=user.id, group_id=group_id)
                 )
 
-        await db.commit()
+        if auto_commit:
+            await db.commit()
         user = await UserService.get_by_id(db, user.id)
         logger.info("user_created: %s", data.username)
         return user
 
     @staticmethod
-    async def update_user(db: AsyncSession, user_id: int, data: UserUpdate) -> Users:
+    async def update_user(
+        db: AsyncSession,
+        user_id: int,
+        data: UserUpdate,
+        *,
+        auto_commit: bool = True,
+    ) -> Users:
         user = await UserService.get_by_id(db, user_id)
         if not user:
             raise NotFoundException(f"用户 ID={user_id} 不存在")
 
-        if data.display_name is not None:
-            user.display_name = data.display_name
-        if data.email is not None:
-            user.email = data.email
-        if data.phone is not None:
-            user.phone = data.phone
-        if data.is_active is not None:
-            user.is_active = data.is_active
-        if data.is_superuser is not None:
-            user.is_superuser = data.is_superuser
-        # v2 字段：支持显式清空（0 表示清空 role_id/manager_id）
-        if data.role_id is not None:
-            user.role_id = data.role_id if data.role_id else None
-        if data.manager_id is not None:
-            user.manager_id = data.manager_id if data.manager_id else None
-        if data.employee_id is not None:
-            user.employee_id = data.employee_id
-        if data.department is not None:
-            user.department = data.department
-        if data.title is not None:
-            user.title = data.title
-        if data.user_group_ids is not None:
-            await db.execute(
-                delete(user_group_member).where(user_group_member.c.user_id == user.id)
-            )
-            ugs_result = await db.execute(
-                select(UserGroup.id).where(UserGroup.id.in_(data.user_group_ids))
-            )
-            for group_id in ugs_result.scalars().all():
-                await db.execute(
-                    user_group_member.insert().values(user_id=user.id, group_id=group_id)
-                )
-
-        await db.commit()
+        await UserService._apply_user_update(db, user, data)
+        if auto_commit:
+            await db.commit()
         user = await UserService.get_by_id(db, user.id)
         return user
 
@@ -808,12 +822,13 @@ class UserService:
             raw_manager_display_name=row.get("manager_display_name", ""),
         )
         user_group_ids = await UserService._resolve_user_group_ids(db, row.get("user_groups", ""))
+        row_password = (row.get("password") or "").strip()
 
         existing = await UserService.get_by_username(db, username)
         if existing:
-            await UserService.update_user(
+            await UserService._apply_user_update(
                 db,
-                existing.id,
+                existing,
                 UserUpdate(
                     display_name=row.get("display_name"),
                     email=row.get("email"),
@@ -830,13 +845,17 @@ class UserService:
                     user_group_ids=user_group_ids,
                 ),
             )
+            if row_password:
+                existing.password = hash_password(row_password)
+                # Mark import-reset passwords as "initial" so the user must change them on next login.
+                existing.password_changed_at = existing.created_at
             return "updated"
 
         await UserService.create_user(
             db,
             UserCreate(
                 username=username,
-                password=(row.get("password") or default_password).strip() or default_password,
+                password=row_password or default_password,
                 display_name=row.get("display_name") or username,
                 email=row.get("email", ""),
                 phone=row.get("phone", ""),
@@ -848,6 +867,7 @@ class UserService:
                 title=row.get("title", ""),
                 user_group_ids=user_group_ids,
             ),
+            auto_commit=False,
         )
         return "created"
 

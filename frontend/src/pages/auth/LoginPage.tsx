@@ -3,10 +3,11 @@ import { Button, Form, Input, Alert, Divider, Tooltip, Tag, Modal, Typography } 
 import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
 import { authApi } from '@/api/auth'
+import { getPostLoginPath } from '@/utils/postLogin'
 
 // ── SagittaDB Logo ────────────────────────────────────────────
 const SagittaLogo = () => (
@@ -75,10 +76,13 @@ export default function LoginPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [loginForm] = Form.useForm()
   const [forcePwForm] = Form.useForm()
-  const { setTokens, setUser } = useAuthStore()
+  const { setTokens, setUser, isAuthenticated, user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState('')
   const [forceChangeMode, setForceChangeMode] = useState(false)
+  const [twoFactorMode, setTwoFactorMode] = useState(false)
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false)
+  const [twoFactorToken, setTwoFactorToken] = useState('')
   const [forceChangeLoading, setForceChangeLoading] = useState(false)
   const [passwordChangeToken, setPasswordChangeToken] = useState('')
   const [passwordChangeReasons, setPasswordChangeReasons] = useState<string[]>([])
@@ -107,8 +111,30 @@ export default function LoginPage() {
     '密码每 30 天必须修改一次',
   ]
 
+  const finishLogin = async (access_token: string, refresh_token: string) => {
+    setTokens(access_token, refresh_token)
+    const meRes = await apiClient.get('/auth/me/', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    })
+    setUser(meRes.data)
+    const target = getPostLoginPath(meRes.data.permissions || [])
+    navigate(target, { replace: true })
+  }
+
+  if (isAuthenticated && user) {
+    return <Navigate to={getPostLoginPath(user.permissions || [])} replace />
+  }
+
   const _doLogin = async (
-    tokenData: { access_token?: string | null; refresh_token?: string | null; password_change_required?: boolean; password_change_token?: string | null; password_change_reasons?: string[] },
+    tokenData: {
+      access_token?: string | null
+      refresh_token?: string | null
+      password_change_required?: boolean
+      password_change_token?: string | null
+      password_change_reasons?: string[]
+      requires_2fa?: boolean
+      two_fa_token?: string | null
+    },
     username?: string,
   ) => {
     if (tokenData.password_change_required) {
@@ -116,8 +142,23 @@ export default function LoginPage() {
       setPasswordChangeReasons(tokenData.password_change_reasons || [])
       setPendingUsername(username || '')
       setForceChangeMode(true)
+      setTwoFactorMode(false)
+      setTwoFactorToken('')
       setError('')
       forcePwForm.resetFields()
+      return
+    }
+
+    if (tokenData.requires_2fa) {
+      if (!tokenData.two_fa_token) {
+        throw new Error('登录响应缺少二步验证凭证')
+      }
+      setTwoFactorToken(tokenData.two_fa_token)
+      setPendingUsername(username || '')
+      setTwoFactorMode(true)
+      setForceChangeMode(false)
+      setError('')
+      loginForm.setFieldsValue({ username: username || '', password: '' })
       return
     }
 
@@ -125,12 +166,7 @@ export default function LoginPage() {
     if (!access_token || !refresh_token) {
       throw new Error('登录响应缺少 token')
     }
-    const meRes = await apiClient.get('/auth/me/', {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
-    setTokens(access_token, refresh_token)
-    setUser(meRes.data)
-    navigate('/dashboard', { replace: true })
+    await finishLogin(access_token, refresh_token)
   }
 
   const handleLogin = async (values: { username: string; password: string }) => {
@@ -202,6 +238,26 @@ export default function LoginPage() {
       setError(e.response?.data?.detail || e.response?.data?.msg || '密码修改失败')
     } finally {
       setForceChangeLoading(false)
+    }
+  }
+
+  const handleVerifyLogin2fa = async (values: { totp_code: string }) => {
+    if (!twoFactorToken) {
+      setError('二步验证凭证已失效，请重新输入账号密码登录')
+      setTwoFactorMode(false)
+      return
+    }
+    setTwoFactorLoading(true)
+    setError('')
+    try {
+      const tokenData = await authApi.verifyLogin2fa(twoFactorToken, values.totp_code)
+      setTwoFactorMode(false)
+      setTwoFactorToken('')
+      await _doLogin(tokenData, pendingUsername)
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '二步验证失败')
+    } finally {
+      setTwoFactorLoading(false)
     }
   }
 
@@ -458,6 +514,62 @@ export default function LoginPage() {
                       setPasswordChangeToken('')
                       setPasswordChangeReasons([])
                       forcePwForm.resetFields()
+                    }}
+                  >
+                    返回登录
+                  </Button>
+                </Form>
+              </>
+            ) : twoFactorMode ? (
+              <>
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="需要完成二步验证"
+                  description={`账号 ${pendingUsername || ''} 已开启 TOTP，请输入认证器中的 6 位验证码继续登录。`}
+                />
+                <Form onFinish={handleVerifyLogin2fa} size="large" layout="vertical">
+                  <Form.Item
+                    name="totp_code"
+                    label="验证码"
+                    rules={[
+                      { required: true, message: '请输入 6 位验证码' },
+                      { pattern: /^\d{6}$/, message: '验证码必须为 6 位数字' },
+                    ]}
+                    style={{ marginBottom: 22 }}
+                  >
+                    <Input
+                      prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                      placeholder="请输入 6 位验证码"
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                      maxLength={6}
+                    />
+                  </Form.Item>
+                  <Form.Item style={{ marginBottom: 10 }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={twoFactorLoading}
+                      block
+                      style={{
+                        height: 46, borderRadius: 8,
+                        background: '#165DFF', border: 'none',
+                        fontWeight: 600, fontSize: 15, letterSpacing: '1px',
+                        boxShadow: '0 4px 20px rgba(22,93,255,0.4)',
+                      }}
+                    >
+                      验证并登录
+                    </Button>
+                  </Form.Item>
+                  <Button
+                    block
+                    onClick={() => {
+                      setTwoFactorMode(false)
+                      setTwoFactorToken('')
+                      setPendingUsername('')
+                      setError('')
                     }}
                   >
                     返回登录

@@ -17,6 +17,7 @@ from app.core.security import (
     get_login_password_change_reasons,
     get_password_days_until_expiry,
     hash_password,
+    is_initial_password_state,
     is_password_expiring_soon,
     is_password_expired,
     validate_password_strength,
@@ -133,6 +134,24 @@ class TestPasswordPolicy:
     def test_default_password_requires_change(self):
         reasons = get_login_password_change_reasons("Admin@2024!")
         assert "当前密码为系统默认密码，必须先修改密码" in reasons
+
+    def test_initial_password_requires_change(self):
+        now = datetime.now(UTC)
+        reasons = get_login_password_change_reasons(
+            "Sagitta@2026A",
+            now,
+            force_change_on_first_login=True,
+        )
+        assert "当前密码为系统分配的初始密码，首次登录必须先修改密码" in reasons
+
+    def test_initial_password_state_detects_new_user(self):
+        now = datetime.now(UTC)
+        assert is_initial_password_state(now, now) is True
+
+    def test_initial_password_state_ignores_changed_password(self):
+        created_at = datetime.now(UTC) - timedelta(days=1)
+        changed_at = datetime.now(UTC)
+        assert is_initial_password_state(changed_at, created_at) is False
 
     def test_password_expired_after_30_days(self):
         changed_at = datetime.now(UTC) - timedelta(days=31)

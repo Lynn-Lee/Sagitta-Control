@@ -10,6 +10,7 @@ import {
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/auth'
+import { getPostLoginPath } from '@/utils/postLogin'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -265,6 +266,7 @@ export default function MainLayout() {
     return parent ? [parent.key as string] : []
   }, [selectedMenuKey])
   const initials = (user?.display_name || user?.username || 'S')[0].toUpperCase()
+  const homePath = getPostLoginPath(user?.permissions || [])
 
   useEffect(() => {
     setMobileNavOpen(false)
@@ -317,7 +319,7 @@ export default function MainLayout() {
             }}
             style={{ color: 'rgba(255,255,255,0.65)', width: 56, height: 56, borderRadius: 0 }}
           />
-          <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+          <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate(homePath)}>
             <SagittaLogo size={26} color="#165DFF" />
             <div style={{ lineHeight: 1 }}>
               <div style={{
