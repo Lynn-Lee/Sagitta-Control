@@ -88,9 +88,10 @@ def extract_table_refs(sql: str, db_name: str, db_type: str = "mysql") -> list[d
         logger.warning("sqlglot_table_ref_failed: sql=%s error=%s", sql[:100], str(e))
         return tables
 
+    default_schema = "" if db_type.lower() == "pgsql" else db_name
     seen: set[tuple[str, str]] = set()
     for tbl in tree.find_all(exp.Table):
-        schema = tbl.db or db_name
+        schema = tbl.db or default_schema
         name = tbl.name
         key = (schema, name)
         if key not in seen:

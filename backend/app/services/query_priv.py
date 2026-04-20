@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -107,6 +108,46 @@ class QueryPrivService:
         return "database", 1
 
     @staticmethod
+    def _pg_table_candidates(schema: str, table_name: str) -> list[str]:
+        candidates: list[str] = []
+        normalized_table = table_name.strip()
+        normalized_schema = schema.strip()
+        if normalized_table:
+            candidates.append(normalized_table)
+        if normalized_schema and normalized_table:
+            qualified_name = f"{normalized_schema}.{normalized_table}"
+            if qualified_name not in candidates:
+                candidates.append(qualified_name)
+        return candidates
+
+    @staticmethod
+    async def _get_pg_table_schema_map(
+        instance: Instance,
+        db_name: str,
+        table_refs: list[dict[str, Any]],
+    ) -> dict[str, list[str]]:
+        if instance.db_type != "pgsql":
+            return {}
+
+        unresolved_tables = sorted(
+            {
+                ref.get("name", "").strip()
+                for ref in table_refs
+                if ref.get("name", "").strip() and not (ref.get("schema") or "").strip()
+            }
+        )
+        if not unresolved_tables:
+            return {}
+
+        from app.engines.registry import get_engine
+
+        engine = get_engine(instance)
+        resolver = getattr(engine, "resolve_table_schemas", None)
+        if not callable(resolver):
+            return {}
+        return await resolver(db_name, unresolved_tables)
+
+    @staticmethod
     async def _has_db_priv(
         db: AsyncSession,
         user_id: int,
@@ -134,8 +175,11 @@ class QueryPrivService:
         user_id: int,
         instance_id: int,
         db_name: str,
-        table_name: str,
+        table_names: list[str],
     ) -> bool:
+        normalized_names = [name.strip() for name in table_names if name and name.strip()]
+        if not normalized_names:
+            return False
         result = await db.execute(
             select(QueryPrivilege).where(
                 and_(
@@ -144,7 +188,7 @@ class QueryPrivService:
                     QueryPrivilege.instance_id == instance_id,
                     QueryPrivilege.scope_type == "table",
                     QueryPrivilege.db_name == db_name,
-                    QueryPrivilege.table_name == table_name,
+                    QueryPrivilege.table_name.in_(normalized_names),
                     QueryPrivilege.valid_date >= date.today(),
                     QueryPrivilege.is_deleted == 0,
                 )
@@ -200,6 +244,7 @@ class QueryPrivService:
             return False, "实例不在你的资源组内"
 
         table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
         if not table_refs:
             has_db_priv = await QueryPrivService._has_db_priv(db, user["id"], instance.id, db_name)
             if has_db_priv:
@@ -207,16 +252,51 @@ class QueryPrivService:
             return False, f"没有数据库 {db_name} 的查询权限，请申请后重试"
 
         for ref in table_refs:
-            schema = ref.get("schema", db_name) or db_name
+            schema = (ref.get("schema") or "").strip()
             table = ref.get("name", "")
             if not table:
                 continue
 
-            if await QueryPrivService._has_table_priv(db, user["id"], instance.id, schema, table):
+            if await QueryPrivService._has_db_priv(db, user["id"], instance.id, db_name):
                 continue
-            if await QueryPrivService._has_db_priv(db, user["id"], instance.id, schema):
+
+            if instance.db_type == "pgsql":
+                if schema:
+                    if await QueryPrivService._has_table_priv(
+                        db,
+                        user["id"],
+                        instance.id,
+                        db_name,
+                        QueryPrivService._pg_table_candidates(schema, table),
+                    ):
+                        continue
+                    return False, f"没有表 {schema}.{table} 的查询权限，请申请后重试"
+
+                matched_schemas = pg_table_schema_map.get(table, [])
+                if len(matched_schemas) > 1:
+                    return (
+                        False,
+                        f"表 {table} 在多个 schema 中存在，请使用 schema.table 查询并按 schema 申请权限",
+                    )
+
+                candidate_names = QueryPrivService._pg_table_candidates(
+                    matched_schemas[0] if len(matched_schemas) == 1 else "",
+                    table,
+                )
+                if await QueryPrivService._has_table_priv(
+                    db, user["id"], instance.id, db_name, candidate_names
+                ):
+                    continue
+
+                resolved_name = f"{matched_schemas[0]}.{table}" if len(matched_schemas) == 1 else table
+                return False, f"没有表 {resolved_name} 的查询权限，请申请后重试"
+
+            effective_schema = schema or db_name
+            if await QueryPrivService._has_table_priv(
+                db, user["id"], instance.id, effective_schema, [table]
+            ):
                 continue
-            return False, f"没有表 {schema}.{table} 的查询权限，请申请后重试"
+            return False, f"没有表 {effective_schema}.{table} 的查询权限，请申请后重试"
 
         return True, "privilege"
 
@@ -250,7 +330,11 @@ class QueryPrivService:
         if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
             return requested_limit
 
-        async def _latest_limit(scope: str, schema: str, table: str = "") -> int | None:
+        async def _latest_limit(
+            scope: str,
+            scope_db_name: str,
+            table_names: list[str] | None = None,
+        ) -> int | None:
             stmt = (
                 select(QueryPrivilege)
                 .where(
@@ -259,7 +343,7 @@ class QueryPrivService:
                         QueryPrivilege.user_group_id.is_(None),
                         QueryPrivilege.instance_id == instance.id,
                         QueryPrivilege.scope_type == scope,
-                        QueryPrivilege.db_name == schema,
+                        QueryPrivilege.db_name == scope_db_name,
                         QueryPrivilege.valid_date >= date.today(),
                         QueryPrivilege.is_deleted == 0,
                     )
@@ -267,29 +351,87 @@ class QueryPrivService:
                 .order_by(QueryPrivilege.created_at.desc(), QueryPrivilege.id.desc())
             )
             if scope == "table":
-                stmt = stmt.where(QueryPrivilege.table_name == table)
+                normalized_table_names = [
+                    name.strip() for name in (table_names or []) if name and name.strip()
+                ]
+                if not normalized_table_names:
+                    return None
+                stmt = stmt.where(QueryPrivilege.table_name.in_(normalized_table_names))
             result = await db.execute(stmt)
             privilege = result.scalars().first()
             return privilege.limit_num if privilege else None
 
         table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
         if not table_refs:
             db_limit = await _latest_limit("database", db_name)
             return min(requested_limit, db_limit) if db_limit is not None else requested_limit
 
         effective_limits: list[int] = []
         for ref in table_refs:
-            schema = ref.get("schema", db_name) or db_name
+            schema = (ref.get("schema") or "").strip()
             table = ref.get("name", "")
             if not table:
                 continue
-            table_limit = await _latest_limit("table", schema, table)
+
+            if instance.db_type == "pgsql":
+                matched_schemas = pg_table_schema_map.get(table, []) if not schema else [schema]
+                if len(matched_schemas) > 1:
+                    continue
+                candidate_names = QueryPrivService._pg_table_candidates(
+                    matched_schemas[0] if matched_schemas else "",
+                    table,
+                )
+                table_limit = await _latest_limit("table", db_name, candidate_names)
+                if table_limit is None:
+                    table_limit = await _latest_limit("database", db_name)
+                if table_limit is not None:
+                    effective_limits.append(table_limit)
+                continue
+
+            effective_schema = schema or db_name
+            table_limit = await _latest_limit("table", effective_schema, [table])
             if table_limit is None:
-                table_limit = await _latest_limit("database", schema)
+                table_limit = await _latest_limit("database", effective_schema)
             if table_limit is not None:
                 effective_limits.append(table_limit)
 
         return min([requested_limit, *effective_limits]) if effective_limits else requested_limit
+
+    @staticmethod
+    async def resolve_pg_search_path(
+        instance: Instance,
+        db_name: str,
+        sql: str,
+    ) -> str | None:
+        if instance.db_type != "pgsql":
+            return None
+
+        table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        if not table_refs:
+            return None
+
+        pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
+        search_path_parts: list[str] = []
+        for ref in table_refs:
+            schema = (ref.get("schema") or "").strip()
+            table = ref.get("name", "").strip()
+            if schema:
+                if schema not in search_path_parts:
+                    search_path_parts.append(schema)
+                continue
+            if not table:
+                continue
+            matched_schemas = pg_table_schema_map.get(table, [])
+            if len(matched_schemas) != 1:
+                return None
+            matched_schema = matched_schemas[0]
+            if matched_schema not in search_path_parts:
+                search_path_parts.append(matched_schema)
+
+        if "public" not in search_path_parts:
+            search_path_parts.append("public")
+        return ",".join(search_path_parts) if search_path_parts else None
 
     @staticmethod
     async def list_my_privileges(

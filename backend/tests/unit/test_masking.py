@@ -70,6 +70,13 @@ class TestExtractTableRefs:
         assert tables[0]["schema"] == "mydb"
         assert tables[0]["name"] == "users"
 
+    def test_pgsql_unqualified_table_does_not_treat_database_as_schema(self):
+        tables = extract_table_refs(
+            'SELECT * FROM "tk_order"', "tms_testdb", "pgsql"
+        )
+        assert tables[0]["schema"] == ""
+        assert tables[0]["name"] == "tk_order"
+
     def test_join(self):
         tables = extract_table_refs(
             "SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id",

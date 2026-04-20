@@ -115,6 +115,12 @@ class TestQueryPrivilegeHelpers:
     def test_database_scope_normalizes_to_database_priv(self):
         assert QueryPrivService._normalize_scope_type("database", "") == ("database", 1)
 
+    def test_pg_table_candidates_include_plain_and_schema_qualified_name(self):
+        assert QueryPrivService._pg_table_candidates("tms", "tk_order") == [
+            "tk_order",
+            "tms.tk_order",
+        ]
+
     @pytest.mark.asyncio
     async def test_effective_query_limit_uses_stricter_table_privilege_limit(self):
         db = AsyncMock()

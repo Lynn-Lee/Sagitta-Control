@@ -59,6 +59,8 @@ export default function QueryPrivPage() {
     queryKey: ['instances-for-priv'],
     queryFn: () => instanceApi.list({ page_size: 200 }),
   })
+  const selectedInstance = (instanceData?.items || []).find((item: any) => item.id === instanceId)
+  const isPgInstance = selectedInstance?.db_type === 'pgsql'
   const { data: flowData } = useQuery({
     queryKey: ['approval-flows-for-query-priv'],
     queryFn: () => approvalFlowApi.list(),
@@ -310,8 +312,13 @@ export default function QueryPrivPage() {
             </Select>
           </Form.Item>
           {scopeType === 'table' && (
-            <Form.Item name="table_name" label="表名" rules={[{ required: true, message: '请输入表名' }]}>
-              <Input placeholder="如 orders / user_profile" />
+            <Form.Item
+              name="table_name"
+              label="表名"
+              extra={isPgInstance ? 'PostgreSQL 非 public schema 表请填写 schema.table，例如 tms.tk_order' : undefined}
+              rules={[{ required: true, message: '请输入表名' }]}
+            >
+              <Input placeholder={isPgInstance ? '如 public.orders / tms.tk_order' : '如 orders / user_profile'} />
             </Form.Item>
           )}
           <Form.Item name="valid_date" label="有效期至" rules={[{ required: true }]}>

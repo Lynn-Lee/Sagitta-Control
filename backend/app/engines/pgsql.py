@@ -56,6 +56,29 @@ class PgSQLEngine:
         pool = await self._get_pool(db_name)
         return pool
 
+    async def resolve_table_schemas(self, db_name: str, table_names: list[str]) -> dict[str, list[str]]:
+        normalized_names = sorted({name.strip() for name in table_names if name and name.strip()})
+        if not normalized_names:
+            return {}
+
+        sql = """
+            SELECT table_name, table_schema
+            FROM information_schema.tables
+            WHERE table_type = 'BASE TABLE'
+              AND table_name = ANY($1::text[])
+              AND table_schema NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY table_name, table_schema
+        """
+        rs = await self._raw_query(db_name=db_name, sql=sql, args=[normalized_names])
+        mapping = {name: [] for name in normalized_names}
+        if rs.error:
+            return mapping
+
+        for row in rs.rows:
+            table_name, table_schema = row[0], row[1]
+            mapping.setdefault(str(table_name), []).append(str(table_schema))
+        return mapping
+
     async def test_connection(self) -> ResultSet:
         rs = ResultSet()
         try:
@@ -246,18 +269,26 @@ class PgSQLEngine:
         try:
             pool = await self._get_pool(db_name)
             async with pool.acquire() as conn:
-                # 将 %(key)s 风格参数转换为 $1,$2 风格
-                exec_sql, args = self._convert_params(sql, parameters)
-                if limit_num > 0 and "limit" not in exec_sql.lower():
-                    exec_sql = f"{exec_sql.rstrip(';')} LIMIT {limit_num}"
-                rows = await conn.fetch(exec_sql, *args)
-                if rows:
-                    rs.column_list = list(rows[0].keys())
-                    rs.rows = [tuple(row.values()) for row in rows]
-                else:
-                    rs.column_list = []
-                    rs.rows = []
-                rs.affected_rows = len(rs.rows)
+                async with conn.transaction():
+                    search_path = kwargs.get("search_path")
+                    if search_path:
+                        await conn.fetchval(
+                            "SELECT set_config('search_path', $1, true)",
+                            search_path,
+                        )
+
+                    # 将 %(key)s 风格参数转换为 $1,$2 风格
+                    exec_sql, args = self._convert_params(sql, parameters)
+                    if limit_num > 0 and "limit" not in exec_sql.lower():
+                        exec_sql = f"{exec_sql.rstrip(';')} LIMIT {limit_num}"
+                    rows = await conn.fetch(exec_sql, *args)
+                    if rows:
+                        rs.column_list = list(rows[0].keys())
+                        rs.rows = [tuple(row.values()) for row in rows]
+                    else:
+                        rs.column_list = []
+                        rs.rows = []
+                    rs.affected_rows = len(rs.rows)
         except Exception as e:
             rs.error = str(e)
             logger.warning("pgsql_query_error: %s", str(e))

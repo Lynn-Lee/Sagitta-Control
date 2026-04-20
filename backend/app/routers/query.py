@@ -83,11 +83,16 @@ async def _run_query_with_permissions(
         requested_limit=data.limit_num,
     )
     safe_sql = engine.filter_sql(data.sql, effective_limit)
+    query_kwargs: dict[str, str] = {}
+    pg_search_path = await QueryPrivService.resolve_pg_search_path(inst, data.db_name, data.sql)
+    if pg_search_path:
+        query_kwargs["search_path"] = pg_search_path
 
     resultset = await engine.query(
         db_name=data.db_name,
         sql=safe_sql,
         limit_num=effective_limit,
+        **query_kwargs,
     )
     if resultset.error:
         raise HTTPException(400, f"查询执行失败：{resultset.error}")
