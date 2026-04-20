@@ -85,6 +85,12 @@ services:
     volumes:
       - downloads:/app/downloads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -117,6 +123,12 @@ services:
       --concurrency=8
       -Q default,execute,notify,archive,monitor
       --loglevel=warning
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME | grep -q OK"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -141,6 +153,12 @@ services:
       - redis
       - postgres
     command: celery -A app.celery_app beat --loglevel=warning
+    healthcheck:
+      test: ["CMD-SHELL", "ps | grep '[c]elery.*beat' >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -160,6 +178,12 @@ services:
     depends_on:
       - redis
     command: celery -A app.celery_app flower --port=5555
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
