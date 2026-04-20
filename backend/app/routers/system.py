@@ -356,14 +356,29 @@ async def list_user_groups(
     page_size: int = Query(50, ge=1, le=200),
     is_active: bool | None = None,
     parent_id: int | None = None,
+    search: str | None = None,
+    leader_ids: list[int] | None = Query(None),
+    parent_ids: list[int] | None = Query(None),
+    resource_group_ids: list[int] | None = Query(None),
+    statuses: list[bool] | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_perm("user_manage")),
 ):
-    total, items = await UserGroupService.list_groups(db, page, page_size, is_active, parent_id)
+    total, items = await UserGroupService.list_groups(
+        db,
+        page,
+        page_size,
+        is_active,
+        parent_id,
+        search,
+        None,
+        leader_ids,
+        parent_ids,
+        resource_group_ids,
+        statuses,
+    )
     result = []
     for g in items:
-        members = await UserGroupService.get_members(db, g.id)
-        rgs = await UserGroupService.get_resource_groups(db, g.id)
         result.append(
             {
                 "id": g.id,
@@ -374,11 +389,65 @@ async def list_user_groups(
                 "parent_id": g.parent_id,
                 "is_active": g.is_active,
                 "tenant_id": g.tenant_id,
-                "member_count": len(members),
-                "resource_group_ids": [rg.id for rg in rgs],
+                "member_count": len(g.members),
+                "resource_group_ids": [rg.id for rg in g.resource_groups],
             }
         )
     return {"total": total, "page": page, "page_size": page_size, "items": result}
+
+
+@router.get("/user-groups/export/", summary="导出用户组")
+async def export_user_groups(
+    export_format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
+    search: str | None = None,
+    is_active: bool | None = None,
+    parent_id: int | None = None,
+    group_ids: list[int] | None = Query(None),
+    leader_ids: list[int] | None = Query(None),
+    parent_ids: list[int] | None = Query(None),
+    resource_group_ids: list[int] | None = Query(None),
+    statuses: list[bool] | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("user_manage")),
+):
+    rows = await UserGroupService.export_groups(
+        db,
+        search=search,
+        is_active=is_active,
+        parent_id=parent_id,
+        group_ids=group_ids,
+        leader_ids=leader_ids,
+        parent_ids=parent_ids,
+        resource_group_ids=resource_group_ids,
+        statuses=statuses,
+    )
+    content, media_type, filename = UserGroupService.build_group_export_file(rows, export_format)
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
+
+
+@router.get("/user-groups/import-template/", summary="下载用户组导入模板")
+async def download_user_group_import_template(
+    export_format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
+    _user=Depends(require_perm("user_manage")),
+):
+    content, media_type, filename = UserGroupService.build_group_import_template(export_format)
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
+
+
+@router.post("/user-groups/import/", summary="导入用户组")
+async def import_user_groups(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("user_manage")),
+):
+    result = await UserGroupService.import_groups(
+        db=db,
+        filename=file.filename or "",
+        content=await file.read(),
+    )
+    return {"status": 0, "msg": "用户组导入完成", "data": result}
 
 
 @router.post("/user-groups/", summary="创建用户组")

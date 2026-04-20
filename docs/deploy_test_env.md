@@ -481,7 +481,7 @@ docker compose up -d frontend
 
 - macOS / Chrome：`Cmd + Shift + R`
 
-### Q7：用户导入导出或权限验证和文档不一致
+### Q7：用户/用户组导入导出、筛选导出或权限验证和文档不一致
 
 优先确认：
 

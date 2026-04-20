@@ -136,8 +136,47 @@ export const roleApi = {
 
 // ── 用户组 ────────────────────────────────────────────────────
 export const userGroupApi = {
-  list: (params?: { page?: number; page_size?: number; is_active?: boolean; parent_id?: number }) =>
-    apiClient.get('/system/user-groups/', { params }).then(r => r.data),
+  list: (params?: {
+    page?: number
+    page_size?: number
+    is_active?: boolean
+    parent_id?: number
+    search?: string
+    leader_ids?: number[]
+    parent_ids?: number[]
+    resource_group_ids?: number[]
+    statuses?: boolean[]
+  }) =>
+    apiClient.get('/system/user-groups/', {
+      params,
+      paramsSerializer: { indexes: null },
+    }).then(r => r.data),
+
+  export: (params?: {
+    export_format?: 'xlsx' | 'csv'
+    search?: string
+    is_active?: boolean
+    parent_id?: number
+    group_ids?: number[]
+    leader_ids?: number[]
+    parent_ids?: number[]
+    resource_group_ids?: number[]
+    statuses?: boolean[]
+  }) =>
+    apiClient.get('/system/user-groups/export/', {
+      params,
+      responseType: 'blob',
+      paramsSerializer: { indexes: null },
+    }).then(r => ({
+      blob: r.data,
+      contentDisposition: r.headers['content-disposition'] as string | undefined,
+    })),
+
+  downloadTemplate: (params?: { export_format?: 'xlsx' | 'csv' }) =>
+    apiClient.get('/system/user-groups/import-template/', { params, responseType: 'blob' }).then(r => ({
+      blob: r.data,
+      contentDisposition: r.headers['content-disposition'] as string | undefined,
+    })),
 
   get: (id: number) =>
     apiClient.get(`/system/user-groups/${id}/`).then(r => r.data),
@@ -153,6 +192,14 @@ export const userGroupApi = {
 
   delete: (id: number) =>
     apiClient.delete(`/system/user-groups/${id}/`).then(r => r.data),
+
+  import: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post('/system/user-groups/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data)
+  },
 }
 
 // ── 系统初始化 ────────────────────────────────────────────────
