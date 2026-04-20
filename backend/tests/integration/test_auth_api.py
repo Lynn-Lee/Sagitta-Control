@@ -95,6 +95,27 @@ class TestLogin:
         assert relogin_data["refresh_token"]
 
     @pytest.mark.asyncio
+    async def test_force_change_password_rejects_same_password(self, client: AsyncClient):
+        await client.post("/api/v1/system/init/")
+        login_resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "Admin@2024!",
+        })
+        assert login_resp.status_code == 200
+
+        change_resp = await client.post("/api/v1/auth/password/change-required/", json={
+            "password_change_token": login_resp.json()["password_change_token"],
+            "new_password": "Admin@2024!",
+        })
+        assert change_resp.status_code == 400
+        assert change_resp.json()["detail"] == "新密码不能与当前密码相同"
+
+        relogin_resp = await client.post("/api/v1/auth/login/", json={
+            "username": "admin", "password": "Admin@2024!",
+        })
+        assert relogin_resp.status_code == 200
+        assert relogin_resp.json()["password_change_required"] is True
+
+    @pytest.mark.asyncio
     async def test_new_local_user_requires_initial_password_change(self, client: AsyncClient):
         access, _ = await _init_and_login(client)
 

@@ -357,7 +357,10 @@ export default function LoginPage() {
 
         {/* ── 错误提示 ── */}
         {error && (
-          <Alert type="error" message={error} showIcon
+          <Alert
+            type="error"
+            message={<span style={{ color: '#FEE2E2' }}>{error}</span>}
+            showIcon
             style={{
               marginBottom: 16, borderRadius: 8,
               background: 'rgba(245,63,63,0.1)',

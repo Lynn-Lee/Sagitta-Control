@@ -299,6 +299,8 @@ async def force_change_password(data: ForceChangePasswordRequest, db: AsyncSessi
     user = await UserService.get_by_id(db, int(payload["sub"]))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+    if verify_password(data.new_password, user.password):
+        raise HTTPException(status_code=400, detail="新密码不能与当前密码相同")
 
     user.password = hash_password(data.new_password)
     user.password_changed_at = datetime.now(UTC)

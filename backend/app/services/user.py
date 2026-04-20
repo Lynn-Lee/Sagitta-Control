@@ -429,6 +429,10 @@ class UserService:
             from app.core.exceptions import AppException
 
             raise AppException("原密码错误", code=400)
+        if verify_password(new_password, user.password):
+            from app.core.exceptions import AppException
+
+            raise AppException("新密码不能与当前密码相同", code=400)
         user.password = hash_password(new_password)
         user.password_changed_at = datetime.now(UTC)
         await db.commit()
