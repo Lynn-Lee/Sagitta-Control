@@ -170,6 +170,7 @@ export default function MaskingRulePage() {
       </SectionCard>
 
       <Modal title={editId ? '编辑脱敏规则' : '新建脱敏规则'} open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending} width={560}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>

@@ -378,6 +378,7 @@ export default function WorkflowSubmit() {
       <Modal
         title="从模板创建工单"
         open={templatePickerOpen}
+        maskClosable={false}
         onOk={handleApplySelectedTemplate}
         onCancel={() => setTemplatePickerOpen(false)}
         okText="使用模板"
@@ -503,6 +504,7 @@ export default function WorkflowSubmit() {
       <Modal
         title="保存当前工单为模板"
         open={saveTemplateOpen}
+        maskClosable={false}
         onOk={handleSaveTemplate}
         onCancel={() => setSaveTemplateOpen(false)}
         okText="保存模板"
@@ -578,7 +580,7 @@ export default function WorkflowSubmit() {
 
       {/* AI Text2SQL Modal */}
       <Modal title={<Space><RobotOutlined />AI 自然语言生成 SQL</Space>}
-        open={aiModalOpen} onOk={handleAiGenerate} onCancel={() => setAiModalOpen(false)}
+        open={aiModalOpen} maskClosable={false} onOk={handleAiGenerate} onCancel={() => setAiModalOpen(false)}
         confirmLoading={aiLoading} okText="生成 SQL">
         <div style={{ marginTop: 16 }}>
           <div style={{ marginBottom: 8 }}>

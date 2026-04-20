@@ -395,6 +395,7 @@ export default function WorkflowTemplatePage() {
       <Modal
         title={editId ? '编辑工单模板' : '新建工单模板'}
         open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending}
@@ -488,6 +489,7 @@ export default function WorkflowTemplatePage() {
       <Drawer
         title="模板预览"
         open={previewOpen}
+        maskClosable={false}
         onClose={() => setPreviewOpen(false)}
         width={720}
       >

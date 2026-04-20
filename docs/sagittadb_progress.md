@@ -2,7 +2,7 @@
 
 > **项目路径：** `/Users/lynn/SynologyDrive/SynologyDrive/Code/SagittaDB`
 > **重构基准：** Archery v1.14.0
-> **文档版本：** v1.9 · 2026-04-19
+> **文档版本：** v1.10 · 2026-04-20
 > **状态说明：** ✅ 已完成并验证 · 🔧 已开发待测试 · 📋 待开发
 
 ---
@@ -42,7 +42,7 @@
 | Security Hardening | Token 黑名单 fail-close、SECRET_KEY 强制校验、Text2SQL 分层、依赖版本收紧 | ✅ | 100% |
 | 多级审批流 | 管理员自定义多节点审批流 + 前端管理页面 | ✅ | 100% |
 | 数据库权限管控 | is_active 启停控制、普通用户不可见禁用库、管理员标灰"已禁用" | ✅ | 100% |
-| Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ | 100% |
+| Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复、业务弹窗遮罩误关闭修复 | ✅ | 100% |
 | 授权体系 v2-lite | 角色系统（superadmin/dba/dba_group/developer）、用户组/资源组职责拆分、库级/表级授权、直属上级审批 | ✅ | 100% |
 | 密码安全策略 | 本地账号复杂度、默认/过期密码强制改密、30 天轮换、到期前 7 天提醒 | ✅ | 100% |
 
@@ -280,6 +280,7 @@
 - 新增 `/oauth/callback` 路由（OAuthCallbackPage）：自动读取 token → 调 /auth/me/ → 跳 dashboard
 - 错误时显示 oauth_error 并 3 秒后自动返回登录页
 - LDAP 登录表单保持原有方案（URL 参数 `?method=ldap` + 表单切换）
+- 业务 `Modal` / `Drawer` 统一设置 `maskClosable={false}`，避免用户误点遮罩导致表单内容丢失；右上角 `X`、`Esc` 与取消按钮仍保留正常关闭行为
 
 **测试覆盖**
 - `test_ldap_auth.py`：5 个单元测试（未启用/配置缺失/用户不存在/密码错误/库未安装）
@@ -553,4 +554,4 @@
 
 ---
 
-*文档最后更新：2026-04-13 · SagittaDB v1.0-GA + v2-lite 权限收敛与后台表格体验收口持续完成中*
+*文档最后更新：2026-04-20 · SagittaDB v1.0-GA + v2-lite 权限收敛与后台表格体验收口持续完成中*

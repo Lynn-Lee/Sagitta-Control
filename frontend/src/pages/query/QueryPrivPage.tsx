@@ -269,6 +269,7 @@ export default function QueryPrivPage() {
       </Card>
 
       <Modal title="申请查询权限" open={applyModalOpen}
+        maskClosable={false}
         onOk={handleApply} onCancel={() => setApplyModalOpen(false)}
         confirmLoading={applyMut.isPending} width={520}>
         <Form form={applyForm} layout="vertical" style={{ marginTop: 16 }}>

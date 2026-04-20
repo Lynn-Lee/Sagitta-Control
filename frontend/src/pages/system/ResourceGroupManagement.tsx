@@ -242,6 +242,7 @@ export default function ResourceGroupManagement() {
 
       {/* 新建/编辑资源组 Modal */}
       <Modal title={editId ? '编辑资源组' : '新建资源组'} open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit} onCancel={() => { setModalOpen(false); setEditRecord(null) }}
         confirmLoading={createMut.isPending || updateMut.isPending}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
@@ -293,6 +294,7 @@ export default function ResourceGroupManagement() {
       <Modal
         title={`用户组管理 — ${currentRg?.group_name || ''}`}
         open={memberModalOpen}
+        maskClosable={false}
         onOk={handleSaveMembers}
         onCancel={() => setMemberModalOpen(false)}
         confirmLoading={savingMembers}

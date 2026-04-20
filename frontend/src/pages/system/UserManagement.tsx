@@ -563,7 +563,7 @@ export default function UserManagement() {
             },
           }} />
       </Card>
-      <Modal title={editId ? '编辑用户' : '新建用户'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)}
+      <Modal title={editId ? '编辑用户' : '新建用户'} open={modalOpen} maskClosable={false} onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         okText={editId ? '保存' : '创建'} confirmLoading={createMut.isPending || updateMut.isPending} width={640}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input disabled={!!editId} /></Form.Item>
@@ -589,6 +589,7 @@ export default function UserManagement() {
       <Modal
         title="批量导入用户"
         open={importOpen}
+        maskClosable={false}
         onOk={handleImport}
         onCancel={() => { setImportOpen(false); setImportFile(null) }}
         okText="开始导入"
@@ -649,6 +650,7 @@ export default function UserManagement() {
       <Modal
         title="导入结果"
         open={importResultOpen}
+        maskClosable={false}
         onCancel={() => setImportResultOpen(false)}
         footer={[
           importResult?.failed ? (

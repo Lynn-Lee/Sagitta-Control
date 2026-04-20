@@ -565,6 +565,7 @@ const UserGroupManagement: React.FC = () => {
       <Modal
         title={editId ? '编辑用户组' : '新建用户组'}
         open={modalOpen}
+        maskClosable={false}
         onOk={() => void handleSubmit()}
         onCancel={() => { setModalOpen(false); form.resetFields(); setEditId(null) }}
         confirmLoading={createMut.isPending || updateMut.isPending}
@@ -649,6 +650,7 @@ const UserGroupManagement: React.FC = () => {
       <Modal
         title="批量导入用户组"
         open={importOpen}
+        maskClosable={false}
         onOk={handleImport}
         onCancel={() => { setImportOpen(false); setImportFile(null) }}
         okText="开始导入"
@@ -702,6 +704,7 @@ const UserGroupManagement: React.FC = () => {
       <Modal
         title="导入结果"
         open={importResultOpen}
+        maskClosable={false}
         onCancel={() => setImportResultOpen(false)}
         footer={[
           importResult?.failed ? (

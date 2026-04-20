@@ -180,6 +180,7 @@ const RoleManagement: React.FC = () => {
       <Modal
         title={editId ? '编辑角色' : '新建角色'}
         open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit}
         onCancel={() => { setModalOpen(false); form.resetFields(); setEditId(null) }}
         confirmLoading={createMut.isPending || updateMut.isPending}

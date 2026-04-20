@@ -305,6 +305,7 @@ export default function ArchivePage() {
       <Modal
         title={<Space><WarningOutlined style={{ color: '#f5222d' }} />确认执行归档</Space>}
         open={confirmOpen}
+        maskClosable={false}
         onOk={handleRun}
         onCancel={() => setConfirmOpen(false)}
         confirmLoading={runMut.isPending}

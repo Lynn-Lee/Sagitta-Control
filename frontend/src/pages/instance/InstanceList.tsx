@@ -152,6 +152,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
       />
 
       <Modal title={`添加${dbLabel}`} open={addModalOpen}
+        maskClosable={false}
         onOk={() => { if (newDbName.trim()) addMut.mutate() }}
         onCancel={() => { setAddModalOpen(false); setNewDbName(''); setNewRemark('') }}
         confirmLoading={addMut.isPending}>
@@ -330,6 +331,7 @@ export default function InstanceList() {
 
       {/* 新建/编辑实例 Modal */}
       <Modal title={editRecord ? '编辑实例' : '新建实例'} open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}>
@@ -410,6 +412,7 @@ export default function InstanceList() {
           </Space>
         }
         open={dbModalOpen}
+        maskClosable={false}
         onCancel={() => setDbModalOpen(false)}
         footer={null}
         width={700}

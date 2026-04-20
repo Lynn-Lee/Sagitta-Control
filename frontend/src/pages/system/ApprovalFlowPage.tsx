@@ -229,6 +229,7 @@ export default function ApprovalFlowPage() {
       <Drawer
         title={editId ? '编辑审批流' : '新建审批流'}
         open={drawerOpen}
+        maskClosable={false}
         onClose={() => setDrawerOpen(false)}
         width={640}
         footer={

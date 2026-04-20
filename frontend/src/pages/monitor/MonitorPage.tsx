@@ -101,6 +101,7 @@ export default function MonitorPage() {
           pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />
       </Card>
       <Modal title={editId ? '编辑采集配置' : '新建采集配置'} open={modalOpen}
+        maskClosable={false}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
