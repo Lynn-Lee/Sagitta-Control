@@ -76,7 +76,7 @@ export default function LoginPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [loginForm] = Form.useForm()
   const [forcePwForm] = Form.useForm()
-  const { setTokens, setUser, isAuthenticated, user } = useAuthStore()
+  const { setTokens, setUser, setAuthProvider, isAuthenticated, user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState('')
   const [forceChangeMode, setForceChangeMode] = useState(false)
@@ -111,8 +111,13 @@ export default function LoginPage() {
     '密码每 30 天必须修改一次',
   ]
 
-  const finishLogin = async (access_token: string, refresh_token: string) => {
+  const finishLogin = async (
+    access_token: string,
+    refresh_token: string,
+    provider: 'local' | 'ldap' = 'local',
+  ) => {
     setTokens(access_token, refresh_token)
+    setAuthProvider(provider)
     const meRes = await apiClient.get('/auth/me/', {
       headers: { Authorization: `Bearer ${access_token}` },
     })
@@ -166,7 +171,7 @@ export default function LoginPage() {
     if (!access_token || !refresh_token) {
       throw new Error('登录响应缺少 token')
     }
-    await finishLogin(access_token, refresh_token)
+    await finishLogin(access_token, refresh_token, isLdap ? 'ldap' : 'local')
   }
 
   const handleLogin = async (values: { username: string; password: string }) => {

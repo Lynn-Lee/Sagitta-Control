@@ -209,7 +209,13 @@ class OracleEngine:
         sql = """
         SELECT
             c.constraint_name,
-            c.constraint_type,
+            CASE c.constraint_type
+              WHEN 'P' THEN 'PRIMARY KEY'
+              WHEN 'U' THEN 'UNIQUE'
+              WHEN 'R' THEN 'FOREIGN KEY'
+              WHEN 'C' THEN 'CHECK'
+              ELSE c.constraint_type
+            END AS constraint_type,
             LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
             MAX(ref.table_name) AS referenced_table_name,
             LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names,
@@ -239,22 +245,53 @@ class OracleEngine:
           END,
           c.constraint_name
         """
+        fallback_sql = """
+        SELECT
+            c.constraint_name,
+            CASE c.constraint_type
+              WHEN 'P' THEN 'PRIMARY KEY'
+              WHEN 'U' THEN 'UNIQUE'
+              WHEN 'R' THEN 'FOREIGN KEY'
+              WHEN 'C' THEN 'CHECK'
+              ELSE c.constraint_type
+            END AS constraint_type,
+            LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
+            MAX(ref.table_name) AS referenced_table_name,
+            LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names,
+            COALESCE(MAX(CASE WHEN c.constraint_type = 'C' THEN c.search_condition_vc END), '') AS check_clause
+        FROM user_constraints c
+        JOIN user_cons_columns cols
+          ON c.constraint_name = cols.constraint_name
+        LEFT JOIN user_constraints ref
+          ON c.r_constraint_name = ref.constraint_name
+        LEFT JOIN user_cons_columns ref_cols
+          ON ref.constraint_name = ref_cols.constraint_name
+         AND cols.position = ref_cols.position
+        WHERE c.table_name = :table_name
+          AND c.constraint_type IN ('P', 'U', 'R', 'C')
+        GROUP BY c.constraint_name, c.constraint_type
+        ORDER BY
+          CASE c.constraint_type
+            WHEN 'P' THEN 1
+            WHEN 'U' THEN 2
+            WHEN 'R' THEN 3
+            WHEN 'C' THEN 4
+            ELSE 9
+          END,
+          c.constraint_name
+        """
         rs = await asyncio.to_thread(
             self._run_query_sync,
             sql,
             {"owner": db_name.upper(), "table_name": tb_name.upper()},
         )
-        if rs.is_success:
-            mapping = {"P": "PRIMARY KEY", "U": "UNIQUE", "R": "FOREIGN KEY", "C": "CHECK"}
-            normalized_rows = []
-            for row in rs.rows:
-                row_dict = dict(zip(rs.column_list, row, strict=False))
-                row_dict["CONSTRAINT_TYPE"] = mapping.get(
-                    str(row_dict.get("CONSTRAINT_TYPE", "")),
-                    str(row_dict.get("CONSTRAINT_TYPE", "")),
-                )
-                normalized_rows.append(row_dict)
-            rs.rows = normalized_rows
+        if not rs.is_success:
+            logger.info("oracle_constraint_query_fallback: %s", rs.error)
+            rs = await asyncio.to_thread(
+                self._run_query_sync,
+                fallback_sql,
+                {"table_name": tb_name.upper()},
+            )
         return rs
 
     async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
@@ -262,6 +299,7 @@ class OracleEngine:
         SELECT
             i.index_name,
             CASE
+              WHEN MAX(CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END) = 1 THEN 'PRIMARY KEY INDEX'
               WHEN i.uniqueness = 'UNIQUE' THEN 'UNIQUE INDEX'
               ELSE 'INDEX'
             END AS index_type,
@@ -270,32 +308,73 @@ class OracleEngine:
               WHEN COUNT(*) > 1 THEN 'YES'
               ELSE 'NO'
             END AS is_composite,
-            COALESCE(MAX(com.comments), '') AS index_comment
+            '' AS index_comment
         FROM all_indexes i
         JOIN all_ind_columns cols
           ON i.owner = cols.index_owner
          AND i.index_name = cols.index_name
          AND i.table_name = cols.table_name
-        LEFT JOIN all_ind_comments com
-          ON i.owner = com.index_owner
-         AND i.index_name = com.index_name
-         AND i.table_name = com.table_name
+        LEFT JOIN all_constraints c
+          ON c.owner = i.table_owner
+         AND c.table_name = i.table_name
+         AND c.index_name = i.index_name
+         AND c.constraint_type IN ('P', 'U')
         WHERE i.table_owner = :owner
           AND i.table_name = :table_name
         GROUP BY i.index_name, i.uniqueness
         ORDER BY
           CASE
-            WHEN i.index_name LIKE 'PK_%' THEN 1
+            WHEN MAX(CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END) = 1 THEN 1
             WHEN i.uniqueness = 'UNIQUE' THEN 2
             ELSE 3
           END,
           i.index_name
         """
-        return await asyncio.to_thread(
+        fallback_sql = """
+        SELECT
+            i.index_name,
+            CASE
+              WHEN MAX(CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END) = 1 THEN 'PRIMARY KEY INDEX'
+              WHEN i.uniqueness = 'UNIQUE' THEN 'UNIQUE INDEX'
+              ELSE 'INDEX'
+            END AS index_type,
+            LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.column_position) AS column_names,
+            CASE
+              WHEN COUNT(*) > 1 THEN 'YES'
+              ELSE 'NO'
+            END AS is_composite,
+            '' AS index_comment
+        FROM user_indexes i
+        JOIN user_ind_columns cols
+          ON i.index_name = cols.index_name
+         AND i.table_name = cols.table_name
+        LEFT JOIN user_constraints c
+          ON c.table_name = i.table_name
+         AND c.index_name = i.index_name
+         AND c.constraint_type IN ('P', 'U')
+        WHERE i.table_name = :table_name
+        GROUP BY i.index_name, i.uniqueness
+        ORDER BY
+          CASE
+            WHEN MAX(CASE WHEN c.constraint_type = 'P' THEN 1 ELSE 0 END) = 1 THEN 1
+            WHEN i.uniqueness = 'UNIQUE' THEN 2
+            ELSE 3
+          END,
+          i.index_name
+        """
+        rs = await asyncio.to_thread(
             self._run_query_sync,
             sql,
             {"owner": db_name.upper(), "table_name": tb_name.upper()},
         )
+        if not rs.is_success:
+            logger.info("oracle_index_query_fallback: %s", rs.error)
+            rs = await asyncio.to_thread(
+                self._run_query_sync,
+                fallback_sql,
+                {"table_name": tb_name.upper()},
+            )
+        return rs
 
     def query_check(self, db_name: str, sql: str) -> dict:
         result = {"msg": "", "has_star": False, "syntax_error": False}

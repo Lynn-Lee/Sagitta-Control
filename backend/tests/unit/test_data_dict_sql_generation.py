@@ -143,7 +143,31 @@ class TestOracleDataDictSql:
 
         assert "FROM all_constraints c" in captured["sql"]
         assert "JOIN all_cons_columns cols" in captured["sql"]
+        assert "CASE c.constraint_type" in captured["sql"]
         assert captured["params"] == {"owner": "HR", "table_name": "USERS"}
+
+    async def test_get_table_constraints_falls_back_to_user_constraints(self, monkeypatch):
+        engine = OracleEngine(instance=MockOracleInstance())
+        calls: list[tuple[str, dict | None]] = []
+
+        def fake_run_query_sync(sql, params=None):
+            calls.append((sql, params))
+            if len(calls) == 1:
+                return ResultSet(error="ORA-00942")
+            return ResultSet()
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+        monkeypatch.setattr("app.engines.oracle.asyncio.to_thread", fake_to_thread)
+
+        await engine.get_table_constraints("HR", "USERS")
+
+        assert "FROM all_constraints c" in calls[0][0]
+        assert calls[0][1] == {"owner": "HR", "table_name": "USERS"}
+        assert "FROM user_constraints c" in calls[1][0]
+        assert calls[1][1] == {"table_name": "USERS"}
 
     async def test_get_table_indexes_uses_all_indexes(self, monkeypatch):
         engine = OracleEngine(instance=MockOracleInstance())
@@ -164,7 +188,32 @@ class TestOracleDataDictSql:
 
         assert "FROM all_indexes i" in captured["sql"]
         assert "JOIN all_ind_columns cols" in captured["sql"]
+        assert "LEFT JOIN all_constraints c" in captured["sql"]
+        assert "PRIMARY KEY INDEX" in captured["sql"]
         assert captured["params"] == {"owner": "HR", "table_name": "USERS"}
+
+    async def test_get_table_indexes_falls_back_to_user_indexes(self, monkeypatch):
+        engine = OracleEngine(instance=MockOracleInstance())
+        calls: list[tuple[str, dict | None]] = []
+
+        def fake_run_query_sync(sql, params=None):
+            calls.append((sql, params))
+            if len(calls) == 1:
+                return ResultSet(error="ORA-00942")
+            return ResultSet()
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+        monkeypatch.setattr("app.engines.oracle.asyncio.to_thread", fake_to_thread)
+
+        await engine.get_table_indexes("HR", "USERS")
+
+        assert "FROM all_indexes i" in calls[0][0]
+        assert calls[0][1] == {"owner": "HR", "table_name": "USERS"}
+        assert "FROM user_indexes i" in calls[1][0]
+        assert calls[1][1] == {"table_name": "USERS"}
 
 
 class TestMssqlDataDictSql:

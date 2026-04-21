@@ -26,13 +26,17 @@ export interface UserInfo {
   days_until_password_expiry?: number
 }
 
+export type AuthProvider = 'local' | 'ldap' | 'dingtalk' | 'feishu' | 'wecom' | 'cas'
+
 interface AuthState {
   accessToken: string | null
   refreshToken: string | null
   user: UserInfo | null
   isAuthenticated: boolean
+  authProvider: AuthProvider | null
   setTokens: (access: string, refresh: string) => void
   setUser: (user: UserInfo) => void
+  setAuthProvider: (provider: AuthProvider | null) => void
   logout: () => void
   hasPermission: (perm: string) => boolean
 }
@@ -44,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       user: null,
       isAuthenticated: false,
+      authProvider: null,
 
       setTokens: (access, refresh) => {
         set({ accessToken: access, refreshToken: refresh, isAuthenticated: true })
@@ -51,9 +56,11 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => set({ user }),
 
+      setAuthProvider: (provider) => set({ authProvider: provider }),
+
       logout: () => set({
         accessToken: null, refreshToken: null,
-        user: null, isAuthenticated: false,
+        user: null, isAuthenticated: false, authProvider: null,
       }),
 
       hasPermission: (perm: string) => {

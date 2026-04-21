@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  Card, Col, Divider, Row, Select, Space, Spin, Table, Tag, Tooltip, Tree, Typography, message,
+  Card, Col, Divider, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Tree, Typography, message,
 } from 'antd'
 import {
   DatabaseOutlined, TableOutlined, FieldBinaryOutlined,
@@ -21,7 +21,8 @@ export default function DataDictPage() {
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [dbName, setDbName] = useState<string>('')
   const [selectedTable, setSelectedTable] = useState<string>('')
-  const [msgApi, msgCtx] = message.useMessage()
+  const [tableKeyword, setTableKeyword] = useState('')
+  const [, msgCtx] = message.useMessage()
 
   const { data: instances } = useQuery({
     queryKey: ['instances-for-dict'],
@@ -69,22 +70,85 @@ export default function DataDictPage() {
   const constraints: any[] = constraintData?.constraints || []
   const indexes: any[] = indexData?.indexes || []
 
-  const renderNoWrapText = (value: string, code = false) => {
-    const content = code
-      ? <Text code style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{value}</Text>
-      : <Text style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{value}</Text>
+  const renderNoWrapText = (
+    value?: string | number | null,
+    options?: { code?: boolean; placeholder?: string; fontSize?: number }
+  ) => {
+    const text = value === null || value === undefined || value === ''
+      ? ''
+      : String(value)
+    if (!text) {
+      return <Text type="secondary">{options?.placeholder || '—'}</Text>
+    }
+
+    const content = options?.code
+      ? (
+        <Text code style={{ fontSize: options?.fontSize || 12, whiteSpace: 'nowrap' }}>
+          {text}
+        </Text>
+      )
+      : (
+        <Text style={{ fontSize: options?.fontSize || 12, whiteSpace: 'nowrap' }}>
+          {text}
+        </Text>
+      )
     return (
-      <Tooltip title={value}>
-        {content}
+      <Tooltip title={text}>
+        <span style={{
+          display: 'block',
+          width: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {content}
+        </span>
       </Tooltip>
     )
   }
 
-  const treeData = tables.map(t => ({
+  const renderEllipsisTag = (value?: string | number | null, color = 'default') => {
+    const text = value === null || value === undefined || value === ''
+      ? '—'
+      : String(value)
+    return (
+      <Tooltip title={text}>
+        <Tag color={color} style={{
+          display: 'inline-block',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {text}
+        </Tag>
+      </Tooltip>
+    )
+  }
+
+  const filteredTables = useMemo(() => {
+    const keyword = tableKeyword.trim().toLowerCase()
+    if (!keyword) return tables
+    return tables.filter((tableName) => tableName.toLowerCase().includes(keyword))
+  }, [tableKeyword, tables])
+
+  const treeData = filteredTables.map(t => ({
     key: t, title: (
       <Space size={4}>
         <TableOutlined style={{ color: '#1558A8' }} />
-        <Text style={{ fontSize: 13 }}>{t}</Text>
+        <Tooltip title={t}>
+          <Text style={{
+            fontSize: 13,
+            display: 'inline-block',
+            maxWidth: 180,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          >
+            {t}
+          </Text>
+        </Tooltip>
       </Space>
     ),
     icon: null,
@@ -92,40 +156,20 @@ export default function DataDictPage() {
 
   const colTableCols = [
     { title: '列名', dataIndex: 'column_name', key: 'column_name', width: 220, ellipsis: true,
-      render: (v: string) => renderNoWrapText(v, true) },
+      render: (v: string) => renderNoWrapText(v, { code: true }) },
     { title: '数据类型', dataIndex: 'column_type', key: 'column_type', width: 170,
-      render: (v: string) => (
-        <Tooltip title={v}>
-          <Tag color="geekblue" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{v}</Tag>
-        </Tooltip>
-      ) },
+      render: (v: string) => renderEllipsisTag(v, 'geekblue') },
     { title: '可空', dataIndex: 'is_nullable', key: 'is_nullable', width: 70,
       render: (v: string | boolean) => {
         const nullable = v === 'YES' || v === true
         return <Tag color={nullable ? 'default' : 'red'}>{nullable ? 'YES' : 'NO'}</Tag>
       }},
     { title: '默认值', dataIndex: 'column_default', key: 'column_default', width: 180, ellipsis: true,
-      render: (v: any) => v !== null && v !== undefined
-        ? (
-          <Tooltip title={String(v)}>
-            <Text
-              code
-              style={{
-                fontSize: 11,
-                whiteSpace: 'nowrap',
-                wordBreak: 'normal',
-                overflowWrap: 'normal',
-              }}
-            >
-              {String(v)}
-            </Text>
-          </Tooltip>
-        )
+      render: (v: any) => v !== null && v !== undefined && v !== ''
+        ? renderNoWrapText(String(v), { code: true, fontSize: 11 })
         : <Text type="secondary" style={{ fontSize: 11 }}>NULL</Text> },
     { title: '注释', dataIndex: 'column_comment', key: 'column_comment', width: 560, ellipsis: true,
-      render: (v: string) => v
-        ? renderNoWrapText(v)
-        : <Text type="secondary">—</Text> },
+      render: (v: string) => renderNoWrapText(v) },
   ]
 
   const constraintTypeColors: Record<string, string> = {
@@ -147,7 +191,7 @@ export default function DataDictPage() {
       dataIndex: 'constraint_type',
       key: 'constraint_type',
       width: 120,
-      render: (v: string) => <Tag color={constraintTypeColors[v] || 'default'}>{v || '—'}</Tag>,
+      render: (v: string) => renderEllipsisTag(v || '—', constraintTypeColors[v] || 'default'),
     },
     {
       title: '约束名称',
@@ -155,9 +199,7 @@ export default function DataDictPage() {
       key: 'constraint_name',
       width: 260,
       ellipsis: true,
-      render: (v: string) => v
-        ? renderNoWrapText(v, true)
-        : <Text type="secondary">—</Text>,
+      render: (v: string) => renderNoWrapText(v, { code: true }),
     },
     {
       title: '涉及列',
@@ -165,9 +207,7 @@ export default function DataDictPage() {
       key: 'column_names',
       width: 240,
       ellipsis: true,
-      render: (v: string) => v
-        ? renderNoWrapText(v)
-        : <Text type="secondary">—</Text>,
+      render: (v: string) => renderNoWrapText(v),
     },
     {
       title: '约束定义',
@@ -175,9 +215,7 @@ export default function DataDictPage() {
       key: 'check_clause',
       width: 360,
       ellipsis: true,
-      render: (v: string) => v
-        ? renderNoWrapText(v, true)
-        : <Text type="secondary">—</Text>,
+      render: (v: string) => renderNoWrapText(v, { code: true }),
     },
     {
       title: '引用目标',
@@ -201,21 +239,21 @@ export default function DataDictPage() {
       dataIndex: 'index_type',
       key: 'index_type',
       width: 140,
-      render: (v: string) => <Tag color={indexTypeColors[v] || 'default'}>{v || '—'}</Tag>,
+      render: (v: string) => renderEllipsisTag(v || '—', indexTypeColors[v] || 'default'),
     },
     {
       title: '索引名称',
       dataIndex: 'index_name',
       key: 'index_name',
       width: 220,
-      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text>,
+      render: (v: string) => renderNoWrapText(v, { code: true }),
     },
     {
       title: '索引列',
       dataIndex: 'column_names',
       key: 'column_names',
       width: 260,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      render: (v: string) => renderNoWrapText(v),
     },
     {
       title: '联合索引',
@@ -229,7 +267,7 @@ export default function DataDictPage() {
       dataIndex: 'index_comment',
       key: 'index_comment',
       width: 220,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      render: (v: string) => renderNoWrapText(v),
     },
   ]
 
@@ -243,7 +281,7 @@ export default function DataDictPage() {
         <Space wrap>
           <Select placeholder="选择实例" style={{ minWidth: 220, maxWidth: 360 }} value={instanceId}
             popupMatchSelectWidth={false}
-            onChange={(v) => { setInstanceId(v); setDbName(''); setSelectedTable('') }}
+            onChange={(v) => { setInstanceId(v); setDbName(''); setSelectedTable(''); setTableKeyword('') }}
             showSearch optionFilterProp="label">
             {instances?.items?.map((i: any) => (
               <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}>
@@ -254,7 +292,7 @@ export default function DataDictPage() {
           </Select>
           <Select placeholder="选择数据库" style={{ minWidth: 160, maxWidth: 360 }}
             popupMatchSelectWidth={false}
-            value={dbName || undefined} onChange={(v) => { setDbName(v); setSelectedTable('') }}
+            value={dbName || undefined} onChange={(v) => { setDbName(v); setSelectedTable(''); setTableKeyword('') }}
             disabled={!instanceId} showSearch optionFilterProp="children">
             {(dbData?.items || []).map((d: any) => (
               <Option key={d.db_name} value={d.db_name} title={d.db_name}>
@@ -266,6 +304,7 @@ export default function DataDictPage() {
           {tables.length > 0 && (
             <Text type="secondary" style={{ fontSize: 12 }}>
               共 {tables.length} 张表
+              {tableKeyword.trim() && `，匹配 ${filteredTables.length} 张`}
               {selectedTable && `，已选：${selectedTable}`}
             </Text>
           )}
@@ -283,13 +322,29 @@ export default function DataDictPage() {
                 <SectionLoading text="加载表结构中..." compact />
               ) : (
                 tables.length ? (
-                  <Tree
-                    treeData={treeData}
-                    selectedKeys={selectedTable ? [selectedTable] : []}
-                    onSelect={(keys) => setSelectedTable(keys[0] as string || '')}
-                    style={{ padding: '8px 0' }}
-                    blockNode
-                  />
+                  <>
+                    <div style={{ padding: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <Input.Search
+                        allowClear
+                        placeholder="搜索表名关键字"
+                        value={tableKeyword}
+                        onChange={(e) => setTableKeyword(e.target.value)}
+                      />
+                    </div>
+                    {filteredTables.length ? (
+                      <Tree
+                        treeData={treeData}
+                        selectedKeys={selectedTable ? [selectedTable] : []}
+                        onSelect={(keys) => setSelectedTable(keys[0] as string || '')}
+                        style={{ padding: '8px 0' }}
+                        blockNode
+                      />
+                    ) : (
+                      <div style={{ padding: 24 }}>
+                        <TableEmptyState title="没有匹配的表名" />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div style={{ padding: 32 }}>
                     <TableEmptyState title="当前数据库下暂无表" />
@@ -353,7 +408,7 @@ export default function DataDictPage() {
                       locale={{ emptyText: <TableEmptyState title="当前表暂无可展示的索引信息" /> }}
                       size="small"
                       tableLayout="auto"
-                      scroll={{ x: 940 }}
+                      scroll={{ x: 980 }}
                       pagination={false}
                     />
                   </div>

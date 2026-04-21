@@ -289,6 +289,16 @@ async def get_cas_authorize_url(
     return cas_base_url + "/login?" + urllib.parse.urlencode({"service": service})
 
 
+async def get_cas_logout_url(db: AsyncSession, redirect_url: str) -> str:
+    cas_server_url = await SystemConfigService.get_value(db, "cas_server_url")
+    if not cas_server_url:
+        raise ValueError("CAS 服务器地址未配置，请在系统配置 → CAS 单点登录中填写")
+    cas_base_url = _normalize_cas_server_url(cas_server_url)
+    if not cas_base_url:
+        raise ValueError("CAS 服务器地址格式不正确")
+    return cas_base_url + "/logout?" + urllib.parse.urlencode({"service": redirect_url})
+
+
 async def handle_cas_callback(
     db: AsyncSession, ticket: str, callback_url: str
 ) -> Users:

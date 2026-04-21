@@ -135,6 +135,7 @@ describe('DataDictPage', () => {
       .mockImplementationOnce(() => [1, vi.fn()])
       .mockImplementationOnce(() => ['demo_db', vi.fn()])
       .mockImplementationOnce(() => ['users', vi.fn()])
+      .mockImplementationOnce(() => ['', vi.fn()])
 
     vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
       matches: query.includes('(min-width'),
@@ -159,6 +160,7 @@ describe('DataDictPage', () => {
     expect(screen.getAllByText('users').length).toBeGreaterThan(0)
     expect(screen.getByText('表约束')).toBeInTheDocument()
     expect(screen.getByText('索引信息')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('搜索表名关键字')).toBeInTheDocument()
 
     expect(screen.getByText('PRIMARY KEY')).toBeInTheDocument()
     expect(screen.getByText('CHECK')).toBeInTheDocument()

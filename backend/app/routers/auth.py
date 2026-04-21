@@ -171,6 +171,21 @@ async def logout(token: str = Depends(oauth2_scheme), redis=Depends(get_redis)):
     return {"status": 0, "msg": "已退出登录"}
 
 
+@router.get("/cas/logout/", summary="CAS 登出跳转", include_in_schema=False)
+async def cas_logout(request: Request, db: AsyncSession = Depends(get_db)):
+    platform_url = (await SystemConfigService.get_value(db, "platform_url")).rstrip("/")
+    if not platform_url:
+        platform_url = str(request.base_url).rstrip("/")
+    redirect_url = f"{platform_url}/login"
+
+    try:
+        logout_url = await oauth_auth.get_cas_logout_url(db, redirect_url)
+    except ValueError:
+        return RedirectResponse(redirect_url, status_code=302)
+
+    return RedirectResponse(logout_url, status_code=302)
+
+
 @router.post("/2fa/setup/", summary="生成 TOTP 密钥")
 async def setup_2fa(user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     import pyotp
@@ -439,6 +454,6 @@ async def oauth_callback(
 
     logger.info("oauth_login: provider=%s username=%s", provider, user.username)
     return RedirectResponse(
-        f"{platform_url}/oauth/callback?access_token={access_token}&refresh_token={refresh_token}",
+        f"{platform_url}/oauth/callback?access_token={access_token}&refresh_token={refresh_token}&provider={provider}",
         status_code=302,
     )

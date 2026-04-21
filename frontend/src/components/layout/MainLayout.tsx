@@ -10,6 +10,7 @@ import {
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/auth'
+import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
 
 const { Header, Sider, Content } = Layout
@@ -229,12 +230,28 @@ export default function MainLayout() {
   const [menuOpenKeys, setMenuOpenKeys] = useState<string[]>([])
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
+  const { user, logout, authProvider } = useAuthStore()
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const screens = useBreakpoint()
   const isMobile = !screens.lg
 
-  const handleLogout = () => { logout(); navigate('/login') }
+  const handleLogout = async () => {
+    const provider = authProvider
+    try {
+      await authApi.logout()
+    } catch {
+      // Best effort: local client state should still be cleared.
+    } finally {
+      logout()
+    }
+
+    if (provider === 'cas') {
+      window.location.href = '/api/v1/auth/cas/logout/'
+      return
+    }
+
+    navigate('/login')
+  }
 
   const userMenuItems: MenuProps['items'] = [
     { key: 'profile', icon: <UserOutlined />, label: '个人设置', onClick: () => navigate('/profile') },

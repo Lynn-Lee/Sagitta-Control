@@ -5,20 +5,21 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Spin, Alert } from 'antd'
-import { useAuthStore } from '@/store/auth'
+import { useAuthStore, type AuthProvider } from '@/store/auth'
 import apiClient from '@/api/client'
 import { getPostLoginPath } from '@/utils/postLogin'
 
 export default function OAuthCallbackPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { setTokens, setUser } = useAuthStore()
+  const { setTokens, setUser, setAuthProvider } = useAuthStore()
   const [errMsg, setErrMsg] = useState('')
 
   useEffect(() => {
     const accessToken  = searchParams.get('access_token')
     const refreshToken = searchParams.get('refresh_token')
     const oauthError   = searchParams.get('oauth_error')
+    const provider     = searchParams.get('provider') as AuthProvider | null
 
     if (oauthError) {
       setErrMsg(decodeURIComponent(oauthError))
@@ -36,6 +37,7 @@ export default function OAuthCallbackPage() {
       .get('/auth/me/', { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(meRes => {
         setTokens(accessToken, refreshToken)
+        setAuthProvider(provider)
         setUser(meRes.data)
         navigate(getPostLoginPath(meRes.data.permissions || []), { replace: true })
       })
