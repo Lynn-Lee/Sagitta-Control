@@ -196,6 +196,7 @@ class TestRelationalDataDictConstraints:
                         "COLUMN_NAMES": "id",
                         "REFERENCED_TABLE_NAME": None,
                         "REFERENCED_COLUMN_NAMES": None,
+                        "CHECK_CLAUSE": None,
                     }
                 ]
             )
@@ -211,6 +212,7 @@ class TestRelationalDataDictConstraints:
                 "column_names": "id",
                 "referenced_table_name": "",
                 "referenced_column_names": "",
+                "check_clause": "",
             }
         ]
 
@@ -226,8 +228,9 @@ class TestRelationalDataDictConstraints:
                     "column_names",
                     "referenced_table_name",
                     "referenced_column_names",
+                    "check_clause",
                 ],
-                rows=[("fk_orders_user", "FOREIGN KEY", "user_id", "users", "id")],
+                rows=[("fk_orders_user", "FOREIGN KEY", "user_id", "users", "id", "")],
             )
         )
         _patch_engine(monkeypatch, engine)
@@ -241,8 +244,35 @@ class TestRelationalDataDictConstraints:
                 "column_names": "user_id",
                 "referenced_table_name": "users",
                 "referenced_column_names": "id",
+                "check_clause": "",
             }
         ]
+
+    @pytest.mark.asyncio
+    async def test_pgsql_check_constraints_include_expression(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        engine = FakeEngine(
+            constraints=ResultSet(
+                rows=[
+                    {
+                        "constraint_name": "users_email_not_null",
+                        "constraint_type": "CHECK",
+                        "column_names": "email",
+                        "referenced_table_name": "",
+                        "referenced_column_names": "",
+                        "check_clause": "CHECK ((email IS NOT NULL))",
+                    }
+                ]
+            )
+        )
+        _patch_engine(monkeypatch, engine)
+
+        result = await InstanceService.get_constraints(None, 1, "demo", "users")
+
+        assert result[0]["constraint_type"] == "CHECK"
+        assert result[0]["column_names"] == "email"
+        assert result[0]["check_clause"] == "CHECK ((email IS NOT NULL))"
 
     @pytest.mark.asyncio
     async def test_oracle_constraint_type_mapping_is_preserved(self, monkeypatch: pytest.MonkeyPatch):
@@ -255,6 +285,7 @@ class TestRelationalDataDictConstraints:
                         "column_names": "EMAIL",
                         "referenced_table_name": "",
                         "referenced_column_names": "",
+                        "check_clause": "",
                     }
                 ]
             )
@@ -277,6 +308,7 @@ class TestRelationalDataDictConstraints:
                         "column_names": "id",
                         "referenced_table_name": "",
                         "referenced_column_names": "",
+                        "check_clause": "",
                     }
                 ]
             )

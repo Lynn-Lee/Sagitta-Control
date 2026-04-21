@@ -82,6 +82,12 @@ class InstanceService:
             "column_names": lowered.get("column_names") or "",
             "referenced_table_name": lowered.get("referenced_table_name") or "",
             "referenced_column_names": lowered.get("referenced_column_names") or "",
+            "check_clause": (
+                lowered.get("check_clause")
+                or lowered.get("search_condition")
+                or lowered.get("search_condition_vc")
+                or ""
+            ),
         }
 
     @staticmethod

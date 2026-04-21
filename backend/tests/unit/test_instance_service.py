@@ -81,6 +81,7 @@ class TestNormalizeConstraintRow:
             "column_names": "id",
             "referenced_table_name": "",
             "referenced_column_names": "",
+            "check_clause": "",
         }
 
     def test_tuple_constraint_row(self):
@@ -90,17 +91,19 @@ class TestNormalizeConstraintRow:
             "column_names",
             "referenced_table_name",
             "referenced_column_names",
+            "check_clause",
         ]
-        row = ("uk_user_email", "UNIQUE", "email", None, None)
+        row = ("users_email_not_null", "CHECK", "email", None, None, "CHECK ((email IS NOT NULL))")
 
         result = InstanceService._normalize_constraint_row(row, cols=cols)
 
         assert result == {
-            "constraint_name": "uk_user_email",
-            "constraint_type": "UNIQUE",
+            "constraint_name": "users_email_not_null",
+            "constraint_type": "CHECK",
             "column_names": "email",
             "referenced_table_name": "",
             "referenced_column_names": "",
+            "check_clause": "CHECK ((email IS NOT NULL))",
         }
 
 

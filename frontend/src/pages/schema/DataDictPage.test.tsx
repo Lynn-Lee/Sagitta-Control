@@ -78,13 +78,15 @@ vi.mock('@tanstack/react-query', () => ({
               column_names: 'id',
               referenced_table_name: '',
               referenced_column_names: '',
+              check_clause: '',
             },
             {
-              constraint_name: 'uk_users_email',
-              constraint_type: 'UNIQUE',
+              constraint_name: '2200_116924_10_not_null_with_a_very_long_constraint_name',
+              constraint_type: 'CHECK',
               column_names: 'email',
               referenced_table_name: '',
               referenced_column_names: '',
+              check_clause: 'CHECK ((email IS NOT NULL))',
             },
           ],
         },
@@ -159,7 +161,9 @@ describe('DataDictPage', () => {
     expect(screen.getByText('索引信息')).toBeInTheDocument()
 
     expect(screen.getByText('PRIMARY KEY')).toBeInTheDocument()
-    expect(screen.getByText('UNIQUE')).toBeInTheDocument()
+    expect(screen.getByText('CHECK')).toBeInTheDocument()
+    expect(screen.getAllByText('约束定义').length).toBeGreaterThan(0)
+    expect(screen.getByText('CHECK ((email IS NOT NULL))')).toBeInTheDocument()
     expect(screen.getByText('idx_users_email_status')).toBeInTheDocument()
     expect(screen.getByText('邮箱状态联合索引')).toBeInTheDocument()
     expect(screen.getByText('email, status')).toBeInTheDocument()
