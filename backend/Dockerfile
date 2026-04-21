@@ -1,20 +1,29 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libffi-dev \
-    libpq-dev \
-    curl \
-    unzip \
-    libaio1 \
-    procps \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    aio_pkg="libaio1"; \
+    if apt-cache show libaio1t64 >/dev/null 2>&1; then aio_pkg="libaio1t64"; fi; \
+    for attempt in 1 2 3 4 5; do \
+        apt-get update -o Acquire::Retries=5 && \
+        apt-get install -y --fix-missing --no-install-recommends -o Acquire::Retries=5 \
+            build-essential \
+            libffi-dev \
+            libpq-dev \
+            curl \
+            unzip \
+            "${aio_pkg}" \
+            procps \
+            ca-certificates && \
+        rm -rf /var/lib/apt/lists/* && \
+        break; \
+        echo "apt install failed on attempt ${attempt}, retrying..."; \
+        sleep 5; \
+    done
 
 # 可选：将 Oracle Instant Client 解压后的目录放到 backend/vendor/oracle/ 下，
 # 构建时会自动复制到镜像。Linux 下使用 Thick 模式时建议通过系统动态库路径加载。
@@ -69,7 +78,7 @@ RUN pip install --no-cache-dir \
 
 COPY . .
 
-RUN adduser -D -u 1000 appuser && chown -R appuser:appuser /app
+RUN adduser --disabled-password --gecos "" --uid 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
