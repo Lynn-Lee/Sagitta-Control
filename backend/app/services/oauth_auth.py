@@ -259,15 +259,34 @@ async def handle_wecom_callback(
 
 # ── CAS（Central Authentication Service）────────────────────
 
+def _normalize_cas_server_url(raw_url: str) -> str:
+    """Return the CAS base URL, accepting common endpoint URLs from admins."""
+    url = raw_url.strip().rstrip("/")
+    for suffix in (
+        "/p3/serviceValidate",
+        "/serviceValidate",
+        "/p3/proxyValidate",
+        "/proxyValidate",
+        "/login",
+    ):
+        if url.lower().endswith(suffix.lower()):
+            url = url[: -len(suffix)].rstrip("/")
+            break
+    return url
+
+
 async def get_cas_authorize_url(
     db: AsyncSession, callback_url: str, state: str
 ) -> str:
     cas_server_url = await SystemConfigService.get_value(db, "cas_server_url")
     if not cas_server_url:
         raise ValueError("CAS 服务器地址未配置，请在系统配置 → CAS 单点登录中填写")
+    cas_base_url = _normalize_cas_server_url(cas_server_url)
+    if not cas_base_url:
+        raise ValueError("CAS 服务器地址格式不正确")
     # 将 state 嵌入 service URL，CAS 会原样回传
     service = callback_url + "?" + urllib.parse.urlencode({"state": state})
-    return cas_server_url.rstrip("/") + "/login?" + urllib.parse.urlencode({"service": service})
+    return cas_base_url + "/login?" + urllib.parse.urlencode({"service": service})
 
 
 async def handle_cas_callback(
@@ -280,8 +299,11 @@ async def handle_cas_callback(
     username_attr = await SystemConfigService.get_value(db, "cas_username_attribute") or "user"
     if not cas_server_url:
         raise ValueError("CAS 配置不完整（服务器地址缺失）")
+    cas_base_url = _normalize_cas_server_url(cas_server_url)
+    if not cas_base_url:
+        raise ValueError("CAS 服务器地址格式不正确")
 
-    validate_url = cas_server_url.rstrip("/") + "/serviceValidate"
+    validate_url = cas_base_url + "/serviceValidate"
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(validate_url, params={"service": callback_url, "ticket": ticket})
         resp.raise_for_status()

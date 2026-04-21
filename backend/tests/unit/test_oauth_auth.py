@@ -2,6 +2,7 @@
 OAuth2 认证服务单元测试（验证配置校验逻辑，使用 mock）。
 """
 from unittest.mock import AsyncMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -84,3 +85,29 @@ async def test_wecom_authorize_url(mock_db):
         url = await oauth_auth.get_authorize_url("wecom", mock_db, "http://cb", "st3")
     assert "work.weixin.qq.com" in url
     assert "wx_corp" in url
+
+
+@pytest.mark.asyncio
+async def test_cas_authorize_url_uses_base_url(mock_db):
+    cfg = _make_config(cas_enabled="true", cas_server_url="https://cas.example.com")
+    with patch("app.services.oauth_auth.SystemConfigService.get_value",
+               side_effect=await _mock_get_value(cfg)):
+        url = await oauth_auth.get_authorize_url(
+            "cas", mock_db, "https://db.example.com/api/v1/auth/cas/callback/", "st4"
+        )
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    assert parsed.geturl().startswith("https://cas.example.com/login?")
+    assert query["service"] == ["https://db.example.com/api/v1/auth/cas/callback/?state=st4"]
+
+
+@pytest.mark.asyncio
+async def test_cas_authorize_url_normalizes_login_endpoint(mock_db):
+    cfg = _make_config(cas_enabled="true", cas_server_url="https://cas.example.com/login")
+    with patch("app.services.oauth_auth.SystemConfigService.get_value",
+               side_effect=await _mock_get_value(cfg)):
+        url = await oauth_auth.get_authorize_url(
+            "cas", mock_db, "https://db.example.com/api/v1/auth/cas/callback/", "st5"
+        )
+    assert url.startswith("https://cas.example.com/login?")
+    assert "/login/login?" not in url
