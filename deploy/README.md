@@ -31,10 +31,37 @@
 - `python-oracledb` 的默认 Thin 模式只能直连 Oracle `12.1+`
 - 连接 Oracle `11.2` 需要 Thick 模式和 Oracle Instant Client
 
+## 生产发布脚本
+
+仓库内置了一个标准生产发布脚本：`deploy/update-prod.sh`。
+
+默认行为：
+
+- 先检查 Git 跟踪文件是否干净
+- 执行数据库备份
+- 拉取当前分支最新代码
+- 重新构建 `backend / celery_worker / celery_beat / flower / frontend`
+- 执行 `alembic upgrade head`
+- 滚动拉起更新后的服务并输出状态
+
+示例：
+
+```bash
+# 按当前分支发布
+bash deploy/update-prod.sh
+
+# 发布到指定 tag / 分支 / commit
+bash deploy/update-prod.sh --ref v1.0.1
+
+# 明确知道刚做过备份时，可跳过备份
+bash deploy/update-prod.sh --skip-backup
+```
+
 ## 目录结构
 
 ```
 deploy/
+├── update-prod.sh         # 生产发布标准脚本
 ├── docker-compose.yml      # 生产部署（独立完整，不依赖根目录文件）
 ├── nginx.conf              # Nginx 反向代理配置
 ├── prometheus/

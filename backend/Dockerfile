@@ -2,10 +2,16 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+ARG APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+ARG APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 RUN set -eux; \
+    sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+    sed -i "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
     aio_pkg="libaio1"; \
     if apt-cache show libaio1t64 >/dev/null 2>&1; then aio_pkg="libaio1t64"; fi; \
     for attempt in 1 2 3 4 5; do \
@@ -37,8 +43,8 @@ RUN set -eux; \
         ldconfig; \
     fi
 
-# 升级 pip
-RUN pip install --no-cache-dir --upgrade pip
+# 升级 pip，并在默认情况下使用国内镜像加速依赖安装。
+RUN pip config set global.index-url "${PIP_INDEX_URL}" && pip install --no-cache-dir --upgrade pip
 
 # 分两步安装：先装编译依赖重的包，再装其余包
 # 这样修改业务代码时不会重新编译 C 扩展
