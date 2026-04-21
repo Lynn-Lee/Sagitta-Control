@@ -149,9 +149,14 @@ class MssqlEngine:
         SELECT
             tc.CONSTRAINT_NAME AS constraint_name,
             tc.CONSTRAINT_TYPE AS constraint_type,
-            STRING_AGG(kcu.COLUMN_NAME, ', ') WITHIN GROUP (ORDER BY kcu.ORDINAL_POSITION) AS column_names,
+            COALESCE(
+              STRING_AGG(kcu.COLUMN_NAME, ', ') WITHIN GROUP (ORDER BY kcu.ORDINAL_POSITION),
+              MAX(CASE WHEN tc.CONSTRAINT_TYPE = 'CHECK' THEN check_col.name END),
+              ''
+            ) AS column_names,
             MAX(ccu.TABLE_NAME) AS referenced_table_name,
-            STRING_AGG(ccu.COLUMN_NAME, ', ') WITHIN GROUP (ORDER BY kcu.ORDINAL_POSITION) AS referenced_column_names
+            STRING_AGG(ccu.COLUMN_NAME, ', ') WITHIN GROUP (ORDER BY kcu.ORDINAL_POSITION) AS referenced_column_names,
+            COALESCE(MAX(CASE WHEN tc.CONSTRAINT_TYPE = 'CHECK' THEN scc.definition END), '') AS check_clause
         FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
         LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
           ON tc.CONSTRAINT_CATALOG = kcu.CONSTRAINT_CATALOG
@@ -166,6 +171,14 @@ class MssqlEngine:
           ON rc.UNIQUE_CONSTRAINT_CATALOG = ccu.CONSTRAINT_CATALOG
          AND rc.UNIQUE_CONSTRAINT_SCHEMA = ccu.CONSTRAINT_SCHEMA
          AND rc.UNIQUE_CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+        LEFT JOIN sys.objects so
+          ON so.name = tc.CONSTRAINT_NAME
+         AND SCHEMA_NAME(so.schema_id) = tc.CONSTRAINT_SCHEMA
+        LEFT JOIN sys.check_constraints scc
+          ON scc.object_id = so.object_id
+        LEFT JOIN sys.columns check_col
+          ON check_col.object_id = scc.parent_object_id
+         AND check_col.column_id = scc.parent_column_id
         WHERE tc.TABLE_SCHEMA = %s AND tc.TABLE_NAME = %s
         GROUP BY tc.CONSTRAINT_NAME, tc.CONSTRAINT_TYPE
         ORDER BY

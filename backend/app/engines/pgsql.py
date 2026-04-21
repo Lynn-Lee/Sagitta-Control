@@ -144,32 +144,54 @@ class PgSQLEngine:
     ) -> ResultSet:
         schema = kwargs.get("schema", "public")
         sql = """SELECT
-                    tc.constraint_name,
-                    tc.constraint_type,
-                    string_agg(kcu.column_name, ', ' ORDER BY kcu.ordinal_position) AS column_names,
-                    MAX(ccu.table_name) AS referenced_table_name,
-                    string_agg(ccu.column_name, ', ' ORDER BY kcu.ordinal_position) AS referenced_column_names
-                 FROM information_schema.table_constraints tc
-                 LEFT JOIN information_schema.key_column_usage kcu
-                   ON tc.constraint_catalog = kcu.constraint_catalog
-                  AND tc.constraint_schema = kcu.constraint_schema
-                  AND tc.constraint_name = kcu.constraint_name
-                  AND tc.table_name = kcu.table_name
-                 LEFT JOIN information_schema.constraint_column_usage ccu
-                   ON tc.constraint_catalog = ccu.constraint_catalog
-                  AND tc.constraint_schema = ccu.constraint_schema
-                  AND tc.constraint_name = ccu.constraint_name
-                 WHERE tc.table_schema = $1 AND tc.table_name = $2
-                 GROUP BY tc.constraint_name, tc.constraint_type
+                    con.conname AS constraint_name,
+                    CASE con.contype
+                      WHEN 'p' THEN 'PRIMARY KEY'
+                      WHEN 'u' THEN 'UNIQUE'
+                      WHEN 'f' THEN 'FOREIGN KEY'
+                      WHEN 'c' THEN 'CHECK'
+                      ELSE con.contype::text
+                    END AS constraint_type,
+                    COALESCE(cols.column_names, '') AS column_names,
+                    COALESCE(ref_tbl.relname, '') AS referenced_table_name,
+                    COALESCE(ref_cols.referenced_column_names, '') AS referenced_column_names,
+                    CASE
+                      WHEN con.contype = 'c' THEN pg_get_constraintdef(con.oid, true)
+                      ELSE ''
+                    END AS check_clause
+                 FROM pg_constraint con
+                 JOIN pg_class tbl
+                   ON tbl.oid = con.conrelid
+                 JOIN pg_namespace ns
+                   ON ns.oid = tbl.relnamespace
+                 LEFT JOIN LATERAL (
+                   SELECT string_agg(att.attname, ', ' ORDER BY ck.ord) AS column_names
+                   FROM unnest(COALESCE(con.conkey, ARRAY[]::smallint[])) WITH ORDINALITY AS ck(attnum, ord)
+                   JOIN pg_attribute att
+                     ON att.attrelid = con.conrelid
+                    AND att.attnum = ck.attnum
+                 ) cols ON TRUE
+                 LEFT JOIN pg_class ref_tbl
+                   ON ref_tbl.oid = con.confrelid
+                 LEFT JOIN LATERAL (
+                   SELECT string_agg(att.attname, ', ' ORDER BY fk.ord) AS referenced_column_names
+                   FROM unnest(COALESCE(con.confkey, ARRAY[]::smallint[])) WITH ORDINALITY AS fk(attnum, ord)
+                   JOIN pg_attribute att
+                     ON att.attrelid = con.confrelid
+                    AND att.attnum = fk.attnum
+                 ) ref_cols ON TRUE
+                 WHERE ns.nspname = $1
+                   AND tbl.relname = $2
+                   AND con.contype IN ('p', 'u', 'f', 'c')
                  ORDER BY
-                   CASE tc.constraint_type
-                     WHEN 'PRIMARY KEY' THEN 1
-                     WHEN 'UNIQUE' THEN 2
-                     WHEN 'FOREIGN KEY' THEN 3
-                     WHEN 'CHECK' THEN 4
+                   CASE con.contype
+                     WHEN 'p' THEN 1
+                     WHEN 'u' THEN 2
+                     WHEN 'f' THEN 3
+                     WHEN 'c' THEN 4
                      ELSE 9
                    END,
-                   tc.constraint_name"""
+                   con.conname"""
         return await self._raw_query(db_name=db_name, sql=sql, args=[schema, tb_name])
 
     async def get_table_indexes(

@@ -153,15 +153,31 @@ export default function DataDictPage() {
       title: '约束名称',
       dataIndex: 'constraint_name',
       key: 'constraint_name',
-      width: 220,
-      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text>,
+      width: 260,
+      ellipsis: true,
+      render: (v: string) => v
+        ? renderNoWrapText(v, true)
+        : <Text type="secondary">—</Text>,
     },
     {
       title: '涉及列',
       dataIndex: 'column_names',
       key: 'column_names',
       width: 240,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      ellipsis: true,
+      render: (v: string) => v
+        ? renderNoWrapText(v)
+        : <Text type="secondary">—</Text>,
+    },
+    {
+      title: '约束定义',
+      dataIndex: 'check_clause',
+      key: 'check_clause',
+      width: 360,
+      ellipsis: true,
+      render: (v: string) => v
+        ? renderNoWrapText(v, true)
+        : <Text type="secondary">—</Text>,
     },
     {
       title: '引用目标',
@@ -170,10 +186,9 @@ export default function DataDictPage() {
       render: (_: any, record: any) => (
         record.referenced_table_name
           ? (
-            <Text style={{ fontSize: 12 }}>
-              {record.referenced_table_name}
-              {record.referenced_column_names ? ` (${record.referenced_column_names})` : ''}
-            </Text>
+            renderNoWrapText(
+              `${record.referenced_table_name}${record.referenced_column_names ? ` (${record.referenced_column_names})` : ''}`,
+            )
           )
           : <Text type="secondary">—</Text>
       ),
@@ -321,8 +336,8 @@ export default function DataDictPage() {
                       loading={constraintLoading}
                       locale={{ emptyText: <TableEmptyState title="当前表暂无可展示的约束信息" /> }}
                       size="small"
-                      tableLayout="auto"
-                      scroll={{ x: 860 }}
+                      tableLayout="fixed"
+                      scroll={{ x: 1240 }}
                       pagination={false}
                     />
 
