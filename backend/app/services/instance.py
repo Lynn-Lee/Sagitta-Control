@@ -32,10 +32,7 @@ class InstanceService:
         row: dict[str, Any] | tuple[Any, ...] | list[Any],
         cols: list[str],
     ) -> dict[str, Any]:
-        if isinstance(row, dict):
-            raw = row
-        else:
-            raw = dict(zip(cols, row, strict=False))
+        raw = row if isinstance(row, dict) else dict(zip(cols, row, strict=False))
 
         lowered = {str(key).lower(): value for key, value in raw.items()}
         normalized = {
@@ -70,10 +67,7 @@ class InstanceService:
         row: dict[str, Any] | tuple[Any, ...] | list[Any],
         cols: list[str],
     ) -> dict[str, Any]:
-        if isinstance(row, dict):
-            raw = row
-        else:
-            raw = dict(zip(cols, row, strict=False))
+        raw = row if isinstance(row, dict) else dict(zip(cols, row, strict=False))
 
         lowered = {str(key).lower(): value for key, value in raw.items()}
         return {
@@ -95,10 +89,7 @@ class InstanceService:
         row: dict[str, Any] | tuple[Any, ...] | list[Any],
         cols: list[str],
     ) -> dict[str, Any]:
-        if isinstance(row, dict):
-            raw = row
-        else:
-            raw = dict(zip(cols, row, strict=False))
+        raw = row if isinstance(row, dict) else dict(zip(cols, row, strict=False))
 
         lowered = {str(key).lower(): value for key, value in raw.items()}
         return {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Card, Empty, Form, Input, List, Modal, Select, Space, Switch, Typography, message, Alert, Table, Tag } from 'antd'
 import Editor from '@monaco-editor/react'
 import { CopyOutlined, RobotOutlined, SaveOutlined } from '@ant-design/icons'
@@ -146,11 +146,17 @@ export default function WorkflowSubmit() {
     },
   })
 
-  const instanceItems = instanceData?.items || []
+  const instanceItems = useMemo(() => instanceData?.items || [], [instanceData?.items])
   const dbItems = (dbData?.items || []) as InstanceDatabase[]
-  const flowItems = (flowData?.items || []) as ApprovalFlowListItem[]
-  const templateCategories = (templateCategoryData?.items || []) as WorkflowTemplateCategory[]
-  const templateItems = (templateData?.items || []) as WorkflowTemplateItem[]
+  const flowItems = useMemo(() => (flowData?.items || []) as ApprovalFlowListItem[], [flowData?.items])
+  const templateCategories = useMemo(
+    () => (templateCategoryData?.items || []) as WorkflowTemplateCategory[],
+    [templateCategoryData?.items]
+  )
+  const templateItems = useMemo(
+    () => (templateData?.items || []) as WorkflowTemplateItem[],
+    [templateData?.items]
+  )
   const instanceMap = useMemo(
     () => new Map<number, InstanceItem>(instanceItems.map((item) => [item.id, item])),
     [instanceItems]
@@ -168,7 +174,7 @@ export default function WorkflowSubmit() {
     [selectedTemplateId, templateItems]
   )
 
-  const applyTemplateToForm = (template: WorkflowTemplateItem) => {
+  const applyTemplateToForm = useCallback((template: WorkflowTemplateItem) => {
     form.setFieldsValue({
       workflow_name: template.template_name,
       flow_id: template.flow_id || undefined,
@@ -177,7 +183,7 @@ export default function WorkflowSubmit() {
     setInstanceId(template.instance_id || undefined)
     setDbName(template.db_name || '')
     setSyntaxType(template.syntax_type ?? 0)
-  }
+  }, [form])
 
   useEffect(() => {
     if (templateState?.id && templateState.id !== prefilledTemplateId) {
@@ -185,7 +191,7 @@ export default function WorkflowSubmit() {
       setPrefilledTemplateId(templateState.id)
       msgApi.success(`已载入模板：${templateState.template_name}`)
     }
-  }, [templateState, prefilledTemplateId, form, msgApi])
+  }, [applyTemplateToForm, msgApi, prefilledTemplateId, templateState])
 
   const handleOpenSaveTemplate = () => {
     const workflowName = form.getFieldValue('workflow_name') || ''

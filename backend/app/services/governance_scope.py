@@ -23,9 +23,7 @@ class GovernanceScopeService:
         if user.get("is_superuser") or user.get("role") in {"superadmin", "dba"}:
             return True
         permissions = set(user.get("permissions", []))
-        if domain == "query" and "query_all_instances" in permissions:
-            return True
-        return False
+        return domain == "query" and "query_all_instances" in permissions
 
     @staticmethod
     def _has_instance_scope_permission(user: dict, domain: ScopeDomain) -> bool:

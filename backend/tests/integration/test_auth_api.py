@@ -2,12 +2,12 @@
 认证模块集成测试（Pack G P0）。
 使用 ASGITransport + 测试 DB，验证完整 HTTP 请求/响应流程。
 """
+
 from io import BytesIO
 
 import pytest
 from httpx import AsyncClient
 from pyotp import TOTP
-
 
 # ── 辅助：初始化管理员 ────────────────────────────────────────
 
@@ -157,7 +157,7 @@ class TestLogin:
         csv_content = (
             "username,display_name,password\n"
             "import_user_1,导入后用户,Reset@2026B\n"
-        ).encode("utf-8")
+        ).encode()
         import_resp = await client.post(
             "/api/v1/system/users/import/",
             headers={"Authorization": f"Bearer {access}"},

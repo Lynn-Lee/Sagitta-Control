@@ -34,9 +34,9 @@ from app.core.security import (
 from app.schemas.auth import (
     ChangePasswordRequest,
     ForceChangePasswordRequest,
-    LoginTwoFAVerifyRequest,
     LdapLoginRequest,
     LoginRequest,
+    LoginTwoFAVerifyRequest,
     RefreshRequest,
     SmsCodeRequest,
     SmsLoginRequest,

@@ -290,27 +290,26 @@ class PgSQLEngine:
         start = time.monotonic()
         try:
             pool = await self._get_pool(db_name)
-            async with pool.acquire() as conn:
-                async with conn.transaction():
-                    search_path = kwargs.get("search_path")
-                    if search_path:
-                        await conn.fetchval(
-                            "SELECT set_config('search_path', $1, true)",
-                            search_path,
-                        )
+            async with pool.acquire() as conn, conn.transaction():
+                search_path = kwargs.get("search_path")
+                if search_path:
+                    await conn.fetchval(
+                        "SELECT set_config('search_path', $1, true)",
+                        search_path,
+                    )
 
-                    # 将 %(key)s 风格参数转换为 $1,$2 风格
-                    exec_sql, args = self._convert_params(sql, parameters)
-                    if limit_num > 0 and "limit" not in exec_sql.lower():
-                        exec_sql = f"{exec_sql.rstrip(';')} LIMIT {limit_num}"
-                    rows = await conn.fetch(exec_sql, *args)
-                    if rows:
-                        rs.column_list = list(rows[0].keys())
-                        rs.rows = [tuple(row.values()) for row in rows]
-                    else:
-                        rs.column_list = []
-                        rs.rows = []
-                    rs.affected_rows = len(rs.rows)
+                # 将 %(key)s 风格参数转换为 $1,$2 风格
+                exec_sql, args = self._convert_params(sql, parameters)
+                if limit_num > 0 and "limit" not in exec_sql.lower():
+                    exec_sql = f"{exec_sql.rstrip(';')} LIMIT {limit_num}"
+                rows = await conn.fetch(exec_sql, *args)
+                if rows:
+                    rs.column_list = list(rows[0].keys())
+                    rs.rows = [tuple(row.values()) for row in rows]
+                else:
+                    rs.column_list = []
+                    rs.rows = []
+                rs.affected_rows = len(rs.rows)
         except Exception as e:
             rs.error = str(e)
             logger.warning("pgsql_query_error: %s", str(e))

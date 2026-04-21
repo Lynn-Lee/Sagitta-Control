@@ -91,8 +91,8 @@ export default function WorkflowTemplatePage() {
     queryFn: () => workflowTemplateApi.list({ search: search || undefined, page_size: 100 }),
   })
 
-  const instanceItems = instances?.items || []
-  const flowItems = flows?.items || []
+  const instanceItems = useMemo(() => instances?.items || [], [instances?.items])
+  const flowItems = useMemo(() => flows?.items || [], [flows?.items])
 
   const instanceMap = useMemo(
     () => new Map<number, InstanceItem>(instanceItems.map((item) => [item.id, item])),
