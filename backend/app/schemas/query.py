@@ -116,12 +116,24 @@ class PrivApplyListResponse(BaseModel):
 class AuditPrivRequest(BaseModel):
     action: str = Field(..., description="pass 或 reject")
     remark: str = ""
+    valid_date: date | None = Field(
+        default=None,
+        description="审批通过时可调整的有效期；只能缩短，不能超过申请有效期",
+    )
 
     @field_validator("action")
     @classmethod
     def action_valid(cls, v: str) -> str:
         if v not in ("pass", "reject"):
             raise ValueError("action 必须是 pass 或 reject")
+        return v
+
+    @field_validator("valid_date")
+    @classmethod
+    def audit_valid_date_future(cls, v: date | None) -> date | None:
+        from datetime import date as d
+        if v is not None and v < d.today():
+            raise ValueError("调整后的有效期不能早于今天")
         return v
 
 
@@ -137,3 +149,7 @@ class PrivilegeItem(BaseModel):
     created_at: str
 
     model_config = {"from_attributes": True}
+
+
+class RevokePrivilegeRequest(BaseModel):
+    reason: str = Field(default="", max_length=500)

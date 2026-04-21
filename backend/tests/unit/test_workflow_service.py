@@ -224,13 +224,14 @@ class TestWorkflowListingAndDetail:
             "app.services.audit.AuditService.get_audited_workflow_ids_for_user",
             AsyncMock(return_value=set()),
         ):
-            total, items = await WorkflowService.list_workflows(
+            total, items, scope = await WorkflowService.list_workflows(
                 db,
                 {"id": 2, "username": "yanjiabao", "is_superuser": False},
                 view="audit",
             )
 
         assert total == 1
+        assert scope is None
         assert items[0]["instance_name"] == "MySQL-技术组"
         assert items[0]["current_node_name"] == "直属领导审批"
         assert items[0]["audit_chain_text"] == "直属领导审批 -> 资源组 DBA 审批"

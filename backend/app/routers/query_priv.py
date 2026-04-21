@@ -3,16 +3,17 @@
 """
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi import Query as QParam
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import current_user, require_perm
+from app.core.deps import current_user
 from app.models.instance import Instance
 from app.models.user import Users
-from app.schemas.query import AuditPrivRequest, PrivApplyRequest
+from app.schemas.query import AuditPrivRequest, PrivApplyRequest, RevokePrivilegeRequest
+from app.services.audit_log import AuditLogService
 from app.services.query_priv import QueryPrivService
 
 logger = logging.getLogger(__name__)
@@ -248,6 +249,7 @@ async def audit_apply(
         auditor=user,
         action=data.action,
         remark=data.remark,
+        valid_date_override=data.valid_date,
     )
     if data.action == "pass":
         msg = "审批通过"
@@ -260,15 +262,63 @@ async def audit_apply(
     return {"status": 0, "msg": msg, "data": {"apply_id": apply.id, "status": apply.status}}
 
 
-@router.delete(
-    "/privileges/{priv_id}/",
-    summary="撤销查询权限",
-    dependencies=[Depends(require_perm("query_mgtpriv"))],
-)
-async def revoke_privilege(
-    priv_id: int,
+@router.get("/privileges/manage/", summary="查询权限统一视角")
+async def list_manage_privileges(
+    page: int = QParam(1, ge=1),
+    page_size: int = QParam(20, ge=1, le=100),
+    instance_id: int | None = None,
+    user_id: int | None = None,
+    db_name: str | None = None,
+    status: str = QParam("active", pattern="^(active|revoked)$"),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await QueryPrivService.revoke_privilege(db, priv_id=priv_id, operator=user)
+    scope, total, items = await QueryPrivService.list_manage_privileges(
+        db=db,
+        user=user,
+        page=page,
+        page_size=page_size,
+        instance_id=instance_id,
+        user_id=user_id,
+        db_name=db_name,
+        status=status,
+    )
+    return {
+        "scope": scope,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
+    }
+
+
+@router.delete(
+    "/privileges/{priv_id}/",
+    summary="撤销查询权限",
+)
+async def revoke_privilege(
+    priv_id: int,
+    request: Request,
+    data: RevokePrivilegeRequest | None = None,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    priv = await QueryPrivService.revoke_privilege(
+        db,
+        priv_id=priv_id,
+        operator=user,
+        reason=data.reason if data else "",
+    )
+    await AuditLogService.write(
+        db,
+        user,
+        action="revoke_query_privilege",
+        module="query",
+        detail=(
+            f"撤销查询权限 #{priv.id}，用户ID={priv.user_id}，实例ID={priv.instance_id}，"
+            f"库={priv.db_name}，表={priv.table_name or '全库'}"
+        ),
+        request=request,
+        remark=data.reason if data else "",
+    )
     return {"status": 0, "msg": "权限已撤销"}

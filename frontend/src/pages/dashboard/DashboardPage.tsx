@@ -6,6 +6,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   FileDoneOutlined,
   FileTextOutlined,
   LockOutlined,
@@ -50,6 +51,7 @@ const QUERY_GOVERNANCE_COLORS = {
   masked: '#14B8A6',
   approved: '#52C41A',
   rejected: '#FA8C16',
+  revoked: '#8C8C8C',
 }
 const WORKFLOW_COLORS = {
   submit: '#1558A8',
@@ -74,6 +76,7 @@ type OverviewResponse = {
     masked_count: number[]
     approved_count: number[]
     rejected_count: number[]
+    revoked_count: number[]
     pending_stock_count: number[]
   }
   top_users?: Array<{ display_name: string; query_count: number }>
@@ -232,6 +235,7 @@ export default function DashboardPage() {
       masked_count: queryOverview.trend?.masked_count[index] ?? 0,
       approved_count: queryOverview.trend?.approved_count[index] ?? 0,
       rejected_count: queryOverview.trend?.rejected_count[index] ?? 0,
+      revoked_count: queryOverview.trend?.revoked_count[index] ?? 0,
       pending_stock_count: queryOverview.trend?.pending_stock_count[index] ?? 0,
     }))
   }, [queryOverview])
@@ -281,6 +285,7 @@ export default function DashboardPage() {
     { title: '待审批查询权限申请数', value: queryOverview?.cards?.pending_query_priv_apply_count ?? 0, icon: <LockOutlined />, color: '#fa8c16' },
     { title: `${queryRangeLabel}已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
     { title: `${queryRangeLabel}已驳回查询权限申请数`, value: queryOverview?.cards?.rejected_query_priv_apply_count ?? 0, icon: <CloseCircleOutlined />, color: '#ff4d4f' },
+    { title: `${queryRangeLabel}撤销查询权限数`, value: queryOverview?.cards?.revoked_query_privilege_count ?? 0, icon: <DeleteOutlined />, color: '#8c8c8c' },
   ]
 
   const workflowCards = [
@@ -400,6 +405,7 @@ export default function DashboardPage() {
                     <Line type="monotone" dataKey="masked_count" stroke={QUERY_GOVERNANCE_COLORS.masked} name="命中脱敏次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="approved_count" stroke={QUERY_GOVERNANCE_COLORS.approved} name="已通过申请数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="rejected_count" stroke={QUERY_GOVERNANCE_COLORS.rejected} name="已驳回申请数" strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="revoked_count" stroke={QUERY_GOVERNANCE_COLORS.revoked} name="撤销权限数" strokeWidth={2} dot={{ r: 2 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

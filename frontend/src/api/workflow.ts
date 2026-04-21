@@ -39,7 +39,7 @@ export interface WorkflowCheckResponse {
 
 export const workflowApi = {
   list: (params?: {
-    view?: 'mine' | 'audit' | 'execute'
+    view?: 'mine' | 'audit' | 'execute' | 'scope'
     status?: number
     instance_id?: number
     search?: string

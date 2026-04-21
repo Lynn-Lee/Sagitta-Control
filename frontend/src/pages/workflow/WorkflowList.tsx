@@ -12,6 +12,7 @@ import { instanceApi } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import dayjs from 'dayjs'
 
@@ -113,9 +114,10 @@ const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
 
 export default function WorkflowList() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const screens = useBreakpoint()
   const isMobile = !screens.md
-  const [activeTab, setActiveTab] = useState<'mine' | 'audit' | 'execute'>('mine')
+  const [activeTab, setActiveTab] = useState<'mine' | 'audit' | 'execute' | 'scope'>('mine')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<number | undefined>()
   const [instanceFilter, setInstanceFilter] = useState<number | undefined>()
@@ -146,6 +148,11 @@ export default function WorkflowList() {
     queryKey: ['workflows', queryParams],
     queryFn: () => workflowApi.list(queryParams),
   })
+  const { data: scopePreview } = useQuery({
+    queryKey: ['workflow-scope-preview', user?.id],
+    queryFn: () => workflowApi.list({ view: 'scope', page: 1, page_size: 1 }),
+  })
+  const showScopeTab = !!scopePreview?.scope && scopePreview.scope.mode !== 'self'
 
   const handleReset = () => {
     setSearch(''); setStatusFilter(undefined); setInstanceFilter(undefined)
@@ -219,7 +226,9 @@ export default function WorkflowList() {
       ? auditColumns
       : activeTab === 'execute'
         ? executeColumns
-        : mineColumns
+        : activeTab === 'scope'
+          ? auditColumns
+          : mineColumns
 
   const engineerPlaceholder =
     activeTab === 'audit' ? '申请人' : '提交人'
@@ -244,13 +253,14 @@ export default function WorkflowList() {
         <Tabs
           activeKey={activeTab}
           onChange={(key) => {
-            setActiveTab(key as 'mine' | 'audit' | 'execute')
+            setActiveTab(key as 'mine' | 'audit' | 'execute' | 'scope')
             setPage(1)
           }}
           items={[
             { key: 'mine', label: '我的工单' },
             { key: 'audit', label: '审批记录' },
             { key: 'execute', label: '执行记录' },
+            ...(showScopeTab ? [{ key: 'scope', label: `工单视图（${scopePreview?.scope?.label || '统一视角'}）` }] : []),
           ]}
           style={{ marginBottom: 8 }}
         />
@@ -334,7 +344,7 @@ export default function WorkflowList() {
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
-          scroll={{ x: activeTab === 'audit' ? 1680 : activeTab === 'execute' ? 1580 : 1540 }}
+          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1680 : activeTab === 'execute' ? 1580 : 1540 }}
           pagination={{
             total: data?.total,
             current: page,

@@ -7,9 +7,9 @@ v2-lite 首发口径：
 - user_group_id / resource_group_id 作为兼容位保留
 """
 
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Date, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -65,6 +65,17 @@ class QueryPrivilege(BaseModel):
     # 1=DATABASE 级 2=TABLE 级（兼容旧数据，新数据优先看 scope_type）
     priv_type: Mapped[int] = mapped_column(Integer, default=1, comment="权限粒度")
     is_deleted: Mapped[int] = mapped_column(Integer, default=0, comment="软删除标志")
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="撤销时间"
+    )
+    revoked_by_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("sql_users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="撤销人ID",
+    )
+    revoked_by_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="撤销人名称")
+    revoke_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="撤销原因")
 
     __table_args__ = (
         Index(
@@ -78,6 +89,7 @@ class QueryPrivilege(BaseModel):
         Index("ix_priv_user_group", "user_group_id"),
         Index("ix_priv_scope_type", "scope_type"),
         Index("ix_priv_resource_group", "resource_group_id"),
+        Index("ix_priv_revoked_at", "revoked_at"),
     )
 
 

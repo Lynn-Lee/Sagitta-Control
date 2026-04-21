@@ -64,6 +64,15 @@ export const queryApi = {
   listPrivileges: (instance_id?: number) =>
     apiClient.get('/query/privileges/', { params: { instance_id } }).then(r => r.data),
 
+  listManagePrivileges: (params?: {
+    page?: number
+    page_size?: number
+    instance_id?: number
+    user_id?: number
+    db_name?: string
+    status?: 'active' | 'revoked'
+  }) => apiClient.get('/query/privileges/manage/', { params }).then(r => r.data),
+
   applyPrivilege: (data: {
     title: string
     instance_id: number
@@ -84,9 +93,9 @@ export const queryApi = {
   listAuditRecords: (params?: { status?: number; page?: number; page_size?: number }) =>
     apiClient.get('/query/privileges/audit-records/', { params }).then(r => r.data),
 
-  auditApply: (apply_id: number, data: { action: 'pass' | 'reject'; remark?: string }) =>
+  auditApply: (apply_id: number, data: { action: 'pass' | 'reject'; remark?: string; valid_date?: string }) =>
     apiClient.post('/query/privileges/audit/', data, { params: { apply_id } }).then(r => r.data),
 
-  revokePrivilege: (priv_id: number) =>
-    apiClient.delete(`/query/privileges/${priv_id}/`).then(r => r.data),
+  revokePrivilege: (priv_id: number, data?: { reason?: string }) =>
+    apiClient.delete(`/query/privileges/${priv_id}/`, { data: data || {} }).then(r => r.data),
 }

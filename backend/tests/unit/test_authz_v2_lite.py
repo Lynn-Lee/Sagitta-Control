@@ -13,7 +13,8 @@ from app.core.exceptions import AppException
 from app.engines.models import ResultSet
 from app.engines.oracle import OracleEngine
 from app.schemas.approval_flow import ApprovalFlowNodeCreate
-from app.schemas.query import PrivApplyRequest
+from app.schemas.query import AuditPrivRequest, PrivApplyRequest
+from app.services.governance_scope import GovernanceScopeService
 from app.services.monitor import MonitorService
 from app.services.query_priv import QueryPrivService
 from app.services.role import BUILTIN_ROLES
@@ -87,6 +88,10 @@ class TestQueryPrivilegeSchema:
         )
         assert req.scope_type == "database"
 
+    def test_audit_valid_date_must_not_be_past(self):
+        with pytest.raises(ValidationError):
+            AuditPrivRequest(action="pass", valid_date="2000-01-01")
+
 
 class TestResourceScopedAccess:
     def test_query_access_respects_resource_group_intersection(self):
@@ -103,6 +108,73 @@ class TestResourceScopedAccess:
         instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=8)])
         user = {"resource_groups": [2, 5], "permissions": [], "is_superuser": False}
         assert MonitorService._can_access_instance(user, instance) is False
+
+
+class TestGovernanceScope:
+    @pytest.mark.asyncio
+    async def test_global_query_scope_for_query_all_instances(self):
+        scope = await GovernanceScopeService.resolve(
+            AsyncMock(),
+            {
+                "id": 7,
+                "role": "developer",
+                "permissions": ["query_all_instances"],
+                "is_superuser": False,
+            },
+            "query",
+        )
+
+        assert scope["mode"] == "global"
+        assert scope["label"] == "全量数据"
+
+    @pytest.mark.asyncio
+    async def test_resource_group_dba_scope_resolves_instance_ids(self):
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [11, 12]
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+
+        scope = await GovernanceScopeService.resolve(
+            db,
+            {
+                "id": 8,
+                "role": "dba_group",
+                "permissions": ["query_mgtpriv"],
+                "resource_groups": [2],
+                "is_superuser": False,
+            },
+            "query",
+        )
+
+        assert scope["mode"] == "instance_scope"
+        assert scope["instance_ids"] == [11, 12]
+
+    @pytest.mark.asyncio
+    async def test_group_leader_scope_includes_active_members_and_self(self):
+        group = SimpleNamespace(
+            members=[
+                SimpleNamespace(id=9, is_active=True),
+                SimpleNamespace(id=10, is_active=False),
+            ]
+        )
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [group]
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+
+        scope = await GovernanceScopeService.resolve(
+            db,
+            {
+                "id": 7,
+                "role": "developer",
+                "permissions": [],
+                "is_superuser": False,
+            },
+            "workflow",
+        )
+
+        assert scope["mode"] == "group"
+        assert scope["user_ids"] == [7, 9]
 
 
 class TestQueryPrivilegeHelpers:
@@ -179,6 +251,154 @@ class TestQueryPrivilegeHelpers:
             )
 
         assert exc_info.value.message == "请选择审批流"
+
+    @pytest.mark.asyncio
+    async def test_audit_apply_can_shorten_valid_date(self):
+        apply = SimpleNamespace(
+            id=99,
+            status=0,
+            flow_id=None,
+            audit_auth_groups_info="",
+            user_id=7,
+            user_group_id=None,
+            instance_id=1,
+            resource_group_id=None,
+            scope_type="database",
+            db_name="analytics",
+            table_name="",
+            valid_date=date(2099, 1, 31),
+            limit_num=100,
+            priv_type=1,
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = apply
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            add=MagicMock(),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        await QueryPrivService.audit_apply(
+            db=db,
+            apply_id=99,
+            auditor={"id": 1, "username": "admin", "is_superuser": True},
+            action="pass",
+            valid_date_override=date(2099, 1, 15),
+        )
+
+        assert apply.valid_date == date(2099, 1, 15)
+        assert db.add.call_args.args[0].valid_date == date(2099, 1, 15)
+
+    @pytest.mark.asyncio
+    async def test_audit_apply_rejects_extending_valid_date(self):
+        apply = SimpleNamespace(
+            id=99,
+            status=0,
+            flow_id=None,
+            audit_auth_groups_info="",
+            valid_date=date(2099, 1, 31),
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = apply
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            add=MagicMock(),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        with pytest.raises(AppException) as exc_info:
+            await QueryPrivService.audit_apply(
+                db=db,
+                apply_id=99,
+                auditor={"id": 1, "username": "admin", "is_superuser": True},
+                action="pass",
+                valid_date_override=date(2099, 2, 1),
+            )
+
+        assert exc_info.value.message == "审批调整后的有效期不能超过申请有效期"
+
+    @pytest.mark.asyncio
+    async def test_revoke_privilege_allows_owner_without_manage_permission(self):
+        priv = SimpleNamespace(id=9, user_id=7, instance_id=1, is_deleted=0)
+        priv_result = MagicMock()
+        priv_result.scalar_one_or_none.return_value = priv
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=priv_result),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        await QueryPrivService.revoke_privilege(
+            db,
+            priv_id=9,
+            operator={"id": 7, "permissions": [], "is_superuser": False},
+        )
+
+        assert priv.is_deleted == 1
+        assert priv.revoked_by_id == 7
+        assert priv.revoked_at is not None
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_revoke_privilege_allows_resource_group_dba_in_scope(self):
+        priv = SimpleNamespace(id=9, user_id=7, instance_id=1, is_deleted=0)
+        instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=2), SimpleNamespace(id=3)])
+        priv_result = MagicMock()
+        priv_result.scalar_one_or_none.return_value = priv
+        instance_result = MagicMock()
+        instance_result.scalar_one_or_none.return_value = instance
+        db = SimpleNamespace(
+            execute=AsyncMock(side_effect=[priv_result, instance_result]),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        await QueryPrivService.revoke_privilege(
+            db,
+            priv_id=9,
+            operator={
+                "id": 8,
+                "permissions": ["query_mgtpriv"],
+                "resource_groups": [3],
+                "is_superuser": False,
+            },
+        )
+
+        assert priv.is_deleted == 1
+        assert priv.revoked_by_id == 8
+        assert priv.revoked_at is not None
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_revoke_privilege_denies_resource_group_dba_out_of_scope(self):
+        priv = SimpleNamespace(id=9, user_id=7, instance_id=1, is_deleted=0)
+        instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=2)])
+        priv_result = MagicMock()
+        priv_result.scalar_one_or_none.return_value = priv
+        instance_result = MagicMock()
+        instance_result.scalar_one_or_none.return_value = instance
+        db = SimpleNamespace(
+            execute=AsyncMock(side_effect=[priv_result, instance_result]),
+            commit=AsyncMock(),
+        )
+
+        with pytest.raises(AppException) as exc_info:
+            await QueryPrivService.revoke_privilege(
+                db,
+                priv_id=9,
+                operator={
+                    "id": 8,
+                    "permissions": ["query_mgtpriv"],
+                    "resource_groups": [3],
+                    "is_superuser": False,
+                },
+            )
+
+        assert exc_info.value.message == "您没有权限撤销该查询权限"
+        assert priv.is_deleted == 0
+        db.commit.assert_not_awaited()
 
 
 class TestManagerResolution:

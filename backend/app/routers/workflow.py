@@ -27,7 +27,7 @@ router = APIRouter()
 
 @router.get("/", summary="工单列表")
 async def list_workflows(
-    view: str = QParam("mine", description="mine|audit|execute"),
+    view: str = QParam("mine", description="mine|audit|execute|scope"),
     status: int | None = None,
     instance_id: int | None = None,
     search: str | None = None,
@@ -40,13 +40,16 @@ async def list_workflows(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total, items = await WorkflowService.list_workflows(
+    total, items, scope = await WorkflowService.list_workflows(
         db, user=user, view=view, status=status, instance_id=instance_id,
         search=search, engineer=engineer, db_name=db_name,
         date_start=date_start, date_end=date_end,
         page=page, page_size=page_size,
     )
-    return {"total": total, "page": page, "page_size": page_size, "items": items}
+    payload = {"total": total, "page": page, "page_size": page_size, "items": items}
+    if scope:
+        payload["scope"] = scope
+    return payload
 
 
 @router.post("/", summary="提交工单", dependencies=[Depends(require_perm("sql_submit"))])

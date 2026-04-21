@@ -11,12 +11,12 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AppException, ConflictException, NotFoundException
 from app.models.instance import Instance, InstanceDatabase
 from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPrivilegeApply
-from app.models.query import QueryLog, QueryPrivilegeApply
-from app.models.role import UserGroup
+from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
 from app.models.user import ResourceGroup, Users
 from app.models.workflow import SqlWorkflow, WorkflowAudit, WorkflowLog, WorkflowStatus
 from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
 from app.services.audit import OP_CANCEL, OP_PASS, OP_REJECT
+from app.services.governance_scope import GovernanceScopeService
 
 logger = logging.getLogger(__name__)
 
@@ -269,73 +269,34 @@ class DashboardService:
 
     @staticmethod
     async def _resolve_query_scope(db: AsyncSession, user: dict) -> dict:
-        if user.get("is_superuser") or user.get("role") == "dba":
-            return {"mode": "global", "label": "全量数据", "user_ids": None, "instance_ids": None}
-
-        if user.get("role") == "dba_group":
-            user_rg_ids = user.get("resource_groups", [])
-            if not user_rg_ids:
-                return {"mode": "instance_scope", "label": "权限实例范围", "user_ids": None, "instance_ids": []}
-
-            result = await db.execute(
-                select(Instance.id)
-                .join(Instance.resource_groups.of_type(ResourceGroup))
-                .where(and_(Instance.is_active.is_(True), ResourceGroup.id.in_(user_rg_ids)))
-                .distinct()
-            )
-            return {
-                "mode": "instance_scope",
-                "label": "权限实例范围",
-                "user_ids": None,
-                "instance_ids": list(result.scalars().all()),
-            }
-
-        leader_groups = await db.execute(
-            select(UserGroup)
-            .options(selectinload(UserGroup.members))
-            .where(and_(UserGroup.leader_id == user["id"], UserGroup.is_active.is_(True)))
-        )
-        groups = leader_groups.scalars().all()
-        if groups:
-            user_ids = {user["id"]}
-            for group in groups:
-                user_ids.update(member.id for member in group.members if member.is_active)
-            return {
-                "mode": "group",
-                "label": "组内数据",
-                "user_ids": sorted(user_ids),
-                "instance_ids": None,
-            }
-
-        return {"mode": "self", "label": "我的数据", "user_ids": [user["id"]], "instance_ids": None}
+        return await GovernanceScopeService.resolve(db, user, "query")
 
     @staticmethod
     def _apply_query_scope(stmt, scope: dict):
-        if scope["mode"] in {"self", "group"}:
-            user_ids = scope.get("user_ids") or []
-            if not user_ids:
-                return stmt.where(QueryLog.user_id == -1)
-            return stmt.where(QueryLog.user_id.in_(user_ids))
-        if scope["mode"] == "instance_scope":
-            instance_ids = scope.get("instance_ids") or []
-            if not instance_ids:
-                return stmt.where(QueryLog.instance_id == -1)
-            return stmt.where(QueryLog.instance_id.in_(instance_ids))
-        return stmt
+        return GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=QueryLog.user_id,
+            instance_col=QueryLog.instance_id,
+        )
 
     @staticmethod
     def _apply_query_apply_scope(stmt, scope: dict):
-        if scope["mode"] in {"self", "group"}:
-            user_ids = scope.get("user_ids") or []
-            if not user_ids:
-                return stmt.where(QueryPrivilegeApply.user_id == -1)
-            return stmt.where(QueryPrivilegeApply.user_id.in_(user_ids))
-        if scope["mode"] == "instance_scope":
-            instance_ids = scope.get("instance_ids") or []
-            if not instance_ids:
-                return stmt.where(QueryPrivilegeApply.instance_id == -1)
-            return stmt.where(QueryPrivilegeApply.instance_id.in_(instance_ids))
-        return stmt
+        return GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=QueryPrivilegeApply.user_id,
+            instance_col=QueryPrivilegeApply.instance_id,
+        )
+
+    @staticmethod
+    def _apply_query_privilege_scope(stmt, scope: dict):
+        return GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=QueryPrivilege.user_id,
+            instance_col=QueryPrivilege.instance_id,
+        )
 
     @staticmethod
     async def get_query_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:
@@ -391,6 +352,17 @@ class DashboardService:
             scope,
         ).subquery()
         pending_query_priv_apply_count = await scalar(select(func.count()).select_from(pending_apply_subq))
+
+        revoked_priv_subq = DashboardService._apply_query_privilege_scope(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.revoked_at >= period_start,
+                    QueryPrivilege.is_deleted == 1,
+                )
+            ),
+            scope,
+        ).subquery()
+        revoked_query_privilege_count = await scalar(select(func.count()).select_from(revoked_priv_subq))
 
         trend_stmt = DashboardService._apply_query_scope(
             select(
@@ -466,16 +438,33 @@ class DashboardService:
         rejected_rows = (await db.execute(rejected_stmt)).all()
         rejected_map = {str(row.d): int(row.rejected_count or 0) for row in rejected_rows}
 
+        revoked_stmt = DashboardService._apply_query_privilege_scope(
+            select(
+                func.date(QueryPrivilege.revoked_at).label("d"),
+                func.count().label("revoked_count"),
+            ).where(
+                and_(
+                    QueryPrivilege.revoked_at >= period_start,
+                    QueryPrivilege.is_deleted == 1,
+                )
+            ),
+            scope,
+        ).group_by(func.date(QueryPrivilege.revoked_at))
+        revoked_rows = (await db.execute(revoked_stmt)).all()
+        revoked_map = {str(row.d): int(row.revoked_count or 0) for row in revoked_rows}
+
         failure_count: list[int] = []
         masked_count: list[int] = []
         approved_count: list[int] = []
         rejected_count: list[int] = []
+        revoked_count: list[int] = []
         pending_stock_count: list[int] = []
         for day_key in dates:
             failure_count.append(query_failure_map.get(day_key, 0) + rejected_map.get(day_key, 0))
             masked_count.append(masked_map.get(day_key, 0))
             approved_count.append(approved_map.get(day_key, 0))
             rejected_count.append(rejected_map.get(day_key, 0))
+            revoked_count.append(revoked_map.get(day_key, 0))
             day_end = datetime.fromisoformat(day_key).replace(tzinfo=UTC) + timedelta(days=1)
             pending_stock_stmt = DashboardService._apply_query_apply_scope(
                 select(QueryPrivilegeApply).where(
@@ -529,6 +518,7 @@ class DashboardService:
                 "pending_query_priv_apply_count": pending_query_priv_apply_count,
                 "approved_query_priv_apply_count": approved_query_priv_apply_count,
                 "rejected_query_priv_apply_count": apply_failure_count,
+                "revoked_query_privilege_count": revoked_query_privilege_count,
             },
             "trend": {
                 "range_label": f"最近{days}天",
@@ -539,6 +529,7 @@ class DashboardService:
                 "masked_count": masked_count,
                 "approved_count": approved_count,
                 "rejected_count": rejected_count,
+                "revoked_count": revoked_count,
                 "pending_stock_count": pending_stock_count,
             },
             "top_users": [
@@ -630,73 +621,25 @@ class DashboardService:
 
     @staticmethod
     async def _resolve_workflow_scope(db: AsyncSession, user: dict) -> dict:
-        if user.get("is_superuser") or user.get("role") == "dba":
-            return {"mode": "global", "label": "全量数据", "user_ids": None, "instance_ids": None}
-
-        if user.get("role") == "dba_group":
-            user_rg_ids = user.get("resource_groups", [])
-            if not user_rg_ids:
-                return {"mode": "instance_scope", "label": "权限实例范围", "user_ids": None, "instance_ids": []}
-
-            result = await db.execute(
-                select(Instance.id)
-                .join(Instance.resource_groups.of_type(ResourceGroup))
-                .where(and_(Instance.is_active.is_(True), ResourceGroup.id.in_(user_rg_ids)))
-                .distinct()
-            )
-            return {
-                "mode": "instance_scope",
-                "label": "权限实例范围",
-                "user_ids": None,
-                "instance_ids": list(result.scalars().all()),
-            }
-
-        leader_groups = await db.execute(
-            select(UserGroup)
-            .options(selectinload(UserGroup.members))
-            .where(and_(UserGroup.leader_id == user["id"], UserGroup.is_active.is_(True)))
-        )
-        groups = leader_groups.scalars().all()
-        if groups:
-            user_ids = {user["id"]}
-            for group in groups:
-                user_ids.update(member.id for member in group.members if member.is_active)
-            return {
-                "mode": "group",
-                "label": "组内数据",
-                "user_ids": sorted(user_ids),
-                "instance_ids": None,
-            }
-
-        return {"mode": "self", "label": "我的数据", "user_ids": [user["id"]], "instance_ids": None}
+        return await GovernanceScopeService.resolve(db, user, "workflow")
 
     @staticmethod
     def _apply_workflow_scope(stmt, scope: dict):
-        if scope["mode"] in {"self", "group"}:
-            user_ids = scope.get("user_ids") or []
-            if not user_ids:
-                return stmt.where(SqlWorkflow.engineer_id == -1)
-            return stmt.where(SqlWorkflow.engineer_id.in_(user_ids))
-        if scope["mode"] == "instance_scope":
-            instance_ids = scope.get("instance_ids") or []
-            if not instance_ids:
-                return stmt.where(SqlWorkflow.instance_id == -1)
-            return stmt.where(SqlWorkflow.instance_id.in_(instance_ids))
-        return stmt
+        return GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=SqlWorkflow.engineer_id,
+            instance_col=SqlWorkflow.instance_id,
+        )
 
     @staticmethod
     def _apply_workflow_log_scope(stmt, scope: dict):
-        if scope["mode"] in {"self", "group"}:
-            user_ids = scope.get("user_ids") or []
-            if not user_ids:
-                return stmt.where(SqlWorkflow.engineer_id == -1)
-            return stmt.where(SqlWorkflow.engineer_id.in_(user_ids))
-        if scope["mode"] == "instance_scope":
-            instance_ids = scope.get("instance_ids") or []
-            if not instance_ids:
-                return stmt.where(SqlWorkflow.instance_id == -1)
-            return stmt.where(SqlWorkflow.instance_id.in_(instance_ids))
-        return stmt
+        return GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=SqlWorkflow.engineer_id,
+            instance_col=SqlWorkflow.instance_id,
+        )
 
     @staticmethod
     async def get_workflow_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:

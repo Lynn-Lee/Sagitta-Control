@@ -18,7 +18,9 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AppException, NotFoundException
 from app.models.instance import Instance
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
+from app.models.user import Users
 from app.models.workflow import AuditStatus
+from app.services.governance_scope import GovernanceScopeService
 from app.services.masking import extract_table_refs
 
 logger = logging.getLogger(__name__)
@@ -98,6 +100,35 @@ class QueryPrivService:
         if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
             return True
         user_rg_ids = set(user.get("resource_groups", []))
+        instance_rg_ids = {rg.id for rg in instance.resource_groups}
+        return bool(user_rg_ids & instance_rg_ids)
+
+    @staticmethod
+    async def _can_revoke_privilege(
+        db: AsyncSession,
+        priv: QueryPrivilege,
+        operator: dict,
+    ) -> bool:
+        """撤销已生效查询权限：本人、资源组 DBA、全局 DBA、超管。"""
+        if GovernanceScopeService.is_global_user(operator, "query"):
+            return True
+        if priv.user_id == operator.get("id"):
+            return True
+
+        permissions = set(operator.get("permissions", []))
+        if "query_mgtpriv" not in permissions or not priv.instance_id:
+            return False
+
+        result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == priv.instance_id)
+        )
+        instance = result.scalar_one_or_none()
+        if not instance:
+            return False
+
+        user_rg_ids = set(operator.get("resource_groups", []))
         instance_rg_ids = {rg.id for rg in instance.resource_groups}
         return bool(user_rg_ids & instance_rg_ids)
 
@@ -452,6 +483,84 @@ class QueryPrivService:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_manage_privileges(
+        db: AsyncSession,
+        user: dict,
+        page: int = 1,
+        page_size: int = 20,
+        instance_id: int | None = None,
+        user_id: int | None = None,
+        db_name: str | None = None,
+        status: str = "active",
+    ) -> tuple[dict, int, list[dict]]:
+        scope = await GovernanceScopeService.resolve(db, user, "query")
+        stmt = (
+            select(QueryPrivilege, Users.username, Users.display_name, Instance.instance_name)
+            .join(Users, QueryPrivilege.user_id == Users.id)
+            .join(Instance, QueryPrivilege.instance_id == Instance.id)
+            .where(
+                and_(
+                    QueryPrivilege.user_group_id.is_(None),
+                )
+            )
+        )
+        if status == "revoked":
+            stmt = stmt.where(QueryPrivilege.is_deleted == 1)
+        else:
+            stmt = stmt.where(
+                and_(
+                    QueryPrivilege.is_deleted == 0,
+                    QueryPrivilege.valid_date >= date.today(),
+                )
+            )
+        stmt = GovernanceScopeService.apply_scope(
+            stmt,
+            scope,
+            user_col=QueryPrivilege.user_id,
+            instance_col=QueryPrivilege.instance_id,
+        )
+        if instance_id:
+            stmt = stmt.where(QueryPrivilege.instance_id == instance_id)
+        if user_id:
+            stmt = stmt.where(QueryPrivilege.user_id == user_id)
+        if db_name:
+            stmt = stmt.where(QueryPrivilege.db_name.ilike(f"%{db_name}%"))
+
+        total_q = await db.execute(select(func.count()).select_from(stmt.subquery()))
+        total = int(total_q.scalar() or 0)
+        result = await db.execute(
+            stmt.order_by(QueryPrivilege.created_at.desc(), QueryPrivilege.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        items: list[dict] = []
+        for priv, username, display_name, instance_name in result.all():
+            items.append(
+                {
+                    "id": priv.id,
+                    "user_id": priv.user_id,
+                    "user_display": display_name or username,
+                    "username": username,
+                    "instance_id": priv.instance_id,
+                    "instance_name": instance_name,
+                    "db_name": priv.db_name,
+                    "table_name": priv.table_name,
+                    "scope_type": priv.scope_type,
+                    "valid_date": priv.valid_date.isoformat(),
+                    "limit_num": priv.limit_num,
+                    "priv_type": priv.priv_type,
+                    "created_at": priv.created_at.isoformat() if priv.created_at else "",
+                    "revoked_at": priv.revoked_at.isoformat() if priv.revoked_at else "",
+                    "revoked_by_id": priv.revoked_by_id,
+                    "revoked_by_name": priv.revoked_by_name or "",
+                    "revoke_reason": priv.revoke_reason or "",
+                    "can_revoke": await QueryPrivService._can_revoke_privilege(db, priv, user),
+                }
+            )
+        return {"mode": scope["mode"], "label": scope["label"]}, total, items
+
+    @staticmethod
     async def apply_privilege(
         db: AsyncSession,
         user_id: int,
@@ -617,6 +726,7 @@ class QueryPrivService:
         auditor: dict,
         action: str,
         remark: str = "",
+        valid_date_override: date | None = None,
     ) -> QueryPrivilegeApply:
         result = await db.execute(
             select(QueryPrivilegeApply).where(QueryPrivilegeApply.id == apply_id)
@@ -636,6 +746,13 @@ class QueryPrivService:
             raise AppException("您没有查询权限审批能力", code=403)
 
         if action == "pass":
+            if valid_date_override:
+                if valid_date_override < date.today():
+                    raise AppException("调整后的有效期不能早于今天", code=400)
+                if valid_date_override > apply.valid_date:
+                    raise AppException("审批调整后的有效期不能超过申请有效期", code=400)
+                apply.valid_date = valid_date_override
+
             if apply.flow_id and apply.audit_auth_groups_info:
                 nodes = json.loads(apply.audit_auth_groups_info or "[]")
                 current_node = next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
@@ -645,6 +762,8 @@ class QueryPrivService:
                 current_node["operator"] = auditor.get("username")
                 current_node["operator_display"] = auditor.get("display_name") or auditor.get("username")
                 current_node["operated_at"] = datetime.now(UTC).isoformat()
+                if valid_date_override:
+                    current_node["adjusted_valid_date"] = valid_date_override.isoformat()
                 next_pending = next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
                 apply.audit_auth_groups_info = json.dumps(nodes, ensure_ascii=False)
                 if next_pending:
@@ -689,13 +808,28 @@ class QueryPrivService:
         return apply
 
     @staticmethod
-    async def revoke_privilege(db: AsyncSession, priv_id: int, operator: dict) -> None:
+    async def revoke_privilege(
+        db: AsyncSession,
+        priv_id: int,
+        operator: dict,
+        reason: str = "",
+    ) -> QueryPrivilege:
         result = await db.execute(select(QueryPrivilege).where(QueryPrivilege.id == priv_id))
         priv = result.scalar_one_or_none()
         if not priv:
             raise NotFoundException(f"权限 ID={priv_id} 不存在")
+        if not await QueryPrivService._can_revoke_privilege(db, priv, operator):
+            raise AppException("您没有权限撤销该查询权限", code=403)
+        if priv.is_deleted == 1:
+            raise AppException("该查询权限已撤销", code=400)
         priv.is_deleted = 1
+        priv.revoked_at = datetime.now(UTC)
+        priv.revoked_by_id = operator.get("id")
+        priv.revoked_by_name = operator.get("display_name") or operator.get("username")
+        priv.revoke_reason = reason[:500] if reason else ""
         await db.commit()
+        await db.refresh(priv)
+        return priv
 
     @staticmethod
     async def write_log(

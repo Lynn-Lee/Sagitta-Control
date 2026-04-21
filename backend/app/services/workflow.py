@@ -23,6 +23,7 @@ from app.models.workflow import (
 )
 from app.schemas.workflow import WorkflowCreateRequest
 from app.services.audit import OP_EXECUTE, AuditService
+from app.services.governance_scope import GovernanceScopeService
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +228,7 @@ class WorkflowService:
         date_end: str | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict], dict | None]:
         """
         查询工单列表。
         所有过滤条件均通过同一套 WHERE 子句构建，避免条件不一致问题。
@@ -239,6 +240,7 @@ class WorkflowService:
 
         from app.services.audit import AuditService
 
+        scope: dict | None = None
         if view == "mine":
             conditions.append(SqlWorkflow.engineer_id == user["id"])
         elif view == "audit":
@@ -253,6 +255,8 @@ class WorkflowService:
             conditions.append(SqlWorkflow.status.in_(EXECUTION_RECORD_STATUSES))
             if not user.get("is_superuser") and "sql_execute" not in user.get("permissions", []):
                 conditions.append(SqlWorkflow.engineer_id == user["id"])
+        elif view == "scope":
+            scope = await GovernanceScopeService.resolve(db, user, "workflow")
         else:
             raise AppException("不支持的工单视图类型", code=400)
 
@@ -291,6 +295,13 @@ class WorkflowService:
 
         # ── 统计总数（同一套条件）────────────────────────────
         count_stmt = select(func.count()).select_from(SqlWorkflow)
+        if scope:
+            count_stmt = GovernanceScopeService.apply_scope(
+                count_stmt,
+                scope,
+                user_col=SqlWorkflow.engineer_id,
+                instance_col=SqlWorkflow.instance_id,
+            )
         if conditions:
             count_stmt = count_stmt.where(and_(*conditions))
         total = (await db.execute(count_stmt)).scalar_one()
@@ -300,6 +311,13 @@ class WorkflowService:
             select(SqlWorkflow, Instance.instance_name)
             .outerjoin(Instance, SqlWorkflow.instance_id == Instance.id)
         )
+        if scope:
+            data_stmt = GovernanceScopeService.apply_scope(
+                data_stmt,
+                scope,
+                user_col=SqlWorkflow.engineer_id,
+                instance_col=SqlWorkflow.instance_id,
+            )
         if conditions:
             data_stmt = data_stmt.where(and_(*conditions))
         data_stmt = (
@@ -349,7 +367,8 @@ class WorkflowService:
                     operator_display_map,
                 )
             items.append(item)
-        return total, items
+        scope_payload = {"mode": scope["mode"], "label": scope["label"]} if scope else None
+        return total, items, scope_payload
 
         # ── 工单详情 ──────────────────────────────────────────────
 
