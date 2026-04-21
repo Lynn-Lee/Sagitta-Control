@@ -18,6 +18,19 @@
 | restart 策略 | `unless-stopped` | `always` |
 | Grafana SSO | 关闭 | 启用（OAuth 集成） |
 
+## Oracle 11g 额外要求
+
+如果生产环境需要连接 `Oracle 11.2` 或更早版本：
+
+- 请启用 `.env` 中的 `ORACLE_DRIVER_MODE=thick`
+- 请在构建镜像前把 Oracle Instant Client 解压到 `backend/vendor/oracle/instantclient_*`
+- 然后重新执行 `docker compose -f deploy/docker-compose.yml build backend celery_worker celery_beat flower`
+
+原因：
+
+- `python-oracledb` 的默认 Thin 模式只能直连 Oracle `12.1+`
+- 连接 Oracle `11.2` 需要 Thick 模式和 Oracle Instant Client
+
 ## 目录结构
 
 ```

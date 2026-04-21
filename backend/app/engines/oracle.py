@@ -8,17 +8,21 @@ Oracle 引擎最小可用实现。
 
 实例配置中的 db_name 对 Oracle 语义为 Service Name / PDB。
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
+import platform
 import time
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 import oracledb
 import sqlglot
 import sqlglot.expressions as exp
 
+from app.core.config import settings
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
 from app.engines.utils import normalize_engine_host, sanitize_sqlglot_error
@@ -27,6 +31,74 @@ if TYPE_CHECKING:
     from app.models.instance import Instance
 
 logger = logging.getLogger(__name__)
+_ORACLE_CLIENT_INIT_LOCK = Lock()
+_ORACLE_CLIENT_INIT_ATTEMPTED = False
+_ORACLE_CLIENT_INIT_ERROR: str | None = None
+
+
+def _build_thick_mode_error(exc: Exception) -> str:
+    return (
+        "Oracle Thick 模式初始化失败。"
+        "当前实例需要 Oracle Instant Client 才能连接低版本数据库；"
+        "请确认容器或宿主机已安装 Instant Client，并将 ORACLE_DRIVER_MODE=thick。"
+        f"原始错误: {exc}"
+    )
+
+
+def _init_oracle_client_if_needed() -> None:
+    global _ORACLE_CLIENT_INIT_ATTEMPTED, _ORACLE_CLIENT_INIT_ERROR
+
+    mode = settings.ORACLE_DRIVER_MODE.strip().lower()
+    if mode == "thin":
+        return
+
+    with _ORACLE_CLIENT_INIT_LOCK:
+        if _ORACLE_CLIENT_INIT_ATTEMPTED:
+            if _ORACLE_CLIENT_INIT_ERROR and mode == "thick":
+                raise RuntimeError(_ORACLE_CLIENT_INIT_ERROR)
+            return
+
+        _ORACLE_CLIENT_INIT_ATTEMPTED = True
+        kwargs: dict[str, str] = {}
+        config_dir = settings.ORACLE_CLIENT_CONFIG_DIR.strip()
+        lib_dir = settings.ORACLE_CLIENT_LIB_DIR.strip()
+
+        if config_dir:
+            kwargs["config_dir"] = config_dir
+
+        if lib_dir:
+            if platform.system().lower() == "linux":
+                logger.info(
+                    "oracle_client_lib_dir_ignored_on_linux lib_dir=%s",
+                    lib_dir,
+                )
+            else:
+                kwargs["lib_dir"] = lib_dir
+
+        try:
+            oracledb.init_oracle_client(**kwargs)
+            logger.info(
+                "oracle_client_initialized mode=thick config_dir=%s",
+                config_dir or "(default)",
+            )
+        except Exception as exc:
+            _ORACLE_CLIENT_INIT_ERROR = _build_thick_mode_error(exc)
+            if mode == "thick":
+                raise RuntimeError(_ORACLE_CLIENT_INIT_ERROR) from exc
+            logger.warning(
+                "oracle_client_init_failed_fallback_to_thin error=%s",
+                _ORACLE_CLIENT_INIT_ERROR,
+            )
+
+
+def _normalize_oracle_connect_error(exc: Exception) -> str:
+    message = str(exc)
+    if "DPY-3010" in message:
+        return (
+            f"{message}；当前 SagittaDB 正在使用 python-oracledb Thin 模式。"
+            "Oracle 11.2 及更早版本需安装 Instant Client，并将 ORACLE_DRIVER_MODE=thick。"
+        )
+    return message
 
 
 class OracleEngine:
@@ -45,6 +117,7 @@ class OracleEngine:
         return f"{self._host}:{self._port}/{self._service_name}"
 
     def _connect_sync(self):
+        _init_oracle_client_if_needed()
         return oracledb.connect(
             user=self._user,
             password=self._password,
@@ -66,8 +139,8 @@ class OracleEngine:
                 else:
                     rs.affected_rows = cur.rowcount or 0
         except Exception as e:
-            rs.error = str(e)
-            logger.warning("oracle_query_error: %s", str(e))
+            rs.error = _normalize_oracle_connect_error(e)
+            logger.warning("oracle_query_error: %s", rs.error)
         finally:
             if conn is not None:
                 conn.close()
@@ -110,9 +183,7 @@ class OracleEngine:
         """
         return await asyncio.to_thread(self._run_query_sync, sql, {"owner": db_name.upper()})
 
-    async def get_all_columns_by_tb(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = """
         SELECT column_name, data_type, nullable, data_default
         FROM all_tab_columns
@@ -134,16 +205,15 @@ class OracleEngine:
             return []
         return [{"table_name": row[0]} for row in rs.rows]
 
-    async def get_table_constraints(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = """
         SELECT
             c.constraint_name,
             c.constraint_type,
             LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
             MAX(ref.table_name) AS referenced_table_name,
-            LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names
+            LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names,
+            COALESCE(MAX(CASE WHEN c.constraint_type = 'C' THEN c.search_condition_vc END), '') AS check_clause
         FROM all_constraints c
         JOIN all_cons_columns cols
           ON c.owner = cols.owner
@@ -187,9 +257,7 @@ class OracleEngine:
             rs.rows = normalized_rows
         return rs
 
-    async def get_table_indexes(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = """
         SELECT
             i.index_name,
