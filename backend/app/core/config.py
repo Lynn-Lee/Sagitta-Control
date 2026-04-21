@@ -6,6 +6,7 @@
 统一使用 SystemConfig 数据库配置（通过 /api/v1/system/config 管理），
 不在此处通过环境变量配置（方便运行时修改，无需重启服务）。
 """
+
 from typing import Literal
 
 from pydantic import model_validator
@@ -57,6 +58,11 @@ class Settings(BaseSettings):
     GO_INCEPTION_HOST: str = ""
     GO_INCEPTION_PORT: int = 4000
 
+    # ─── Oracle 驱动模式（11g 需 Thick 模式）──────────────────
+    ORACLE_DRIVER_MODE: Literal["auto", "thin", "thick"] = "auto"
+    ORACLE_CLIENT_LIB_DIR: str = ""
+    ORACLE_CLIENT_CONFIG_DIR: str = ""
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         _default_key = "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS"
@@ -65,9 +71,10 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "生产环境禁止使用默认 SECRET_KEY，"
                     "请设置环境变量 SECRET_KEY 为至少 32 字符的随机字符串。\n"
-                    "生成命令：python -c \"import secrets; print(secrets.token_hex(32))\""
+                    '生成命令：python -c "import secrets; print(secrets.token_hex(32))"'
                 )
             import warnings
+
             warnings.warn(
                 "SECRET_KEY 使用默认值，请在生产环境中替换！",
                 stacklevel=2,

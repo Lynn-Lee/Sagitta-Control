@@ -45,6 +45,29 @@ docker compose exec backend alembic upgrade head
 # Flower：     http://localhost:5555
 ```
 
+## Oracle 11g 连接说明
+
+SagittaDB 的 Oracle 驱动基于 `python-oracledb`。如果目标库是 `Oracle 11.2` 或更早版本，必须启用 Thick 模式并提供 Oracle Instant Client；仅用默认 Thin 模式会报 `DPY-3010`。
+
+推荐做法：
+
+```bash
+# 1. 将 Oracle Instant Client 解压到后端构建上下文
+# 例如：backend/vendor/oracle/instantclient_19_27/
+
+# 2. 在 .env 中启用 Thick 模式
+ORACLE_DRIVER_MODE=thick
+
+# 3. 重新构建并启动
+docker compose build backend celery_worker celery_beat flower
+docker compose up -d
+```
+
+补充说明：
+
+- Linux 容器中通常不需要额外设置 `ORACLE_CLIENT_LIB_DIR`；镜像构建时会自动把 `/opt/oracle/instantclient` 加入动态库搜索路径。
+- 如果你的 Oracle 是 `12.1+`，可以继续使用 `ORACLE_DRIVER_MODE=thin` 或默认的 `auto`。
+
 ## 目录结构
 
 ```

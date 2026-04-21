@@ -1,14 +1,32 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Alpine 用 apk，不依赖 Debian apt 源
-RUN apk add --no-cache \
-    gcc \
-    musl-dev \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libffi-dev \
-    postgresql-dev \
-    curl
+    libpq-dev \
+    curl \
+    unzip \
+    libaio1 \
+    procps \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 可选：将 Oracle Instant Client 解压后的目录放到 backend/vendor/oracle/ 下，
+# 构建时会自动复制到镜像。Linux 下使用 Thick 模式时建议通过系统动态库路径加载。
+COPY vendor/oracle/ /opt/oracle/
+
+RUN set -eux; \
+    if find /opt/oracle -maxdepth 1 -type d -name 'instantclient*' | grep -q .; then \
+        client_dir="$(find /opt/oracle -maxdepth 1 -type d -name 'instantclient*' | head -n1)"; \
+        ln -sfn "$client_dir" /opt/oracle/instantclient; \
+        printf '%s\n' /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle-instantclient.conf; \
+        ldconfig; \
+    fi
 
 # 升级 pip
 RUN pip install --no-cache-dir --upgrade pip
