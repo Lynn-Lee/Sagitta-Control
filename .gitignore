@@ -45,6 +45,8 @@ frontend/build/
 *~
 .DS_Store
 Thumbs.db
+AGENTS.md
+CLAUDE.md
 
 # ─── Docker ───────────────────────────────────────────────────
 *.log
@@ -52,6 +54,7 @@ Thumbs.db
 # ─── 本地上传/下载 ────────────────────────────────────────────
 backend/downloads/
 backend/app/uploads/
+backend/celerybeat-schedule
 
 # ─── Alembic ──────────────────────────────────────────────────
 # 版本文件需要提交，这里不忽略
