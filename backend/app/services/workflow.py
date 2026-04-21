@@ -21,8 +21,8 @@ from app.models.workflow import (
     WorkflowAudit,
     WorkflowStatus,
 )
-from app.schemas.workflow import WorkflowCreateRequest
-from app.services.audit import OP_EXECUTE, AuditService
+from app.schemas.workflow import WorkflowCreateRequest, WorkflowExecuteRequest
+from app.services.audit import OP_EXECUTE, OP_TIMING, AuditService
 from app.services.governance_scope import GovernanceScopeService
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,17 @@ class WorkflowService:
             "audit_auth_groups": wf.audit_auth_groups,
             "run_date_start": wf.run_date_start.isoformat() if wf.run_date_start else None,
             "run_date_end": wf.run_date_end.isoformat() if wf.run_date_end else None,
+            "execute_mode": getattr(wf, "execute_mode", None),
+            "scheduled_execute_at": (
+                wf.scheduled_execute_at.isoformat() if getattr(wf, "scheduled_execute_at", None) else None
+            ),
+            "executed_by_id": getattr(wf, "executed_by_id", None),
+            "executed_by_name": getattr(wf, "executed_by_name", None),
+            "external_executed_at": (
+                wf.external_executed_at.isoformat() if getattr(wf, "external_executed_at", None) else None
+            ),
+            "external_result_status": getattr(wf, "external_result_status", None),
+            "external_result_remark": getattr(wf, "external_result_remark", None),
             "finish_time": wf.finish_time.isoformat() if wf.finish_time else None,
             "created_at": wf.created_at.isoformat() if wf.created_at else "",
             "current_node_name": "—",
@@ -439,8 +450,12 @@ class WorkflowService:
         db: AsyncSession,
         workflow_id: int,
         operator: dict,
-        mode: str = "auto",
+        data: WorkflowExecuteRequest | None = None,
+        mode: str | None = None,
     ) -> dict:
+        if data is None:
+            data = WorkflowExecuteRequest(mode=mode or "immediate")
+
         result = await db.execute(
             select(SqlWorkflow)
             .options(selectinload(SqlWorkflow.content))
@@ -455,24 +470,156 @@ class WorkflowService:
                 f"工单状态为【{STATUS_DESC.get(wf.status,'未知')}】，不能执行", code=400
             )
 
+        if data.mode == "scheduled":
+            return await WorkflowService._schedule_execution(db, wf, operator, data)
+        if data.mode == "external":
+            return await WorkflowService._record_external_execution(db, wf, operator, data)
+
+        return await WorkflowService._execute_immediately(db, wf, operator)
+
+    @staticmethod
+    def _operator_display(operator: dict) -> str:
+        return operator.get("display_name") or operator.get("username") or str(operator.get("id", ""))
+
+    @staticmethod
+    def _ensure_aware_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    @staticmethod
+    async def _get_workflow_audit(db: AsyncSession, workflow_id: int) -> WorkflowAudit | None:
+        audit_result = await db.execute(
+            select(WorkflowAudit).where(WorkflowAudit.workflow_id == workflow_id)
+        )
+        return audit_result.scalar_one_or_none()
+
+    @staticmethod
+    async def _write_execution_log(
+        db: AsyncSession,
+        workflow_id: int,
+        operator: dict,
+        operation_type: str,
+        remark: str,
+    ) -> None:
+        audit = await WorkflowService._get_workflow_audit(db, workflow_id)
+        if audit:
+            await AuditService._write_log(db, audit.id, operator, operation_type, remark=remark)
+
+    @staticmethod
+    async def _execute_immediately(
+        db: AsyncSession,
+        wf: SqlWorkflow,
+        operator: dict,
+    ) -> dict:
         # 更新为队列中
+        wf.execute_mode = "immediate"
+        wf.executed_by_id = operator.get("id")
+        wf.executed_by_name = WorkflowService._operator_display(operator)
+        wf.scheduled_execute_at = None
         wf.status = WorkflowStatus.QUEUING
+        await WorkflowService._write_execution_log(
+            db,
+            wf.id,
+            operator,
+            OP_EXECUTE,
+            remark="DBA 确认立即平台执行，已加入执行队列",
+        )
         await db.commit()
 
         # 提交 Celery 任务
         try:
             from app.tasks.execute_sql import execute_workflow_task
-            task = execute_workflow_task.delay(workflow_id, operator.get("id"))
+            task = execute_workflow_task.delay(wf.id, operator.get("id"))
             return {
                 "msg": "已加入执行队列",
                 "task_id": task.id,
-                "workflow_id": workflow_id,
+                "workflow_id": wf.id,
             }
         except Exception as e:
             # Celery 不可用时降级为同步执行
             logger.warning("celery_unavailable, executing sync: %s", str(e))
             await WorkflowService._execute_sync(db, wf, operator)
-            return {"msg": "执行完成（同步模式）", "workflow_id": workflow_id}
+            return {"msg": "执行完成（同步模式）", "workflow_id": wf.id}
+
+    @staticmethod
+    async def _schedule_execution(
+        db: AsyncSession,
+        wf: SqlWorkflow,
+        operator: dict,
+        data: WorkflowExecuteRequest,
+    ) -> dict:
+        scheduled_at = data.scheduled_at or data.timing_time
+        if scheduled_at is None:
+            raise AppException("请选择预约执行时间", code=400)
+        scheduled_at = WorkflowService._ensure_aware_utc(scheduled_at)
+        if scheduled_at <= datetime.now(UTC):
+            raise AppException("预约执行时间必须晚于当前时间", code=400)
+
+        wf.execute_mode = "scheduled"
+        wf.scheduled_execute_at = scheduled_at
+        wf.executed_by_id = operator.get("id")
+        wf.executed_by_name = WorkflowService._operator_display(operator)
+        wf.status = WorkflowStatus.TIMING_TASK
+        await WorkflowService._write_execution_log(
+            db,
+            wf.id,
+            operator,
+            OP_TIMING,
+            remark=f"DBA 预约平台执行，预约时间：{scheduled_at.isoformat()}",
+        )
+        await db.commit()
+        return {
+            "msg": "已预约定时执行",
+            "workflow_id": wf.id,
+            "scheduled_execute_at": scheduled_at.isoformat(),
+        }
+
+    @staticmethod
+    async def _record_external_execution(
+        db: AsyncSession,
+        wf: SqlWorkflow,
+        operator: dict,
+        data: WorkflowExecuteRequest,
+    ) -> dict:
+        if data.external_executed_at is None:
+            raise AppException("请填写外部实际执行时间", code=400)
+        if not data.external_status:
+            raise AppException("请选择外部执行结果", code=400)
+        remark = (data.external_remark or "").strip()
+        if not remark:
+            raise AppException("请填写外部执行结果备注", code=400)
+
+        executed_at = WorkflowService._ensure_aware_utc(data.external_executed_at)
+        wf.execute_mode = "external"
+        wf.executed_by_id = operator.get("id")
+        wf.executed_by_name = WorkflowService._operator_display(operator)
+        wf.external_executed_at = executed_at
+        wf.external_result_status = data.external_status
+        wf.external_result_remark = remark
+        wf.finish_time = executed_at
+        wf.status = WorkflowStatus.FINISH if data.external_status == "success" else WorkflowStatus.EXCEPTION
+        if wf.content:
+            wf.content.execute_result = json.dumps(
+                {
+                    "mode": "external",
+                    "success": data.external_status == "success",
+                    "status": data.external_status,
+                    "executed_at": executed_at.isoformat(),
+                    "operator": wf.executed_by_name,
+                    "remark": remark,
+                },
+                ensure_ascii=False,
+            )
+        await WorkflowService._write_execution_log(
+            db,
+            wf.id,
+            operator,
+            OP_EXECUTE,
+            remark=f"DBA 登记外部已执行，结果：{data.external_status}，备注：{remark}",
+        )
+        await db.commit()
+        return {"msg": "外部执行结果已登记", "workflow_id": wf.id, "status": wf.status}
 
     @staticmethod
     async def _execute_sync(

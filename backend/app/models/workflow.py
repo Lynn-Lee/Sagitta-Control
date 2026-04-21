@@ -96,6 +96,27 @@ class SqlWorkflow(BaseModel):
     run_date_end: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="可执行时间窗口结束"
     )
+    execute_mode: Mapped[str | None] = mapped_column(
+        String(20), comment="执行方式：immediate/scheduled/external"
+    )
+    scheduled_execute_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="预约平台执行时间"
+    )
+    executed_by_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sql_users.id", ondelete="SET NULL"), nullable=True, comment="执行决策人ID"
+    )
+    executed_by_name: Mapped[str | None] = mapped_column(
+        String(100), comment="执行决策人名称"
+    )
+    external_executed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="外部实际执行时间"
+    )
+    external_result_status: Mapped[str | None] = mapped_column(
+        String(20), comment="外部执行结果：success/failed"
+    )
+    external_result_remark: Mapped[str | None] = mapped_column(
+        String(500), comment="外部执行结果备注"
+    )
     finish_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="实际执行完成时间"
     )
@@ -121,6 +142,7 @@ class SqlWorkflow(BaseModel):
         Index("ix_workflow_status", "status"),
         Index("ix_workflow_engineer", "engineer_id"),
         Index("ix_workflow_instance", "instance_id"),
+        Index("ix_workflow_scheduled_execute", "status", "scheduled_execute_at"),
         Index("ix_workflow_tenant", "tenant_id"),
     )
 

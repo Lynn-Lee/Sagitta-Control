@@ -23,6 +23,10 @@ sys.modules.setdefault(
     "celery",
     SimpleNamespace(Celery=_FakeCelery),
 )
+sys.modules.setdefault(
+    "celery.schedules",
+    SimpleNamespace(crontab=lambda *args, **kwargs: ("crontab", args, kwargs)),
+)
 
 WorkflowStatus = importlib.import_module("app.models.workflow").WorkflowStatus
 execute_sql_task_module = importlib.import_module("app.tasks.execute_sql")
@@ -88,7 +92,10 @@ class TestExecuteAsync:
             instance_id=8,
             db_name="testdb",
             content=SimpleNamespace(sql_content="select 1", execute_result=None),
-            status=None,
+            status=WorkflowStatus.QUEUING,
+            execute_mode=None,
+            executed_by_id=None,
+            executed_by_name=None,
             finish_time=None,
         )
         db = AsyncMock()
@@ -116,7 +123,10 @@ class TestExecuteAsync:
             instance_id=9,
             db_name="analytics",
             content=SimpleNamespace(sql_content="select 1", execute_result=None),
-            status=None,
+            status=WorkflowStatus.QUEUING,
+            execute_mode=None,
+            executed_by_id=None,
+            executed_by_name=None,
             finish_time=None,
         )
         operator_user = SimpleNamespace(username="dba_user")
@@ -156,7 +166,10 @@ class TestExecuteAsync:
             instance_id=9,
             db_name="analytics",
             content=SimpleNamespace(sql_content="delete from orders", execute_result=None),
-            status=None,
+            status=WorkflowStatus.QUEUING,
+            execute_mode=None,
+            executed_by_id=None,
+            executed_by_name=None,
             finish_time=None,
         )
         db = AsyncMock()
@@ -180,4 +193,45 @@ class TestExecuteAsync:
         assert workflow.content.execute_result == '{"error": "sql failed"}'
         assert workflow.finish_time is not None
         assert db.commit.await_count == 2
+        engine.dispose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_async_skips_non_executable_status(self):
+        workflow = SimpleNamespace(id=7, status=WorkflowStatus.REVIEW_PASS)
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=MagicMock(return_value=workflow)))
+        engine = SimpleNamespace(dispose=AsyncMock())
+
+        with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
+            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        ):
+            await execute_sql_task_module._execute_async(7, 2)
+
+        db.commit.assert_not_awaited()
+        engine.dispose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_dispatch_scheduled_async_enqueues_due_workflows(self):
+        workflow = SimpleNamespace(
+            id=8,
+            engineer_id=3,
+            executed_by_id=9,
+            status=WorkflowStatus.TIMING_TASK,
+            execute_mode="scheduled",
+        )
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [workflow]
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+        engine = SimpleNamespace(dispose=AsyncMock())
+
+        with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
+            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        ), patch.object(execute_sql_task_module.execute_workflow_task, "delay", create=True) as delay_mock:
+            dispatched = await execute_sql_task_module._dispatch_scheduled_async()
+
+        assert dispatched == 1
+        assert workflow.status == WorkflowStatus.QUEUING
+        delay_mock.assert_called_once_with(8, 9)
+        db.commit.assert_awaited_once()
         engine.dispose.assert_awaited_once()

@@ -27,6 +27,19 @@ def execute_workflow_task(self, workflow_id: int, operator_id: int):
         raise
 
 
+@celery_app.task(bind=True, name="dispatch_scheduled_workflows", max_retries=0, queue="execute")
+def dispatch_scheduled_workflows_task(self):
+    """扫描到期的预约工单并投递执行任务。"""
+    logger.info("dispatch_scheduled_workflows start")
+    try:
+        dispatched = asyncio.run(_dispatch_scheduled_async())
+        logger.info("dispatch_scheduled_workflows done: dispatched=%s", dispatched)
+        return dispatched
+    except Exception as e:
+        logger.error("dispatch_scheduled_workflows failed: error=%s", str(e))
+        raise
+
+
 async def _execute_async(workflow_id: int, operator_id: int):
     """异步执行逻辑。"""
     from sqlalchemy import select
@@ -55,6 +68,15 @@ async def _execute_async(workflow_id: int, operator_id: int):
         wf = result.scalar_one_or_none()
         if not wf:
             logger.error("workflow not found: %s", workflow_id)
+            await engine.dispose()
+            return
+        if wf.status not in (WorkflowStatus.QUEUING, WorkflowStatus.TIMING_TASK):
+            logger.warning(
+                "workflow status is not executable: workflow_id=%s status=%s",
+                workflow_id,
+                wf.status,
+            )
+            await engine.dispose()
             return
 
         # 加载操作人
@@ -70,9 +92,13 @@ async def _execute_async(workflow_id: int, operator_id: int):
         if not inst:
             wf.status = WorkflowStatus.EXCEPTION
             await db.commit()
+            await engine.dispose()
             return
 
         # 更新为执行中
+        wf.execute_mode = wf.execute_mode or "immediate"
+        wf.executed_by_id = wf.executed_by_id or operator_id
+        wf.executed_by_name = wf.executed_by_name or (user.username if user else "system")
         wf.status = WorkflowStatus.EXECUTING
         await db.commit()
 
@@ -109,3 +135,45 @@ async def _execute_async(workflow_id: int, operator_id: int):
         await db.commit()
 
     await engine.dispose()
+
+
+async def _dispatch_scheduled_async(limit: int = 50) -> int:
+    """投递已到预约时间的 SQL 工单。"""
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import settings
+    from app.models.workflow import SqlWorkflow, WorkflowStatus
+
+    importlib.import_module("app.models")
+
+    engine = create_async_engine(settings.DATABASE_URL)
+    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    now = datetime.now(UTC)
+    dispatched = 0
+
+    async with async_session_local() as db:
+        stmt = (
+            select(SqlWorkflow)
+            .where(
+                SqlWorkflow.status == WorkflowStatus.TIMING_TASK,
+                SqlWorkflow.scheduled_execute_at.is_not(None),
+                SqlWorkflow.scheduled_execute_at <= now,
+            )
+            .order_by(SqlWorkflow.scheduled_execute_at.asc(), SqlWorkflow.id.asc())
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await db.execute(stmt)
+        workflows = result.scalars().all()
+        for wf in workflows:
+            operator_id = wf.executed_by_id or wf.engineer_id
+            wf.status = WorkflowStatus.QUEUING
+            wf.execute_mode = "scheduled"
+            execute_workflow_task.delay(wf.id, operator_id)
+            dispatched += 1
+        await db.commit()
+
+    await engine.dispose()
+    return dispatched

@@ -142,7 +142,7 @@ async def execute_workflow(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await WorkflowService.execute(db, workflow_id, operator=user, mode=data.mode)
+    result = await WorkflowService.execute(db, workflow_id, operator=user, data=data)
     return {"status": 0, **result}
 
 

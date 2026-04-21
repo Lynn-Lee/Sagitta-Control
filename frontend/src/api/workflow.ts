@@ -11,7 +11,15 @@ export interface WorkflowItem {
   engineer_display: string
   status: number
   status_desc: string
+  execute_mode?: string | null
+  scheduled_execute_at?: string | null
+  executed_by_id?: number | null
+  executed_by_name?: string | null
+  external_executed_at?: string | null
+  external_result_status?: string | null
+  external_result_remark?: string | null
   created_at: string
+  finish_time?: string | null
   current_node_name?: string
   audit_chain_text?: string
 }
@@ -62,7 +70,13 @@ export const workflowApi = {
   audit: (id: number, data: { action: 'pass' | 'reject'; remark?: string }) =>
     apiClient.post(`/workflow/${id}/audit/`, data).then(r => r.data),
 
-  execute: (id: number, data?: { mode?: string }) =>
+  execute: (id: number, data?: {
+    mode?: 'immediate' | 'scheduled' | 'external'
+    scheduled_at?: string
+    external_executed_at?: string
+    external_status?: 'success' | 'failed'
+    external_remark?: string
+  }) =>
     apiClient.post(`/workflow/${id}/execute/`, data || {}).then(r => r.data),
 
   cancel: (id: number) =>

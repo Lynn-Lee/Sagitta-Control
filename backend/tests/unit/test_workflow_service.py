@@ -11,7 +11,7 @@ import pytest
 
 from app.core.exceptions import AppException
 from app.models.workflow import AuditStatus, WorkflowStatus, WorkflowType
-from app.schemas.workflow import WorkflowCreateRequest
+from app.schemas.workflow import WorkflowCreateRequest, WorkflowExecuteRequest
 from app.services.workflow import WorkflowService
 
 
@@ -82,6 +82,13 @@ class TestFmtWorkflow:
         wf.run_date_start = None
         wf.run_date_end = None
         wf.finish_time = None
+        wf.execute_mode = None
+        wf.scheduled_execute_at = None
+        wf.executed_by_id = None
+        wf.executed_by_name = None
+        wf.external_executed_at = None
+        wf.external_result_status = None
+        wf.external_result_remark = None
         wf.export_format = None
         wf.created_at = datetime(2026, 1, 1)
         wf.updated_at = datetime(2026, 1, 1)
@@ -192,6 +199,13 @@ class TestWorkflowListingAndDetail:
             audit_auth_groups="1",
             run_date_start=None,
             run_date_end=None,
+            execute_mode=None,
+            scheduled_execute_at=None,
+            executed_by_id=None,
+            executed_by_name=None,
+            external_executed_at=None,
+            external_result_status=None,
+            external_result_remark=None,
             finish_time=None,
             created_at=datetime(2026, 4, 18, tzinfo=UTC),
             content=None,
@@ -291,6 +305,133 @@ class TestWorkflowListingAndDetail:
 
 
 class TestWorkflowExecuteSync:
+    def _execute_workflow(self, **overrides):
+        wf = SimpleNamespace(
+            id=10,
+            instance_id=8,
+            db_name="ump_testdb",
+            content=SimpleNamespace(sql_content="delete from t", execute_result=None),
+            status=WorkflowStatus.REVIEW_PASS,
+            execute_mode=None,
+            scheduled_execute_at=None,
+            executed_by_id=None,
+            executed_by_name=None,
+            external_executed_at=None,
+            external_result_status=None,
+            external_result_remark=None,
+            finish_time=None,
+        )
+        for key, value in overrides.items():
+            setattr(wf, key, value)
+        return wf
+
+    @pytest.mark.asyncio
+    async def test_schedule_execution_sets_timing_task_and_logs(self):
+        db = AsyncMock()
+        db.add = MagicMock()
+        wf = self._execute_workflow()
+        audit = SimpleNamespace(id=99)
+        db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=audit)))
+        scheduled_at = datetime(2099, 1, 1, 10, 0, tzinfo=UTC)
+
+        result = await WorkflowService._schedule_execution(
+            db,
+            wf,
+            {"id": 7, "username": "dba", "display_name": "DBA"},
+            WorkflowExecuteRequest(mode="scheduled", scheduled_at=scheduled_at),
+        )
+
+        assert wf.status == WorkflowStatus.TIMING_TASK
+        assert wf.execute_mode == "scheduled"
+        assert wf.scheduled_execute_at == scheduled_at
+        assert wf.executed_by_id == 7
+        assert wf.executed_by_name == "DBA"
+        assert result["scheduled_execute_at"] == scheduled_at.isoformat()
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_schedule_execution_rejects_past_time(self):
+        db = AsyncMock()
+        db.add = MagicMock()
+        wf = self._execute_workflow()
+
+        with pytest.raises(AppException, match="预约执行时间必须晚于当前时间"):
+            await WorkflowService._schedule_execution(
+                db,
+                wf,
+                {"id": 7, "username": "dba"},
+                WorkflowExecuteRequest(mode="scheduled", scheduled_at=datetime(2000, 1, 1, tzinfo=UTC)),
+            )
+
+    @pytest.mark.asyncio
+    async def test_record_external_execution_success_finishes_workflow(self):
+        db = AsyncMock()
+        db.add = MagicMock()
+        wf = self._execute_workflow()
+        audit = SimpleNamespace(id=99)
+        db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=audit)))
+        executed_at = datetime(2026, 4, 21, 10, 0, tzinfo=UTC)
+
+        result = await WorkflowService._record_external_execution(
+            db,
+            wf,
+            {"id": 7, "username": "dba", "display_name": "DBA"},
+            WorkflowExecuteRequest(
+                mode="external",
+                external_executed_at=executed_at,
+                external_status="success",
+                external_remark="已在堡垒机执行，影响 3 行",
+            ),
+        )
+
+        assert wf.status == WorkflowStatus.FINISH
+        assert wf.finish_time == executed_at
+        assert wf.execute_mode == "external"
+        assert wf.external_result_status == "success"
+        assert "堡垒机" in wf.content.execute_result
+        assert result["status"] == WorkflowStatus.FINISH
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_record_external_execution_failure_marks_exception(self):
+        db = AsyncMock()
+        wf = self._execute_workflow()
+        db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+        executed_at = datetime(2026, 4, 21, 10, 0, tzinfo=UTC)
+
+        await WorkflowService._record_external_execution(
+            db,
+            wf,
+            {"id": 7, "username": "dba"},
+            WorkflowExecuteRequest(
+                mode="external",
+                external_executed_at=executed_at,
+                external_status="failed",
+                external_remark="执行失败，等待回滚",
+            ),
+        )
+
+        assert wf.status == WorkflowStatus.EXCEPTION
+        assert wf.external_result_status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_record_external_execution_requires_remark(self):
+        db = AsyncMock()
+        wf = self._execute_workflow()
+
+        with pytest.raises(AppException, match="请填写外部执行结果备注"):
+            await WorkflowService._record_external_execution(
+                db,
+                wf,
+                {"id": 7, "username": "dba"},
+                WorkflowExecuteRequest(
+                    mode="external",
+                    external_executed_at=datetime(2026, 4, 21, 10, 0, tzinfo=UTC),
+                    external_status="success",
+                    external_remark=" ",
+                ),
+            )
+
     @pytest.mark.asyncio
     async def test_execute_sync_marks_missing_instance_as_exception(self):
         db = AsyncMock()

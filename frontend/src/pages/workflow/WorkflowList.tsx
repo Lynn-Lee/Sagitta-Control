@@ -112,6 +112,26 @@ const renderStatus = (s: number, r: any) => (
 
 const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
 
+const EXECUTION_MODE_LABEL: Record<string, string> = {
+  immediate: '立即',
+  scheduled: '定时',
+  external: '外部',
+}
+
+const renderExecutionInfo = (_: unknown, r: any) => {
+  if (!r.execute_mode) return <Text type="secondary">待决策</Text>
+  const color = r.execute_mode === 'external' ? 'purple' : r.execute_mode === 'scheduled' ? 'warning' : 'blue'
+  return (
+    <Space size={4} direction="vertical">
+      <Tag color={color} style={{ width: 'fit-content', marginInlineEnd: 0 }}>
+        {EXECUTION_MODE_LABEL[r.execute_mode] || r.execute_mode}
+      </Tag>
+      {r.scheduled_execute_at && <Text type="secondary" style={{ fontSize: 12 }}>{renderDate(r.scheduled_execute_at)}</Text>}
+      {r.external_executed_at && <Text type="secondary" style={{ fontSize: 12 }}>{renderDate(r.external_executed_at)}</Text>}
+    </Space>
+  )
+}
+
 export default function WorkflowList() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -206,6 +226,7 @@ export default function WorkflowList() {
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
     { title: '提交人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
+    { title: '执行方式', key: 'execute_mode', width: 130, render: renderExecutionInfo },
     {
       title: '完成时间',
       dataIndex: 'finish_time',
@@ -344,7 +365,7 @@ export default function WorkflowList() {
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
-          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1680 : activeTab === 'execute' ? 1580 : 1540 }}
+          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1680 : activeTab === 'execute' ? 1710 : 1540 }}
           pagination={{
             total: data?.total,
             current: page,

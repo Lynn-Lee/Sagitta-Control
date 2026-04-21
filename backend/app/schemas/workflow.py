@@ -40,8 +40,28 @@ class WorkflowAuditRequest(BaseModel):
 
 
 class WorkflowExecuteRequest(BaseModel):
-    mode: str = Field(default="auto", description="auto=立即执行 manual=手动执行")
-    timing_time: datetime | None = None
+    mode: str = Field(default="immediate", description="immediate=立即执行 scheduled=定时执行 external=外部已执行")
+    scheduled_at: datetime | None = Field(default=None, description="预约平台执行时间")
+    timing_time: datetime | None = Field(default=None, description="兼容旧字段：预约平台执行时间")
+    external_executed_at: datetime | None = Field(default=None, description="外部实际执行时间")
+    external_status: str | None = Field(default=None, description="success 或 failed")
+    external_remark: str | None = Field(default=None, max_length=500, description="外部执行结果备注")
+
+    @field_validator("mode")
+    @classmethod
+    def mode_valid(cls, v: str) -> str:
+        aliases = {"auto": "immediate", "manual": "external", "timing": "scheduled"}
+        normalized = aliases.get(v, v)
+        if normalized not in ("immediate", "scheduled", "external"):
+            raise ValueError("mode 必须是 immediate、scheduled 或 external")
+        return normalized
+
+    @field_validator("external_status")
+    @classmethod
+    def external_status_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("success", "failed"):
+            raise ValueError("external_status 必须是 success 或 failed")
+        return v
 
 
 class WorkflowItem(BaseModel):
@@ -60,6 +80,13 @@ class WorkflowItem(BaseModel):
     run_date_start: str | None
     run_date_end: str | None
     finish_time: str | None
+    execute_mode: str | None = None
+    scheduled_execute_at: str | None = None
+    executed_by_id: int | None = None
+    executed_by_name: str | None = None
+    external_executed_at: str | None = None
+    external_result_status: str | None = None
+    external_result_remark: str | None = None
     created_at: str
 
     model_config = {"from_attributes": True}
@@ -82,6 +109,13 @@ class WorkflowDetailResponse(BaseModel):
     run_date_start: str | None
     run_date_end: str | None
     finish_time: str | None
+    execute_mode: str | None = None
+    scheduled_execute_at: str | None = None
+    executed_by_id: int | None = None
+    executed_by_name: str | None = None
+    external_executed_at: str | None = None
+    external_result_status: str | None = None
+    external_result_remark: str | None = None
     created_at: str
     sql_content: str = ""
     review_content: str = ""

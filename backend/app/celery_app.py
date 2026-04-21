@@ -2,6 +2,7 @@
 Celery 应用配置。
 """
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -42,5 +43,11 @@ celery_app.conf.update(
     # Worker 并发
     worker_prefetch_multiplier=1,  # execute 队列逐条处理，防止堆积
     # Beat 定时任务（Sprint 5 添加监控采集调度）
-    beat_schedule={},
+    beat_schedule={
+        "dispatch-scheduled-workflows-every-minute": {
+            "task": "dispatch_scheduled_workflows",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "execute"},
+        },
+    },
 )
