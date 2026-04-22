@@ -1,23 +1,49 @@
 import { useMemo, useState } from 'react'
 import {
-  Card, Col, Divider, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Tree, Typography, message,
+  Button, Card, Col, Collapse, Divider, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Tree, Typography, message,
 } from 'antd'
 import {
-  DatabaseOutlined, TableOutlined, FieldBinaryOutlined,
+  DatabaseOutlined, TableOutlined, FieldBinaryOutlined, KeyOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { instanceApi } from '@/api/instance'
+import type { InstanceDatabase } from '@/api/instance'
 import apiClient from '@/api/client'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionLoading from '@/components/common/SectionLoading'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text } = Typography
 const { Option } = Select
 
+function normalizeConstraintExpr(value?: string | null) {
+  return String(value || '')
+    .replace(/^CHECK\s*/i, '')
+    .replace(/[()"`[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+function isColumnNotNullCheck(constraint: any) {
+  if (constraint?.constraint_type !== 'CHECK') return false
+  const columnNames = String(constraint?.column_names || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  if (columnNames.length !== 1) return false
+  const normalizedColumn = columnNames[0].replace(/["`[\]]/g, '').trim().toUpperCase()
+  const normalizedClause = normalizeConstraintExpr(constraint?.check_clause)
+  return normalizedClause === `${normalizedColumn} IS NOT NULL`
+}
+
 export default function DataDictPage() {
+  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [dbName, setDbName] = useState<string>('')
   const [selectedTable, setSelectedTable] = useState<string>('')
@@ -29,19 +55,19 @@ export default function DataDictPage() {
     queryFn: () => instanceApi.list({ page_size: 200 }),
   })
 
-  const { data: dbData } = useQuery({
+  const { data: dbData, error: dbDataError } = useQuery({
     queryKey: ['registered-dbs-dict', instanceId],
-    queryFn: () => instanceApi.listRegisteredDbs(instanceId!),
+    queryFn: () => instanceApi.getDatabases(instanceId!),
     enabled: !!instanceId,
   })
 
-  const { data: tableData, isLoading: tableLoading } = useQuery({
+  const { data: tableData, isLoading: tableLoading, error: tableDataError } = useQuery({
     queryKey: ['tables-dict', instanceId, dbName],
     queryFn: () => apiClient.get(`/instances/${instanceId}/tables/`, { params: { db_name: dbName } }).then(r => r.data),
     enabled: !!instanceId && !!dbName,
   })
 
-  const { data: columnData, isLoading: colLoading } = useQuery({
+  const { data: columnData, isLoading: colLoading, error: columnDataError } = useQuery({
     queryKey: ['columns-dict', instanceId, dbName, selectedTable],
     queryFn: () => apiClient.get(`/instances/${instanceId}/columns/`, {
       params: { db_name: dbName, tb_name: selectedTable }
@@ -49,7 +75,7 @@ export default function DataDictPage() {
     enabled: !!instanceId && !!dbName && !!selectedTable,
   })
 
-  const { data: constraintData, isLoading: constraintLoading } = useQuery({
+  const { data: constraintData, isLoading: constraintLoading, error: constraintDataError } = useQuery({
     queryKey: ['constraints-dict', instanceId, dbName, selectedTable],
     queryFn: () => apiClient.get(`/instances/${instanceId}/constraints/`, {
       params: { db_name: dbName, tb_name: selectedTable }
@@ -57,7 +83,7 @@ export default function DataDictPage() {
     enabled: !!instanceId && !!dbName && !!selectedTable,
   })
 
-  const { data: indexData, isLoading: indexLoading } = useQuery({
+  const { data: indexData, isLoading: indexLoading, error: indexDataError } = useQuery({
     queryKey: ['indexes-dict', instanceId, dbName, selectedTable],
     queryFn: () => apiClient.get(`/instances/${instanceId}/indexes/`, {
       params: { db_name: dbName, tb_name: selectedTable }
@@ -69,6 +95,14 @@ export default function DataDictPage() {
   const columns: any[] = columnData?.columns || []
   const constraints: any[] = constraintData?.constraints || []
   const indexes: any[] = indexData?.indexes || []
+  const dbAccessDenied = (dbDataError as any)?.response?.status === 403
+  const objectAccessDenied = [tableDataError, columnDataError, constraintDataError, indexDataError]
+    .some((error) => (error as any)?.response?.status === 403)
+  const canSelectDisabledDb = !!user?.is_superuser || !!user?.permissions?.includes('query_all_instances')
+  const visibleConstraints = useMemo(
+    () => constraints.filter((constraint) => !isColumnNotNullCheck(constraint)),
+    [constraints],
+  )
 
   const renderNoWrapText = (
     value?: string | number | null,
@@ -154,6 +188,91 @@ export default function DataDictPage() {
     icon: null,
   }))
 
+  const decoratedColumns = useMemo(() => {
+    const badgeMap = new Map<string, Array<{ key: string; label: string; color: string; icon?: 'key'; tooltip?: string }>>()
+    const pushBadge = (
+      columnName: string,
+      badge: { key: string; label: string; color: string; icon?: 'key'; tooltip?: string },
+    ) => {
+      if (!columnName) return
+      const current = badgeMap.get(columnName) || []
+      if (!current.some((item) => item.key === badge.key)) {
+        current.push(badge)
+        badgeMap.set(columnName, current)
+      }
+    }
+
+    constraints.forEach((constraint) => {
+      const columnNames = String(constraint.column_names || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      if (constraint.constraint_type === 'PRIMARY KEY' && columnNames.length === 1) {
+        pushBadge(columnNames[0], { key: 'primary-key', label: '主键', color: 'red', icon: 'key' })
+      }
+      if (constraint.constraint_type === 'UNIQUE' && columnNames.length === 1) {
+        pushBadge(columnNames[0], { key: 'unique', label: '唯一', color: 'gold' })
+      }
+      if (constraint.constraint_type === 'UNIQUE' && columnNames.length > 1) {
+        const groupKey = `composite-unique:${columnNames.join('|')}`
+        const tooltip = `参与联合唯一约束：${columnNames.join(', ')}`
+        columnNames.forEach((columnName) => {
+          pushBadge(columnName, {
+            key: groupKey,
+            label: '联合唯一',
+            color: 'gold',
+            tooltip,
+          })
+        })
+      }
+    })
+
+    indexes.forEach((index) => {
+      const columnNames = String(index.column_names || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      if (index.index_type === 'UNIQUE INDEX' && columnNames.length === 1) {
+        pushBadge(columnNames[0], { key: 'unique-index', label: '唯一索引', color: 'gold' })
+      }
+      if (index.index_type === 'UNIQUE INDEX' && columnNames.length > 1) {
+        const groupKey = `composite-unique:${columnNames.join('|')}`
+        const tooltip = `参与联合唯一索引：${columnNames.join(', ')}`
+        columnNames.forEach((columnName) => {
+          pushBadge(columnName, {
+            key: groupKey,
+            label: '联合唯一',
+            color: 'gold',
+            tooltip,
+          })
+        })
+      }
+    })
+
+    return columns.map((column, index) => {
+      const badges = [...(badgeMap.get(column.column_name) || [])]
+      const pushLocalBadge = (badge: { key: string; label: string; color: string; icon?: 'key'; tooltip?: string }) => {
+        if (!badges.some((item) => item.key === badge.key)) {
+          badges.push(badge)
+        }
+      }
+      if (column.column_key === 'PRI') {
+        pushLocalBadge({ key: 'primary-key', label: '主键', color: 'red', icon: 'key' })
+      }
+      if (column.column_key === 'UNI') {
+        pushLocalBadge({ key: 'unique', label: '唯一', color: 'gold' })
+      }
+      const normalizedNullable = String(column.is_nullable || '').toUpperCase()
+      if (normalizedNullable === 'NO' || normalizedNullable === 'N' || column.is_nullable === false) {
+        badges.push({ key: 'not-null', label: '非空', color: 'volcano' })
+      }
+      const dedupedBadges = badges.filter(
+        (badge, badgeIndex) => badges.findIndex((item) => item.key === badge.key) === badgeIndex,
+      )
+      return { key: index, ...column, badges: dedupedBadges }
+    })
+  }, [columns, constraints, indexes])
+
   const colTableCols = [
     { title: '列名', dataIndex: 'column_name', key: 'column_name', width: 220, ellipsis: true,
       render: (v: string) => renderNoWrapText(v, { code: true }) },
@@ -168,6 +287,20 @@ export default function DataDictPage() {
       render: (v: any) => v !== null && v !== undefined && v !== ''
         ? renderNoWrapText(String(v), { code: true, fontSize: 11 })
         : <Text type="secondary" style={{ fontSize: 11 }}>NULL</Text> },
+    { title: '约束标记', dataIndex: 'badges', key: 'badges', width: 260,
+      render: (badges: Array<{ key: string; label: string; color: string; icon?: 'key'; tooltip?: string }>) => (
+        badges?.length ? (
+          <Space size={[6, 6]} wrap>
+            {badges.map((badge) => (
+              <Tooltip key={badge.key} title={badge.tooltip}>
+                <Tag color={badge.color} icon={badge.icon === 'key' ? <KeyOutlined /> : undefined}>
+                  {badge.label}
+                </Tag>
+              </Tooltip>
+            ))}
+          </Space>
+        ) : <Text type="secondary">—</Text>
+      ) },
     { title: '注释', dataIndex: 'column_comment', key: 'column_comment', width: 560, ellipsis: true,
       render: (v: string) => renderNoWrapText(v) },
   ]
@@ -294,9 +427,16 @@ export default function DataDictPage() {
             popupMatchSelectWidth={false}
             value={dbName || undefined} onChange={(v) => { setDbName(v); setSelectedTable(''); setTableKeyword('') }}
             disabled={!instanceId} showSearch optionFilterProp="children">
-            {(dbData?.items || []).map((d: any) => (
-              <Option key={d.db_name} value={d.db_name} title={d.db_name}>
-                {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}
+            {(dbData?.databases || []).map((dbItem: InstanceDatabase) => (
+              <Option
+                key={dbItem.db_name}
+                value={dbItem.db_name}
+                title={dbItem.db_name}
+                disabled={!dbItem.is_active && !canSelectDisabledDb}
+              >
+                {dbItem.db_name}
+                {!dbItem.is_active && <Tag color="default" style={{ marginLeft: 4, fontSize: 10 }}>已禁用</Tag>}
+                {dbItem.remark ? <Text type="secondary" style={{ fontSize: 11 }}> ({dbItem.remark})</Text> : null}
               </Option>
             ))}
           </Select>
@@ -311,7 +451,33 @@ export default function DataDictPage() {
         </Space>
       </FilterCard>
 
-      {dbName && (
+      {instanceId && dbAccessDenied && !dbName && (
+        <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+          <div style={{ padding: '48px 0', textAlign: 'center' }}>
+            <DatabaseOutlined style={{ fontSize: 40, color: '#8c8c8c', marginBottom: 12 }} />
+            <div style={{ fontSize: 15, marginBottom: 8 }}>暂无数据字典访问权限</div>
+            <Text type="secondary">
+              该实例的数据字典需要先申请相同范围的查询权限，审批通过后会自动继承结构查看权限。
+            </Text>
+            <div style={{ marginTop: 16 }}>
+              <Button
+                type="primary"
+                onClick={() => navigate('/query/privileges', {
+                  state: {
+                    openApply: true,
+                    instanceId,
+                    scopeType: 'instance',
+                  },
+                })}
+              >
+                申请查询权限
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {dbName && !objectAccessDenied && (
         <Row gutter={16}>
           {/* 表列表 */}
           <Col xs={24} md={6}>
@@ -369,7 +535,7 @@ export default function DataDictPage() {
               {selectedTable ? (
                 <>
                   <Table
-                    dataSource={columns.map((c, i) => ({ key: i, ...c }))}
+                    dataSource={decoratedColumns}
                     columns={colTableCols}
                     loading={colLoading}
                     locale={{ emptyText: <TableEmptyState title="暂无字段信息" /> }}
@@ -381,19 +547,31 @@ export default function DataDictPage() {
 
                   <div style={{ padding: '0 16px 16px' }}>
                     <Divider style={{ margin: '12px 0 16px' }} />
-                    <Space style={{ marginBottom: 12 }} wrap>
-                      <Text strong>表约束</Text>
-                      {constraints.length > 0 && <Tag>{constraints.length} 条</Tag>}
-                    </Space>
-                    <Table
-                      dataSource={constraints.map((item, i) => ({ key: `${item.constraint_name}-${i}`, ...item }))}
-                      columns={constraintTableCols}
-                      loading={constraintLoading}
-                      locale={{ emptyText: <TableEmptyState title="当前表暂无可展示的约束信息" /> }}
-                      size="small"
-                      tableLayout="fixed"
-                      scroll={{ x: 1240 }}
-                      pagination={false}
+                    <Collapse
+                      defaultActiveKey={['constraint-details']}
+                      items={[
+                        {
+                          key: 'constraint-details',
+                          label: (
+                            <Space wrap>
+                              <Text strong>约束详情</Text>
+                              {visibleConstraints.length > 0 && <Tag>{visibleConstraints.length} 条</Tag>}
+                            </Space>
+                          ),
+                          children: (
+                            <Table
+                              dataSource={visibleConstraints.map((item, i) => ({ key: `${item.constraint_name}-${i}`, ...item }))}
+                              columns={constraintTableCols}
+                              loading={constraintLoading}
+                              locale={{ emptyText: <TableEmptyState title="当前表暂无可展示的约束信息" /> }}
+                              size="small"
+                              tableLayout="fixed"
+                              scroll={{ x: 1240 }}
+                              pagination={false}
+                            />
+                          ),
+                        },
+                      ]}
                     />
 
                     <Divider style={{ margin: '16px 0' }} />
@@ -424,7 +602,35 @@ export default function DataDictPage() {
         </Row>
       )}
 
-      {!dbName && (
+      {dbName && objectAccessDenied && (
+        <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+          <div style={{ padding: '48px 0', textAlign: 'center' }}>
+            <FieldBinaryOutlined style={{ fontSize: 40, color: '#8c8c8c', marginBottom: 12 }} />
+            <div style={{ fontSize: 15, marginBottom: 8 }}>当前范围暂无数据字典访问权限</div>
+            <Text type="secondary">
+              你需要先申请该数据库或表的查询权限，审批通过后才能查看对应结构信息。
+            </Text>
+            <div style={{ marginTop: 16 }}>
+              <Button
+                type="primary"
+                onClick={() => navigate('/query/privileges', {
+                  state: {
+                    openApply: true,
+                    instanceId,
+                    dbName,
+                    tableName: selectedTable || undefined,
+                    scopeType: selectedTable ? 'table' : 'database',
+                  },
+                })}
+              >
+                申请查询权限
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!dbName && !dbAccessDenied && (
         <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
           <div style={{ padding: '60px 0', textAlign: 'center', color: '#AEAEB2' }}>
             <DatabaseOutlined style={{ fontSize: 48, marginBottom: 16 }} />

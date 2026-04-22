@@ -80,7 +80,7 @@ export const queryApi = {
     flow_id?: number
     db_name: string
     table_name?: string
-    scope_type?: 'database' | 'table'
+    scope_type?: 'instance' | 'database' | 'table'
     valid_date: string
     limit_num?: number
     priv_type?: number

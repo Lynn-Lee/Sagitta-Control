@@ -58,7 +58,7 @@ class PrivApplyRequest(BaseModel):
     flow_id: int | None = None
     db_name: str
     table_name: str = ""
-    scope_type: Literal["database", "table"] = "database"
+    scope_type: Literal["instance", "database", "table"] = "database"
     valid_date: date
     limit_num: int = Field(default=100, ge=1, le=100000)
     priv_type: int = Field(default=1, description="1=库级 2=表级")
@@ -75,7 +75,20 @@ class PrivApplyRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_scope_fields(self) -> "PrivApplyRequest":
+        self.db_name = self.db_name.strip()
         self.table_name = self.table_name.strip()
+        if self.scope_type == "instance":
+            self.db_name = ""
+            self.table_name = ""
+        elif self.scope_type == "database":
+            if not self.db_name:
+                raise ValueError("库级授权必须填写数据库名")
+            self.table_name = ""
+        elif self.scope_type == "table":
+            if not self.db_name:
+                raise ValueError("表级授权必须填写数据库名")
+            if not self.table_name:
+                raise ValueError("表级授权必须填写表名")
         if self.scope_type == "table" and not self.table_name:
             raise ValueError("表级授权必须填写表名")
         return self

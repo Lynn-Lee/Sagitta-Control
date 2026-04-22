@@ -55,6 +55,11 @@ class TestInstanceDataDictRouter:
     ):
         monkeypatch.setattr(
             instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
+        monkeypatch.setattr(
+            instance_router,
             "_ensure_instance_access",
             AsyncMock(return_value=SimpleNamespace(id=1)),
         )
@@ -101,6 +106,11 @@ class TestInstanceDataDictRouter:
     ):
         monkeypatch.setattr(
             instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
+        monkeypatch.setattr(
+            instance_router,
             "_ensure_instance_access",
             AsyncMock(return_value=SimpleNamespace(id=1)),
         )
@@ -130,6 +140,11 @@ class TestInstanceDataDictRouter:
     async def test_get_indexes_returns_payload(
         self, api_client, monkeypatch: pytest.MonkeyPatch, override_current_user
     ):
+        monkeypatch.setattr(
+            instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
         monkeypatch.setattr(
             instance_router,
             "_ensure_instance_access",
@@ -173,6 +188,11 @@ class TestInstanceDataDictRouter:
     ):
         monkeypatch.setattr(
             instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
+        monkeypatch.setattr(
+            instance_router,
             "_ensure_instance_access",
             AsyncMock(return_value=SimpleNamespace(id=1)),
         )
@@ -187,6 +207,11 @@ class TestInstanceDataDictRouter:
     ):
         monkeypatch.setattr(
             instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
+        monkeypatch.setattr(
+            instance_router,
             "_ensure_instance_access",
             AsyncMock(return_value=SimpleNamespace(id=1)),
         )
@@ -194,3 +219,20 @@ class TestInstanceDataDictRouter:
         resp = await api_client.get("/api/v1/instances/1/indexes/", params={"tb_name": "users"})
 
         assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_get_columns_returns_403_when_data_dict_scope_missing(
+        self, api_client, monkeypatch: pytest.MonkeyPatch, override_current_user
+    ):
+        monkeypatch.setattr(
+            instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(side_effect=instance_router.HTTPException(403, "暂无数据字典访问权限，请先申请对应范围的查询权限")),
+        )
+
+        resp = await api_client.get(
+            "/api/v1/instances/1/columns/",
+            params={"db_name": "demo", "tb_name": "users"},
+        )
+
+        assert resp.status_code == 403

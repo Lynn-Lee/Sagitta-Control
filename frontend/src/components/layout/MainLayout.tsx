@@ -203,11 +203,11 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/diagnostic', icon: <MenuIcon component={DiagnosticMenuSvg} label="会话管理" />, label: '会话管理' },
       { key: '/slowlog', icon: <MenuIcon component={SlowlogMenuSvg} label="慢日志分析" />, label: '慢日志分析' },
       { key: '/optimize', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 优化" />, label: 'SQL 优化' },
-      { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典' },
       { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档' },
       { key: '/binlog', icon: <MenuIcon component={BinlogMenuSvg} label="回滚辅助" />, label: '回滚辅助' },
     ],
   },
+  { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典', permission: 'menu_schema' },
   { key: '/instance', icon: <MenuIcon component={InstanceMenuSvg} label="实例管理" />, label: '实例管理', permission: 'instance_manage' },
   {
     key: 'system-group', icon: <SettingOutlined />, label: '系统管理', permission: 'menu_system',

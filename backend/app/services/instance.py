@@ -28,6 +28,15 @@ logger = logging.getLogger(__name__)
 
 class InstanceService:
     @staticmethod
+    def _resolve_table_lookup(instance: Instance, db_name: str, tb_name: str) -> tuple[str, dict[str, Any]]:
+        normalized_table = tb_name.strip()
+        if instance.db_type == "pgsql" and "." in normalized_table:
+            schema, table_name = normalized_table.split(".", 1)
+            if schema and table_name:
+                return table_name, {"schema": schema}
+        return normalized_table, {}
+
+    @staticmethod
     def _normalize_column_row(
         row: dict[str, Any] | tuple[Any, ...] | list[Any],
         cols: list[str],
@@ -314,7 +323,12 @@ class InstanceService:
     ) -> list[dict]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
-        rs = await engine.get_all_columns_by_tb(db_name=db_name, tb_name=tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        rs = await engine.get_all_columns_by_tb(
+            db_name=db_name,
+            tb_name=resolved_table_name,
+            **extra_kwargs,
+        )
         if not rs.is_success:
             raise Exception(f"获取列信息失败：{rs.error}")
         cols = rs.column_list or []
@@ -330,7 +344,8 @@ class InstanceService:
         if getter is None:
             return []
 
-        rs = await getter(db_name=db_name, tb_name=tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        rs = await getter(db_name=db_name, tb_name=resolved_table_name, **extra_kwargs)
         if not rs.is_success:
             raise Exception(f"获取约束信息失败：{rs.error}")
         cols = rs.column_list or []
@@ -346,7 +361,8 @@ class InstanceService:
         if getter is None:
             return []
 
-        rs = await getter(db_name=db_name, tb_name=tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        rs = await getter(db_name=db_name, tb_name=resolved_table_name, **extra_kwargs)
         if not rs.is_success:
             raise Exception(f"获取索引信息失败：{rs.error}")
         cols = rs.column_list or []

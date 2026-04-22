@@ -542,6 +542,7 @@ class UserService:
             ("menu_dashboard", "Dashboard 菜单"),
             ("menu_sqlworkflow", "SQL 工单菜单"),
             ("menu_query", "在线查询菜单"),
+            ("menu_schema", "数据字典菜单"),
             ("menu_ops", "运维工具菜单"),
             ("menu_monitor", "可观测中心菜单"),
             ("menu_system", "系统管理菜单"),

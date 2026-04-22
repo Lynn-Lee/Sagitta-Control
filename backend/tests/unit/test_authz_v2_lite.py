@@ -32,6 +32,7 @@ class TestBuiltinRolePermissions:
     def test_developer_is_menu_query_only_for_core_entry(self):
         developer = _role_permissions("developer")
         assert "menu_query" in developer
+        assert "menu_schema" in developer
         assert "menu_monitor" not in developer
         assert "process_view" not in developer
         assert "archive_apply" not in developer
@@ -58,6 +59,23 @@ class TestApprovalFlowNodeSchema:
 
 
 class TestQueryPrivilegeSchema:
+    def test_instance_scope_can_omit_db_and_table_name(self):
+        req = PrivApplyRequest(
+            title="申请实例级权限",
+            instance_id=1,
+            db_name="",
+            table_name="",
+            valid_date="2099-01-01",
+            limit_num=100,
+            priv_type=0,
+            apply_reason="需要排查问题",
+            audit_auth_groups="1",
+            scope_type="instance",
+        )
+        assert req.scope_type == "instance"
+        assert req.db_name == ""
+        assert req.table_name == ""
+
     def test_table_scope_requires_table_name(self):
         with pytest.raises(ValidationError):
             PrivApplyRequest(
@@ -178,14 +196,17 @@ class TestGovernanceScope:
 
 
 class TestQueryPrivilegeHelpers:
+    def test_instance_scope_normalizes_to_instance_priv(self):
+        assert QueryPrivService._normalize_scope_type("instance", "", "") == ("instance", 0)
+
     def test_table_scope_normalizes_to_table_priv(self):
-        assert QueryPrivService._normalize_scope_type("table", "") == ("table", 2)
+        assert QueryPrivService._normalize_scope_type("table", "", "") == ("table", 2)
 
     def test_table_name_also_forces_table_scope(self):
-        assert QueryPrivService._normalize_scope_type("database", "orders") == ("table", 2)
+        assert QueryPrivService._normalize_scope_type("database", "orders", "") == ("table", 2)
 
     def test_database_scope_normalizes_to_database_priv(self):
-        assert QueryPrivService._normalize_scope_type("database", "") == ("database", 1)
+        assert QueryPrivService._normalize_scope_type("database", "", "analytics") == ("database", 1)
 
     def test_pg_table_candidates_include_plain_and_schema_qualified_name(self):
         assert QueryPrivService._pg_table_candidates("tms", "tk_order") == [
@@ -289,6 +310,89 @@ class TestQueryPrivilegeHelpers:
 
         assert apply.valid_date == date(2099, 1, 15)
         assert db.add.call_args.args[0].valid_date == date(2099, 1, 15)
+
+    @pytest.mark.asyncio
+    async def test_check_data_dict_access_accepts_instance_scope_privilege(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        db = AsyncMock()
+
+        async def fake_execute(_stmt):
+            result = MagicMock()
+            result.scalars.return_value.first.return_value = SimpleNamespace(id=1)
+            return result
+
+        db.execute = AsyncMock(side_effect=fake_execute)
+
+        allowed, reason = await QueryPrivService.check_data_dict_access(
+            db=db,
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+        )
+
+        assert allowed is True
+        assert reason == "instance_privilege"
+
+    @pytest.mark.asyncio
+    async def test_check_data_dict_access_accepts_table_scope_on_root_entry(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        db = AsyncMock()
+
+        async def fake_execute(_stmt):
+            result = MagicMock()
+            result.scalars.return_value.first.return_value = None
+            return result
+
+        db.execute = AsyncMock(side_effect=fake_execute)
+        QueryPrivService._has_any_data_dict_priv = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+        allowed, reason = await QueryPrivService.check_data_dict_access(
+            db=db,
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+        )
+
+        assert allowed is True
+        assert reason == "scoped_privilege"
+
+    @pytest.mark.asyncio
+    async def test_check_data_dict_access_accepts_table_scope_on_database_entry(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        db = AsyncMock()
+
+        QueryPrivService._has_instance_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
+        QueryPrivService._has_db_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
+        QueryPrivService._has_any_table_priv_in_db = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+        allowed, reason = await QueryPrivService.check_data_dict_access(
+            db=db,
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+            db_name="ump_testdb",
+        )
+
+        assert allowed is True
+        assert reason == "table_privilege_in_database"
+
+    @pytest.mark.asyncio
+    async def test_check_data_dict_access_denies_without_matching_scope(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        empty_result = MagicMock()
+        empty_result.scalars.return_value.first.return_value = None
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=empty_result)
+        QueryPrivService._has_any_data_dict_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
+        QueryPrivService._has_any_table_priv_in_db = AsyncMock(return_value=False)  # type: ignore[method-assign]
+
+        allowed, reason = await QueryPrivService.check_data_dict_access(
+            db=db,
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+            db_name="analytics",
+            table_name="orders",
+        )
+
+        assert allowed is False
+        assert "数据字典访问权限" in reason
 
     @pytest.mark.asyncio
     async def test_audit_apply_rejects_extending_valid_date(self):

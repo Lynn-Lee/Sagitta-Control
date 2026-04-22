@@ -12,8 +12,29 @@ from app.schemas.instance import (
 )
 from app.services.instance import InstanceService, TunnelService
 from app.services.instance_database import InstanceDatabaseService
+from app.services.query_priv import QueryPrivService
 
 router = APIRouter()
+
+
+async def _ensure_data_dict_access(
+    db: AsyncSession,
+    user: dict,
+    instance_id: int,
+    db_name: str = "",
+    tb_name: str = "",
+):
+    inst = await _ensure_instance_access(db, user, instance_id)
+    allowed, reason = await QueryPrivService.check_data_dict_access(
+        db=db,
+        user=user,
+        instance=inst,
+        db_name=db_name,
+        table_name=tb_name,
+    )
+    if not allowed:
+        raise HTTPException(403, "暂无数据字典访问权限，请先申请对应范围的查询权限")
+    return inst
 
 
 def _validate_resource_group_scope(user: dict, resource_group_ids: list[int] | None) -> None:
@@ -139,16 +160,23 @@ async def get_databases(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _ensure_instance_access(db, user, instance_id)
-    is_superuser = user.get("is_superuser", False)
-    if is_superuser:
-        databases = await InstanceService.get_databases(db, instance_id)
-    else:
-        registered = await InstanceDatabaseService.list_databases(
-            db, instance_id, include_inactive=False
-        )
-        databases = [r["db_name"] for r in registered]
-    return {"databases": databases}
+    inst = await _ensure_data_dict_access(db, user, instance_id)
+    registered = await InstanceDatabaseService.list_databases(
+        db, instance_id, include_inactive=True
+    )
+    if user.get("is_superuser", False):
+        return {"databases": registered}
+
+    allowed_database_names = await QueryPrivService.list_data_dict_databases(
+        db=db,
+        user=user,
+        instance=inst,
+        database_names=[item["db_name"] for item in registered],
+    )
+    allowed_set = set(allowed_database_names)
+    return {
+        "databases": [item for item in registered if item["db_name"] in allowed_set]
+    }
 
 
 @router.get("/{instance_id}/tables/", summary="获取表列表")
@@ -158,8 +186,15 @@ async def get_tables(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
-    await _ensure_instance_access(db, user, instance_id)
+    inst = await _ensure_data_dict_access(db, user, instance_id, db_name=db_name)
     tables = await InstanceService.get_tables(db, instance_id, db_name)
+    tables = await QueryPrivService.list_data_dict_tables(
+        db=db,
+        user=user,
+        instance=inst,
+        db_name=db_name,
+        table_names=tables,
+    )
     return {"tables": tables}
 
 
@@ -171,7 +206,7 @@ async def get_columns(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
-    await _ensure_instance_access(db, user, instance_id)
+    await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     columns = await InstanceService.get_columns(db, instance_id, db_name, tb_name)
     return {"columns": columns}
 
@@ -184,7 +219,7 @@ async def get_constraints(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
-    await _ensure_instance_access(db, user, instance_id)
+    await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     constraints = await InstanceService.get_constraints(db, instance_id, db_name, tb_name)
     return {"constraints": constraints}
 
@@ -197,7 +232,7 @@ async def get_indexes(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
-    await _ensure_instance_access(db, user, instance_id)
+    await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     indexes = await InstanceService.get_indexes(db, instance_id, db_name, tb_name)
     return {"indexes": indexes}
 

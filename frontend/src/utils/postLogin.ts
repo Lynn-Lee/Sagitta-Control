@@ -1,6 +1,7 @@
 export function getPostLoginPath(permissions: string[] = []) {
   if (permissions.includes('menu_dashboard')) return '/dashboard'
   if (permissions.includes('menu_query')) return '/query'
+  if (permissions.includes('menu_schema')) return '/schema'
   if (permissions.includes('menu_sqlworkflow')) return '/workflow'
   if (permissions.includes('menu_monitor')) return '/monitor'
   if (permissions.includes('menu_ops')) return '/slowlog'

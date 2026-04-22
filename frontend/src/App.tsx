@@ -67,7 +67,7 @@ export default function App() {
           <Route path="archive"              element={<PermissionGuard permission="menu_ops"><ArchivePage /></PermissionGuard>} />
           <Route path="binlog"               element={<PermissionGuard permission="menu_ops"><BinlogPage /></PermissionGuard>} />
           <Route path="optimize"             element={<PermissionGuard permission="menu_ops"><OptimizePage /></PermissionGuard>} />
-          <Route path="schema"               element={<PermissionGuard permission="menu_ops"><DataDictPage /></PermissionGuard>} />
+          <Route path="schema"               element={<PermissionGuard permission="menu_schema"><DataDictPage /></PermissionGuard>} />
           <Route path="instance"             element={<PermissionGuard permission="instance_manage"><InstanceList /></PermissionGuard>} />
           <Route path="system/users"         element={<PermissionGuard permission="menu_system"><UserManagement /></PermissionGuard>} />
           <Route path="system/groups"        element={<PermissionGuard permission="menu_system"><ResourceGroupManagement /></PermissionGuard>} />

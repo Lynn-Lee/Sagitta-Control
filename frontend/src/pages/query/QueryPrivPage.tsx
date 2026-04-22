@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
 import { PlusOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import { queryApi } from '@/api/query'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
@@ -21,19 +22,46 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   3: { label: '已取消', color: 'default' },
 }
 
+const SCOPE_META: Record<string, { label: string; color: string }> = {
+  instance: { label: '实例级', color: 'volcano' },
+  database: { label: '库级', color: 'blue' },
+  table: { label: '表级', color: 'purple' },
+}
+
 export default function QueryPrivPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
+  const location = useLocation()
   const screens = useBreakpoint()
   const isMobile = !screens.md
   const [applyModalOpen, setApplyModalOpen] = useState(false)
   const [applyForm] = Form.useForm()
   const [auditForm] = Form.useForm()
   const [instanceId, setInstanceId] = useState<number | undefined>()
-  const [scopeType, setScopeType] = useState<'database' | 'table'>('database')
+  const [scopeType, setScopeType] = useState<'instance' | 'database' | 'table'>('database')
   const [auditModalOpen, setAuditModalOpen] = useState(false)
   const [auditTarget, setAuditTarget] = useState<any>(null)
   const [msgApi, msgCtx] = message.useMessage()
+
+  useEffect(() => {
+    const state = location.state as {
+      openApply?: boolean
+      instanceId?: number
+      dbName?: string
+      tableName?: string
+      scopeType?: 'instance' | 'database' | 'table'
+    } | null
+    if (!state?.openApply) return
+    const nextScope = state.scopeType || (state.tableName ? 'table' : state.dbName ? 'database' : 'instance')
+    setInstanceId(state.instanceId)
+    setScopeType(nextScope)
+    setApplyModalOpen(true)
+    applyForm.setFieldsValue({
+      scope_type: nextScope,
+      db_name: state.dbName || undefined,
+      table_name: state.tableName || '',
+    })
+  }, [applyForm, location.state])
 
   // 我的权限列表
   const { data: privData } = useQuery({
@@ -142,7 +170,9 @@ export default function QueryPrivPage() {
         valid_date: values.valid_date.format('YYYY-MM-DD'),
         instance_id: instanceId,
         flow_id: values.flow_id,
-        priv_type: values.scope_type === 'table' ? 2 : 1,
+        db_name: values.scope_type === 'instance' ? '' : values.db_name,
+        table_name: values.scope_type === 'table' ? values.table_name : '',
+        priv_type: values.scope_type === 'table' ? 2 : values.scope_type === 'database' ? 1 : 0,
       })
     } catch { /* validation */ }
   }
@@ -196,14 +226,21 @@ export default function QueryPrivPage() {
       render: (instanceIdValue: number) => instanceNameMap.get(instanceIdValue) || `实例#${instanceIdValue}`,
     },
     { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: true },
-    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={v === 'table' ? 'purple' : 'blue'}>{v === 'table' ? '表级' : '库级'}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string) => v || <Text type="secondary">全库</Text> },
+    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
     { title: '行数限制', dataIndex: 'limit_num', width: 90 },
     {
       title: '有效期', dataIndex: 'valid_date', width: 110,
       render: (v: string) => {
-        const expired = dayjs(v).isBefore(dayjs())
-        return <Tag color={expired ? 'default' : 'success'}>{v}{expired ? ' (已过期)' : ''}</Tag>
+        const expiry = dayjs(v)
+        const expired = expiry.endOf('day').isBefore(dayjs())
+        const expiresToday = expiry.isSame(dayjs(), 'day')
+        return (
+          <Tag color={expired ? 'default' : expiresToday ? 'warning' : 'success'}>
+            {v}
+            {expired ? ' (已过期)' : expiresToday ? ' (今日到期)' : ''}
+          </Tag>
+        )
       },
     },
     {
@@ -230,8 +267,8 @@ export default function QueryPrivPage() {
       render: (instanceName: string, r: any) => instanceName || instanceNameMap.get(r.instance_id) || `实例#${r.instance_id}`,
     },
     { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: true },
-    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={v === 'table' ? 'purple' : 'blue'}>{v === 'table' ? '表级' : '库级'}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string) => v || <Text type="secondary">全库</Text> },
+    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
     { title: '行数限制', dataIndex: 'limit_num', width: 90 },
     { title: '有效期', dataIndex: 'valid_date', width: 120, render: (v: string) => <Tag color="success">{v}</Tag> },
     {
@@ -280,8 +317,8 @@ export default function QueryPrivPage() {
     },
     { title: '申请人', dataIndex: 'applicant_name', width: 120, render: (v: string, r: any) => v || r.applicant_username || '—' },
     { title: '申请数据库', dataIndex: 'db_name', width: 150, ellipsis: true },
-    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={v === 'table' ? 'purple' : 'blue'}>{v === 'table' ? '表级' : '库级'}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string) => v || <Text type="secondary">全库</Text> },
+    { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
     { title: '行数限制', dataIndex: 'limit_num', width: 100 },
     { title: '有效期', dataIndex: 'valid_date', width: 120 },
     { title: '申请理由', dataIndex: 'apply_reason', width: 220, ellipsis: true },
@@ -458,7 +495,7 @@ export default function QueryPrivPage() {
             <Input placeholder="简明描述申请用途" />
           </Form.Item>
           <Form.Item label="目标实例" required>
-            <Select placeholder="选择实例" onChange={v => setInstanceId(v)} showSearch optionFilterProp="label"
+            <Select placeholder="选择实例" value={instanceId} onChange={v => { setInstanceId(v); applyForm.setFieldValue('db_name', undefined); applyForm.setFieldValue('table_name', '') }} showSearch optionFilterProp="label"
               popupMatchSelectWidth={false} style={{ minWidth: 220 }}>
               {instanceData?.items?.map((i: any) => (
                 <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}>
@@ -468,10 +505,25 @@ export default function QueryPrivPage() {
             </Select>
           </Form.Item>
           <Form.Item name="scope_type" label="授权范围" initialValue="database" rules={[{ required: true }]}>
-            <Select onChange={(v) => setScopeType(v)}>
+            <Select onChange={(v) => {
+              setScopeType(v)
+              if (v === 'instance') {
+                applyForm.setFieldValue('db_name', undefined)
+                applyForm.setFieldValue('table_name', '')
+              }
+              if (v === 'database') {
+                applyForm.setFieldValue('table_name', '')
+              }
+            }}>
+              <Option value="instance">实例级授权</Option>
               <Option value="database">库级授权</Option>
               <Option value="table">表级授权</Option>
             </Select>
+          </Form.Item>
+          <Form.Item>
+            <Text type="secondary">
+              查询权限审批通过后，将同时获得相同范围的数据字典查看权限。
+            </Text>
           </Form.Item>
           <Form.Item name="flow_id" label="审批流" rules={[{ required: true, message: '请选择审批流' }]}>
             <Select placeholder="选择审批流模板">
@@ -480,16 +532,18 @@ export default function QueryPrivPage() {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="db_name" label="数据库" rules={[{ required: true }]}>
-            <Select placeholder="选择数据库" showSearch disabled={!instanceId}
+          {scopeType !== 'instance' && (
+            <Form.Item name="db_name" label="数据库" rules={[{ required: true }]}>
+              <Select placeholder="选择数据库" showSearch disabled={!instanceId}
               popupMatchSelectWidth={false} style={{ minWidth: 180 }} optionFilterProp="children">
-              {(dbData?.items || []).map((d: any) => (
-                <Option key={d.db_name} value={d.db_name} title={d.db_name}>
-                  {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+                {(dbData?.items || []).map((d: any) => (
+                  <Option key={d.db_name} value={d.db_name} title={d.db_name}>
+                    {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
           {scopeType === 'table' && (
             <Form.Item
               name="table_name"

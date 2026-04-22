@@ -46,9 +46,9 @@ export const instanceApi = {
   testConnection: (id: number) =>
     apiClient.post(`/instances/${id}/test/`).then(r => r.data),
 
-  // 旧接口：实时查询引擎（在线查询页面保留使用）
+  // 数据字典数据库列表：基于已注册库并带启用状态
   getDatabases: (id: number) =>
-    apiClient.get<{ databases: string[] }>(`/instances/${id}/databases/`).then(r => r.data),
+    apiClient.get<{ databases: InstanceDatabase[] }>(`/instances/${id}/databases/`).then(r => r.data),
 
   // ── 数据库注册管理（Pack C2）──────────────────────────────
 

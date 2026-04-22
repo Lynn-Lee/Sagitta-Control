@@ -1,7 +1,7 @@
 """
 查询权限校验与管理服务。
 v2-lite: 资源访问范围由 UserGroup -> ResourceGroup -> Instance 决定，
-数据级授权仅保留 user 主体的 database / table 两级粒度。
+数据级授权保留 user 主体的 instance / database / table 三级粒度。
 """
 
 from __future__ import annotations
@@ -133,10 +133,71 @@ class QueryPrivService:
         return bool(user_rg_ids & instance_rg_ids)
 
     @staticmethod
-    def _normalize_scope_type(scope_type: str | None, table_name: str = "") -> tuple[str, int]:
+    def _normalize_scope_type(
+        scope_type: str | None,
+        table_name: str = "",
+        db_name: str = "",
+    ) -> tuple[str, int]:
+        if scope_type == "instance":
+            return "instance", 0
         if scope_type == "table" or table_name.strip():
             return "table", 2
+        if scope_type == "database" or db_name.strip():
+            return "database", 1
         return "database", 1
+
+    @staticmethod
+    def _normalize_table_lookup_names(instance: Instance, db_name: str, table_name: str) -> list[str]:
+        normalized_table = table_name.strip()
+        if not normalized_table:
+            return []
+        if instance.db_type == "pgsql" and "." in normalized_table:
+            schema, plain_table = normalized_table.split(".", 1)
+            return QueryPrivService._pg_table_candidates(schema, plain_table)
+        effective_schema = db_name.strip()
+        if instance.db_type != "pgsql" and effective_schema:
+            return [normalized_table, f"{effective_schema}.{normalized_table}"]
+        return [normalized_table]
+
+    @staticmethod
+    async def _has_instance_priv(
+        db: AsyncSession,
+        user_id: int,
+        instance_id: int,
+    ) -> bool:
+        result = await db.execute(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.user_id == user_id,
+                    QueryPrivilege.user_group_id.is_(None),
+                    QueryPrivilege.instance_id == instance_id,
+                    QueryPrivilege.scope_type == "instance",
+                    QueryPrivilege.valid_date >= date.today(),
+                    QueryPrivilege.is_deleted == 0,
+                )
+            )
+        )
+        return result.scalars().first() is not None
+
+    @staticmethod
+    async def _has_any_data_dict_priv(
+        db: AsyncSession,
+        user_id: int,
+        instance_id: int,
+    ) -> bool:
+        result = await db.execute(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.user_id == user_id,
+                    QueryPrivilege.user_group_id.is_(None),
+                    QueryPrivilege.instance_id == instance_id,
+                    QueryPrivilege.scope_type.in_(["instance", "database", "table"]),
+                    QueryPrivilege.valid_date >= date.today(),
+                    QueryPrivilege.is_deleted == 0,
+                )
+            )
+        )
+        return result.scalars().first() is not None
 
     @staticmethod
     def _pg_table_candidates(schema: str, table_name: str) -> list[str]:
@@ -185,6 +246,8 @@ class QueryPrivService:
         instance_id: int,
         db_name: str,
     ) -> bool:
+        if await QueryPrivService._has_instance_priv(db, user_id, instance_id):
+            return True
         result = await db.execute(
             select(QueryPrivilege).where(
                 and_(
@@ -201,6 +264,30 @@ class QueryPrivService:
         return result.scalars().first() is not None
 
     @staticmethod
+    async def _has_any_table_priv_in_db(
+        db: AsyncSession,
+        user_id: int,
+        instance_id: int,
+        db_name: str,
+    ) -> bool:
+        if await QueryPrivService._has_instance_priv(db, user_id, instance_id):
+            return True
+        result = await db.execute(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.user_id == user_id,
+                    QueryPrivilege.user_group_id.is_(None),
+                    QueryPrivilege.instance_id == instance_id,
+                    QueryPrivilege.scope_type == "table",
+                    QueryPrivilege.db_name == db_name,
+                    QueryPrivilege.valid_date >= date.today(),
+                    QueryPrivilege.is_deleted == 0,
+                )
+            )
+        )
+        return result.scalars().first() is not None
+
+    @staticmethod
     async def _has_table_priv(
         db: AsyncSession,
         user_id: int,
@@ -208,6 +295,8 @@ class QueryPrivService:
         db_name: str,
         table_names: list[str],
     ) -> bool:
+        if await QueryPrivService._has_instance_priv(db, user_id, instance_id):
+            return True
         normalized_names = [name.strip() for name in table_names if name and name.strip()]
         if not normalized_names:
             return False
@@ -226,6 +315,119 @@ class QueryPrivService:
             )
         )
         return result.scalars().first() is not None
+
+    @staticmethod
+    async def list_data_dict_databases(
+        db: AsyncSession,
+        user: dict,
+        instance: Instance,
+        database_names: list[str],
+    ) -> list[str]:
+        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+            return database_names
+        if not QueryPrivService.user_has_instance_access(user, instance):
+            return []
+        if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
+            return database_names
+
+        result = await db.execute(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.user_id == user["id"],
+                    QueryPrivilege.user_group_id.is_(None),
+                    QueryPrivilege.instance_id == instance.id,
+                    QueryPrivilege.valid_date >= date.today(),
+                    QueryPrivilege.is_deleted == 0,
+                    QueryPrivilege.scope_type.in_(["database", "table"]),
+                )
+            )
+        )
+        allowed_db_names = {
+            priv.db_name.strip()
+            for priv in result.scalars().all()
+            if priv.db_name and priv.db_name.strip()
+        }
+        return [name for name in database_names if name in allowed_db_names]
+
+    @staticmethod
+    async def list_data_dict_tables(
+        db: AsyncSession,
+        user: dict,
+        instance: Instance,
+        db_name: str,
+        table_names: list[str],
+    ) -> list[str]:
+        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+            return table_names
+        if not QueryPrivService.user_has_instance_access(user, instance):
+            return []
+        if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
+            return table_names
+        if await QueryPrivService._has_db_priv(db, user["id"], instance.id, db_name):
+            return table_names
+
+        result = await db.execute(
+            select(QueryPrivilege).where(
+                and_(
+                    QueryPrivilege.user_id == user["id"],
+                    QueryPrivilege.user_group_id.is_(None),
+                    QueryPrivilege.instance_id == instance.id,
+                    QueryPrivilege.scope_type == "table",
+                    QueryPrivilege.db_name == db_name,
+                    QueryPrivilege.valid_date >= date.today(),
+                    QueryPrivilege.is_deleted == 0,
+                )
+            )
+        )
+        allowed_table_names = {
+            priv.table_name.strip()
+            for priv in result.scalars().all()
+            if priv.table_name and priv.table_name.strip()
+        }
+        visible_tables = [name for name in table_names if name in allowed_table_names]
+        for table_name in sorted(allowed_table_names):
+            if table_name not in visible_tables:
+                visible_tables.append(table_name)
+        return visible_tables
+
+    @staticmethod
+    async def check_data_dict_access(
+        db: AsyncSession,
+        user: dict,
+        instance: Instance,
+        db_name: str = "",
+        table_name: str = "",
+    ) -> tuple[bool, str]:
+        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+            return True, "admin"
+        if not QueryPrivService.user_has_instance_access(user, instance):
+            return False, "实例不在你的资源组内"
+        if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
+            return True, "instance_privilege"
+
+        normalized_db = db_name.strip()
+        normalized_table = table_name.strip()
+        if not normalized_db:
+            if await QueryPrivService._has_any_data_dict_priv(db, user["id"], instance.id):
+                return True, "scoped_privilege"
+            return False, "没有该实例的数据字典访问权限，请先申请查询权限"
+        if await QueryPrivService._has_db_priv(db, user["id"], instance.id, normalized_db):
+            return True, "db_privilege"
+        if not normalized_table:
+            if await QueryPrivService._has_any_table_priv_in_db(
+                db, user["id"], instance.id, normalized_db
+            ):
+                return True, "table_privilege_in_database"
+            return False, f"没有数据库 {normalized_db} 的数据字典访问权限，请先申请查询权限"
+
+        candidate_names = QueryPrivService._normalize_table_lookup_names(
+            instance, normalized_db, normalized_table
+        )
+        if await QueryPrivService._has_table_priv(
+            db, user["id"], instance.id, normalized_db, candidate_names
+        ):
+            return True, "table_privilege"
+        return False, f"没有表 {normalized_table} 的数据字典访问权限，请先申请查询权限"
 
     @staticmethod
     async def _resolve_apply_group_id(
@@ -277,6 +479,8 @@ class QueryPrivService:
         table_refs = extract_table_refs(sql, db_name, instance.db_type)
         pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
         if not table_refs:
+            if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
+                return True, "instance_privilege"
             has_db_priv = await QueryPrivService._has_db_priv(db, user["id"], instance.id, db_name)
             if has_db_priv:
                 return True, "db_privilege"
@@ -374,13 +578,14 @@ class QueryPrivService:
                         QueryPrivilege.user_group_id.is_(None),
                         QueryPrivilege.instance_id == instance.id,
                         QueryPrivilege.scope_type == scope,
-                        QueryPrivilege.db_name == scope_db_name,
                         QueryPrivilege.valid_date >= date.today(),
                         QueryPrivilege.is_deleted == 0,
                     )
                 )
                 .order_by(QueryPrivilege.created_at.desc(), QueryPrivilege.id.desc())
             )
+            if scope != "instance":
+                stmt = stmt.where(QueryPrivilege.db_name == scope_db_name)
             if scope == "table":
                 normalized_table_names = [
                     name.strip() for name in (table_names or []) if name and name.strip()
@@ -394,9 +599,15 @@ class QueryPrivService:
 
         table_refs = extract_table_refs(sql, db_name, instance.db_type)
         pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
+        instance_limit = await _latest_limit("instance", "")
         if not table_refs:
             db_limit = await _latest_limit("database", db_name)
-            return min(requested_limit, db_limit) if db_limit is not None else requested_limit
+            effective_candidates = [requested_limit]
+            if db_limit is not None:
+                effective_candidates.append(db_limit)
+            if instance_limit is not None:
+                effective_candidates.append(instance_limit)
+            return min(effective_candidates)
 
         effective_limits: list[int] = []
         for ref in table_refs:
@@ -416,6 +627,8 @@ class QueryPrivService:
                 table_limit = await _latest_limit("table", db_name, candidate_names)
                 if table_limit is None:
                     table_limit = await _latest_limit("database", db_name)
+                if table_limit is None:
+                    table_limit = instance_limit
                 if table_limit is not None:
                     effective_limits.append(table_limit)
                 continue
@@ -424,6 +637,8 @@ class QueryPrivService:
             table_limit = await _latest_limit("table", effective_schema, [table])
             if table_limit is None:
                 table_limit = await _latest_limit("database", effective_schema)
+            if table_limit is None:
+                table_limit = instance_limit
             if table_limit is not None:
                 effective_limits.append(table_limit)
 
@@ -583,7 +798,7 @@ class QueryPrivService:
         if flow_id is None:
             raise AppException("请选择审批流", code=400)
         normalized_scope_type, normalized_priv_type = QueryPrivService._normalize_scope_type(
-            scope_type, table_name
+            scope_type, table_name, db_name
         )
         resolved_group_id = await QueryPrivService._resolve_apply_group_id(
             db, user=user, instance_id=instance_id, group_id=group_id
@@ -773,7 +988,7 @@ class QueryPrivService:
 
             apply.status = 1
             normalized_scope_type, normalized_priv_type = QueryPrivService._normalize_scope_type(
-                apply.scope_type, apply.table_name
+                apply.scope_type, apply.table_name, apply.db_name
             )
             priv = QueryPrivilege(
                 user_id=apply.user_id,
