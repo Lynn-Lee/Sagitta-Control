@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from sqlalchemy import func, select
@@ -27,6 +28,202 @@ logger = logging.getLogger(__name__)
 
 
 class InstanceService:
+    @staticmethod
+    def _normalize_default_expression(default_value: Any) -> str:
+        if default_value in (None, ""):
+            return ""
+        normalized = " ".join(str(default_value).split())
+        return normalized.strip()
+
+    @staticmethod
+    def _escape_sql_literal(value: str) -> str:
+        return value.replace("'", "''")
+
+    @staticmethod
+    def _build_comment_statements(
+        instance: Instance,
+        table_name: str,
+        columns: list[dict[str, Any]],
+        *,
+        schema_name: str | None = None,
+    ) -> list[str]:
+        if instance.db_type not in {"pgsql", "oracle"}:
+            return []
+
+        if schema_name:
+            table_ref = (
+                f"{InstanceService._quote_identifier(instance, schema_name)}."
+                f"{InstanceService._quote_identifier(instance, table_name)}"
+            )
+        else:
+            table_ref = InstanceService._quote_identifier(instance, table_name)
+
+        comment_lines: list[str] = []
+        for column in columns:
+            comment = str(column.get("column_comment") or "").strip()
+            column_name = str(column.get("column_name") or "").strip()
+            if not comment or not column_name:
+                continue
+            comment_lines.append(
+                f"COMMENT ON COLUMN {table_ref}.{InstanceService._quote_identifier(instance, column_name)} "
+                f"IS '{InstanceService._escape_sql_literal(comment)}';"
+            )
+        return comment_lines
+
+    @staticmethod
+    def _is_system_generated_constraint(constraint_name: str) -> bool:
+        normalized = constraint_name.strip().upper()
+        return normalized.startswith("SYS_C") or normalized.startswith("BIN$")
+
+    @staticmethod
+    def _is_simple_not_null_check(constraint: dict[str, Any]) -> bool:
+        if str(constraint.get("constraint_type") or "").upper() != "CHECK":
+            return False
+        column_names = InstanceService._split_column_names(constraint.get("column_names"))
+        if len(column_names) != 1:
+            return False
+        column_name = column_names[0].replace('"', "").strip().upper()
+        check_clause = str(constraint.get("check_clause") or "").strip().upper()
+        compact_clause = " ".join(check_clause.replace('"', "").replace("(", " ").replace(")", " ").split())
+        return compact_clause in {f"CHECK {column_name} IS NOT NULL", f"{column_name} IS NOT NULL"}
+
+    @staticmethod
+    def _quote_identifier(instance: Instance, identifier: str) -> str:
+        if instance.db_type in {"mysql", "tidb", "doris"}:
+            return f"`{identifier}`"
+        return f'"{identifier}"'
+
+    @staticmethod
+    def _split_column_names(value: str | None) -> list[str]:
+        return [item.strip() for item in str(value or "").split(",") if item.strip()]
+
+    @staticmethod
+    def _build_constraint_clause(
+        instance: Instance,
+        constraint: dict[str, Any],
+    ) -> str:
+        constraint_type = str(constraint.get("constraint_type") or "").upper()
+        constraint_name = str(constraint.get("constraint_name") or "").strip()
+        column_names = InstanceService._split_column_names(constraint.get("column_names"))
+        referenced_table = str(constraint.get("referenced_table_name") or "").strip()
+        referenced_columns = InstanceService._split_column_names(
+            constraint.get("referenced_column_names")
+        )
+        check_clause = str(constraint.get("check_clause") or "").strip()
+
+        quoted_columns = ", ".join(
+            InstanceService._quote_identifier(instance, column_name)
+            for column_name in column_names
+        )
+        named_prefix = (
+            f"CONSTRAINT {InstanceService._quote_identifier(instance, constraint_name)} "
+            if constraint_name and constraint_name != "PRIMARY"
+            else ""
+        )
+
+        if constraint_type == "PRIMARY KEY" and quoted_columns:
+            return f"PRIMARY KEY ({quoted_columns})"
+        if constraint_type == "UNIQUE" and quoted_columns:
+            return f"{named_prefix}UNIQUE ({quoted_columns})"
+        if constraint_type == "FOREIGN KEY" and quoted_columns and referenced_table:
+            quoted_ref_columns = ", ".join(
+                InstanceService._quote_identifier(instance, column_name)
+                for column_name in referenced_columns
+            )
+            ref_target = InstanceService._quote_identifier(instance, referenced_table)
+            reference_clause = (
+                f" REFERENCES {ref_target} ({quoted_ref_columns})"
+                if quoted_ref_columns
+                else f" REFERENCES {ref_target}"
+            )
+            return f"{named_prefix}FOREIGN KEY ({quoted_columns}){reference_clause}"
+        if constraint_type == "CHECK" and check_clause:
+            if InstanceService._is_system_generated_constraint(constraint_name) and InstanceService._is_simple_not_null_check(constraint):
+                return ""
+            normalized_check = check_clause
+            if normalized_check.upper().startswith("CHECK"):
+                normalized_check = normalized_check[5:].strip()
+            if InstanceService._is_system_generated_constraint(constraint_name):
+                named_prefix = ""
+            return f"{named_prefix}CHECK {normalized_check}"
+        return ""
+
+    @staticmethod
+    def _build_generic_table_ddl(
+        instance: Instance,
+        tb_name: str,
+        columns: list[dict[str, Any]],
+        constraints: list[dict[str, Any]],
+    ) -> str:
+        table_name = InstanceService._quote_identifier(instance, tb_name)
+        lines: list[str] = []
+
+        for column in columns:
+            column_name = InstanceService._quote_identifier(
+                instance, str(column.get("column_name") or "")
+            )
+            column_type = str(column.get("column_type") or "text").strip()
+            nullable = str(column.get("is_nullable") or "YES").upper()
+            default_value = InstanceService._normalize_default_expression(column.get("column_default"))
+            column_parts = [column_name, column_type]
+            if nullable in {"NO", "N", "FALSE"} or column.get("is_nullable") is False:
+                column_parts.append("NOT NULL")
+            if default_value:
+                column_parts.append(f"DEFAULT {default_value}")
+            lines.append(f"  {' '.join(column_parts)}")
+
+        for constraint in constraints:
+            clause = InstanceService._build_constraint_clause(instance, constraint)
+            if clause:
+                lines.append(f"  {clause}")
+
+        body = ",\n".join(lines) if lines else "  -- no column metadata available"
+        ddl = f"CREATE TABLE {table_name} (\n{body}\n);"
+
+        comment_lines = InstanceService._build_comment_statements(instance, tb_name, columns)
+        if comment_lines:
+            ddl = f"{ddl}\n\n" + "\n".join(comment_lines)
+
+        return ddl
+
+    @staticmethod
+    def _simplify_oracle_ddl(raw_ddl: str) -> str:
+        simplified = raw_ddl.replace("\r\n", "\n").replace("\r", "\n").strip()
+        simplified = re.sub(
+            r'CREATE\s+TABLE\s+"[^"]+"\."([^"]+)"',
+            r'CREATE TABLE "\1"',
+            simplified,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        simplified = re.sub(
+            r'(GENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY)(?:\s*\([^)]*\)|(?:\s+(?:MINVALUE|MAXVALUE|NOMINVALUE|NOMAXVALUE|START\s+WITH|INCREMENT\s+BY|CACHE|NOCACHE|ORDER|NOORDER|CYCLE|NOCYCLE|KEEP|NOKEEP|SCALE|NOSCALE|\d+))+)',
+            r'\1',
+            simplified,
+            flags=re.IGNORECASE,
+        )
+        simplified = re.sub(r'\n\s*USING INDEX\b[^\n]*', '', simplified, flags=re.IGNORECASE)
+        simplified = re.sub(r'\bENABLE\b', '', simplified, flags=re.IGNORECASE)
+        simplified = re.sub(r'[ \t]+', ' ', simplified)
+        simplified = re.sub(r' +\n', '\n', simplified)
+        simplified = re.sub(r'\(\s*\n', '(\n', simplified)
+        simplified = re.sub(r'\n{3,}', '\n\n', simplified)
+        simplified = re.sub(r'\n\s+\)', '\n)', simplified)
+        return simplified.strip()
+
+    @staticmethod
+    async def _collect_table_metadata(
+        db: AsyncSession,
+        instance_id: int,
+        db_name: str,
+        tb_name: str,
+    ) -> tuple[Instance, str, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+        inst = await InstanceService._load_instance(db, instance_id)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        columns = await InstanceService.get_columns(db, instance_id, db_name, tb_name)
+        constraints = await InstanceService.get_constraints(db, instance_id, db_name, tb_name)
+        return inst, resolved_table_name, extra_kwargs, columns, constraints
+
     @staticmethod
     def _resolve_table_lookup(instance: Instance, db_name: str, tb_name: str) -> tuple[str, dict[str, Any]]:
         normalized_table = tb_name.strip()
@@ -367,6 +564,74 @@ class InstanceService:
             raise Exception(f"获取索引信息失败：{rs.error}")
         cols = rs.column_list or []
         return [InstanceService._normalize_index_row(row, cols) for row in rs.rows]
+
+    @staticmethod
+    async def get_table_ddl(
+        db: AsyncSession, instance_id: int, db_name: str, tb_name: str
+    ) -> dict[str, str | None]:
+        inst, resolved_table_name, extra_kwargs, columns, constraints = (
+            await InstanceService._collect_table_metadata(db, instance_id, db_name, tb_name)
+        )
+        engine = get_engine(inst)
+        source = "generated"
+        ddl = ""
+        raw_ddl = ""
+
+        try:
+            rs = await engine.describe_table(
+                db_name=db_name,
+                tb_name=resolved_table_name,
+                **extra_kwargs,
+            )
+            if rs.is_success and rs.rows:
+                lowered_columns = [str(col).lower() for col in (rs.column_list or [])]
+                if "create table" in lowered_columns:
+                    create_idx = lowered_columns.index("create table")
+                    first_row = rs.rows[0]
+                    if isinstance(first_row, dict):
+                        ddl = str(first_row.get(rs.column_list[create_idx], "")).strip()
+                    elif isinstance(first_row, (tuple, list)) and len(first_row) > create_idx:
+                        ddl = str(first_row[create_idx]).strip()
+                    source = "engine"
+                    raw_ddl = ddl
+                elif inst.db_type in {"mysql", "tidb"} and len(rs.rows[0]) >= 2:
+                    first_row = rs.rows[0]
+                    if isinstance(first_row, (tuple, list)):
+                        ddl = str(first_row[1]).strip()
+                        source = "engine"
+                        raw_ddl = ddl
+        except Exception:
+            ddl = ""
+
+        if not ddl:
+            ddl = InstanceService._build_generic_table_ddl(
+                inst,
+                tb_name,
+                columns,
+                constraints,
+            )
+            source = "generated"
+            raw_ddl = ddl
+
+        copyable_ddl = ddl
+        if inst.db_type == "oracle":
+            oracle_comment_lines = InstanceService._build_comment_statements(
+                inst,
+                resolved_table_name,
+                columns,
+                schema_name=db_name,
+            )
+            if oracle_comment_lines and not all(line in (raw_ddl or ddl) for line in oracle_comment_lines):
+                raw_ddl = f"{(raw_ddl or ddl).rstrip()}\n\n" + "\n".join(oracle_comment_lines)
+            copyable_ddl = InstanceService._simplify_oracle_ddl(raw_ddl or ddl)
+
+        return {
+            "table_name": tb_name,
+            "ddl": copyable_ddl,
+            "copyable_ddl": copyable_ddl,
+            "raw_ddl": raw_ddl or ddl,
+            "source": source,
+        }
 
     @staticmethod
     async def get_variables(db: AsyncSession, instance_id: int) -> list[dict]:

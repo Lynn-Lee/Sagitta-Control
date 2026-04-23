@@ -101,6 +101,41 @@ class TestInstanceDataDictRouter:
         assert args[1:] == (1, "demo", "users")
 
     @pytest.mark.asyncio
+    async def test_get_ddl_returns_payload(
+        self, api_client, monkeypatch: pytest.MonkeyPatch, override_current_user
+    ):
+        monkeypatch.setattr(
+            instance_router,
+            "_ensure_data_dict_access",
+            AsyncMock(return_value=SimpleNamespace(id=1)),
+        )
+        get_table_ddl = AsyncMock(
+            return_value={
+                "table_name": "users",
+                "ddl": "CREATE TABLE users (id bigint)",
+                "copyable_ddl": "CREATE TABLE users (id bigint)",
+                "raw_ddl": "CREATE TABLE users (id bigint)",
+                "source": "engine",
+            }
+        )
+        monkeypatch.setattr(instance_router.InstanceService, "get_table_ddl", get_table_ddl)
+
+        resp = await api_client.get(
+            "/api/v1/instances/1/ddl/",
+            params={"db_name": "demo", "tb_name": "users"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "table_name": "users",
+            "ddl": "CREATE TABLE users (id bigint)",
+            "copyable_ddl": "CREATE TABLE users (id bigint)",
+            "raw_ddl": "CREATE TABLE users (id bigint)",
+            "source": "engine",
+        }
+        get_table_ddl.assert_awaited_once_with(ANY, 1, "demo", "users")
+
+    @pytest.mark.asyncio
     async def test_get_constraints_returns_payload(
         self, api_client, monkeypatch: pytest.MonkeyPatch, override_current_user
     ):

@@ -66,6 +66,13 @@ app/
 | Security Hardening — 安全加固 | ✅ 完成 |
 | 多级审批流 | ✅ 完成（v2-lite 首发 3 种审批人类型） |
 
+## 最近补充
+
+- Oracle 表 DDL 预览优先走 `DBMS_METADATA.GET_DDL('TABLE', ...)`
+- DDL 接口响应新增 `copyable_ddl / raw_ddl`，前端可切换“可复制 DDL / 原始 DDL”
+- PostgreSQL / Oracle 数据字典列查询已补齐 `column_comment`
+- PostgreSQL / Oracle 的 DDL 预览会追加 `COMMENT ON COLUMN ...`；其中 Oracle 原始 DDL 保留原生输出并补充注释语句
+
 ## 权限实现口径（v2-lite）
 
 后端当前以“单层单职责”为原则：

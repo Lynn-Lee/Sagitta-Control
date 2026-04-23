@@ -66,10 +66,13 @@ npm run build
 - Dashboard 实例与库概览模块包含 4 个卡片、实例类型分布、实例状态分布、库-Schema 状态分布；实例类型展示名统一为 `MySQL / PostgreSQL / Oracle / TiDB / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - Dashboard 中审批相关排行反映的是“当前权限范围内业务对象涉及的审批处理情况”，不等同于当前登录人的个人审批待办/已办工作量
 - 在线查询结果区支持自适应浏览器高度、`row_num` 行号列、分页与每页条数切换，以及当前页/全部结果导出
+- 在线查询页已收敛为三段式工作台：左侧表浏览器、中间 SQL 编辑器、底部 `DDL 预览 / 结果` Tab；表浏览器支持 `插入表名`、`生成 DDL`
+- `DDL 预览` 支持 `可复制 DDL / 原始 DDL` 双模式；`复制 DDL` 会按当前所见版本复制
 - 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持侧边菜单高亮
 - 登录页已适配窄屏窗口，登录卡片、第三方登录区和底部说明不会再发生横向溢出或遮挡
 - 列表页、详情页与工具页正在统一到共享 UI 骨架：`PageHeader / FilterCard / TableEmptyState / SectionLoading / SectionCard`
 - 在线查询、脱敏规则、归档、SQL 优化、SQL 回滚辅助等工具页已完成统一页头、区块卡片和空态/加载态收敛
+- 数据字典页已补齐 PostgreSQL / Oracle 列注释显示；对应 DDL 预览也会附带 `COMMENT ON COLUMN ...` 语句，便于直接复制到目标环境
 
 ## 目录说明
 

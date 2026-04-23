@@ -147,6 +147,14 @@ class TableListResponse(BaseModel):
     tables: list[str]
 
 
+class TableDDLResponse(BaseModel):
+    table_name: str
+    ddl: str
+    copyable_ddl: str | None = None
+    raw_ddl: str | None = None
+    source: str = "generated"
+
+
 class ColumnInfo(BaseModel):
     column_name: str
     column_type: str

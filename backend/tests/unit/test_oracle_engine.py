@@ -2,6 +2,10 @@
 Oracle 引擎驱动模式测试。
 """
 
+from types import SimpleNamespace
+
+import pytest
+
 import app.engines.oracle as oracle_module
 from app.engines.oracle import OracleEngine
 
@@ -96,3 +100,67 @@ class TestOracleDriverMode:
 
         assert "ORACLE_DRIVER_MODE=thick" in message
         assert "DPI-1047" in message
+
+
+class _MockCursor:
+    def __init__(self, ddl: str):
+        self.ddl = ddl
+        self.description = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        return None
+
+    def fetchone(self):
+        return (self.ddl,)
+
+
+class _MockConnection:
+    def __init__(self, ddl: str):
+        self.ddl = ddl
+
+    def cursor(self):
+        return _MockCursor(self.ddl)
+
+    def close(self):
+        return None
+
+
+class TestOracleDDL:
+    def test_get_table_ddl_uses_dbms_metadata(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        monkeypatch.setattr(engine, "_connect_sync", lambda: _MockConnection('CREATE TABLE "USERS" (\n  "ID" NUMBER\n);\n'))
+
+        rs = engine._get_table_ddl_sync("demo", "users")
+
+        assert rs.is_success
+        assert rs.column_list == ["CREATE TABLE"]
+        assert rs.rows == [('CREATE TABLE "USERS" (\n  "ID" NUMBER\n);',)]
+
+
+class TestOracleMetadataQueries:
+    @pytest.mark.asyncio
+    async def test_get_all_columns_by_tb_queries_column_comments(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        def fake_run_query_sync(sql, params=None):
+            captured["sql"] = sql
+            captured["params"] = params
+            return SimpleNamespace(is_success=True, rows=[], column_list=[])
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        await engine.get_all_columns_by_tb("demo_schema", "users_demo")
+
+        sql = str(captured["sql"])
+        assert "FROM all_tab_columns c" in sql
+        assert "LEFT JOIN all_col_comments cm" in sql
+        assert captured["params"] == {"owner": "DEMO_SCHEMA", "table_name": "USERS_DEMO"}

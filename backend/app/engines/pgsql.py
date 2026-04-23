@@ -109,7 +109,8 @@ class PgSQLEngine:
 
     async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         schema = kwargs.get("schema", "public")
-        sql = """SELECT column_name, data_type, is_nullable, column_default
+        sql = """SELECT column_name, data_type, is_nullable, column_default,
+                        col_description((table_schema||'.'||table_name)::regclass::oid, ordinal_position) AS column_comment
                  FROM information_schema.columns
                  WHERE table_name = $1 AND table_schema = $2
                  ORDER BY ordinal_position"""

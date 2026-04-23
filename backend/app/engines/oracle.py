@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import platform
+import re
 import time
 from threading import Lock
 from typing import TYPE_CHECKING, Any
@@ -34,6 +35,12 @@ logger = logging.getLogger(__name__)
 _ORACLE_CLIENT_INIT_LOCK = Lock()
 _ORACLE_CLIENT_INIT_ATTEMPTED = False
 _ORACLE_CLIENT_INIT_ERROR: str | None = None
+_RAW_DDL_TRANSFORM_SQL = """
+BEGIN
+    DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SQLTERMINATOR', true);
+    DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'PRETTY', true);
+END;
+"""
 
 
 def _build_thick_mode_error(exc: Exception) -> str:
@@ -185,10 +192,18 @@ class OracleEngine:
 
     async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = """
-        SELECT column_name, data_type, nullable, data_default
-        FROM all_tab_columns
-        WHERE owner = :owner AND table_name = :table_name
-        ORDER BY column_id
+        SELECT c.column_name,
+               c.data_type,
+               c.nullable,
+               c.data_default,
+               COALESCE(cm.comments, '') AS column_comment
+        FROM all_tab_columns c
+        LEFT JOIN all_col_comments cm
+          ON c.owner = cm.owner
+         AND c.table_name = cm.table_name
+         AND c.column_name = cm.column_name
+        WHERE c.owner = :owner AND c.table_name = :table_name
+        ORDER BY c.column_id
         """
         return await asyncio.to_thread(
             self._run_query_sync,
@@ -197,7 +212,51 @@ class OracleEngine:
         )
 
     async def describe_table(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
+        rs = await asyncio.to_thread(self._get_table_ddl_sync, db_name, tb_name)
+        if rs.is_success and rs.rows:
+            return rs
         return await self.get_all_columns_by_tb(db_name, tb_name, **kwargs)
+
+    def _normalize_ddl_text(self, ddl: str) -> str:
+        normalized = ddl.replace("\r\n", "\n").replace("\r", "\n").strip()
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+        return normalized
+
+    def _get_table_ddl_sync(self, db_name: str, tb_name: str) -> ResultSet:
+        rs = ResultSet()
+        start = time.monotonic()
+        conn = None
+        try:
+            conn = self._connect_sync()
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(_RAW_DDL_TRANSFORM_SQL)
+                except Exception as exc:
+                    logger.info("oracle_set_metadata_transform_failed: %s", exc)
+                cur.execute(
+                    """
+                    SELECT DBMS_METADATA.GET_DDL('TABLE', :table_name, :owner) AS create_table
+                    FROM dual
+                    """,
+                    {"table_name": tb_name.upper(), "owner": db_name.upper()},
+                )
+                row = cur.fetchone()
+                ddl = row[0] if row else None
+                if ddl is None:
+                    rs.error = "未获取到表 DDL"
+                else:
+                    ddl_text = ddl.read() if hasattr(ddl, "read") else str(ddl)
+                    rs.column_list = ["CREATE TABLE"]
+                    rs.rows = [(self._normalize_ddl_text(ddl_text),)]
+                    rs.affected_rows = 1
+        except Exception as exc:
+            rs.error = _normalize_oracle_connect_error(exc)
+            logger.info("oracle_get_table_ddl_failed: %s", rs.error)
+        finally:
+            if conn is not None:
+                conn.close()
+            rs.cost_time = int((time.monotonic() - start) * 1000)
+        return rs
 
     async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
         rs = await self.get_all_tables(db_name)

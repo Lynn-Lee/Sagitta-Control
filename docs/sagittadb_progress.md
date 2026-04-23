@@ -112,6 +112,8 @@
 - 已生效查询权限支持申请用户、资源组 DBA、全局 DBA、超管按权限范围撤销
 - 查询权限撤销记录完整保留撤销时间、撤销人、撤销原因；历史软删除记录通过迁移回填为“系统/历史数据”
 - 查询权限页新增统一治理视角管理页和“已撤销权限”视图
+- 在线查询工作台已重构为：左侧表浏览器、中间 SQL 编辑器、底部 `DDL 预览 / 结果` Tab
+- 表浏览器支持 `插入表名`、`生成 DDL`；`DDL 预览` 支持 `可复制 DDL / 原始 DDL` 双模式与 `复制 DDL`
 - 数据脱敏（sqlglot 解析所有方言，替代 goInception）：
   - 7 种内置规则（邮箱/手机号/银行卡/身份证/姓名/地址/自定义正则）
   - 按实例/数据库/表/列精确匹配
@@ -209,6 +211,8 @@
 - 索引信息：主键索引、唯一索引、普通索引、是否联合索引、索引列
 - 当前关系型数据库优先支持：`MySQL / TiDB / PostgreSQL / Oracle / MSSQL`
 - TiDB 复用 MySQL 元数据实现；Doris / Cassandra / Elasticsearch 仍待补齐或验证
+- PostgreSQL / Oracle 列注释链路已补齐：数据字典字段详情可直接展示 `column_comment`
+- PostgreSQL / Oracle 生成 DDL 会补充 `COMMENT ON COLUMN ...`；Oracle 同时保留 `DBMS_METADATA.GET_DDL` 原始版本供 DBA 查看
 
 **数据归档**
 - 全数据库支持矩阵（不支持的返回明确提示）

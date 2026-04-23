@@ -20,6 +20,14 @@ export interface InstanceDatabase {
   db_name_label: string
 }
 
+export interface TableDDLResponse {
+  table_name: string
+  ddl: string
+  copyable_ddl?: string
+  raw_ddl?: string
+  source: 'engine' | 'generated'
+}
+
 export interface InstanceListResponse {
   total: number
   page: number
@@ -49,6 +57,16 @@ export const instanceApi = {
   // 数据字典数据库列表：基于已注册库并带启用状态
   getDatabases: (id: number) =>
     apiClient.get<{ databases: InstanceDatabase[] }>(`/instances/${id}/databases/`).then(r => r.data),
+
+  getTables: (instanceId: number, dbName: string) =>
+    apiClient.get<{ tables: string[] }>(`/instances/${instanceId}/tables/`, {
+      params: { db_name: dbName }
+    }).then(r => r.data),
+
+  getTableDdl: (instanceId: number, dbName: string, tableName: string) =>
+    apiClient.get<TableDDLResponse>(`/instances/${instanceId}/ddl/`, {
+      params: { db_name: dbName, tb_name: tableName }
+    }).then(r => r.data),
 
   // ── 数据库注册管理（Pack C2）──────────────────────────────
 

@@ -211,6 +211,19 @@ async def get_columns(
     return {"columns": columns}
 
 
+@router.get("/{instance_id}/ddl/", summary="获取表建表语句")
+async def get_table_ddl(
+    instance_id: int,
+    db_name: str = Query(...),
+    tb_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(current_user),
+):
+    await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
+    ddl = await InstanceService.get_table_ddl(db, instance_id, db_name, tb_name)
+    return ddl
+
+
 @router.get("/{instance_id}/constraints/", summary="获取表约束信息")
 async def get_constraints(
     instance_id: int,
