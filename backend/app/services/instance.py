@@ -219,7 +219,9 @@ class InstanceService:
         tb_name: str,
     ) -> tuple[Instance, str, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
         inst = await InstanceService._load_instance(db, instance_id)
-        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(
+            inst, db_name, tb_name
+        )
         columns = await InstanceService.get_columns(db, instance_id, db_name, tb_name)
         constraints = await InstanceService.get_constraints(db, instance_id, db_name, tb_name)
         return inst, resolved_table_name, extra_kwargs, columns, constraints
@@ -520,7 +522,9 @@ class InstanceService:
     ) -> list[dict]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
-        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(
+            inst, db_name, tb_name
+        )
         rs = await engine.get_all_columns_by_tb(
             db_name=db_name,
             tb_name=resolved_table_name,
@@ -541,7 +545,9 @@ class InstanceService:
         if getter is None:
             return []
 
-        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(inst, db_name, tb_name)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(
+            inst, db_name, tb_name
+        )
         rs = await getter(db_name=db_name, tb_name=resolved_table_name, **extra_kwargs)
         if not rs.is_success:
             raise Exception(f"获取约束信息失败：{rs.error}")
@@ -569,13 +575,16 @@ class InstanceService:
     async def get_table_ddl(
         db: AsyncSession, instance_id: int, db_name: str, tb_name: str
     ) -> dict[str, str | None]:
-        inst, resolved_table_name, extra_kwargs, columns, constraints = (
-            await InstanceService._collect_table_metadata(db, instance_id, db_name, tb_name)
+        inst = await InstanceService._load_instance(db, instance_id)
+        resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(
+            inst, db_name, tb_name
         )
         engine = get_engine(inst)
         source = "generated"
         ddl = ""
         raw_ddl = ""
+        columns: list[dict[str, Any]] = []
+        constraints: list[dict[str, Any]] = []
 
         try:
             rs = await engine.describe_table(
@@ -604,6 +613,18 @@ class InstanceService:
             ddl = ""
 
         if not ddl:
+            try:
+                columns = await InstanceService.get_columns(
+                    db, instance_id, db_name, tb_name
+                )
+            except Exception:
+                columns = []
+            try:
+                constraints = await InstanceService.get_constraints(
+                    db, instance_id, db_name, tb_name
+                )
+            except Exception:
+                constraints = []
             ddl = InstanceService._build_generic_table_ddl(
                 inst,
                 tb_name,
@@ -615,13 +636,22 @@ class InstanceService:
 
         copyable_ddl = ddl
         if inst.db_type == "oracle":
+            if not columns:
+                try:
+                    columns = await InstanceService.get_columns(
+                        db, instance_id, db_name, tb_name
+                    )
+                except Exception:
+                    columns = []
             oracle_comment_lines = InstanceService._build_comment_statements(
                 inst,
                 resolved_table_name,
                 columns,
                 schema_name=db_name,
             )
-            if oracle_comment_lines and not all(line in (raw_ddl or ddl) for line in oracle_comment_lines):
+            if oracle_comment_lines and not all(
+                line in (raw_ddl or ddl) for line in oracle_comment_lines
+            ):
                 raw_ddl = f"{(raw_ddl or ddl).rstrip()}\n\n" + "\n".join(oracle_comment_lines)
             copyable_ddl = InstanceService._simplify_oracle_ddl(raw_ddl or ddl)
 

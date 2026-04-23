@@ -278,7 +278,7 @@ class OracleEngine:
             LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
             MAX(ref.table_name) AS referenced_table_name,
             LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names,
-            COALESCE(MAX(CASE WHEN c.constraint_type = 'C' THEN c.search_condition_vc END), '') AS check_clause
+            '' AS check_clause
         FROM all_constraints c
         JOIN all_cons_columns cols
           ON c.owner = cols.owner
@@ -317,7 +317,7 @@ class OracleEngine:
             LISTAGG(cols.column_name, ', ') WITHIN GROUP (ORDER BY cols.position) AS column_names,
             MAX(ref.table_name) AS referenced_table_name,
             LISTAGG(ref_cols.column_name, ', ') WITHIN GROUP (ORDER BY ref_cols.position) AS referenced_column_names,
-            COALESCE(MAX(CASE WHEN c.constraint_type = 'C' THEN c.search_condition_vc END), '') AS check_clause
+            '' AS check_clause
         FROM user_constraints c
         JOIN user_cons_columns cols
           ON c.constraint_name = cols.constraint_name

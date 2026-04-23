@@ -35,6 +35,14 @@ class FakeEngine:
         return self._indexes
 
 
+class FakeDdlEngine(FakeEngine):
+    async def describe_table(self, db_name: str, tb_name: str, **kwargs):
+        return ResultSet(
+            column_list=["CREATE TABLE"],
+            rows=[('CREATE TABLE "DEMO_SCHEMA"."DEMO_EVENTS" ("EVENT_ID" VARCHAR2(30 CHAR));',)],
+        )
+
+
 async def _stub_load_instance(_db, _instance_id):
     return SimpleNamespace(id=1, db_type="stub")
 
@@ -451,3 +459,31 @@ class TestRelationalDataDictIndexes:
                 "index_comment": "",
             }
         ]
+
+
+class TestRelationalTableDDL:
+    @pytest.mark.asyncio
+    async def test_oracle_engine_ddl_is_not_blocked_by_constraint_metadata(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        engine = FakeDdlEngine()
+
+        async def stub_load_instance(_db, _instance_id):
+            return SimpleNamespace(id=1, db_type="oracle")
+
+        async def stub_get_columns(_db, _instance_id, _db_name, _tb_name):
+            return []
+
+        async def fail_get_constraints(*_args, **_kwargs):
+            raise AssertionError("constraints should not be fetched when engine DDL succeeds")
+
+        monkeypatch.setattr(InstanceService, "_load_instance", staticmethod(stub_load_instance))
+        monkeypatch.setattr(InstanceService, "get_columns", staticmethod(stub_get_columns))
+        monkeypatch.setattr(InstanceService, "get_constraints", staticmethod(fail_get_constraints))
+        monkeypatch.setattr("app.services.instance.get_engine", lambda inst: engine)
+
+        result = await InstanceService.get_table_ddl(None, 1, "DEMO_SCHEMA", "DEMO_EVENTS")
+
+        assert result["source"] == "engine"
+        assert 'CREATE TABLE "DEMO_EVENTS"' in result["ddl"]
+        assert 'CREATE TABLE "DEMO_SCHEMA"."DEMO_EVENTS"' in result["raw_ddl"]

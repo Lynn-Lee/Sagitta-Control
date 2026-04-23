@@ -164,3 +164,25 @@ class TestOracleMetadataQueries:
         assert "FROM all_tab_columns c" in sql
         assert "LEFT JOIN all_col_comments cm" in sql
         assert captured["params"] == {"owner": "DEMO_SCHEMA", "table_name": "USERS_DEMO"}
+
+    @pytest.mark.asyncio
+    async def test_constraint_query_avoids_12c_only_search_condition_vc(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        def fake_run_query_sync(sql, params=None):
+            captured["sql"] = sql
+            captured["params"] = params
+            return SimpleNamespace(is_success=True, rows=[], column_list=[])
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        await engine.get_table_constraints("demo_schema", "users_demo")
+
+        sql = str(captured["sql"])
+        assert "SEARCH_CONDITION_VC" not in sql
+        assert "'' AS check_clause" in sql
+        assert captured["params"] == {"owner": "DEMO_SCHEMA", "table_name": "USERS_DEMO"}
