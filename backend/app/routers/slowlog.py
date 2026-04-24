@@ -58,6 +58,26 @@ async def list_slow_queries(
             LIMIT {limit}
         """
         rs = await engine.query(db_name="information_schema", sql=sql, limit_num=limit)
+    elif inst.db_type == "starrocks":
+        rs = await engine.processlist(command_type="ALL")
+        if rs.is_success:
+            def _time_value(row: object) -> int:
+                if isinstance(row, dict):
+                    value = row.get("Time", row.get("TIME", 0))
+                    try:
+                        return int(value or 0)
+                    except Exception:
+                        return 0
+                return 0
+
+            rs.rows = [
+                row for row in rs.rows
+                if (
+                    not isinstance(row, dict)
+                    or str(row.get("Command", row.get("COMMAND", ""))).lower() != "sleep"
+                )
+                and _time_value(row) > 1
+            ][:limit]
     else:
         return {"items": [], "msg": f"{inst.db_type} 暂不支持慢查询分析"}
 

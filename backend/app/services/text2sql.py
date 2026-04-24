@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 _DIALECT_NAMES: dict[str, str] = {
     "mysql": "MySQL",
+    "starrocks": "StarRocks",
     "pgsql": "PostgreSQL",
     "oracle": "Oracle",
     "mssql": "SQL Server",

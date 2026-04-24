@@ -44,7 +44,7 @@ async def explain_sql(
     if inst.db_type == "pgsql":
         explain_sql = f"EXPLAIN (FORMAT JSON, ANALYZE false, BUFFERS false) {data.sql.rstrip(';')}"
         rs = await engine.query(db_name=data.db_name, sql=explain_sql, limit_num=0)
-    elif inst.db_type == "mysql":
+    elif inst.db_type in {"mysql", "starrocks"}:
         explain_sql = f"EXPLAIN {data.sql.rstrip(';')}"
         rs = await engine.query(db_name=data.db_name, sql=explain_sql, limit_num=100)
     else:
@@ -78,7 +78,7 @@ async def sql_advice(
         raise HTTPException(404, "实例不存在")
 
     dialect_map = {
-        "mysql": "mysql", "pgsql": "postgres", "oracle": "oracle",
+        "mysql": "mysql", "starrocks": "mysql", "pgsql": "postgres", "oracle": "oracle",
         "clickhouse": "clickhouse", "mssql": "tsql",
     }
     dialect = dialect_map.get(inst.db_type, "mysql")

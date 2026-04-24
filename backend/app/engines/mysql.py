@@ -1,6 +1,6 @@
 """
 MySQL 引擎实现。
-支持：MySQL 5.7+ / MariaDB / TiDB / OceanBase / Doris（通过子类）
+支持：MySQL 5.7+ / MariaDB / TiDB / OceanBase
 
 安全修复：
 - P0-2：基础审核用 sqlglot，goInception 降级为可选增强（不再在 SQL 中传密码）

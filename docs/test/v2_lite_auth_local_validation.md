@@ -30,7 +30,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 - 浏览器标题显示为 `矢 准 数 据`
 - 资源组弹窗只保留“关联数据库实例 / 关联用户组 / 状态”
 - 用户组编辑时不可继续关联停用资源组
-- 数据库类型显示统一为 `MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
+- 数据库类型显示统一为 `MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - SQL 工单提交页不再手动选择资源组，系统按权限链路自动解析
 - 核心后台列表页统一了固定列宽、横向滚动和关键字段展示
 - 实例管理中的数据库/Schema 同步会全量对齐当前连接用户真实可见范围

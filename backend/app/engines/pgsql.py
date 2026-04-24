@@ -213,7 +213,8 @@ class PgSQLEngine:
                       WHEN position(',' in COALESCE(substring(indexdef FROM '\((.*)\)'), '')) > 0 THEN 'YES'
                       ELSE 'NO'
                     END AS is_composite,
-                    '' AS index_comment
+                    '' AS index_comment,
+                    indexdef AS index_definition
                  FROM pg_indexes
                  WHERE schemaname = $1 AND tablename = $2
                  ORDER BY

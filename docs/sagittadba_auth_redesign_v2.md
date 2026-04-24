@@ -359,7 +359,7 @@ def get_user_accessible_instances(user):
 - 资源组创建/编辑弹窗只保留：`group_name / group_name_cn / instance_ids / user_group_ids / is_active`
 - 资源组级 Webhook 不再作为首发权限模型的一部分，通知主路径统一走系统配置
 - 用户组编辑页只允许选择启用中的资源组；历史停用资源组仍可在列表中看到，但不会继续作为可选项
-- 前端数据库类型显示统一使用官方名称：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
+- 前端数据库类型显示统一使用官方名称：`MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 
 ---
 

@@ -119,7 +119,7 @@ class RollbackService:
         - DDL 的逆向需要人工处理
         """
         dialect_map = {
-            "mysql": "mysql", "tidb": "mysql", "doris": "mysql",
+            "mysql": "mysql", "tidb": "mysql", "starrocks": "mysql", "doris": "mysql",
             "pgsql": "postgres", "oracle": "oracle", "mssql": "tsql",
             "clickhouse": "clickhouse",
         }

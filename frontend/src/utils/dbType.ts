@@ -1,5 +1,6 @@
 export const DB_TYPE_LABELS: Record<string, string> = {
   mysql: 'MySQL',
+  starrocks: 'StarRocks',
   postgres: 'PostgreSQL',
   pgsql: 'PostgreSQL',
   postgresql: 'PostgreSQL',

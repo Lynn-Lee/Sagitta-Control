@@ -83,7 +83,7 @@
 - 用户批量导入默认密码示例调整为 `Sagitta@2026A`，满足长度、数字、大小写字母和特殊字符规则
 
 **实例管理**
-- 11 种数据库类型支持（MySQL/PostgreSQL/Oracle/MongoDB/Redis/ClickHouse/Elasticsearch/OpenSearch/MSSQL/Cassandra/Doris/TiDB）
+- 13 种数据库类型支持（MySQL/PostgreSQL/Oracle/MongoDB/Redis/ClickHouse/Elasticsearch/OpenSearch/MSSQL/Cassandra/Doris/TiDB/StarRocks）
 - 实例 CRUD + 测试连接
 - Fernet 对称加密存储密码字段
 - SSH 隧道配置（跳板机连接）
@@ -113,7 +113,7 @@
 - 查询权限撤销记录完整保留撤销时间、撤销人、撤销原因；历史软删除记录通过迁移回填为“系统/历史数据”
 - 查询权限页新增统一治理视角管理页和“已撤销权限”视图
 - 在线查询工作台已重构为：左侧表浏览器、中间 SQL 编辑器、底部 `DDL 预览 / 结果` Tab
-- 表浏览器支持 `插入表名`、`生成 DDL`；`DDL 预览` 支持 `可复制 DDL / 原始 DDL` 双模式与 `复制 DDL`
+- 表浏览器支持标题行 `插入表名`；选择表后自动刷新 `DDL 预览`，支持 `简化 DDL / 原始 DDL` 双模式与 `复制 DDL`
 - 数据脱敏（sqlglot 解析所有方言，替代 goInception）：
   - 7 种内置规则（邮箱/手机号/银行卡/身份证/姓名/地址/自定义正则）
   - 按实例/数据库/表/列精确匹配
@@ -199,6 +199,7 @@
 | MySQL | ✅ | 完整实现 |
 | PostgreSQL | ✅ | 完整实现（含数据字典列/约束/索引） |
 | Oracle | ✅ | 数据字典列/约束/索引已实现，需真实环境验证 |
+| StarRocks | ✅ | 独立引擎实现，使用 FE MySQL 协议连接，按 StarRocks 语义补齐查询、元数据、审核、监控与 purge 归档 |
 | MongoDB | ✅ | 完整实现（含 processlist / metrics） |
 | Redis | ✅ | 白名单安全控制，16 数据库，INFO 指标 |
 | ClickHouse | ✅ | clickhouse-connect HTTP 协议 |
@@ -211,10 +212,10 @@
 - 字段信息：列名、数据类型、可空、默认值、注释
 - 表约束：主键、唯一键、外键、引用表/列
 - 索引信息：主键索引、唯一索引、普通索引、是否联合索引、索引列
-- 当前关系型数据库优先支持：`MySQL / TiDB / PostgreSQL / Oracle / MSSQL`
+- 当前关系型数据库优先支持：`MySQL / TiDB / StarRocks / PostgreSQL / Oracle / MSSQL`
 - TiDB 复用 MySQL 元数据实现；Doris / Cassandra / Elasticsearch 仍待补齐或验证
 - PostgreSQL / Oracle 列注释链路已补齐：数据字典字段详情可直接展示 `column_comment`
-- PostgreSQL / Oracle 生成 DDL 会补充 `COMMENT ON COLUMN ...`；Oracle 同时保留 `DBMS_METADATA.GET_DDL` 原始版本供 DBA 查看
+- PostgreSQL / Oracle 生成 DDL 会补充 `COMMENT ON COLUMN ...`；Oracle `简化 DDL` 会剥离 storage/tablespace 等物理属性，`原始 DDL` 保留 `DBMS_METADATA.GET_DDL` 原始版本供 DBA 查看；PostgreSQL `简化 DDL` 会追加普通索引定义并跳过主键/唯一约束重复索引
 
 **数据归档**
 - 全数据库支持矩阵（不支持的返回明确提示）

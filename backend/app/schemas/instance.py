@@ -39,7 +39,7 @@ class TunnelResponse(BaseModel):
 DB_TYPES = [
     "mysql", "tidb", "pgsql", "oracle", "mongo", "redis",
     "clickhouse", "elasticsearch", "opensearch",
-    "mssql", "cassandra", "doris",
+    "mssql", "cassandra", "doris", "starrocks",
 ]
 
 

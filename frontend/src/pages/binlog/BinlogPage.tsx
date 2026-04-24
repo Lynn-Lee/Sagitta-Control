@@ -78,7 +78,7 @@ export default function BinlogPage() {
                 <Form.Item name="db_type" label="数据库类型"
                   rules={[{ required: true }]} initialValue="mysql">
                   <Select>
-                    {['mysql', 'tidb', 'pgsql', 'oracle', 'mssql', 'clickhouse', 'doris'].map(t => (
+                    {['mysql', 'tidb', 'starrocks', 'pgsql', 'oracle', 'mssql', 'clickhouse', 'doris'].map(t => (
                       <Option key={t} value={t}>{formatDbTypeLabel(t)}</Option>
                     ))}
                   </Select>

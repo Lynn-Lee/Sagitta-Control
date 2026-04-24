@@ -356,6 +356,7 @@ class TestRelationalDataDictIndexes:
                 "column_names": "email, tenant_id",
                 "is_composite": "YES",
                 "index_comment": "联合检索",
+                "index_definition": "",
             }
         ]
 
@@ -391,8 +392,18 @@ class TestRelationalDataDictIndexes:
                     "column_names",
                     "is_composite",
                     "index_comment",
+                    "index_definition",
                 ],
-                rows=[("users_pkey", "PRIMARY KEY INDEX", "id", "NO", "")],
+                rows=[
+                    (
+                        "idx_users_email",
+                        "INDEX",
+                        "email",
+                        "NO",
+                        "",
+                        "CREATE INDEX idx_users_email ON public.users USING btree (email)",
+                    )
+                ],
             )
         )
         _patch_engine(monkeypatch, engine)
@@ -401,11 +412,12 @@ class TestRelationalDataDictIndexes:
 
         assert result == [
             {
-                "index_name": "users_pkey",
-                "index_type": "PRIMARY KEY INDEX",
-                "column_names": "id",
+                "index_name": "idx_users_email",
+                "index_type": "INDEX",
+                "column_names": "email",
                 "is_composite": "NO",
                 "index_comment": "",
+                "index_definition": "CREATE INDEX idx_users_email ON public.users USING btree (email)",
             }
         ]
 
@@ -457,6 +469,7 @@ class TestRelationalDataDictIndexes:
                 "column_names": "status, created_at",
                 "is_composite": "YES",
                 "index_comment": "",
+                "index_definition": "",
             }
         ]
 

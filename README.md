@@ -113,7 +113,7 @@ SagittaDB/
 ## 数据字典近况
 
 - 数据字典已从“字段浏览”扩展为“字段 + 约束详情 + 索引信息”三块联动展示。
-- 当前关系型数据库优先支持：`MySQL / TiDB / PostgreSQL / Oracle / MSSQL`。
+- 当前关系型数据库优先支持：`MySQL / TiDB / StarRocks / PostgreSQL / Oracle / MSSQL`。
 - 表字段详情页已针对长默认值、长注释做了单行省略、悬浮查看与横向滚动优化，避免长文本挤压列名换行。
 - PostgreSQL / Oracle 的列注释链路已补齐：数据字典会直接展示 `column_comment`，DDL 预览也会追加对应的 `COMMENT ON COLUMN ...` 语句。
 - 后端新增了统一元数据归一化层，前端无需按数据库类型分别适配约束/索引字段名。
@@ -172,7 +172,7 @@ SagittaDB/
     - 实例类型分布
     - 实例状态分布
     - 库-Schema 状态分布
-    - 实例类型展示名统一使用规范命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
+    - 实例类型展示名统一使用规范命名：`MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
   - 全部统计按当前登录用户权限范围裁剪，模块内部统一使用同一个时间范围（`7/14/30/60` 天 + 自定义天数）
   - 审批相关排行与统计反映“当前权限范围内业务对象涉及的审批处理”，不等同于当前登录人的个人待办/已办工作量
 
@@ -197,10 +197,10 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - Oracle 实例同步遵循统一规则：高权限账号可同步更多 Schema，普通 Schema 用户仅同步自己当前真实可见的 Schema
 - 实例如果仍被资源组关联，删除时会被后端拒绝，并明确提示“请到资源组管理中移除该实例后再删除”
 - 在线查询执行时会按当前有效查询权限真实限制返回最大行数；重复有效授权记录不再导致内部错误
-- 在线查询页已重构为三段式工作台：左侧表浏览器、中间 SQL 编辑器、底部 `DDL 预览 / 结果` Tab；支持 `插入表名`、`生成 DDL` 与 `复制 DDL`
+- 在线查询页已重构为三段式工作台：左侧表浏览器、中间 SQL 编辑器、底部 `DDL 预览 / 结果` Tab；选择表后自动刷新 DDL 预览，表浏览器标题行保留 `插入表名`，底部支持 `复制 DDL`
 - 在线查询新增 `查询历史` 页面：按现有 v2-lite 查询治理范围展示“谁在何时执行/导出了什么 SQL、多少行、耗时、是否脱敏、来源 IP、是否失败”
 - 在线查询导出已统一改为后端导出留痕，`查询` / `导出` 成功与失败都会写入 `query_log`；新增 Alembic 迁移 `0017_query_log_history_audit` 与 `0018_qlog_snapshot_backfill`
-- DDL 预览支持 `可复制 DDL / 原始 DDL` 双模式：默认给普通用户更简洁的可复制版本，Oracle 原始 DDL 则保留 `DBMS_METADATA.GET_DDL` 输出供 DBA 查看
+- DDL 预览支持 `简化 DDL / 原始 DDL` 双模式：默认给开发人员更简洁、可迁移的简化版本，Oracle 原始 DDL 保留 `DBMS_METADATA.GET_DDL` 输出供 DBA 查看；PostgreSQL 简化 DDL 会追加普通索引定义并跳过主键/唯一约束重复索引
 - 浏览器标题统一为 `矢 准 数 据`
 - 密码安全策略已下沉到所有本地用户：创建用户、批量导入、个人改密、登录强制改密都使用同一套复杂度规则；`password_changed_at` 支持 30 天过期与 7 天到期提醒
 - 登录页强制改密流程改为页内表单，提示文案会完整展示长度、数字、大小写字母、特殊字符和 30 天轮换要求
@@ -208,7 +208,7 @@ cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
 - 左侧主导航与系统管理子菜单已切换为统一的自定义单色 SVG 图标，并继续跟随 Ant Design 的默认尺寸、颜色与选中态机制
 - `SQL 工单`、`在线查询`、`运维工具` 的子菜单图标也已切换为同一套自定义 SVG；其中“慢日志分析”图标已按视觉尺寸做过一次收紧校准，避免在侧栏中显得偏小
 - 业务弹窗与业务抽屉已统一关闭遮罩点击自动关闭；用户点击黑色遮罩不再误关表单，但仍保留右上角 `X`、`Esc` 与取消按钮等显式关闭方式
-- 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
+- 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示
 - 主布局已支持响应式侧栏与移动端抽屉导航，详情页会按路由映射保持菜单高亮
 - 登录页、在线查询页、Dashboard 等首批高频页面已完成响应式与信息语义修正

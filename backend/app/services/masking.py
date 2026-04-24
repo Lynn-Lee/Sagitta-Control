@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # db_type → sqlglot 方言名映射
 DIALECT_MAP: dict[str, str] = {
     "mysql":         "mysql",
+    "starrocks":     "mysql",
     "pgsql":         "postgres",
     "oracle":        "oracle",
     "clickhouse":    "clickhouse",

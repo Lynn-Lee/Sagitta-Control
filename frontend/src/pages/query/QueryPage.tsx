@@ -129,14 +129,6 @@ export default function QueryPage() {
     msgApi.success(`已插入表名 ${selectedTable}`)
   }, [insertTextAtCursor, msgApi, selectedTable])
 
-  const handleGenerateDdl = useCallback(() => {
-    if (!selectedTable) {
-      msgApi.warning('请先选择一张表')
-      return
-    }
-    setActiveBottomTab('ddlPreview')
-  }, [msgApi, selectedTable])
-
   const handleCopyDdl = useCallback(async () => {
     if (!displayedDdl) return
     await navigator.clipboard.writeText(displayedDdl)
@@ -385,22 +377,10 @@ export default function QueryPage() {
                   <Text strong style={{ fontSize: 15 }}>表浏览器</Text>
                   {allTables.length > 0 && <Tag>{allTables.length}</Tag>}
                 </Space>
-                <Text type="secondary" style={{ fontSize: 12 }}>仅浏览表名</Text>
-              </div>
-              <Space size={8} wrap>
                 <Button size="small" onClick={handleInsertTableName} disabled={!selectedTable}>
                   插入表名
                 </Button>
-                <Button
-                  size="small"
-                  type="primary"
-                  onClick={handleGenerateDdl}
-                  disabled={!selectedTable}
-                  style={{ minWidth: 88, whiteSpace: 'nowrap' }}
-                >
-                  生成 DDL
-                </Button>
-              </Space>
+              </div>
             </div>
             <div style={{ padding: 12, borderBottom: '1px solid rgba(5, 5, 5, 0.06)' }}>
               <Input
@@ -569,7 +549,7 @@ export default function QueryPage() {
                         value={ddlViewMode}
                         onChange={(value) => setDdlViewMode(value)}
                         options={[
-                          { label: '可复制 DDL', value: 'copyable' },
+                          { label: '简化 DDL', value: 'copyable' },
                           { label: '原始 DDL', value: 'raw' },
                         ]}
                       />
@@ -593,7 +573,7 @@ export default function QueryPage() {
                   >
                     {!selectedTable ? (
                       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="从左侧选择一张表，然后点击生成 DDL 或直接查看预览" />
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="从左侧选择一张表后查看预览" />
                       </div>
                     ) : ddlAccessDenied ? (
                       <Alert type="warning" showIcon message="当前表暂无结构查看权限" />

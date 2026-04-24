@@ -100,8 +100,9 @@ class TestPgsqlDataDictSql:
 
         await engine.get_table_constraints("analytics", "users", schema="public")
 
-        assert "information_schema.table_constraints" in captured["sql"]
-        assert "information_schema.key_column_usage" in captured["sql"]
+        assert "FROM pg_constraint con" in captured["sql"]
+        assert "JOIN pg_class tbl" in captured["sql"]
+        assert "pg_get_constraintdef" in captured["sql"]
         assert captured["args"] == ["public", "users"]
 
     async def test_get_table_indexes_uses_pg_indexes(self, monkeypatch):
@@ -119,6 +120,7 @@ class TestPgsqlDataDictSql:
         await engine.get_table_indexes("analytics", "users", schema="public")
 
         assert "FROM pg_indexes" in captured["sql"]
+        assert "indexdef AS index_definition" in captured["sql"]
         assert "indexdef ILIKE" in captured["sql"]
         assert captured["args"] == ["public", "users"]
 

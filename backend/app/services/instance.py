@@ -154,6 +154,7 @@ class InstanceService:
         tb_name: str,
         columns: list[dict[str, Any]],
         constraints: list[dict[str, Any]],
+        indexes: list[dict[str, Any]] | None = None,
     ) -> str:
         table_name = InstanceService._quote_identifier(instance, tb_name)
         lines: list[str] = []
@@ -184,7 +185,66 @@ class InstanceService:
         if comment_lines:
             ddl = f"{ddl}\n\n" + "\n".join(comment_lines)
 
+        index_lines = InstanceService._build_index_statements(
+            instance,
+            tb_name,
+            indexes or [],
+            constraints,
+        )
+        if index_lines:
+            ddl = f"{ddl}\n\n" + "\n".join(index_lines)
+
         return ddl
+
+    @staticmethod
+    def _build_index_statements(
+        instance: Instance,
+        tb_name: str,
+        indexes: list[dict[str, Any]],
+        constraints: list[dict[str, Any]],
+    ) -> list[str]:
+        if instance.db_type != "pgsql":
+            return []
+
+        constraint_index_names = {
+            str(item.get("constraint_name") or "").strip().lower()
+            for item in constraints
+            if str(item.get("constraint_type") or "").upper() in {"PRIMARY KEY", "UNIQUE"}
+        }
+        table_name = InstanceService._quote_identifier(instance, tb_name)
+        statements: list[str] = []
+
+        for index in indexes:
+            index_name = str(index.get("index_name") or "").strip()
+            if not index_name:
+                continue
+            index_type = str(index.get("index_type") or "").upper()
+            if (
+                index_name.lower() in constraint_index_names
+                or "PRIMARY KEY" in index_type
+                or index_name.lower().endswith("_pkey")
+            ):
+                continue
+
+            definition = str(index.get("index_definition") or "").strip()
+            if definition:
+                statements.append(definition.rstrip(";") + ";")
+                continue
+
+            column_names = InstanceService._split_column_names(index.get("column_names"))
+            if not column_names:
+                continue
+            quoted_columns = ", ".join(
+                InstanceService._quote_identifier(instance, column_name)
+                for column_name in column_names
+            )
+            keyword = "CREATE UNIQUE INDEX" if "UNIQUE" in index_type else "CREATE INDEX"
+            statements.append(
+                f"{keyword} {InstanceService._quote_identifier(instance, index_name)} "
+                f"ON {table_name} ({quoted_columns});"
+            )
+
+        return statements
 
     @staticmethod
     def _simplify_oracle_ddl(raw_ddl: str) -> str:
@@ -202,13 +262,34 @@ class InstanceService:
             simplified,
             flags=re.IGNORECASE,
         )
+        simplified = re.sub(
+            r'\n\s*STORAGE\s*\([^)]*\)',
+            '',
+            simplified,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
         simplified = re.sub(r'\n\s*USING INDEX\b[^\n]*', '', simplified, flags=re.IGNORECASE)
+        simplified = re.sub(
+            r'\n\s*(?:SEGMENT\s+CREATION|PCTFREE|PCTUSED|INITRANS|MAXTRANS|NOCOMPRESS|COMPRESS|LOGGING|NOLOGGING|TABLESPACE|BUFFER_POOL|FLASH_CACHE|CELL_FLASH_CACHE)\b[^\n;]*(?:;)?',
+            '',
+            simplified,
+            flags=re.IGNORECASE,
+        )
+        simplified = re.sub(r'\n\s*ENABLE\s*(?=\n|\))', '', simplified, flags=re.IGNORECASE)
         simplified = re.sub(r'\bENABLE\b', '', simplified, flags=re.IGNORECASE)
         simplified = re.sub(r'[ \t]+', ' ', simplified)
         simplified = re.sub(r' +\n', '\n', simplified)
         simplified = re.sub(r'\(\s*\n', '(\n', simplified)
         simplified = re.sub(r'\n{3,}', '\n\n', simplified)
         simplified = re.sub(r'\n\s+\)', '\n)', simplified)
+        if "COMMENT ON" in simplified:
+            table_ddl, comments = simplified.split("COMMENT ON", 1)
+            table_ddl = table_ddl.strip()
+            if table_ddl.upper().startswith("CREATE TABLE") and not table_ddl.endswith(";"):
+                table_ddl += ";"
+            simplified = f"{table_ddl}\n\nCOMMENT ON {comments.strip()}"
+        elif simplified.upper().startswith("CREATE TABLE") and not simplified.endswith(";"):
+            simplified += ";"
         return simplified.strip()
 
     @staticmethod
@@ -306,6 +387,7 @@ class InstanceService:
             "column_names": lowered.get("column_names") or "",
             "is_composite": lowered.get("is_composite") or "NO",
             "index_comment": lowered.get("index_comment") or "",
+            "index_definition": lowered.get("index_definition") or "",
         }
 
     @staticmethod
@@ -585,6 +667,7 @@ class InstanceService:
         raw_ddl = ""
         columns: list[dict[str, Any]] = []
         constraints: list[dict[str, Any]] = []
+        indexes: list[dict[str, Any]] = []
 
         try:
             rs = await engine.describe_table(
@@ -603,7 +686,7 @@ class InstanceService:
                         ddl = str(first_row[create_idx]).strip()
                     source = "engine"
                     raw_ddl = ddl
-                elif inst.db_type in {"mysql", "tidb"} and len(rs.rows[0]) >= 2:
+                elif inst.db_type in {"mysql", "tidb", "starrocks"} and len(rs.rows[0]) >= 2:
                     first_row = rs.rows[0]
                     if isinstance(first_row, (tuple, list)):
                         ddl = str(first_row[1]).strip()
@@ -625,11 +708,18 @@ class InstanceService:
                 )
             except Exception:
                 constraints = []
+            try:
+                indexes = await InstanceService.get_indexes(
+                    db, instance_id, db_name, tb_name
+                )
+            except Exception:
+                indexes = []
             ddl = InstanceService._build_generic_table_ddl(
                 inst,
                 tb_name,
                 columns,
                 constraints,
+                indexes,
             )
             source = "generated"
             raw_ddl = ddl

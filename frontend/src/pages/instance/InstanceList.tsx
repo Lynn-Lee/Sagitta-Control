@@ -23,10 +23,11 @@ const { useBreakpoint } = Grid
 const DB_TYPE_COLORS: Record<string, string> = {
   mysql: 'blue', pgsql: 'geekblue', oracle: 'red', mongo: 'green',
   redis: 'volcano', clickhouse: 'orange', elasticsearch: 'gold',
-  opensearch: 'lime', mssql: 'cyan', cassandra: 'purple', doris: 'magenta', tidb: 'red',
+  opensearch: 'lime', mssql: 'cyan', cassandra: 'purple', doris: 'magenta',
+  tidb: 'red', starrocks: 'gold',
 }
 const DB_TYPES = ['mysql', 'pgsql', 'oracle', 'mongo', 'redis',
-  'clickhouse', 'elasticsearch', 'opensearch', 'mssql', 'cassandra', 'doris', 'tidb']
+  'clickhouse', 'elasticsearch', 'opensearch', 'mssql', 'cassandra', 'doris', 'tidb', 'starrocks']
 
 // ── 数据库管理子组件 ───────────────────────────────────────
 function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {

@@ -309,6 +309,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 | 数据库 | purge（直接删除） | dest（迁移到目标） |
 |---|---|---|
 | MySQL/TiDB/Doris | ✅ `DELETE ... LIMIT N` | ✅ |
+| StarRocks | ✅ `DELETE FROM table WHERE condition` | ❌ |
 | PostgreSQL | ✅ `DELETE WHERE ctid IN` | ✅ |
 | Oracle | ✅ `DELETE WHERE ROWID IN` | ✅ |
 | SQL Server | ✅ `DELETE TOP(N)` | ✅ |
@@ -390,7 +391,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
   - 实例类型分布
   - 实例状态分布
   - 库/Schema 状态分布
-  - 实例类型展示名统一使用规范命名：`MySQL / PostgreSQL / Oracle / TiDB / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
+  - 实例类型展示名统一使用规范命名：`MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / MSSQL / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 在线查询中的“治理失败次数”统计口径包括：
   - 查询执行失败
   - 查询权限申请失败

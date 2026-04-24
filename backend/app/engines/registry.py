@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 _REGISTRY: dict[str, str] = {
     "mysql":         "app.engines.mysql:MysqlEngine",
     "tidb":          "app.engines.mysql:MysqlEngine",
+    "starrocks":     "app.engines.starrocks:StarRocksEngine",
     "pgsql":         "app.engines.pgsql:PgSQLEngine",
     "oracle":        "app.engines.oracle:OracleEngine",
     "mongo":         "app.engines.mongo:MongoEngine",

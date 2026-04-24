@@ -23,6 +23,7 @@ class TestEngineRegistry:
         engines = supported_engines()
         assert "mysql" in engines
         assert "tidb" in engines
+        assert "starrocks" in engines
         assert "pgsql" in engines
         assert "mongo" in engines
         assert "redis" in engines
@@ -44,6 +45,12 @@ class TestEngineRegistry:
         instance = MockInstance("tidb")
         engine = get_engine(instance)
         assert engine.name == "MysqlEngine"
+
+    def test_get_starrocks_engine(self):
+        instance = MockInstance("starrocks")
+        engine = get_engine(instance)
+        assert engine.name == "StarRocksEngine"
+        assert engine.db_type == "starrocks"
 
     def test_get_mssql_engine(self):
         instance = MockInstance("mssql")

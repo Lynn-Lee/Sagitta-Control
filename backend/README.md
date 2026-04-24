@@ -69,9 +69,10 @@ app/
 ## 最近补充
 
 - Oracle 表 DDL 预览优先走 `DBMS_METADATA.GET_DDL('TABLE', ...)`
-- DDL 接口响应新增 `copyable_ddl / raw_ddl`，前端可切换“可复制 DDL / 原始 DDL”
+- DDL 接口响应新增 `copyable_ddl / raw_ddl`，前端可切换“简化 DDL / 原始 DDL”
 - PostgreSQL / Oracle 数据字典列查询已补齐 `column_comment`
-- PostgreSQL / Oracle 的 DDL 预览会追加 `COMMENT ON COLUMN ...`；其中 Oracle 原始 DDL 保留原生输出并补充注释语句
+- PostgreSQL / Oracle 的 DDL 预览会追加 `COMMENT ON COLUMN ...`；Oracle 简化 DDL 会剥离 storage/tablespace 等物理属性，原始 DDL 保留原生输出并补充注释语句
+- StarRocks 已从 MySQL 映射改为独立 `StarRocksEngine`，查询、元数据、审核、监控能力按 StarRocks 语义实现，归档首版支持 dry-run 与 purge 模式
 
 ## 权限实现口径（v2-lite）
 

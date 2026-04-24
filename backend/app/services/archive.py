@@ -12,6 +12,7 @@
   PostgreSQL        purge + dest  DELETE WHERE ctid IN (LIMIT N)
   Oracle            purge + dest  DELETE WHERE ROWNUM <= N
   MSSQL             purge + dest  DELETE TOP(N) FROM ...
+  StarRocks         purge only    DELETE FROM ... WHERE ...
   ClickHouse        purge only    ALTER TABLE ... DELETE WHERE (异步)
   MongoDB           purge + dest  deleteMany with limit
   Cassandra         purge only    DELETE + IF EXISTS（无 LIMIT，需用 SELECT+批量DELETE）
@@ -41,6 +42,7 @@ ARCHIVE_SUPPORT: dict[str, dict] = {
     "pgsql":         {"purge": True,  "dest": True,  "batch_delete": "ctid"},
     "oracle":        {"purge": True,  "dest": True,  "batch_delete": "rownum"},
     "mssql":         {"purge": True,  "dest": True,  "batch_delete": "top"},
+    "starrocks":     {"purge": True,  "dest": False, "batch_delete": "where"},
     "clickhouse":    {"purge": True,  "dest": False, "batch_delete": "ch_alter"},
     "mongo":         {"purge": True,  "dest": True,  "batch_delete": "mongo"},
     "cassandra":     {"purge": True,  "dest": False, "batch_delete": "cassandra"},
@@ -80,6 +82,9 @@ def build_batch_delete_sql(db_type: str, table_name: str, condition: str, batch_
     elif dt == "mssql":
         return f"DELETE TOP({batch_size}) FROM [{t}] WHERE {condition}"
 
+    elif dt == "starrocks":
+        return f"DELETE FROM `{t}` WHERE {condition}"
+
     elif dt == "clickhouse":
         # ClickHouse ALTER TABLE DELETE 是异步的，无法精确分批
         return f"ALTER TABLE {t} DELETE WHERE {condition}"
@@ -96,7 +101,7 @@ def build_count_sql(db_type: str, table_name: str, condition: str) -> str:
     dt = db_type.lower()
     t = table_name
 
-    if dt in ("mysql", "tidb", "doris"):
+    if dt in ("mysql", "tidb", "doris", "starrocks"):
         return f"SELECT COUNT(*) FROM `{t}` WHERE {condition}"
     elif dt in ("pgsql", "oracle", "mssql"):
         return f'SELECT COUNT(*) FROM "{t}" WHERE {condition}'
@@ -107,6 +112,13 @@ def build_count_sql(db_type: str, table_name: str, condition: str) -> str:
 
 
 class ArchiveService:
+    @staticmethod
+    def _first_value(row: Any) -> Any:
+        if isinstance(row, dict):
+            return next(iter(row.values()), 0)
+        if isinstance(row, (tuple, list)):
+            return row[0] if row else 0
+        return row
 
     @staticmethod
     async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
@@ -154,7 +166,7 @@ class ArchiveService:
         if rs.error:
             return {"count": -1, "supported": True, "msg": f"估算失败：{rs.error}"}
 
-        count = rs.rows[0][0] if rs.rows else 0
+        count = ArchiveService._first_value(rs.rows[0]) if rs.rows else 0
         return {
             "count": count,
             "supported": True,
@@ -187,6 +199,9 @@ class ArchiveService:
         if dry_run:
             return {**estimate, "dry_run": True, "mode": "purge"}
 
+        if estimate["count"] < 0:
+            return {"success": False, "supported": True, "msg": estimate.get("msg", "归档估算失败")}
+
         if estimate["count"] == 0:
             return {"success": True, "total_deleted": 0, "msg": "没有符合条件的数据，无需归档"}
 
@@ -208,6 +223,19 @@ class ArchiveService:
                 "success": True, "mode": "purge",
                 "msg": "ClickHouse DELETE 已提交（异步执行，请通过 system.mutations 查看进度）",
                 "total_deleted": estimate["count"],
+            }
+
+        # StarRocks：DELETE 必须带 WHERE，不使用 MySQL DELETE ... LIMIT 分批模型。
+        if inst.db_type == "starrocks":
+            delete_sql = build_batch_delete_sql(inst.db_type, table_name, condition, batch_size)
+            rs = await engine.execute(db_name=db_name, sql=delete_sql)
+            if rs.error:
+                return {"success": False, "msg": f"StarRocks 归档失败：{rs.error}"}
+            return {
+                "success": True,
+                "mode": "purge",
+                "total_deleted": estimate["count"],
+                "msg": f"StarRocks 归档完成，共删除约 {estimate['count']} 行",
             }
 
         # Cassandra：SELECT + 批量 DELETE
@@ -233,7 +261,7 @@ class ArchiveService:
 
             # 检查剩余行数
             count_rs = await engine.query(db_name=db_name, sql=count_sql, limit_num=1)
-            remaining = count_rs.rows[0][0] if count_rs.rows else 0
+            remaining = ArchiveService._first_value(count_rs.rows[0]) if count_rs.rows else 0
             logger.info("archive_purge: batch=%d total_deleted=%d remaining=%d",
                         batch+1, total_deleted, remaining)
 
