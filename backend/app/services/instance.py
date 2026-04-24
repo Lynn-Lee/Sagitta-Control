@@ -394,14 +394,16 @@ class InstanceService:
         raw = row if isinstance(row, dict) else dict(zip(cols, row, strict=False))
 
         lowered = {str(key).lower(): value for key, value in raw.items()}
-        return {
+        normalized = {
             "index_name": lowered.get("index_name") or "",
             "index_type": lowered.get("index_type") or "",
             "column_names": lowered.get("column_names") or "",
             "is_composite": lowered.get("is_composite") or "NO",
             "index_comment": lowered.get("index_comment") or "",
-            "index_definition": lowered.get("index_definition") or "",
         }
+        if "index_definition" in lowered:
+            normalized["index_definition"] = lowered.get("index_definition") or ""
+        return normalized
 
     @staticmethod
     async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
@@ -671,7 +673,10 @@ class InstanceService:
         if not rs.is_success:
             raise Exception(f"获取索引信息失败：{rs.error}")
         cols = rs.column_list or []
-        return [InstanceService._normalize_index_row(row, cols) for row in rs.rows]
+        indexes = [InstanceService._normalize_index_row(row, cols) for row in rs.rows]
+        for index in indexes:
+            index.setdefault("index_definition", "")
+        return indexes
 
     @staticmethod
     async def get_table_ddl(

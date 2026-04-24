@@ -316,7 +316,17 @@ class StarRocksEngine(MysqlEngine):
                 review.append(item)
                 continue
 
-            if isinstance(stmt, (exp.Drop, exp.TruncateTable, exp.Alter)):
+            ddl_types = tuple(
+                expr_type
+                for expr_type in (
+                    exp.Drop,
+                    exp.TruncateTable,
+                    getattr(exp, "Alter", None),
+                    getattr(exp, "AlterTable", None),
+                )
+                if expr_type is not None
+            )
+            if isinstance(stmt, ddl_types):
                 item.errlevel = 1
                 item.errormessage = f"StarRocks 高风险 DDL：{type(stmt).__name__}，请确认已备份或可回滚"
 
