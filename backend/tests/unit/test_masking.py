@@ -171,3 +171,28 @@ class TestDataMaskingService:
             rs, 'SELECT phone FROM "users"', "pgsql"
         )
         assert "****" in masked.rows[0][0]
+
+    def test_wildcard_column_masking(self):
+        """列名支持 * 通配，和规则管理页面提示保持一致。"""
+        rules = [{"column_name": "*phone*", "rule_type": "phone"}]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["receiver_phone"],
+            rows=[("13812345678",)],
+        )
+        masked = svc.mask_result(rs, "SELECT receiver_phone FROM orders", "mysql")
+        assert masked.rows[0][0] == "138****78"
+
+    def test_address_and_card_masking(self):
+        rules = [
+            {"column_name": "address", "rule_type": "address"},
+            {"column_name": "bank_card", "rule_type": "card"},
+        ]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["address", "bank_card"],
+            rows=[("上海市浦东新区世纪大道100号", "6222021202001234567")],
+        )
+        masked = svc.mask_result(rs, "SELECT address, bank_card FROM users", "mysql")
+        assert masked.rows[0][0] == "上海市浦东新***"
+        assert masked.rows[0][1] == "622202 **** **** 4567"

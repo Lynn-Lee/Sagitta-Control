@@ -439,12 +439,15 @@ export default function MainLayout() {
                 padding: '12px 16px',
                 borderTop: '1px solid #F0F1F5',
                 marginTop: 8,
+                textAlign: 'center',
               }}>
                 <Text style={{
                   fontSize: 10,
                   fontFamily: "'JetBrains Mono', monospace",
                   color: '#C9CDD4',
                   letterSpacing: '0.5px',
+                  display: 'block',
+                  whiteSpace: 'nowrap',
                 }}>
                   全引擎兼容 · 全流程可观测
                 </Text>

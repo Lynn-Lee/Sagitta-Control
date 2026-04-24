@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, NotFoundException
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 # ── 规则类型元数据（用于前端展示）─────────────────────────────
 RULE_TYPES = [
     {"value": "email",   "label": "邮箱",   "example": "ab****@domain.com", "desc": "保留前2位和@后内容"},
-    {"value": "phone",   "label": "手机号", "example": "138****5678",       "desc": "保留前3位和后2位"},
-    {"value": "card",    "label": "银行卡", "example": "6222 **** **** 1234","desc": "保留前6位和后4位"},
+    {"value": "phone",   "label": "手机号", "example": "138****78",         "desc": "保留前3位和后2位"},
+    {"value": "card",    "label": "银行卡", "example": "622202 **** **** 1234", "desc": "保留前6位和后4位"},
     {"value": "id_card", "label": "身份证", "example": "110***********1234", "desc": "保留前3位和后4位"},
     {"value": "name",    "label": "姓名",   "example": "张**",               "desc": "保留姓氏"},
     {"value": "address", "label": "地址",   "example": "北京市朝阳区***",    "desc": "保留前6个字符"},
@@ -146,10 +146,11 @@ class MaskingRuleService:
         stmt = select(MaskingRule).where(
             and_(
                 MaskingRule.is_active,
-                (MaskingRule.instance_id == instance_id) |
-                (MaskingRule.instance_id is None),
-                (MaskingRule.db_name == db_name) |
-                (MaskingRule.db_name == "*"),
+                or_(
+                    MaskingRule.instance_id == instance_id,
+                    MaskingRule.instance_id.is_(None),
+                ),
+                or_(MaskingRule.db_name == db_name, MaskingRule.db_name == "*"),
             )
         )
         rows = (await db.execute(stmt)).scalars().all()

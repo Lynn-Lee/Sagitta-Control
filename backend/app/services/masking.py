@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+from fnmatch import fnmatchcase
 from typing import Any
 
 import sqlglot
@@ -118,7 +119,7 @@ class DataMaskingService:
     BUILT_IN_RULES: dict[str, Any] = {
         "email":   {"pattern": r"(\w{2})\w+(@.+)", "replacement": r"\1***\2"},
         "phone":   {"pattern": r"(\d{3})\d{4,8}(\d{2})", "replacement": r"\1****\2"},
-        "card":    {"pattern": r"(\d{4})\d+(\d{4})", "replacement": r"\1 **** **** \2"},
+        "card":    {"pattern": r"(\d{6})\d+(\d{4})", "replacement": r"\1 **** **** \2"},
         "id_card": {"pattern": r"(\d{3})\d{11}(\w{4})", "replacement": r"\1***********\2"},
         "name":    {"pattern": r"([\u4e00-\u9fa5]{1})[\u4e00-\u9fa5]+", "replacement": r"\1**"},
         "address": {"pattern": r"(.{6}).+", "replacement": r"\1***"},
@@ -131,6 +132,19 @@ class DataMaskingService:
                 [{"column_name": "phone", "rule_type": "phone"}, ...]
         """
         self.rules = rules or []
+
+    @staticmethod
+    def _matches_pattern(value: str, pattern: str) -> bool:
+        """Case-insensitive exact or shell-style wildcard match."""
+        if not pattern:
+            return False
+        value_lower = value.lower()
+        pattern_lower = pattern.lower()
+        return (
+            pattern_lower == "*"
+            or value_lower == pattern_lower
+            or fnmatchcase(value_lower, pattern_lower)
+        )
 
     def _apply_rule(self, value: str, rule: dict[str, Any]) -> str:
         """对单个值应用脱敏规则。"""
@@ -193,7 +207,16 @@ class DataMaskingService:
                 continue
             # 尝试在结果集列名中匹配
             for idx, col in enumerate(resultset.column_list):
-                if col.lower() == col_name or col_ref_map.get(col.lower(), {}).get("field", "").lower() == col_name:
+                ref = col_ref_map.get(col.lower(), {})
+                ref_field = ref.get("field", "")
+                ref_table = ref.get("table", "*")
+                table_name = rule.get("table_name", "*")
+                column_matches = (
+                    self._matches_pattern(col, col_name)
+                    or self._matches_pattern(ref_field, col_name)
+                )
+                table_matches = table_name == "*" or self._matches_pattern(ref_table, table_name)
+                if column_matches and table_matches:
                     mask_cols[idx] = rule
                     break
 

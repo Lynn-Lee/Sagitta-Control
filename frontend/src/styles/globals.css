@@ -107,6 +107,33 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   box-shadow: var(--glow) !important;
 }
 
+.query-history-range-picker.ant-picker {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr 18px;
+  column-gap: 4px;
+  align-items: center;
+}
+
+.query-history-range-picker .ant-picker-range-separator {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding-inline: 0;
+}
+
+.query-history-range-picker .ant-picker-input {
+  width: auto;
+  min-width: 0;
+}
+
+.query-history-range-picker .ant-picker-input > input {
+  text-align: center;
+}
+
+.query-history-range-picker .ant-picker-suffix {
+  margin-inline-start: 0;
+}
+
 /* 表格行 hover */
 .ant-table-tbody > tr.ant-table-row:hover > td {
   background: var(--color-primary-bg) !important;

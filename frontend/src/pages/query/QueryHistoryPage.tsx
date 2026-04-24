@@ -197,7 +197,8 @@ export default function QueryHistoryPage() {
         <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
           <RangePicker
             value={dateRange ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
-            style={{ width: filterWidth(320), minWidth: isMobile ? undefined : 320 }}
+            className={isMobile ? undefined : 'query-history-range-picker'}
+            style={{ width: filterWidth(280), minWidth: isMobile ? undefined : 280 }}
             onChange={(_, strs) => { setDateRange(strs[0] ? [strs[0], strs[1]] : null); setPage(1) }}
           />
           <Input

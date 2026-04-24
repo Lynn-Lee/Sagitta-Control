@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Alert, Button, Form, Input, InputNumber, Modal, Popconfirm,
   Select, Space, Switch, Table, Tag, Typography, message,
@@ -19,10 +19,81 @@ const RULE_TYPE_COLORS: Record<string, string> = {
   name: 'purple', address: 'cyan', regex: 'geekblue',
 }
 
+const PREVIEW_SAMPLES: Record<string, string> = {
+  email: 'zhangsan@example.com',
+  phone: '13812345678',
+  card: '6222021202001234567',
+  id_card: '110101199001011234',
+  name: '张三',
+  address: '上海市浦东新区世纪大道100号',
+  regex: '13812345678',
+}
+
+const MASKING_TEMPLATES = [
+  {
+    key: 'phone',
+    label: '手机号脱敏',
+    values: {
+      rule_name: '手机号脱敏',
+      description: '适用于 mobile、phone、tel 等手机号字段',
+      rule_type: 'phone',
+      column_name: '*phone*',
+      db_name: '*',
+      table_name: '*',
+      is_active: true,
+    },
+  },
+  {
+    key: 'address',
+    label: '寄收件人地址脱敏',
+    values: {
+      rule_name: '寄收件人地址脱敏',
+      description: '适用于 address、receiver_address、sender_address 等地址字段',
+      rule_type: 'address',
+      column_name: '*address*',
+      db_name: '*',
+      table_name: '*',
+      is_active: true,
+    },
+  },
+  {
+    key: 'id_card',
+    label: '身份证号脱敏',
+    values: {
+      rule_name: '身份证号脱敏',
+      description: '适用于 id_card、identity_no、cert_no 等证件字段',
+      rule_type: 'id_card',
+      column_name: '*id_card*',
+      db_name: '*',
+      table_name: '*',
+      is_active: true,
+    },
+  },
+  {
+    key: 'card',
+    label: '银行卡号脱敏',
+    values: {
+      rule_name: '银行卡号脱敏',
+      description: '适用于 bank_card、card_no、account_no 等银行卡字段',
+      rule_type: 'card',
+      column_name: '*card*',
+      db_name: '*',
+      table_name: '*',
+      is_active: true,
+    },
+  },
+]
+
 function PreviewPanel({ form }: { form: any }) {
   const [previewValue, setPreviewValue] = useState('13812345678')
   const [previewResult, setPreviewResult] = useState<{ original: string; masked: string } | null>(null)
   const [loading, setLoading] = useState(false)
+  const ruleType = Form.useWatch('rule_type', form)
+
+  useEffect(() => {
+    setPreviewValue(PREVIEW_SAMPLES[ruleType] || PREVIEW_SAMPLES.phone)
+    setPreviewResult(null)
+  }, [ruleType])
 
   const handlePreview = async () => {
     const vals = form.getFieldsValue()
@@ -117,6 +188,12 @@ export default function MaskingRulePage() {
   const openEdit = (r: any) => {
     setEditId(r.id); setRuleType(r.rule_type); form.setFieldsValue(r); setModalOpen(true)
   }
+  const applyTemplate = (key: string) => {
+    const template = MASKING_TEMPLATES.find(t => t.key === key)
+    if (!template) return
+    setRuleType(template.values.rule_type)
+    form.setFieldsValue(template.values)
+  }
 
   const columns = [
     { title: '规则名称', dataIndex: 'rule_name', width: 220, render: (v: string, r: any) => (
@@ -174,6 +251,13 @@ export default function MaskingRulePage() {
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending} width={560}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          {!editId && (
+            <Form.Item label="常用模板">
+              <Select placeholder="选择模板后自动填充规则" allowClear onChange={applyTemplate}>
+                {MASKING_TEMPLATES.map(t => <Option key={t.key} value={t.key}>{t.label}</Option>)}
+              </Select>
+            </Form.Item>
+          )}
           <Form.Item name="rule_name" label="规则名称" rules={[{ required: true }]}>
             <Input placeholder="如：手机号脱敏" />
           </Form.Item>
