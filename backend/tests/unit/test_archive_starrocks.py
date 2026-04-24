@@ -1,6 +1,11 @@
 """StarRocks 归档策略测试。"""
 
-from app.services.archive import ARCHIVE_SUPPORT, build_batch_delete_sql, build_count_sql, check_support
+from app.services.archive import (
+    ARCHIVE_SUPPORT,
+    build_batch_delete_sql,
+    build_count_sql,
+    check_support,
+)
 
 
 def test_starrocks_supports_purge_only():

@@ -10,8 +10,8 @@ from app.core.database import AsyncSessionLocal
 from app.engines.models import ResultSet
 from app.engines.registry import get_engine
 from app.models.instance import Instance
-from app.services.session_diagnostic import SessionDiagnosticService
 from app.models.slowlog import SlowQueryConfig
+from app.services.session_diagnostic import SessionDiagnosticService
 from app.services.slowlog import DEFAULT_SLOW_THRESHOLD_MS, SlowLogService
 
 logger = logging.getLogger(__name__)

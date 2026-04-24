@@ -26,8 +26,8 @@ from app.schemas.slowlog import (
     SlowQueryDistributionItem,
     SlowQueryEngineRow,
     SlowQueryExplainResponse,
-    SlowQueryFingerprintItem,
     SlowQueryFingerprintDetailResponse,
+    SlowQueryFingerprintItem,
     SlowQueryOverviewResponse,
     SlowQueryRecommendation,
     SlowQueryTrendPoint,
@@ -69,7 +69,10 @@ def normalize_sql_fingerprint(sql: str) -> tuple[str, str]:
     normalized = re.sub(r"\b\d+(?:\.\d+)?\b", "?", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip().rstrip(";")
     normalized = normalized[:2000]
-    digest = hashlib.sha1(normalized.lower().encode("utf-8")).hexdigest()
+    digest = hashlib.sha1(
+        normalized.lower().encode(),
+        usedforsecurity=False,
+    ).hexdigest()
     return digest, normalized
 
 
@@ -764,7 +767,8 @@ class SlowLogService:
             fingerprint, fingerprint_text = normalize_sql_fingerprint(item.sql_text)
             occurred = item.occurred_at or now
             source_ref = item.source_ref or hashlib.sha1(
-                f"{instance.id}:{item.source}:{fingerprint}:{occurred}".encode("utf-8")
+                f"{instance.id}:{item.source}:{fingerprint}:{occurred}".encode(),
+                usedforsecurity=False,
             ).hexdigest()
             if item.source != "platform":
                 source_ref = f"{instance.id}:{source_ref}"

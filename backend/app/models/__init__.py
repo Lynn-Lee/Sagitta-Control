@@ -13,9 +13,9 @@ from app.models.monitor import (  # noqa: F401
     MonitorPrivilegeApply,
 )
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply  # noqa: F401
+from app.models.role import Role, UserGroup  # noqa: F401
 from app.models.session import SessionSnapshot  # noqa: F401
 from app.models.slowlog import SlowQueryConfig, SlowQueryLog  # noqa: F401
-from app.models.role import Role, UserGroup  # noqa: F401
 from app.models.system import OperationLog, SystemConfig  # noqa: F401
 from app.models.user import Permission, ResourceGroup, Users  # noqa: F401
 from app.models.workflow import (  # noqa: F401

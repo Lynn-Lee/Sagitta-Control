@@ -13,7 +13,6 @@ from app.models.instance import Instance
 from app.models.session import SessionSnapshot
 from app.schemas.diagnostic import SessionItem
 
-
 _ONLINE_COLUMNS = [
     "session_id",
     "serial",

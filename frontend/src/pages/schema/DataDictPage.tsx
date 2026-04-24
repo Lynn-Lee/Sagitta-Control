@@ -91,10 +91,10 @@ export default function DataDictPage() {
     enabled: !!instanceId && !!dbName && !!selectedTable,
   })
 
-  const tables: string[] = tableData?.tables || []
-  const columns: any[] = columnData?.columns || []
-  const constraints: any[] = constraintData?.constraints || []
-  const indexes: any[] = indexData?.indexes || []
+  const tables: string[] = useMemo(() => tableData?.tables || [], [tableData])
+  const columns: any[] = useMemo(() => columnData?.columns || [], [columnData])
+  const constraints: any[] = useMemo(() => constraintData?.constraints || [], [constraintData])
+  const indexes: any[] = useMemo(() => indexData?.indexes || [], [indexData])
   const dbAccessDenied = (dbDataError as any)?.response?.status === 403
   const objectAccessDenied = [tableDataError, columnDataError, constraintDataError, indexDataError]
     .some((error) => (error as any)?.response?.status === 403)
