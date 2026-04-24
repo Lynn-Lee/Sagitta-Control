@@ -273,13 +273,17 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - 显示：会话 ID、用户、来源 IP、执行时长、当前 SQL
 - 支持 Kill 指定会话（需 `process_kill` 权限）
 - 支持引擎：MySQL/PostgreSQL/Oracle/MongoDB/ClickHouse/Redis
+- 平台定时采集会话快照，支持按时间范围、实例、用户、数据库、SQL 关键字和运行时长查询历史会话
+- Oracle 支持 ASH/AWR 历史入口，适用于已结束会话和历史性能排查
 
 #### 2.5.2 慢日志分析
 
-- 查询数据库慢日志记录
-- 按执行时间、扫描行数、执行次数排序
-- 慢 SQL 文本展示
-- 支持：MySQL/PostgreSQL/MongoDB
+- 统一展示平台在线查询历史与数据库原生慢日志记录
+- 支持按实例、数据库、来源、时间范围、SQL 关键字和耗时阈值筛选
+- 支持 SQL 指纹聚合，展示调用次数、平均/P95/最大耗时、扫描行数、返回行数和最后出现时间
+- 支持指纹详情：趋势、实例分布、数据库分布、用户分布、来源分布、样例 SQL 与结构化优化建议
+- 支持实例级慢日志采集配置：启用状态、慢 SQL 阈值、采集间隔、保留天数、单次采集上限和最近采集状态
+- 支持 MySQL / PostgreSQL 执行计划分析；Redis 展示 SLOWLOG；其他引擎第三版分批接入
 
 #### 2.5.3 SQL 优化
 
@@ -574,6 +578,9 @@ PostgreSQL(:5432)  Redis(:6379)   Celery Worker
 | `workflow_template` | SQL 工单模板 |
 | `query_privileges` | 在线查询权限记录 |
 | `monitor_collect_config` | 监控采集配置 |
+| `session_snapshot` | 会话历史快照 |
+| `slow_query_log` | 慢 SQL 明细与指纹分析来源 |
+| `slow_query_config` | 慢日志采集配置与最近采集状态 |
 
 ---
 

@@ -102,6 +102,7 @@ SagittaDB/
 | 数据库权限管控 | is_active 启停控制、普通用户不可见禁用库、管理员标灰"已禁用" | ✅ 100% |
 | 授权体系 v2-lite | 角色权限、用户组资源范围、库/表级查询授权、权限排查接口 | ✅ 100% |
 | 密码安全策略 | 复杂度校验、默认/过期密码强制改密、到期前 7 天提醒、导入默认密码合规化 | ✅ 100% |
+| 会话诊断与慢日志分析 | 在线/历史会话、慢日志采集配置、SQL 指纹聚合、MySQL/PG 执行计划分析 | ✅ 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ 100% |
 
 **总体完成度：100%（v1.0-GA）**
@@ -176,6 +177,16 @@ SagittaDB/
   - 全部统计按当前登录用户权限范围裁剪，模块内部统一使用同一个时间范围（`7/14/30/60` 天 + 自定义天数）
   - 审批相关排行与统计反映“当前权限范围内业务对象涉及的审批处理”，不等同于当前登录人的个人待办/已办工作量
 
+## 运维诊断近况
+
+- 会话管理已扩展为在线会话 + 历史会话诊断：周期性 `collect_session_snapshots` 会写入 `session_snapshot`，前端可按实例、来源、用户、数据库、SQL 关键字和运行时长筛选历史会话。
+- Oracle 会话诊断新增 ASH/AWR 历史入口；普通在线会话仍通过统一 `processlist / kill_connection` 能力处理。
+- 慢日志分析已升级到 v2：新增 `slow_query_log` 与 `slow_query_config`，支持平台查询历史同步、MySQL/PG/Redis 原生采集、SQL 指纹聚合、实例级采集配置和最近采集状态。
+- MySQL / PostgreSQL 慢 SQL 详情支持执行计划分析：MySQL 使用 `EXPLAIN FORMAT=JSON`，PostgreSQL 使用 `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`；其他引擎保留入口并返回明确的不支持提示。
+- 慢日志页面包含 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
+- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`。
+- 详细说明见 [docs/slowlog_diagnostic_v2.md](docs/slowlog_diagnostic_v2.md)。
+
 ## 最近验证
 
 本次 v2-lite 收敛相关验证已通过：
@@ -185,6 +196,8 @@ cd frontend && npm run typecheck
 cd backend && python3 -m compileall app
 cd backend && ./.venv/bin/python -m pytest tests/unit/test_auth.py
 cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
+cd backend && ./.venv/bin/python -m pytest tests/unit/test_session_diagnostic.py tests/unit/test_slowlog_service.py -q
+cd frontend && ./node_modules/.bin/eslint src/pages/diagnostic/DiagnosticPage.tsx src/api/diagnostic.ts src/pages/slowlog/SlowlogPage.tsx src/api/slowlog.ts --ext ts,tsx --report-unused-disable-directives --max-warnings 0
 ```
 
 近期补充完成并已联调验证的权限与交互收口：

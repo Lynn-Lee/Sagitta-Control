@@ -415,5 +415,27 @@ class PgSQLEngine:
         rs = await self.test_connection()
         return {"health": {"up": 1 if rs.is_success else 0}}
 
+    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+        """Collect PostgreSQL slow statement summaries from pg_stat_statements."""
+        sql = """
+            SELECT
+              'pgsql_statements' AS source,
+              queryid::text AS source_ref,
+              current_database() AS db_name,
+              query AS sql_text,
+              round(mean_exec_time::numeric)::bigint AS duration_ms,
+              rows AS rows_sent,
+              calls
+            FROM pg_stat_statements
+            WHERE mean_exec_time >= 1000
+            ORDER BY mean_exec_time DESC
+            LIMIT $1
+        """
+        return await self._raw_query(db_name=self._db_name, sql=sql, args=[int(limit)])
+
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        explain_sql = f"EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE) {sql.strip().rstrip(';')}"
+        return await self._raw_query(db_name=db_name or self._db_name, sql=explain_sql, args=[])
+
     def get_supported_metric_groups(self) -> list[str]:
         return ["health", "performance", "replication"]

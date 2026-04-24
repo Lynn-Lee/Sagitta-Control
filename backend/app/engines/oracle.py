@@ -154,6 +154,25 @@ class OracleEngine:
             rs.cost_time = int((time.monotonic() - start) * 1000)
         return rs
 
+    def _run_statement_sync(self, sql: str, params: dict[str, Any] | None = None) -> ResultSet:
+        rs = ResultSet()
+        start = time.monotonic()
+        conn = None
+        try:
+            conn = self._connect_sync()
+            with conn.cursor() as cur:
+                cur.execute(sql, params or {})
+                rs.affected_rows = cur.rowcount or 0
+            conn.commit()
+        except Exception as e:
+            rs.error = _normalize_oracle_connect_error(e)
+            logger.warning("oracle_statement_error: %s", rs.error)
+        finally:
+            if conn is not None:
+                conn.close()
+            rs.cost_time = int((time.monotonic() - start) * 1000)
+        return rs
+
     async def get_connection(self, db_name: str | None = None):
         return await asyncio.to_thread(self._connect_sync)
 
@@ -528,6 +547,173 @@ class OracleEngine:
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
         return await self.execute(workflow.db_name, workflow.sql_content)
+
+    async def processlist(
+        self, command_type: str = "ALL", **kwargs: Any
+    ) -> ResultSet:
+        sql = """
+        SELECT
+            s.sid AS session_id,
+            s.serial# AS serial,
+            s.username AS username,
+            s.machine AS host,
+            s.program AS program,
+            s.schemaname AS db_name,
+            s.status AS state,
+            CASE s.command
+              WHEN 0 THEN ''
+              WHEN 2 THEN 'INSERT'
+              WHEN 3 THEN 'SELECT'
+              WHEN 6 THEN 'UPDATE'
+              WHEN 7 THEN 'DELETE'
+              WHEN 44 THEN 'COMMIT'
+              WHEN 45 THEN 'ROLLBACK'
+              WHEN 47 THEN 'PL/SQL EXECUTE'
+              ELSE TO_CHAR(s.command)
+            END AS command,
+            s.last_call_et AS time_seconds,
+            s.sql_id AS sql_id,
+            DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
+            s.event AS event,
+            s.blocking_session AS blocking_session
+        FROM v$session s
+        LEFT JOIN v$sql q
+          ON s.sql_id = q.sql_id
+         AND s.sql_child_number = q.child_number
+        WHERE s.type = 'USER'
+          AND s.audsid != USERENV('SESSIONID')
+        ORDER BY s.last_call_et DESC
+        """
+        rs = await asyncio.to_thread(self._run_query_sync, sql, None)
+        if rs.is_success:
+            return rs
+
+        logger.info("oracle_processlist_vsql_fallback: %s", rs.error)
+        fallback_sql = """
+        SELECT
+            s.sid AS session_id,
+            s.serial# AS serial,
+            s.username AS username,
+            s.machine AS host,
+            s.program AS program,
+            s.schemaname AS db_name,
+            s.status AS state,
+            CASE s.command
+              WHEN 0 THEN ''
+              WHEN 2 THEN 'INSERT'
+              WHEN 3 THEN 'SELECT'
+              WHEN 6 THEN 'UPDATE'
+              WHEN 7 THEN 'DELETE'
+              WHEN 44 THEN 'COMMIT'
+              WHEN 45 THEN 'ROLLBACK'
+              WHEN 47 THEN 'PL/SQL EXECUTE'
+              ELSE TO_CHAR(s.command)
+            END AS command,
+            s.last_call_et AS time_seconds,
+            s.sql_id AS sql_id,
+            CAST(NULL AS VARCHAR2(4000)) AS sql_text,
+            s.event AS event,
+            s.blocking_session AS blocking_session
+        FROM v$session s
+        WHERE s.type = 'USER'
+          AND s.audsid != USERENV('SESSIONID')
+        ORDER BY s.last_call_et DESC
+        """
+        return await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
+
+    async def kill_connection(self, thread_id: int, serial: str | int | None = None) -> ResultSet:
+        if serial in (None, ""):
+            return ResultSet(error="Oracle Kill 会话必须提供 serial")
+        sql = f"ALTER SYSTEM KILL SESSION '{int(thread_id)},{int(serial)}' IMMEDIATE"
+        return await asyncio.to_thread(self._run_statement_sync, sql, None)
+
+    async def ash_history(
+        self,
+        source: str = "ash",
+        date_start: Any | None = None,
+        date_end: Any | None = None,
+        sql_keyword: str | None = None,
+        limit_num: int = 50,
+        offset: int = 0,
+    ) -> ResultSet:
+        view_name = (
+            "dba_hist_active_sess_history"
+            if source == "awr"
+            else "v$active_session_history"
+        )
+        sql_text_join = "LEFT JOIN v$sql q ON ash.sql_id = q.sql_id"
+        sql = f"""
+        SELECT * FROM (
+            SELECT inner_q.*, ROWNUM AS rn FROM (
+                SELECT
+                    ash.sample_time AS collected_at,
+                    ash.session_id AS session_id,
+                    ash.session_serial# AS serial,
+                    COALESCE(u.username, TO_CHAR(ash.user_id)) AS username,
+                    ash.machine AS host,
+                    ash.program AS program,
+                    ash.session_state AS state,
+                    ash.sql_id AS sql_id,
+                    DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
+                    ash.event AS event,
+                    ash.blocking_session AS blocking_session,
+                    0 AS time_seconds
+                FROM {view_name} ash
+                {sql_text_join}
+                LEFT JOIN all_users u ON ash.user_id = u.user_id
+                WHERE 1 = 1
+                  AND (:date_start IS NULL OR ash.sample_time >= :date_start)
+                  AND (:date_end IS NULL OR ash.sample_time <= :date_end)
+                  AND (:sql_keyword IS NULL OR LOWER(DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1)) LIKE :sql_keyword)
+                ORDER BY ash.sample_time DESC
+            ) inner_q
+            WHERE ROWNUM <= :row_limit
+        )
+        WHERE rn > :row_offset
+        """
+        params = {
+            "date_start": date_start,
+            "date_end": date_end,
+            "sql_keyword": f"%{sql_keyword.lower()}%" if sql_keyword else None,
+            "row_limit": int(offset + limit_num),
+            "row_offset": int(offset),
+        }
+        rs = await asyncio.to_thread(self._run_query_sync, sql, params)
+        if rs.is_success:
+            return rs
+
+        logger.info("oracle_ash_vsql_fallback: %s", rs.error)
+        fallback_sql = f"""
+        SELECT * FROM (
+            SELECT inner_q.*, ROWNUM AS rn FROM (
+                SELECT
+                    ash.sample_time AS collected_at,
+                    ash.session_id AS session_id,
+                    ash.session_serial# AS serial,
+                    COALESCE(u.username, TO_CHAR(ash.user_id)) AS username,
+                    CAST(NULL AS VARCHAR2(255)) AS host,
+                    CAST(NULL AS VARCHAR2(255)) AS program,
+                    ash.session_state AS state,
+                    ash.sql_id AS sql_id,
+                    CAST(NULL AS VARCHAR2(4000)) AS sql_text,
+                    ash.event AS event,
+                    ash.blocking_session AS blocking_session,
+                    0 AS time_seconds
+                FROM {view_name} ash
+                LEFT JOIN all_users u ON ash.user_id = u.user_id
+                WHERE 1 = 1
+                  AND (:date_start IS NULL OR ash.sample_time >= :date_start)
+                  AND (:date_end IS NULL OR ash.sample_time <= :date_end)
+                ORDER BY ash.sample_time DESC
+            ) inner_q
+            WHERE ROWNUM <= :row_limit
+        )
+        WHERE rn > :row_offset
+        """
+        if sql_keyword:
+            rs.error = "当前账号无 V$SQL 权限，无法按 SQL 关键字过滤 ASH/AWR 历史"
+            return rs
+        return await asyncio.to_thread(self._run_query_sync, fallback_sql, params)
 
     async def collect_metrics(self) -> dict:
         return {"health": {"up": 1 if (await self.test_connection()).is_success else 0}}

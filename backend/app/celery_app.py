@@ -49,5 +49,15 @@ celery_app.conf.update(
             "schedule": crontab(minute="*"),
             "options": {"queue": "execute"},
         },
+        "collect-session-snapshots-every-minute": {
+            "task": "collect_session_snapshots",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "monitor"},
+        },
+        "collect-slow-queries-every-five-minutes": {
+            "task": "collect_slow_queries",
+            "schedule": crontab(minute="*/5"),
+            "options": {"queue": "monitor"},
+        },
     },
 )

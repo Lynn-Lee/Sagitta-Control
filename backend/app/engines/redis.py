@@ -212,6 +212,22 @@ class RedisEngine:
             rs.error = str(e)
         return rs
 
+    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+        rs = await self.get_slow_log(limit=limit)
+        if rs.is_success:
+            rs.column_list = ["id", "duration_us", "command", "source", "source_ref"]
+            rs.rows = [
+                {
+                    "id": row[0],
+                    "duration_us": row[2],
+                    "command": row[3],
+                    "source": "redis_slowlog",
+                    "source_ref": f"redis:{row[0]}",
+                }
+                for row in rs.rows
+            ]
+        return rs
+
     async def collect_metrics(self) -> dict:
         try:
             r = await self._get_client()

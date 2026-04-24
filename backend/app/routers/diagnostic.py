@@ -2,8 +2,9 @@
 会话/锁/事务诊断路由（Sprint 4）。
 """
 import logging
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi import Query as QParam
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,9 @@ from app.core.database import get_db
 from app.core.deps import current_user, require_perm
 from app.engines.registry import get_engine
 from app.models.instance import Instance
+from app.schemas.diagnostic import KillSessionRequest, SessionHistoryResponse, SessionListResponse
+from app.services.audit_log import AuditLogService
+from app.services.session_diagnostic import SessionDiagnosticService, items_to_legacy_rows
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,10 +29,24 @@ async def _get_instance(db: AsyncSession, instance_id: int) -> Instance:
     return inst
 
 
-@router.get("/processlist/", summary="查看会话列表", dependencies=[Depends(require_perm("process_view"))])
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(400, f"时间格式错误：{value}") from exc
+
+
+@router.get(
+    "/processlist/",
+    summary="查看会话列表",
+    response_model=SessionListResponse,
+    dependencies=[Depends(require_perm("process_view"))],
+)
 async def get_processlist(
     instance_id: int = QParam(..., description="实例ID"),
-    command_type: str = "Query",
+    command_type: str = "ALL",
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -37,28 +55,142 @@ async def get_processlist(
     rs = await engine.processlist(command_type=command_type)
     if rs.error:
         raise HTTPException(400, f"获取会话列表失败：{rs.error}")
+    items = SessionDiagnosticService.normalize_result(inst, rs)
+    columns, rows = items_to_legacy_rows(items)
     return {
-        "column_list": rs.column_list,
-        "rows": [list(r) if isinstance(r, tuple) else r for r in rs.rows],
-        "total": len(rs.rows),
+        "items": items,
+        "column_list": columns,
+        "rows": rows,
+        "total": len(items),
     }
 
 
-@router.post("/kill/", summary="Kill 会话", dependencies=[Depends(require_perm("process_kill"))])
-async def kill_session(
-    instance_id: int,
-    thread_id: int,
+@router.get(
+    "/sessions/history/",
+    summary="查看历史会话采样",
+    response_model=SessionHistoryResponse,
+    dependencies=[Depends(require_perm("process_view"))],
+)
+async def list_session_history(
+    instance_id: int | None = None,
+    db_type: str | None = None,
+    username: str | None = None,
+    db_name: str | None = None,
+    sql_keyword: str | None = None,
+    date_start: str | None = None,
+    date_end: str | None = None,
+    min_seconds: int | None = QParam(default=None, ge=0),
+    page: int = QParam(default=1, ge=1),
+    page_size: int = QParam(default=50, ge=1, le=200),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await SessionDiagnosticService.list_history(
+        db,
+        instance_id=instance_id,
+        db_type=db_type,
+        username=username,
+        db_name=db_name,
+        sql_keyword=sql_keyword,
+        date_start=_parse_dt(date_start),
+        date_end=_parse_dt(date_end),
+        min_seconds=min_seconds,
+        page=page,
+        page_size=page_size,
+    )
+    return {"total": total, "items": items}
+
+
+@router.get(
+    "/sessions/oracle-ash/",
+    summary="Oracle ASH/AWR 历史会话",
+    response_model=SessionHistoryResponse,
+    dependencies=[Depends(require_perm("process_view"))],
+)
+async def list_oracle_ash_history(
+    instance_id: int = QParam(...),
+    source: str = QParam(default="ash", pattern="^(ash|awr)$"),
+    date_start: str | None = None,
+    date_end: str | None = None,
+    sql_keyword: str | None = None,
+    page: int = QParam(default=1, ge=1),
+    page_size: int = QParam(default=50, ge=1, le=200),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     inst = await _get_instance(db, instance_id)
+    if inst.db_type != "oracle":
+        raise HTTPException(400, "ASH/AWR 历史仅支持 Oracle 实例")
+    engine = get_engine(inst)
+    if not hasattr(engine, "ash_history"):
+        raise HTTPException(400, "当前 Oracle 引擎暂不支持 ASH/AWR 历史")
+    rs = await engine.ash_history(
+        source=source,
+        date_start=_parse_dt(date_start),
+        date_end=_parse_dt(date_end),
+        sql_keyword=sql_keyword,
+        limit_num=page_size,
+        offset=(page - 1) * page_size,
+    )
+    if rs.error:
+        raise HTTPException(400, f"获取 Oracle ASH/AWR 历史失败：{rs.error}")
+    items = SessionDiagnosticService.normalize_result(inst, rs, source=f"oracle_{source}")
+    return {"total": rs.affected_rows or len(items), "items": items}
+
+
+@router.post("/kill/", summary="Kill 会话", dependencies=[Depends(require_perm("process_kill"))])
+async def kill_session(
+    request: Request,
+    payload: KillSessionRequest | None = Body(default=None),
+    instance_id: int | None = None,
+    thread_id: int | None = None,
+    session_id: str | None = None,
+    serial: str = "",
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if payload is not None:
+        instance_id = payload.instance_id
+        session_id = payload.session_id
+        serial = payload.serial
+    elif thread_id is not None:
+        session_id = str(thread_id)
+
+    if not instance_id or not session_id:
+        raise HTTPException(400, "缺少 instance_id 或 session_id")
+
+    inst = await _get_instance(db, instance_id)
     engine = get_engine(inst)
 
     if hasattr(engine, 'kill_connection'):
-        rs = await engine.kill_connection(thread_id)
+        if inst.db_type == "oracle":
+            if not serial:
+                raise HTTPException(400, "Oracle Kill 会话必须提供 serial")
+            rs = await engine.kill_connection(int(session_id), serial=serial)
+        else:
+            rs = await engine.kill_connection(int(session_id))
         if rs.error:
+            await AuditLogService.write(
+                db=db,
+                user=user,
+                action="kill_session",
+                module="session",
+                detail=f"instance={inst.instance_name}, session_id={session_id}, serial={serial}",
+                result="failed",
+                request=request,
+                remark=rs.error,
+            )
             raise HTTPException(400, f"Kill 失败：{rs.error}")
-        return {"status": 0, "msg": f"已 Kill 会话 {thread_id}"}
+        await AuditLogService.write(
+            db=db,
+            user=user,
+            action="kill_session",
+            module="session",
+            detail=f"instance={inst.instance_name}, session_id={session_id}, serial={serial}",
+            result="success",
+            request=request,
+        )
+        return {"status": 0, "msg": f"已 Kill 会话 {session_id}"}
     else:
         raise HTTPException(400, f"{inst.db_type} 引擎暂不支持 Kill 操作")
 

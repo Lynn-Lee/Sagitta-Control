@@ -96,6 +96,8 @@ src/
     ├── workflow/    SQL 工单
     ├── query/       在线查询
     ├── monitor/     可观测中心
+    ├── diagnostic/  在线/历史会话诊断
+    ├── slowlog/     慢日志分析与指纹诊断
     ├── instance/    实例管理
     ├── system/      系统管理
     └── audit/       审计日志
@@ -122,6 +124,8 @@ src/
 - `QueryPage`：查询结果表格只渲染当前页数据，结果区支持统一导出、权限排查与自适应高度
 - `LoginPage`：登录卡片支持窄屏自适应，OAuth 按钮区改为可换行布局
 - `DashboardPage`：统计卡片文案与后端真实聚合语义对齐
+- `DiagnosticPage`：支持在线会话、平台历史会话和 Oracle ASH 历史切换，统一筛选与表格展示
+- `SlowlogPage`：支持慢 SQL 总览、明细、指纹聚合、指纹详情、执行计划分析、实时慢查询和采集配置
 - 公共骨架组件：
   - `PageHeader`：统一页面标题、说明文案和右侧操作区
   - `FilterCard`：统一筛选区卡片边框、圆角和内边距

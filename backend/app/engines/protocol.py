@@ -185,6 +185,22 @@ class EngineProtocol(Protocol):
         """
         return {"health": {"up": 0}}
 
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+    ) -> ResultSet:
+        """采集引擎原生慢 SQL/慢命令摘要。"""
+        return ResultSet(warning=f"{self.db_type} 暂不支持原生慢日志采集")
+
+    async def explain_query(
+        self,
+        db_name: str,
+        sql: str,
+    ) -> ResultSet:
+        """返回查询执行计划（不执行 SQL）。"""
+        return ResultSet(warning=f"{self.db_type} 暂不支持执行计划分析")
+
     def get_supported_metric_groups(self) -> list[str]:
         """返回此引擎支持的指标分组列表（3.0 细粒度权限预留）。"""
         return ["health"]

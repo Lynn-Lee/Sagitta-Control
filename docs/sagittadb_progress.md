@@ -2,7 +2,7 @@
 
 > **项目路径：** `/Users/lynn/SynologyDrive/SynologyDrive/Code/SagittaDB`
 > **重构基准：** Archery v1.14.0
-> **文档版本：** v1.11 · 2026-04-21
+> **文档版本：** v1.12 · 2026-04-24
 > **状态说明：** ✅ 已完成并验证 · 🔧 已开发待测试 · 📋 待开发
 
 ---
@@ -47,6 +47,7 @@
 | 密码安全策略 | 本地账号复杂度、默认/过期密码强制改密、30 天轮换、到期前 7 天提醒 | ✅ | 100% |
 | 统一治理视角 | Dashboard、查询权限、SQL 工单统一 self/group/instance_scope/global 视角 | ✅ | 100% |
 | 查询权限撤销审计 | 已生效查询权限撤销、撤销记录、历史软删除回填、Dashboard 撤销统计 | ✅ | 100% |
+| 会话诊断与慢日志分析 | 在线/历史会话、Oracle ASH、慢日志采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
 
 **总体完成度：100%（v1.0-GA），v2-lite 首发范围已完成并进入体验收口与持续验收阶段**
 
@@ -147,8 +148,8 @@
 - 系统配置中配置 API Key
 
 **运维工具**
-- 会话管理（processlist / kill）
-- 慢日志分析
+- 会话管理（processlist / kill），并已扩展到平台历史会话快照与 Oracle ASH/AWR 历史查询
+- 慢日志分析 v2：平台查询历史同步、原生慢日志采集、SQL 指纹聚合、实例级采集配置、指纹详情、结构化优化建议、MySQL/PostgreSQL 执行计划分析
 - SQL 优化建议（sqlglot 规则）
 - 数据字典（三级浏览：实例→数据库→表→字段结构）
 
@@ -164,6 +165,16 @@
 - Prometheus + Grafana 集成
 - Alertmanager 告警管理
 - Prometheus SD（服务发现）端点
+- 监控队列新增 `collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入 `session_snapshot` 和 `slow_query_log`
+
+**会话诊断与慢日志补充**
+- Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`
+- `session_snapshot` 保存实例、DB 类型、会话 ID、用户、主机、运行秒数、SQL 文本、等待事件、阻塞会话、采集来源与采集错误
+- `slow_query_log` 统一保存 `platform / mysql_slowlog / pgsql_statements / redis_slowlog` 来源慢 SQL
+- `slow_query_config` 保存实例级启用状态、慢 SQL 阈值、采集间隔、保留天数、采集上限与最近采集状态
+- 慢日志页面新增 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`
+- 指纹详情支持趋势、实例/库/用户/来源分布、结构化建议和样例 SQL
+- 执行计划分析首发支持 MySQL `EXPLAIN FORMAT=JSON` 和 PostgreSQL `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`
 
 ### Pack C1 — 系统管理 ✅
 
@@ -420,7 +431,7 @@
 |---|---|---|
 | Celery Worker 健康检查 unhealthy | 低 | 无 HTTP 健康检查端点，功能正常但状态显示异常 |
 | Oracle/MSSQL/Cassandra/Elasticsearch/OpenSearch 引擎未全量验证 | 中 | 骨架已实现，需真实环境测试 |
-| Alembic 迁移文件需手动执行 | 低 | 新建表均有对应 SQL 脚本，需补充 CI 自动执行 |
+| Alembic 迁移文件需手动执行 | 低 | 新建表均有对应迁移脚本，需补充 CI 自动执行 |
 | totp_secret 字段已扩展至 500 | 已修复 | 原 100 字节不足，已通过 ALTER TABLE 修复 |
 | OAuth 回调 URL 需与各平台后台配置一致 | 低 | 部署时需在钉钉/飞书/企微管理后台填写正确的 callback URL |
 

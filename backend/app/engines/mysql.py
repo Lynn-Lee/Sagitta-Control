@@ -410,6 +410,30 @@ class MysqlEngine:
     def get_supported_metric_groups(self) -> list[str]:
         return ["health", "performance", "replication", "innodb"]
 
+    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+        """Collect MySQL slow statement digests from performance_schema."""
+        sql = """
+            SELECT
+              'mysql_slowlog' AS source,
+              DIGEST AS source_ref,
+              SCHEMA_NAME AS db_name,
+              DIGEST_TEXT AS sql_text,
+              ROUND(AVG_TIMER_WAIT / 1000000000) AS duration_ms,
+              SUM_ROWS_EXAMINED AS rows_examined,
+              SUM_ROWS_SENT AS rows_sent,
+              COUNT_STAR AS count_star
+            FROM performance_schema.events_statements_summary_by_digest
+            WHERE DIGEST_TEXT IS NOT NULL
+              AND AVG_TIMER_WAIT >= 1000000000000
+            ORDER BY AVG_TIMER_WAIT DESC
+            LIMIT %(limit)s
+        """
+        return await self.query(db_name="", sql=sql, parameters={"limit": int(limit)}, limit_num=limit)
+
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        explain_sql = f"EXPLAIN FORMAT=JSON {sql.strip().rstrip(';')}"
+        return await self.query(db_name=db_name, sql=explain_sql, limit_num=1)
+
     @property
     def auto_backup(self) -> bool:
         return True  # MySQL 支持 Binlog 备份

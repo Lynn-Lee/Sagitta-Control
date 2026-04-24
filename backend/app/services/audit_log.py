@@ -108,4 +108,4 @@ class AuditLogService:
 
     @staticmethod
     def get_modules() -> list[str]:
-        return ["auth", "workflow", "query", "instance", "user", "system", "monitor"]
+        return ["auth", "workflow", "query", "instance", "user", "system", "monitor", "session"]

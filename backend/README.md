@@ -13,7 +13,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 
 # 启动 Celery Worker
-celery -A app.celery_app worker -Q default,execute,notify --loglevel=info
+celery -A app.celery_app worker -Q default,execute,notify,archive,monitor --loglevel=info
 
 # 启动 Celery Beat（定时任务）
 celery -A app.celery_app beat --loglevel=info
@@ -73,6 +73,9 @@ app/
 - PostgreSQL / Oracle 数据字典列查询已补齐 `column_comment`
 - PostgreSQL / Oracle 的 DDL 预览会追加 `COMMENT ON COLUMN ...`；Oracle 简化 DDL 会剥离 storage/tablespace 等物理属性，原始 DDL 保留原生输出并补充注释语句
 - StarRocks 已从 MySQL 映射改为独立 `StarRocksEngine`，查询、元数据、审核、监控能力按 StarRocks 语义实现，归档首版支持 dry-run 与 purge 模式
+- 会话诊断新增 `SessionSnapshot` 和 `collect_session_snapshots`，支持在线会话、历史快照和 Oracle ASH/AWR 历史入口
+- 慢日志分析新增 `SlowQueryLog / SlowQueryConfig`，支持平台查询历史同步、原生慢日志采集、实例级阈值/周期/保留配置、SQL 指纹详情和 MySQL/PostgreSQL 执行计划分析
+- Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`
 
 ## 权限实现口径（v2-lite）
 
@@ -114,4 +117,7 @@ pytest tests/ -v --cov=app
 
 # v2-lite 授权单测
 ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
+
+# 会话诊断与慢日志单测
+./.venv/bin/python -m pytest tests/unit/test_session_diagnostic.py tests/unit/test_slowlog_service.py -q
 ```
