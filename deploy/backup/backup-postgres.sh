@@ -11,7 +11,7 @@
 #   POSTGRES_USER     用户名（默认 sagitta）
 #   POSTGRES_PASSWORD 密码
 #   POSTGRES_DB       库名（默认 sagittadb）
-#   BACKUP_DIR        本地备份目录（默认 /var/backups/sagittadb）
+#   BACKUP_DIR        本地备份目录（默认 /data/sagittadb/backups）
 #   BACKUP_RETAIN_DAYS 本地保留天数（默认 7）
 #   S3_BUCKET         S3 存储桶名（留空跳过上传）
 #   S3_PREFIX         S3 路径前缀（默认 sagittadb/db）
@@ -23,7 +23,7 @@ POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-sagitta}"
 POSTGRES_DB="${POSTGRES_DB:-sagittadb}"
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/sagittadb}"
+BACKUP_DIR="${BACKUP_DIR:-/data/sagittadb/backups}"
 BACKUP_RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-7}"
 S3_BUCKET="${S3_BUCKET:-}"
 S3_PREFIX="${S3_PREFIX:-sagittadb/db}"
