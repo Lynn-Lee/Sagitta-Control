@@ -7,11 +7,20 @@ from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.engines.models import ResultSet
 from app.models.instance import Instance
-from app.models.session import SessionSnapshot
-from app.schemas.diagnostic import SessionItem
+from app.models.session import SessionCollectConfig, SessionSnapshot
+from app.schemas.diagnostic import (
+    SessionCollectConfigItem,
+    SessionCollectConfigUpdate,
+    SessionCollectConfigUpsert,
+    SessionItem,
+)
+
+DEFAULT_SESSION_COLLECT_INTERVAL = 60
+DEFAULT_SESSION_RETENTION_DAYS = 30
 
 _ONLINE_COLUMNS = [
     "session_id",
@@ -121,7 +130,141 @@ def items_to_legacy_rows(items: list[SessionItem]) -> tuple[list[str], list[list
     return _ONLINE_COLUMNS, rows
 
 
+def is_collect_due(cfg: Any, now: datetime) -> bool:
+    if not getattr(cfg, "is_enabled", True):
+        return False
+    last_collect_at = getattr(cfg, "last_collect_at", None)
+    if not last_collect_at:
+        return True
+    return now - last_collect_at >= timedelta(seconds=int(getattr(cfg, "collect_interval", DEFAULT_SESSION_COLLECT_INTERVAL)))
+
+
 class SessionDiagnosticService:
+    @staticmethod
+    def can_access_instance(user: dict, instance: Instance) -> bool:
+        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+            return True
+        user_rg_ids = set(user.get("resource_groups") or [])
+        instance_rg_ids = {rg.id for rg in getattr(instance, "resource_groups", [])}
+        return bool(user_rg_ids & instance_rg_ids)
+
+    @staticmethod
+    async def get_instance_or_404(db: AsyncSession, instance_id: int, user: dict | None = None) -> Instance:
+        from fastapi import HTTPException
+
+        result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == instance_id, Instance.is_active.is_(True))
+        )
+        instance = result.scalar_one_or_none()
+        if not instance:
+            raise HTTPException(404, f"实例 ID={instance_id} 不存在")
+        if user is not None and not SessionDiagnosticService.can_access_instance(user, instance):
+            raise HTTPException(403, "无权访问该实例")
+        return instance
+
+    @staticmethod
+    async def ensure_default_config(
+        db: AsyncSession,
+        instance: Instance,
+        user: dict | None = None,
+    ) -> SessionCollectConfig:
+        result = await db.execute(
+            select(SessionCollectConfig).where(SessionCollectConfig.instance_id == instance.id)
+        )
+        cfg = result.scalar_one_or_none()
+        if cfg:
+            return cfg
+        cfg = SessionCollectConfig(
+            instance_id=instance.id,
+            is_enabled=True,
+            collect_interval=DEFAULT_SESSION_COLLECT_INTERVAL,
+            retention_days=DEFAULT_SESSION_RETENTION_DAYS,
+            last_collect_status="never",
+            created_by=(user or {}).get("username", ""),
+        )
+        db.add(cfg)
+        await db.flush()
+        return cfg
+
+    @staticmethod
+    async def list_configs(db: AsyncSession, user: dict) -> tuple[int, list[SessionCollectConfigItem]]:
+        instance_stmt = (
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.is_active.is_(True))
+            .order_by(Instance.id.desc())
+        )
+        instances = (await db.execute(instance_stmt)).scalars().all()
+        items: list[SessionCollectConfigItem] = []
+        for inst in instances:
+            if not SessionDiagnosticService.can_access_instance(user, inst):
+                continue
+            cfg = await SessionDiagnosticService.ensure_default_config(db, inst, user)
+            items.append(
+                SessionCollectConfigItem(
+                    id=cfg.id,
+                    instance_id=inst.id,
+                    instance_name=inst.instance_name,
+                    db_type=inst.db_type,
+                    is_enabled=cfg.is_enabled,
+                    collect_interval=cfg.collect_interval,
+                    retention_days=cfg.retention_days,
+                    last_collect_at=cfg.last_collect_at,
+                    last_collect_status=cfg.last_collect_status,
+                    last_collect_error=cfg.last_collect_error,
+                    last_collect_count=cfg.last_collect_count,
+                    created_by=cfg.created_by,
+                )
+            )
+        await db.commit()
+        return len(items), items
+
+    @staticmethod
+    async def upsert_config(
+        db: AsyncSession,
+        data: SessionCollectConfigUpsert,
+        user: dict,
+    ) -> SessionCollectConfig:
+        instance = await SessionDiagnosticService.get_instance_or_404(db, data.instance_id, user)
+        cfg = await SessionDiagnosticService.ensure_default_config(db, instance, user)
+        cfg.is_enabled = data.is_enabled
+        cfg.collect_interval = data.collect_interval
+        cfg.retention_days = data.retention_days
+        if not cfg.created_by:
+            cfg.created_by = user.get("username", "")
+        await db.commit()
+        await db.refresh(cfg)
+        return cfg
+
+    @staticmethod
+    async def update_config(
+        db: AsyncSession,
+        config_id: int,
+        data: SessionCollectConfigUpdate,
+        user: dict,
+    ) -> SessionCollectConfig:
+        from fastapi import HTTPException
+
+        result = await db.execute(
+            select(SessionCollectConfig, Instance)
+            .join(Instance, SessionCollectConfig.instance_id == Instance.id)
+            .options(selectinload(Instance.resource_groups))
+            .where(SessionCollectConfig.id == config_id)
+        )
+        row = result.first()
+        if not row:
+            raise HTTPException(404, "会话采集配置不存在")
+        cfg, instance = row
+        if not SessionDiagnosticService.can_access_instance(user, instance):
+            raise HTTPException(403, "无权修改该实例会话采集配置")
+        for field, value in data.model_dump(exclude_none=True).items():
+            setattr(cfg, field, value)
+        await db.commit()
+        await db.refresh(cfg)
+        return cfg
+
     @staticmethod
     def normalize_result(instance: Instance, rs: ResultSet, source: str = "online") -> list[SessionItem]:
         now = datetime.now(UTC)
@@ -256,7 +399,14 @@ class SessionDiagnosticService:
         ]
 
     @staticmethod
-    async def cleanup_old_snapshots(db: AsyncSession, retention_days: int = 30) -> int:
+    async def cleanup_old_snapshots(
+        db: AsyncSession,
+        retention_days: int = DEFAULT_SESSION_RETENTION_DAYS,
+        instance_id: int | None = None,
+    ) -> int:
         cutoff = datetime.now(UTC) - timedelta(days=retention_days)
-        result = await db.execute(delete(SessionSnapshot).where(SessionSnapshot.collected_at < cutoff))
+        stmt = delete(SessionSnapshot).where(SessionSnapshot.collected_at < cutoff)
+        if instance_id is not None:
+            stmt = stmt.where(SessionSnapshot.instance_id == instance_id)
+        result = await db.execute(stmt)
         return int(result.rowcount or 0)

@@ -13,7 +13,15 @@ from app.core.database import get_db
 from app.core.deps import current_user, require_perm
 from app.engines.registry import get_engine
 from app.models.instance import Instance
-from app.schemas.diagnostic import KillSessionRequest, SessionHistoryResponse, SessionListResponse
+from app.schemas.diagnostic import (
+    KillSessionRequest,
+    SessionCollectConfigItem,
+    SessionCollectConfigListResponse,
+    SessionCollectConfigUpdate,
+    SessionCollectConfigUpsert,
+    SessionHistoryResponse,
+    SessionListResponse,
+)
 from app.services.audit_log import AuditLogService
 from app.services.session_diagnostic import SessionDiagnosticService, items_to_legacy_rows
 
@@ -99,6 +107,79 @@ async def list_session_history(
         page_size=page_size,
     )
     return {"total": total, "items": items}
+
+
+@router.get(
+    "/sessions/configs/",
+    summary="查看会话采集配置",
+    response_model=SessionCollectConfigListResponse,
+    dependencies=[Depends(require_perm("process_view"))],
+)
+async def list_session_collect_configs(
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await SessionDiagnosticService.list_configs(db, user)
+    return {"total": total, "items": items}
+
+
+@router.post(
+    "/sessions/configs/",
+    summary="创建或更新会话采集配置",
+    response_model=SessionCollectConfigItem,
+    dependencies=[Depends(require_perm("process_kill"))],
+)
+async def upsert_session_collect_config(
+    data: SessionCollectConfigUpsert,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    cfg = await SessionDiagnosticService.upsert_config(db, data, user)
+    inst = await _get_instance(db, cfg.instance_id)
+    return SessionCollectConfigItem(
+        id=cfg.id,
+        instance_id=cfg.instance_id,
+        instance_name=inst.instance_name,
+        db_type=inst.db_type,
+        is_enabled=cfg.is_enabled,
+        collect_interval=cfg.collect_interval,
+        retention_days=cfg.retention_days,
+        last_collect_at=cfg.last_collect_at,
+        last_collect_status=cfg.last_collect_status,
+        last_collect_error=cfg.last_collect_error,
+        last_collect_count=cfg.last_collect_count,
+        created_by=cfg.created_by,
+    )
+
+
+@router.put(
+    "/sessions/configs/{config_id}/",
+    summary="更新会话采集配置",
+    response_model=SessionCollectConfigItem,
+    dependencies=[Depends(require_perm("process_kill"))],
+)
+async def update_session_collect_config(
+    config_id: int,
+    data: SessionCollectConfigUpdate,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    cfg = await SessionDiagnosticService.update_config(db, config_id, data, user)
+    inst = await _get_instance(db, cfg.instance_id)
+    return SessionCollectConfigItem(
+        id=cfg.id,
+        instance_id=cfg.instance_id,
+        instance_name=inst.instance_name,
+        db_type=inst.db_type,
+        is_enabled=cfg.is_enabled,
+        collect_interval=cfg.collect_interval,
+        retention_days=cfg.retention_days,
+        last_collect_at=cfg.last_collect_at,
+        last_collect_status=cfg.last_collect_status,
+        last_collect_error=cfg.last_collect_error,
+        last_collect_count=cfg.last_collect_count,
+        created_by=cfg.created_by,
+    )
 
 
 @router.get(

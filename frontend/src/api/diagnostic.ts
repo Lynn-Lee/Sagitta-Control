@@ -35,6 +35,26 @@ export interface SessionHistoryResponse {
   items: SessionItem[]
 }
 
+export interface SessionCollectConfigItem {
+  id: number
+  instance_id: number
+  instance_name: string
+  db_type: string
+  is_enabled: boolean
+  collect_interval: number
+  retention_days: number
+  last_collect_at?: string | null
+  last_collect_status: string
+  last_collect_error: string
+  last_collect_count: number
+  created_by: string
+}
+
+export interface SessionCollectConfigListResponse {
+  total: number
+  items: SessionCollectConfigItem[]
+}
+
 export const diagnosticApi = {
   processlist: (params: { instance_id: number; command_type?: string }) =>
     apiClient.get<SessionListResponse>('/diagnostic/processlist/', { params }).then(r => r.data),
@@ -66,4 +86,22 @@ export const diagnosticApi = {
     page_size?: number
   }) =>
     apiClient.get<SessionHistoryResponse>('/diagnostic/sessions/oracle-ash/', { params }).then(r => r.data),
+
+  listConfigs: () =>
+    apiClient.get<SessionCollectConfigListResponse>('/diagnostic/sessions/configs/').then(r => r.data),
+
+  upsertConfig: (data: {
+    instance_id: number
+    is_enabled: boolean
+    collect_interval: number
+    retention_days: number
+  }) =>
+    apiClient.post<SessionCollectConfigItem>('/diagnostic/sessions/configs/', data).then(r => r.data),
+
+  updateConfig: (configId: number, data: {
+    is_enabled?: boolean
+    collect_interval?: number
+    retention_days?: number
+  }) =>
+    apiClient.put<SessionCollectConfigItem>(`/diagnostic/sessions/configs/${configId}/`, data).then(r => r.data),
 }

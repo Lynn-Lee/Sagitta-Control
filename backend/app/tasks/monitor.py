@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -11,7 +12,11 @@ from app.engines.models import ResultSet
 from app.engines.registry import get_engine
 from app.models.instance import Instance
 from app.models.slowlog import SlowQueryConfig
-from app.services.session_diagnostic import SessionDiagnosticService
+from app.services.session_diagnostic import (
+    DEFAULT_SESSION_RETENTION_DAYS,
+    SessionDiagnosticService,
+    is_collect_due,
+)
 from app.services.slowlog import DEFAULT_SLOW_THRESHOLD_MS, SlowLogService
 
 logger = logging.getLogger(__name__)
@@ -22,21 +27,53 @@ def placeholder_task(self, *args, **kwargs):
     return {"task": "monitor", "status": "Sprint 实现中"}
 
 
-async def _collect_session_snapshots_async(retention_days: int = 30) -> dict:
+async def _collect_session_snapshots_async(retention_days: int = DEFAULT_SESSION_RETENTION_DAYS) -> dict:
     async with AsyncSessionLocal() as db:
         instances = (
             await db.execute(select(Instance).where(Instance.is_active.is_(True)))
         ).scalars().all()
         saved = 0
         failed = 0
+        skipped = 0
+        deleted = 0
+        now = datetime.now(UTC)
 
         for inst in instances:
+            cfg = await SessionDiagnosticService.ensure_default_config(db, inst)
             try:
+                if not cfg.is_enabled:
+                    cfg.last_collect_status = "skipped"
+                    cfg.last_collect_error = "采集已禁用"
+                    cfg.last_collect_count = 0
+                    skipped += 1
+                    deleted += await SessionDiagnosticService.cleanup_old_snapshots(
+                        db,
+                        retention_days=cfg.retention_days,
+                        instance_id=inst.id,
+                    )
+                    continue
+                if not is_collect_due(cfg, now):
+                    skipped += 1
+                    deleted += await SessionDiagnosticService.cleanup_old_snapshots(
+                        db,
+                        retention_days=cfg.retention_days,
+                        instance_id=inst.id,
+                    )
+                    continue
                 engine = get_engine(inst)
                 rs = await engine.processlist(command_type="ALL")
-                saved += await SessionDiagnosticService.save_snapshot(db, inst, rs)
+                count = await SessionDiagnosticService.save_snapshot(db, inst, rs, collected_at=now)
                 if rs.error:
+                    cfg.last_collect_status = "failed"
+                    cfg.last_collect_error = rs.error[:2000]
+                    cfg.last_collect_count = 0
                     failed += 1
+                else:
+                    cfg.last_collect_status = "success"
+                    cfg.last_collect_error = ""
+                    cfg.last_collect_count = count
+                    saved += count
+                cfg.last_collect_at = now
             except Exception as exc:
                 logger.warning(
                     "session_snapshot_collect_failed instance_id=%s error=%s",
@@ -44,16 +81,24 @@ async def _collect_session_snapshots_async(retention_days: int = 30) -> dict:
                     exc,
                 )
                 failed += 1
-                saved += await SessionDiagnosticService.save_snapshot(
-                    db, inst, ResultSet(error=str(exc))
-                )
+                cfg.last_collect_status = "failed"
+                cfg.last_collect_error = str(exc)[:2000]
+                cfg.last_collect_count = 0
+                cfg.last_collect_at = now
+                await SessionDiagnosticService.save_snapshot(db, inst, ResultSet(error=str(exc)), collected_at=now)
 
-        deleted = await SessionDiagnosticService.cleanup_old_snapshots(db, retention_days)
+            deleted += await SessionDiagnosticService.cleanup_old_snapshots(
+                db,
+                retention_days=cfg.retention_days,
+                instance_id=inst.id,
+            )
+
         await db.commit()
         return {
             "instances": len(instances),
             "saved": saved,
             "failed": failed,
+            "skipped": skipped,
             "deleted": deleted,
             "retention_days": retention_days,
         }
@@ -73,8 +118,6 @@ async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100
         failed = 0
         unsupported = 0
         skipped = 0
-        from datetime import UTC, datetime, timedelta
-
         now = datetime.now(UTC)
 
         for inst in instances:

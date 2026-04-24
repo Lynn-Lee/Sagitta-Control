@@ -1,10 +1,11 @@
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 
 from app.engines.models import ResultSet
 from app.engines.oracle import OracleEngine
-from app.services.session_diagnostic import normalize_session_row
+from app.services.session_diagnostic import is_collect_due, normalize_session_row
 
 
 class _Instance(SimpleNamespace):
@@ -33,6 +34,24 @@ def test_normalize_mysql_processlist_row():
     assert item.command == "Query"
     assert item.time_seconds == 8
     assert item.sql_text == "select * from t"
+
+
+def test_session_collect_due_uses_instance_interval():
+    now = datetime.now(UTC)
+
+    assert is_collect_due(SimpleNamespace(is_enabled=True, collect_interval=60, last_collect_at=None), now)
+    assert not is_collect_due(
+        SimpleNamespace(is_enabled=True, collect_interval=60, last_collect_at=now - timedelta(seconds=30)),
+        now,
+    )
+    assert is_collect_due(
+        SimpleNamespace(is_enabled=True, collect_interval=60, last_collect_at=now - timedelta(seconds=60)),
+        now,
+    )
+    assert not is_collect_due(
+        SimpleNamespace(is_enabled=False, collect_interval=60, last_collect_at=now - timedelta(seconds=120)),
+        now,
+    )
 
 
 def test_normalize_oracle_session_row_requires_serial():

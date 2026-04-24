@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd'
+import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
-import { diagnosticApi, type SessionItem } from '@/api/diagnostic'
+import { diagnosticApi, type SessionCollectConfigItem, type SessionItem } from '@/api/diagnostic'
 import { instanceApi, type InstanceItem } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
@@ -26,6 +26,9 @@ export default function DiagnosticPage() {
   const [historyPageSize, setHistoryPageSize] = useState(50)
   const [historyFilters, setHistoryFilters] = useState<any>({})
   const [sqlDetail, setSqlDetail] = useState<SessionItem | null>(null)
+  const [configModalOpen, setConfigModalOpen] = useState(false)
+  const [editingConfig, setEditingConfig] = useState<SessionCollectConfigItem | null>(null)
+  const [configForm] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
   const qc = useQueryClient()
   const hasPermission = useAuthStore((s) => s.hasPermission)
@@ -49,6 +52,11 @@ export default function DiagnosticPage() {
     refetchInterval: 5000,
   })
 
+  const configQuery = useQuery({
+    queryKey: ['session-collect-configs'],
+    queryFn: () => diagnosticApi.listConfigs(),
+  })
+
   const killMut = useMutation({
     mutationFn: (row: SessionItem) => diagnosticApi.kill({
       instance_id: instanceId!,
@@ -60,6 +68,22 @@ export default function DiagnosticPage() {
       qc.invalidateQueries({ queryKey: ['processlist'] })
     },
     onError: (e: any) => msgApi.error(e.response?.data?.detail || e.response?.data?.msg || 'Kill 失败'),
+  })
+
+  const configMut = useMutation({
+    mutationFn: (values: { is_enabled: boolean; collect_interval: number; retention_days: number }) => {
+      if (editingConfig) return diagnosticApi.updateConfig(editingConfig.id, values)
+      if (!instanceId) throw new Error('请先选择实例')
+      return diagnosticApi.upsertConfig({ instance_id: instanceId, ...values })
+    },
+    onSuccess: () => {
+      msgApi.success('采集配置已保存')
+      setConfigModalOpen(false)
+      setEditingConfig(null)
+      configForm.resetFields()
+      qc.invalidateQueries({ queryKey: ['session-collect-configs'] })
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.detail || '保存采集配置失败'),
   })
 
   const historyQuery = useQuery({
@@ -155,6 +179,43 @@ export default function DiagnosticPage() {
     setHistoryPage(pagination.current || 1)
     setHistoryPageSize(pagination.pageSize || 50)
   }
+
+  const openConfigModal = (row?: SessionCollectConfigItem) => {
+    setEditingConfig(row || null)
+    configForm.setFieldsValue({
+      is_enabled: row?.is_enabled ?? true,
+      collect_interval: row?.collect_interval ?? 60,
+      retention_days: row?.retention_days ?? 30,
+    })
+    setConfigModalOpen(true)
+  }
+
+  const configColumns: ColumnsType<SessionCollectConfigItem> = [
+    { title: '实例', dataIndex: 'instance_name', width: 180, ellipsis: true },
+    { title: '类型', dataIndex: 'db_type', width: 100, render: (v) => <Tag color="blue">{formatDbTypeLabel(v)}</Tag> },
+    { title: '启用', dataIndex: 'is_enabled', width: 90, render: (v) => <Tag color={v ? 'green' : 'default'}>{v ? '启用' : '停用'}</Tag> },
+    { title: '采样间隔', dataIndex: 'collect_interval', width: 120, render: (v) => `${v}s` },
+    { title: '保留天数', dataIndex: 'retention_days', width: 110, render: (v) => `${v}天` },
+    { title: '最近采集', dataIndex: 'last_collect_at', width: 170, render: renderDate },
+    {
+      title: '状态',
+      dataIndex: 'last_collect_status',
+      width: 120,
+      render: (v) => {
+        const color = v === 'success' ? 'green' : v === 'failed' ? 'red' : v === 'skipped' ? 'default' : 'blue'
+        return <Tag color={color}>{v || 'never'}</Tag>
+      },
+    },
+    { title: '最近条数', dataIndex: 'last_collect_count', width: 100 },
+    { title: '错误', dataIndex: 'last_collect_error', width: 260, ellipsis: true },
+    {
+      title: '操作',
+      key: 'action',
+      width: 90,
+      fixed: 'right',
+      render: (_, row) => <Button size="small" disabled={!canKill} onClick={() => openConfigModal(row)}>编辑</Button>,
+    },
+  ]
 
   return (
     <div>
@@ -269,6 +330,37 @@ export default function DiagnosticPage() {
               </Space>
             ),
           },
+          {
+            key: 'config',
+            label: '采集配置',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <FilterCard>
+                  <Space>
+                    <Button type="primary" disabled={!instanceId || !canKill} onClick={() => openConfigModal()}>
+                      为当前实例配置
+                    </Button>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      未配置实例默认启用，采样间隔 60s，保留 30 天
+                    </Text>
+                  </Space>
+                </FilterCard>
+                <Card style={{ borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+                  <Table
+                    rowKey="id"
+                    dataSource={configQuery.data?.items ?? []}
+                    columns={configColumns}
+                    loading={configQuery.isLoading || configQuery.isFetching}
+                    size="small"
+                    tableLayout="fixed"
+                    scroll={{ x: 1350 }}
+                    locale={{ emptyText: <TableEmptyState title="暂无采集配置" /> }}
+                    pagination={{ pageSize: 50, showSizeChanger: false }}
+                  />
+                </Card>
+              </Space>
+            ),
+          },
         ]}
       />
 
@@ -280,6 +372,44 @@ export default function DiagnosticPage() {
       >
         <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{sqlDetail?.sql_text}</pre>
       </Drawer>
+
+      <Modal
+        title={editingConfig ? `编辑采集配置：${editingConfig.instance_name}` : '配置当前实例采集'}
+        open={configModalOpen}
+        onCancel={() => {
+          setConfigModalOpen(false)
+          setEditingConfig(null)
+          configForm.resetFields()
+        }}
+        onOk={() => configForm.submit()}
+        confirmLoading={configMut.isPending}
+        destroyOnClose
+      >
+        <Form
+          form={configForm}
+          layout="vertical"
+          onFinish={(values) => configMut.mutate(values)}
+          initialValues={{ is_enabled: true, collect_interval: 60, retention_days: 30 }}
+        >
+          <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="collect_interval"
+            label="采样间隔（秒）"
+            rules={[{ required: true, message: '请输入采样间隔' }]}
+          >
+            <InputNumber min={10} max={86400} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="retention_days"
+            label="保留天数"
+            rules={[{ required: true, message: '请输入保留天数' }]}
+          >
+            <InputNumber min={1} max={365} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
