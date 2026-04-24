@@ -5,7 +5,7 @@
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote as urllib_quote
 from urllib.parse import urlencode as urllib_urlencode
 
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import current_user, oauth2_scheme
 from app.core.security import (
+    INITIAL_PASSWORD_GRACE_SECONDS,
     create_access_token,
     create_password_change_token,
     create_refresh_token,
@@ -318,7 +319,9 @@ async def force_change_password(data: ForceChangePasswordRequest, db: AsyncSessi
         raise HTTPException(status_code=400, detail="新密码不能与当前密码相同")
 
     user.password = hash_password(data.new_password)
-    user.password_changed_at = datetime.now(UTC)
+    user.password_changed_at = datetime.now(UTC) + timedelta(
+        seconds=INITIAL_PASSWORD_GRACE_SECONDS + 1
+    )
     await db.commit()
     return {"status": 0, "msg": "密码已修改，请使用新密码重新登录"}
 
