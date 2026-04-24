@@ -124,6 +124,14 @@ vi.mock('@tanstack/react-query', () => ({
               referenced_column_names: '',
               check_clause: '',
             },
+            {
+              constraint_name: 'ck_users_status',
+              constraint_type: 'CHECK',
+              column_names: 'status',
+              referenced_table_name: '',
+              referenced_column_names: '',
+              check_clause: 'CHECK (status IN (0, 1))',
+            },
           ],
         },
         isLoading: false,
@@ -209,6 +217,8 @@ describe('DataDictPage', () => {
     expect(screen.getAllByText('非空').length).toBeGreaterThan(0)
     expect(screen.getAllByText('联合唯一').length).toBe(2)
     expect(screen.queryByText('CHECK ((email IS NOT NULL))')).not.toBeInTheDocument()
+    expect(screen.getByText('ck_users_status')).toBeInTheDocument()
+    expect(screen.getByText('CHECK (status IN (0, 1))')).toBeInTheDocument()
     expect(screen.getByText('idx_users_email_status')).toBeInTheDocument()
     expect(screen.getByText('邮箱状态联合索引')).toBeInTheDocument()
     expect(screen.getByText('uniq_users_tenant_email')).toBeInTheDocument()

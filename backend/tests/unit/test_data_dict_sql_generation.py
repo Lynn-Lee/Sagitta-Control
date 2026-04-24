@@ -146,6 +146,7 @@ class TestOracleDataDictSql:
         assert "FROM all_constraints c" in captured["sql"]
         assert "JOIN all_cons_columns cols" in captured["sql"]
         assert "CASE c.constraint_type" in captured["sql"]
+        assert "c.search_condition_vc" in captured["sql"]
         assert captured["params"] == {"owner": "HR", "table_name": "USERS"}
 
     async def test_get_table_constraints_falls_back_to_user_constraints(self, monkeypatch):
@@ -170,6 +171,31 @@ class TestOracleDataDictSql:
         assert calls[0][1] == {"owner": "HR", "table_name": "USERS"}
         assert "FROM user_constraints c" in calls[1][0]
         assert calls[1][1] == {"table_name": "USERS"}
+
+    async def test_get_table_constraints_falls_back_without_search_condition_vc(
+        self, monkeypatch
+    ):
+        engine = OracleEngine(instance=MockOracleInstance())
+        calls: list[tuple[str, dict | None]] = []
+
+        def fake_run_query_sync(sql, params=None):
+            calls.append((sql, params))
+            if len(calls) < 3:
+                return ResultSet(error="ORA-00904: invalid identifier")
+            return ResultSet()
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+        monkeypatch.setattr("app.engines.oracle.asyncio.to_thread", fake_to_thread)
+
+        await engine.get_table_constraints("HR", "USERS")
+
+        assert "c.search_condition_vc" in calls[0][0]
+        assert "c.search_condition_vc" in calls[1][0]
+        assert "c.search_condition_vc" not in calls[2][0]
+        assert "'' AS check_clause" in calls[2][0]
 
     async def test_get_table_indexes_uses_all_indexes(self, monkeypatch):
         engine = OracleEngine(instance=MockOracleInstance())

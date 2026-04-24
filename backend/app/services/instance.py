@@ -84,8 +84,21 @@ class InstanceService:
             return False
         column_name = column_names[0].replace('"', "").strip().upper()
         check_clause = str(constraint.get("check_clause") or "").strip().upper()
+        if not check_clause and InstanceService._is_system_generated_constraint(
+            str(constraint.get("constraint_name") or "")
+        ):
+            return True
         compact_clause = " ".join(check_clause.replace('"', "").replace("(", " ").replace(")", " ").split())
         return compact_clause in {f"CHECK {column_name} IS NOT NULL", f"{column_name} IS NOT NULL"}
+
+    @staticmethod
+    def _should_hide_column_not_null_check(constraint: dict[str, Any]) -> bool:
+        return (
+            InstanceService._is_system_generated_constraint(
+                str(constraint.get("constraint_name") or "")
+            )
+            and InstanceService._is_simple_not_null_check(constraint)
+        )
 
     @staticmethod
     def _quote_identifier(instance: Instance, identifier: str) -> str:
@@ -138,7 +151,7 @@ class InstanceService:
             )
             return f"{named_prefix}FOREIGN KEY ({quoted_columns}){reference_clause}"
         if constraint_type == "CHECK" and check_clause:
-            if InstanceService._is_system_generated_constraint(constraint_name) and InstanceService._is_simple_not_null_check(constraint):
+            if InstanceService._should_hide_column_not_null_check(constraint):
                 return ""
             normalized_check = check_clause
             if normalized_check.upper().startswith("CHECK"):
@@ -634,7 +647,14 @@ class InstanceService:
         if not rs.is_success:
             raise Exception(f"获取约束信息失败：{rs.error}")
         cols = rs.column_list or []
-        return [InstanceService._normalize_constraint_row(row, cols) for row in rs.rows]
+        constraints = [
+            InstanceService._normalize_constraint_row(row, cols) for row in rs.rows
+        ]
+        return [
+            constraint
+            for constraint in constraints
+            if not InstanceService._should_hide_column_not_null_check(constraint)
+        ]
 
     @staticmethod
     async def get_indexes(
