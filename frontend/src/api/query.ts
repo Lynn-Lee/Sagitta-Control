@@ -17,6 +17,35 @@ export interface QueryAccessExplanation {
   layer: 'identity' | 'resource_scope' | 'data_scope'
 }
 
+export interface QueryLogItem {
+  id: number
+  user_id?: number | null
+  username: string
+  instance_id?: number | null
+  instance_name: string
+  db_type: string
+  db_name: string
+  sqllog: string
+  operation_type: 'execute' | 'export'
+  export_format: string
+  effect_row: number
+  cost_time_ms: number
+  priv_check: boolean
+  hit_rule: boolean
+  masking: boolean
+  is_favorite: boolean
+  client_ip: string
+  error: string
+  created_at: string
+}
+
+export interface QueryLogListResponse {
+  total: number
+  page: number
+  page_size: number
+  items: QueryLogItem[]
+}
+
 export const queryApi = {
   execute: (data: {
     instance_id: number
@@ -38,6 +67,8 @@ export const queryApi = {
       db_name: string
       sql: string
       limit_num?: number
+      export_offset?: number
+      export_limit?: number
     },
     exportFormat: 'xlsx' | 'csv',
   ) => {
@@ -53,9 +84,16 @@ export const queryApi = {
 
   getLogs: (params?: {
     instance_id?: number
+    username?: string
+    db_name?: string
+    operation_type?: 'execute' | 'export'
+    masking?: boolean
+    sql_keyword?: string
+    date_start?: string
+    date_end?: string
     page?: number
     page_size?: number
-  }) => apiClient.get('/query/logs/', { params }).then(r => r.data),
+  }) => apiClient.get<QueryLogListResponse>('/query/logs/', { params }).then(r => r.data),
 
   toggleFavorite: (log_id: number) =>
     apiClient.post(`/query/logs/${log_id}/favorite/`).then(r => r.data),

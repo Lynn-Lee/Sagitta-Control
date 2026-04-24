@@ -31,8 +31,6 @@ const EDITOR_OPTIONS = {
   automaticLayout: true,
 }
 
-const FRONTEND_EXPORT_THRESHOLD = 5000
-
 function triggerDownload(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -48,42 +46,6 @@ function extractFileName(contentDisposition?: string, fallback = 'query_result.x
   if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
   const normalMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
   return normalMatch?.[1] || fallback
-}
-
-function exportRowsAsCsv(headers: string[], rows: any[][], filename: string) {
-  const lines = [
-    headers,
-    ...rows.map((row) => row.map((cell) => cell == null ? '' : String(cell))),
-  ]
-  const csv = lines
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  triggerDownload(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }), filename)
-}
-
-function exportRowsAsExcel(headers: string[], rows: any[][], filename: string) {
-  const escapeHtml = (value: any) => String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-  const table = `
-    <table>
-      <thead>
-        <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
-      </thead>
-      <tbody>
-        ${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
-      </tbody>
-    </table>
-  `
-  const html = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-      <head><meta charset="UTF-8" /></head>
-      <body>${table}</body>
-    </html>
-  `
-  triggerDownload(new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename)
 }
 
 export default function QueryPage() {
@@ -256,16 +218,6 @@ export default function QueryPage() {
     [resultRows, resultPage, resultPageSize],
   )
 
-  const exportHeaders = useMemo(
-    () => ['row_num', ...(result?.column_list ?? [])],
-    [result?.column_list],
-  )
-
-  const toExportMatrix = (rows: typeof resultRows) => rows.map((row) => [
-    row.__rowNo,
-    ...(result?.column_list.map((_col, idx) => row[idx]) ?? []),
-  ])
-
   const handleExport = async (scope: 'current' | 'all', format: 'csv' | 'excel') => {
     if (!resultRows.length) {
       msgApi.warning('当前没有可导出的查询结果')
@@ -275,37 +227,30 @@ export default function QueryPage() {
     const exportLabel = scope === 'current' ? '当前页' : '全部结果'
     const exportFormat = format === 'csv' ? 'csv' : 'xlsx'
 
-    if (scope === 'all' && resultRows.length > FRONTEND_EXPORT_THRESHOLD) {
-      try {
-        const { blob, contentDisposition } = await queryApi.exportResult(
-          {
-            instance_id: instanceId!,
-            db_name: dbName,
-            sql,
-            limit_num: limitNum,
-          },
-          exportFormat,
-        )
-        triggerDownload(
-          blob,
-          extractFileName(contentDisposition, `${dbPart}_all_rows.${exportFormat}`),
-        )
-        msgApi.success(`已通过后端导出全部结果为 ${format === 'csv' ? 'CSV' : 'Excel'}`)
-      } catch (e: any) {
-        msgApi.error(e.response?.data?.msg || '导出失败')
-      }
-      return
+    try {
+      const isCurrentPage = scope === 'current'
+      const { blob, contentDisposition } = await queryApi.exportResult(
+        {
+          instance_id: instanceId!,
+          db_name: dbName,
+          sql,
+          limit_num: isCurrentPage ? resultPage * resultPageSize : limitNum,
+          export_offset: isCurrentPage ? (resultPage - 1) * resultPageSize : undefined,
+          export_limit: isCurrentPage ? resultPageSize : undefined,
+        },
+        exportFormat,
+      )
+      triggerDownload(
+        blob,
+        extractFileName(
+          contentDisposition,
+          `${dbPart}_${scope === 'current' ? 'current_page' : 'all_rows'}.${exportFormat}`,
+        ),
+      )
+      msgApi.success(`已通过后端导出${exportLabel}为${format === 'csv' ? ' CSV' : ' Excel'}`)
+    } catch (e: any) {
+      msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '导出失败')
     }
-
-    const rows = scope === 'current' ? currentPageRows : resultRows
-    const matrix = toExportMatrix(rows)
-    const filePrefix = `${dbPart}_${scope === 'current' ? 'current_page' : 'all_rows'}`
-    if (format === 'csv') {
-      exportRowsAsCsv(exportHeaders, matrix, `${filePrefix}.csv`)
-    } else {
-      exportRowsAsExcel(exportHeaders, matrix, `${filePrefix}.xls`)
-    }
-    msgApi.success(`已导出${exportLabel}为${format === 'csv' ? ' CSV' : ' Excel'}`)
   }
 
   useEffect(() => {

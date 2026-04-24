@@ -8,7 +8,7 @@ import logging
 from io import BytesIO, StringIO
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import Query as QParam
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
@@ -45,6 +45,9 @@ async def _run_query_with_permissions(
     db: AsyncSession,
     user: dict,
     data: QueryExecuteRequest,
+    operation_type: str = "execute",
+    export_format: str = "",
+    client_ip: str = "",
 ) -> tuple[Instance, dict]:
     inst = await _load_instance(db, data.instance_id)
     engine = get_engine(inst)
@@ -107,6 +110,10 @@ async def _run_query_with_permissions(
     masking_svc = DataMaskingService(rules=active_rules)
     masked_result = masking_svc.mask_result(resultset, data.sql, inst.db_type)
     is_masked = masked_result is not resultset
+    if operation_type == "export" and data.export_limit:
+        start = data.export_offset or 0
+        masked_result.rows = masked_result.rows[start:start + data.export_limit]
+        masked_result.affected_rows = len(masked_result.rows)
 
     try:
         await QueryPrivService.write_log(
@@ -115,11 +122,17 @@ async def _run_query_with_permissions(
             instance_id=inst.id,
             db_name=data.db_name,
             sql=data.sql,
-            effect_row=resultset.affected_rows,
-            cost_time_ms=resultset.cost_time,
+            effect_row=masked_result.affected_rows,
+            cost_time_ms=masked_result.cost_time,
             priv_check=passed,
             hit_rule=False,
             masking=is_masked,
+            operation_type=operation_type,
+            export_format=export_format,
+            username=user.get("username") or user.get("display_name") or "",
+            instance_name=inst.instance_name,
+            db_type=inst.db_type,
+            client_ip=client_ip,
         )
     except Exception as e:
         logger.warning("write_query_log failed: %s", str(e))
@@ -146,6 +159,51 @@ async def _run_query_with_permissions(
         "is_masked": is_masked,
         "error": "",
     }
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+async def _write_failed_query_log(
+    db: AsyncSession,
+    user: dict,
+    data: QueryExecuteRequest,
+    operation_type: str,
+    export_format: str,
+    client_ip: str,
+    error: str,
+) -> None:
+    try:
+        await db.rollback()
+        inst = None
+        if data.instance_id:
+            result = await db.execute(select(Instance).where(Instance.id == data.instance_id))
+            inst = result.scalar_one_or_none()
+        await QueryPrivService.write_log(
+            db=db,
+            user_id=user.get("id"),
+            instance_id=inst.id if inst else None,
+            db_name=data.db_name,
+            sql=data.sql,
+            effect_row=0,
+            cost_time_ms=0,
+            priv_check=False,
+            hit_rule=False,
+            masking=False,
+            operation_type=operation_type,
+            export_format=export_format,
+            username=user.get("username") or user.get("display_name") or "",
+            instance_name=inst.instance_name if inst else "",
+            db_type=inst.db_type if inst else "",
+            client_ip=client_ip,
+            error=error,
+        )
+    except Exception as e:
+        logger.warning("write_failed_query_log failed: %s", str(e))
 
 
 def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, str, str]:
@@ -185,6 +243,7 @@ def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, s
 @router.post("/", summary="执行在线查询")
 async def execute_query(
     data: QueryExecuteRequest,
+    request: Request,
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -196,21 +255,61 @@ async def execute_query(
     4. 数据脱敏（sqlglot 解析列引用，支持所有方言）
     5. 写入查询日志
     """
-    _, result = await _run_query_with_permissions(db=db, user=user, data=data)
-    return result
+    client_ip = _client_ip(request)
+    try:
+        _, result = await _run_query_with_permissions(
+            db=db,
+            user=user,
+            data=data,
+            operation_type="execute",
+            client_ip=client_ip,
+        )
+        return result
+    except HTTPException as e:
+        await _write_failed_query_log(
+            db,
+            user,
+            data,
+            operation_type="execute",
+            export_format="",
+            client_ip=client_ip,
+            error=str(e.detail),
+        )
+        raise
 
 
 @router.post("/export/", summary="导出在线查询结果")
 async def export_query_result(
     data: QueryExecuteRequest,
+    request: Request,
     export_format: str = QParam("xlsx", pattern="^(xlsx|csv)$"),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _, result = await _run_query_with_permissions(db=db, user=user, data=data)
-    content, media_type, filename = _build_query_export_file(result, export_format)
-    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
-    return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
+    client_ip = _client_ip(request)
+    try:
+        _, result = await _run_query_with_permissions(
+            db=db,
+            user=user,
+            data=data,
+            operation_type="export",
+            export_format=export_format,
+            client_ip=client_ip,
+        )
+        content, media_type, filename = _build_query_export_file(result, export_format)
+        headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+        return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
+    except HTTPException as e:
+        await _write_failed_query_log(
+            db,
+            user,
+            data,
+            operation_type="export",
+            export_format=export_format,
+            client_ip=client_ip,
+            error=str(e.detail),
+        )
+        raise
 
 
 @router.post("/access-check/", summary="查询权限排查")
@@ -237,15 +336,31 @@ async def explain_query_access(
 @router.get("/logs/", summary="查询日志列表")
 async def list_query_logs(
     instance_id: int | None = None,
+    username: str | None = None,
+    db_name: str | None = None,
+    operation_type: str | None = QParam(None, pattern="^(execute|export)$"),
+    masking: bool | None = None,
+    sql_keyword: str | None = None,
+    date_start: str | None = None,
+    date_end: str | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # 普通用户只能看自己的日志，超管可看所有
-    uid = None if user.get("is_superuser") else user["id"]
     total, logs = await QueryPrivService.list_logs(
-        db, user_id=uid, instance_id=instance_id, page=page, page_size=page_size
+        db,
+        user=user,
+        instance_id=instance_id,
+        username=username,
+        db_name=db_name,
+        operation_type=operation_type,
+        masking=masking,
+        sql_keyword=sql_keyword,
+        date_start=date_start,
+        date_end=date_end,
+        page=page,
+        page_size=page_size,
     )
     return {
         "total": total,
@@ -254,13 +369,23 @@ async def list_query_logs(
         "items": [
             {
                 "id": log.id,
+                "user_id": log.user_id,
+                "username": log.username,
+                "instance_id": log.instance_id,
+                "instance_name": log.instance_name,
+                "db_type": log.db_type,
                 "db_name": log.db_name,
-                "sqllog": log.sqllog[:200],
+                "sqllog": log.sqllog,
+                "operation_type": log.operation_type,
+                "export_format": log.export_format,
                 "effect_row": log.effect_row,
                 "cost_time_ms": log.cost_time_ms,
                 "priv_check": log.priv_check,
+                "hit_rule": log.hit_rule,
                 "masking": log.masking,
                 "is_favorite": log.is_favorite,
+                "client_ip": log.client_ip,
+                "error": log.error,
                 "created_at": log.created_at.isoformat() if log.created_at else "",
             }
             for log in logs

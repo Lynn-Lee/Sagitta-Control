@@ -196,6 +196,39 @@ class TestGovernanceScope:
 
 
 class TestQueryPrivilegeHelpers:
+    @pytest.mark.asyncio
+    async def test_write_log_records_query_history_metadata(self):
+        db = SimpleNamespace(add=MagicMock(), commit=AsyncMock())
+
+        await QueryPrivService.write_log(
+            db=db,
+            user_id=7,
+            instance_id=9,
+            db_name="analytics",
+            sql="SELECT * FROM orders",
+            effect_row=25,
+            cost_time_ms=42,
+            priv_check=True,
+            hit_rule=False,
+            masking=True,
+            operation_type="export",
+            export_format="xlsx",
+            username="alice",
+            instance_name="mysql-prod",
+            db_type="mysql",
+            client_ip="10.0.0.8",
+            error="",
+        )
+
+        log = db.add.call_args.args[0]
+        assert log.operation_type == "export"
+        assert log.export_format == "xlsx"
+        assert log.username == "alice"
+        assert log.instance_name == "mysql-prod"
+        assert log.effect_row == 25
+        assert log.masking is True
+        db.commit.assert_awaited_once()
+
     def test_instance_scope_normalizes_to_instance_priv(self):
         assert QueryPrivService._normalize_scope_type("instance", "", "") == ("instance", 0)
 

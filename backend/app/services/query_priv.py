@@ -1049,8 +1049,8 @@ class QueryPrivService:
     @staticmethod
     async def write_log(
         db: AsyncSession,
-        user_id: int,
-        instance_id: int,
+        user_id: int | None,
+        instance_id: int | None,
         db_name: str,
         sql: str,
         effect_row: int,
@@ -1058,12 +1058,26 @@ class QueryPrivService:
         priv_check: bool,
         hit_rule: bool,
         masking: bool,
+        operation_type: str = "execute",
+        export_format: str = "",
+        username: str = "",
+        instance_name: str = "",
+        db_type: str = "",
+        client_ip: str = "",
+        error: str = "",
     ) -> None:
         log = QueryLog(
             user_id=user_id,
             instance_id=instance_id,
             db_name=db_name,
             sqllog=sql[:10000],
+            operation_type=operation_type,
+            export_format=export_format,
+            username=username[:100],
+            instance_name=instance_name[:100],
+            db_type=db_type[:20],
+            client_ip=client_ip[:50],
+            error=error[:4000],
             effect_row=effect_row,
             cost_time_ms=cost_time_ms,
             priv_check=priv_check,
@@ -1076,16 +1090,52 @@ class QueryPrivService:
     @staticmethod
     async def list_logs(
         db: AsyncSession,
-        user_id: int | None = None,
+        user: dict,
         instance_id: int | None = None,
+        username: str | None = None,
+        db_name: str | None = None,
+        operation_type: str | None = None,
+        masking: bool | None = None,
+        sql_keyword: str | None = None,
+        date_start: str | None = None,
+        date_end: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[int, list[QueryLog]]:
+        from datetime import timedelta
+
         query = select(QueryLog)
-        if user_id:
-            query = query.where(QueryLog.user_id == user_id)
+
+        scope = await GovernanceScopeService.resolve(db, user, "query")
+        if scope["user_ids"] is not None:
+            query = query.where(QueryLog.user_id.in_(scope["user_ids"]))
+        if scope["instance_ids"] is not None:
+            query = query.where(QueryLog.instance_id.in_(scope["instance_ids"]))
+
         if instance_id:
             query = query.where(QueryLog.instance_id == instance_id)
+        if username:
+            query = query.where(QueryLog.username.ilike(f"%{username}%"))
+        if db_name:
+            query = query.where(QueryLog.db_name.ilike(f"%{db_name}%"))
+        if operation_type:
+            query = query.where(QueryLog.operation_type == operation_type)
+        if masking is not None:
+            query = query.where(QueryLog.masking.is_(masking))
+        if sql_keyword:
+            query = query.where(QueryLog.sqllog.ilike(f"%{sql_keyword}%"))
+        if date_start:
+            try:
+                ds = datetime.fromisoformat(date_start).replace(tzinfo=UTC)
+                query = query.where(QueryLog.created_at >= ds)
+            except ValueError:
+                pass
+        if date_end:
+            try:
+                de = datetime.fromisoformat(date_end).replace(tzinfo=UTC) + timedelta(days=1)
+                query = query.where(QueryLog.created_at < de)
+            except ValueError:
+                pass
 
         total_q = await db.execute(select(func.count()).select_from(query.subquery()))
         total = total_q.scalar_one()

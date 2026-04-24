@@ -17,6 +17,7 @@ const WorkflowDetail       = lazy(() => import('@/pages/workflow/WorkflowDetail'
 const WorkflowTemplatePage = lazy(() => import('@/pages/workflow/WorkflowTemplatePage'))
 const QueryPage            = lazy(() => import('@/pages/query/QueryPage'))
 const QueryPrivPage        = lazy(() => import('@/pages/query/QueryPrivPage'))
+const QueryHistoryPage     = lazy(() => import('@/pages/query/QueryHistoryPage'))
 const MonitorPage          = lazy(() => import('@/pages/monitor/MonitorPage'))
 const DiagnosticPage       = lazy(() => import('@/pages/diagnostic/DiagnosticPage'))
 const SlowlogPage          = lazy(() => import('@/pages/slowlog/SlowlogPage'))
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="workflow/:id"         element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowDetail /></PermissionGuard>} />
           <Route path="query"                element={<PermissionGuard permission="menu_query"><QueryPage /></PermissionGuard>} />
           <Route path="query/privileges"     element={<PermissionGuard permission="menu_query"><QueryPrivPage /></PermissionGuard>} />
+          <Route path="query/history"        element={<PermissionGuard permission="menu_query"><QueryHistoryPage /></PermissionGuard>} />
           <Route path="monitor"              element={<PermissionGuard permission="menu_monitor"><MonitorPage /></PermissionGuard>} />
           <Route path="slowlog"              element={<PermissionGuard permission="menu_ops"><SlowlogPage /></PermissionGuard>} />
           <Route path="diagnostic"           element={<PermissionGuard permission="menu_ops"><DiagnosticPage /></PermissionGuard>} />

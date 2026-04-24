@@ -7,7 +7,7 @@ import {
   DashboardOutlined, SettingOutlined, AuditOutlined, BellOutlined,
   LogoutOutlined, UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   BugOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
-  KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined,
+  KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined, HistoryOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/auth'
 import { authApi } from '@/api/auth'
@@ -194,6 +194,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { key: '/query', icon: <MenuIcon component={QueryExecuteMenuSvg} label="执行查询" />, label: '执行查询' },
       { key: '/query/privileges', icon: <MenuIcon component={QueryPrivilegeMenuSvg} label="查询权限" />, label: '查询权限' },
+      { key: '/query/history', icon: <HistoryOutlined />, label: '查询历史' },
     ],
   },
   { key: '/monitor', icon: <MenuIcon component={MonitorMenuSvg} label="可观测中心" />, label: '可观测中心', permission: 'menu_monitor' },

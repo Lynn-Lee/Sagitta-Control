@@ -179,6 +179,15 @@ class QueryLog(BaseModel):
     )
     db_name: Mapped[str] = mapped_column(String(64), default="", comment="数据库名")
     sqllog: Mapped[str] = mapped_column(Text, nullable=False, comment="执行的 SQL")
+    operation_type: Mapped[str] = mapped_column(
+        String(20), default="execute", comment="操作类型：execute/export"
+    )
+    export_format: Mapped[str] = mapped_column(String(10), default="", comment="导出格式")
+    username: Mapped[str] = mapped_column(String(100), default="", comment="操作人快照")
+    instance_name: Mapped[str] = mapped_column(String(100), default="", comment="实例名称快照")
+    db_type: Mapped[str] = mapped_column(String(20), default="", comment="数据库类型快照")
+    client_ip: Mapped[str] = mapped_column(String(50), default="", comment="客户端IP")
+    error: Mapped[str] = mapped_column(Text, default="", comment="失败原因")
     effect_row: Mapped[int] = mapped_column(BigInteger, default=0, comment="影响行数")
     cost_time_ms: Mapped[int] = mapped_column(Integer, default=0, comment="执行耗时(ms)")
     # 权限校验是否通过
@@ -193,5 +202,6 @@ class QueryLog(BaseModel):
     __table_args__ = (
         Index("ix_qlog_user_date", "user_id", "created_at"),
         Index("ix_qlog_instance", "instance_id"),
+        Index("ix_qlog_operation_type", "operation_type"),
         Index("ix_qlog_tenant", "tenant_id"),
     )

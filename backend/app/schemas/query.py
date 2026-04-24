@@ -12,6 +12,8 @@ class QueryExecuteRequest(BaseModel):
     db_name: str
     sql: str = Field(..., min_length=1, max_length=50000)
     limit_num: int = Field(default=100, ge=1, le=100000)
+    export_offset: int | None = Field(default=None, ge=0)
+    export_limit: int | None = Field(default=None, ge=1, le=100000)
 
     @field_validator("sql")
     @classmethod
@@ -32,13 +34,23 @@ class QueryResultResponse(BaseModel):
 
 class QueryLogItem(BaseModel):
     id: int
+    user_id: int | None = None
+    username: str = ""
+    instance_id: int | None = None
+    instance_name: str = ""
+    db_type: str = ""
     db_name: str
     sqllog: str
+    operation_type: str = "execute"
+    export_format: str = ""
     effect_row: int
     cost_time_ms: int
     priv_check: bool
+    hit_rule: bool = False
     masking: bool
     is_favorite: bool
+    client_ip: str = ""
+    error: str = ""
     created_at: str
 
     model_config = {"from_attributes": True}

@@ -158,6 +158,8 @@
 - Dashboard SQL 工单概览（10 个卡片、工单提交趋势、工单治理趋势、执行趋势、待审批库存趋势、5 个 Top 图，按权限范围裁剪；审批相关排行按业务对象范围统计而非个人审批待办）
 - Dashboard 实例与库概览（4 个卡片、实例类型分布、实例状态分布、库-Schema 状态分布，按权限范围裁剪；实例类型展示名统一为规范命名）
 - 在线查询结果区支持自适应高度、分页、`row_num` 行号列、当前页/全部结果导出
+- 在线查询新增 `查询历史` 页面：支持时间范围、操作人、实例、数据库、操作类型、脱敏、SQL 关键字筛选，支持 SQL 明细查看、复制和收藏
+- 查询历史复用 v2-lite 查询治理范围；查询/导出成功与失败统一写入 `query_log`，迁移新增 `0017_query_log_history_audit` 和 `0018_qlog_snapshot_backfill`
 - 监控配置管理（Prometheus Exporter 配置）
 - Prometheus + Grafana 集成
 - Alertmanager 告警管理
