@@ -616,17 +616,22 @@ docker compose exec postgres dropdb -U sagitta sagittadb_verify
 ### 6.1 滚动更新（Docker Compose）
 
 ```bash
-# 1. 拉取最新代码
-git pull origin main
+# 推荐：在生产服务器项目目录执行标准发布脚本
+bash deploy/update-prod.sh
 
-# 2. 重新构建镜像
-docker compose -f deploy/docker-compose.yml build backend frontend
+# 发布指定 tag / 分支 / commit
+bash deploy/update-prod.sh --ref v1.0.1
 
-# 3. 滚动重启（逐个服务）
-docker compose -f deploy/docker-compose.yml up -d --no-deps backend
-docker compose -f deploy/docker-compose.yml up -d --no-deps frontend
-docker compose -f deploy/docker-compose.yml up -d --no-deps celery_worker
+# 已确认有近期备份时，可以跳过备份
+bash deploy/update-prod.sh --skip-backup
+
+# 无缓存构建并在成功后清理悬空镜像
+bash deploy/update-prod.sh --no-cache --prune
 ```
+
+`deploy/update-prod.sh` 会自动完成：检查工作区、拉取 `origin/main` 最新 Git 代码、通过 compose 内置 `postgres` 容器执行备份、构建生产镜像、启动依赖服务、执行 `alembic upgrade head`、重建应用服务、检查本机健康接口并输出服务状态。失败时脚本会打印 `backend / frontend / celery_worker` 近期日志，便于回滚或定位。
+
+默认备份目录为 `/data/sagittadb/backups`，默认保留 7 天；可在执行脚本前通过 `BACKUP_DIR` 和 `BACKUP_RETAIN_DAYS` 覆盖。
 
 ### 6.2 查看生产日志
 
@@ -687,22 +692,11 @@ docker compose -f deploy/docker-compose.yml restart celery_worker
 具体步骤：
 
 ```bash
-# 备份
-bash deploy/backup/backup-postgres.sh
+# 升级到 origin/main 最新提交
+bash deploy/update-prod.sh
 
-# 拉取新版本代码
-git pull origin main
-git checkout v1.0.1   # 切换到目标版本 tag
-
-# 重新构建并启动
-docker compose -f deploy/docker-compose.yml build
-docker compose -f deploy/docker-compose.yml up -d
-
-# 执行迁移
-docker compose exec backend alembic upgrade head
-
-# 验证
-curl https://your-domain.com/health
+# 或升级到指定版本
+bash deploy/update-prod.sh --ref v1.0.1
 ```
 
 ---

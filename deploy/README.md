@@ -38,16 +38,19 @@
 默认行为：
 
 - 先检查 Git 跟踪文件是否干净
-- 执行数据库备份
-- 拉取当前分支最新代码
+- 拉取 `origin/main` 最新代码（或切换到指定 tag / 分支 / commit）
+- 通过 compose 内置 `postgres` 容器执行数据库备份
 - 重新构建 `backend / celery_worker / celery_beat / flower / frontend`
+- 确保 `postgres / redis` 处于运行状态
 - 执行 `alembic upgrade head`
-- 滚动拉起更新后的服务并输出状态
+- 重建更新后的应用服务
+- 检查后端和前端健康接口
+- 输出服务状态；失败时自动打印近期日志方便定位
 
 示例：
 
 ```bash
-# 按当前分支发布
+# 按 origin/main 发布
 bash deploy/update-prod.sh
 
 # 发布到指定 tag / 分支 / commit
@@ -55,6 +58,20 @@ bash deploy/update-prod.sh --ref v1.0.1
 
 # 明确知道刚做过备份时，可跳过备份
 bash deploy/update-prod.sh --skip-backup
+
+# 强制无缓存构建，并在成功后清理悬空镜像
+bash deploy/update-prod.sh --no-cache --prune
+
+# 如果生产入口不是本机 80/8000，可指定健康检查地址
+bash deploy/update-prod.sh \
+  --backend-health https://db.example.com/health \
+  --frontend-health https://db.example.com/health
+```
+
+默认备份目录为 `/data/sagittadb/backups`，默认保留 7 天；可在执行脚本前通过环境变量覆盖：
+
+```bash
+BACKUP_DIR=/data/sagittadb/backups BACKUP_RETAIN_DAYS=14 bash deploy/update-prod.sh
 ```
 
 ## 目录结构
