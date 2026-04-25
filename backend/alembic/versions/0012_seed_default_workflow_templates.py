@@ -43,9 +43,9 @@ DEFAULT_TEMPLATES = [
     {
         "template_name": "数据清理-按条件删除历史数据",
         "category": "cleanup",
-        "description": "用于按业务条件、时间范围清理历史数据，先校验后删除。",
-        "scene_desc": "适用于定期清理历史明细、日志、缓存落库表等场景，执行前需先确认影响范围。",
-        "risk_hint": "删除类操作不可逆，必须先补全校验 SQL 并确认影响行数，建议在低峰期执行。",
+        "description": "用于小范围、一次性的临时 SQL 删除；大批量历史清理请优先使用数据归档。",
+        "scene_desc": "适用于少量异常数据或一次性人工 SQL 清理。定期清理、分批限速、跨库迁移等场景请使用数据归档。",
+        "risk_hint": "删除类操作不可逆，必须先补全校验 SQL 并确认影响行数；大表按条件历史清理建议改走数据归档审批作业。",
         "rollback_hint": "执行前先备份受影响数据；如已删除需通过备份表或 binlog/归档数据回补。",
         "sql_content": """-- 请先将 SELECT 校验语句补充完整
 SELECT COUNT(*) AS affected_rows

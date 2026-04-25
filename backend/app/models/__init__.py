@@ -4,6 +4,7 @@
 """
 
 from app.models.approval_flow import ApprovalFlow, ApprovalFlowNode  # noqa: F401
+from app.models.archive import ArchiveBatchLog, ArchiveJob  # noqa: F401
 from app.models.base import Base, BaseModel  # noqa: F401
 from app.models.instance import Instance, InstanceDatabase, InstanceTag, SshTunnel  # noqa: F401
 from app.models.masking import MaskingRule, WorkflowTemplate  # noqa: F401
@@ -39,6 +40,8 @@ __all__ = [
     "Instance",
     "ApprovalFlow",
     "ApprovalFlowNode",
+    "ArchiveJob",
+    "ArchiveBatchLog",
     "SshTunnel",
     "InstanceTag",
     "InstanceDatabase",

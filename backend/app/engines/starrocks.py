@@ -74,6 +74,10 @@ class StarRocksEngine(MysqlEngine):
     name = "StarRocksEngine"
     db_type = "starrocks"
 
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        explain_sql = f"EXPLAIN COSTS {sql.strip().rstrip(';')}"
+        return await self.query(db_name=db_name, sql=explain_sql, limit_num=1000)
+
     def __init__(self, instance: Any) -> None:
         super().__init__(instance)
         self._capabilities: StarRocksCapabilities | None = None

@@ -312,20 +312,22 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 | 数据库 | purge（直接删除） | dest（迁移到目标） |
 |---|---|---|
-| MySQL/TiDB/Doris | ✅ `DELETE ... LIMIT N` | ✅ |
+| MySQL/TiDB | ✅ `DELETE ... LIMIT N` | ✅ |
 | StarRocks | ✅ `DELETE FROM table WHERE condition` | ❌ |
 | PostgreSQL | ✅ `DELETE WHERE ctid IN` | ✅ |
 | Oracle | ✅ `DELETE WHERE ROWID IN` | ✅ |
 | SQL Server | ✅ `DELETE TOP(N)` | ✅ |
 | ClickHouse | ✅ `ALTER TABLE DELETE WHERE` | ❌（异步） |
 | MongoDB | ✅ 分批 deleteMany | ✅ |
-| Cassandra | ✅ SELECT+批量DELETE | ❌ |
+| Doris/Cassandra | ❌（待真实环境验证/主键发现） | ❌ |
 | Redis/Elasticsearch | ❌ 不支持 | ❌ |
 
 **安全机制：**
-- 默认 `dry_run=true`，先估算影响行数，确认后再执行
-- 分批执行（默认 1000 行/批），批次间可配置休眠时间
-- 执行前显示确认弹窗，需二次确认
+- 先估算影响行数，再提交归档审批工单；审批通过后才允许启动后台作业
+- 分批执行（默认 1000 行/批），批次间可配置休眠时间，并记录 `archive_batch_log`
+- 支持作业暂停、继续、取消；暂停/取消在当前批次完成后生效，已完成批次不自动回滚
+- 关系型条件禁止空 WHERE、多语句、注释绕过和明显全表条件；MongoDB 条件必须是非空 JSON
+- 作业完成后不提供自动撤销，只提供备份、归档目标或 binlog 回补建议
 
 #### 2.5.6 SQL 回滚辅助
 

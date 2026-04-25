@@ -184,7 +184,8 @@ SagittaDB/
 - 慢日志分析已升级到 v2：新增 `slow_query_log` 与 `slow_query_config`，支持平台查询历史同步、MySQL/PG/Redis 原生采集、SQL 指纹聚合、实例级采集配置和最近采集状态。
 - MySQL / PostgreSQL 慢 SQL 详情支持执行计划分析：MySQL 使用 `EXPLAIN FORMAT=JSON`，PostgreSQL 使用 `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`；其他引擎保留入口并返回明确的不支持提示。
 - 慢日志页面包含 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
-- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`。
+- 数据归档已升级为审批作业：提交后生成归档审批工单，审批通过后由 Celery `archive` 队列分批执行，并支持暂停、继续、取消和批次日志查看。
+- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`。
 - 详细说明见 [docs/slowlog_diagnostic_v2.md](docs/slowlog_diagnostic_v2.md)。
 
 ## 最近验证

@@ -16,6 +16,7 @@ import logging
 import platform
 import re
 import time
+import uuid
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
@@ -235,6 +236,21 @@ class OracleEngine:
         if rs.is_success and rs.rows:
             return rs
         return await self.get_all_columns_by_tb(db_name, tb_name, **kwargs)
+
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        statement_id = f"SAGITTA_{uuid.uuid4().hex[:24].upper()}"
+        explain_sql = f"EXPLAIN PLAN SET STATEMENT_ID = '{statement_id}' FOR {sql.strip().rstrip(';')}"
+        rs = await asyncio.to_thread(self._run_statement_sync, explain_sql, None)
+        if not rs.is_success:
+            return rs
+        display_sql = """
+        SELECT plan_table_output
+        FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, :statement_id, 'TYPICAL +PREDICATE +ALIAS +COST +BYTES'))
+        """
+        plan_rs = await asyncio.to_thread(self._run_query_sync, display_sql, {"statement_id": statement_id})
+        cleanup_sql = "DELETE FROM plan_table WHERE statement_id = :statement_id"
+        await asyncio.to_thread(self._run_statement_sync, cleanup_sql, {"statement_id": statement_id})
+        return plan_rs
 
     def _normalize_ddl_text(self, ddl: str) -> str:
         normalized = ddl.replace("\r\n", "\n").replace("\r", "\n").strip()

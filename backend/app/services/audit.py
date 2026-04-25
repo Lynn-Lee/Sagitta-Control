@@ -204,6 +204,10 @@ class AuditService:
             audit.current_status = AuditStatus.PASSED
             workflow.status = WorkflowStatus.REVIEW_PASS
             msg = "全部审批通过，工单已就绪"
+            if audit.workflow_type == int(WorkflowType.ARCHIVE):
+                from app.services.archive import ArchiveService
+
+                await ArchiveService.mark_workflow_approved(db, workflow.id)
 
         await AuditService._write_log(db, audit.id, operator, OP_PASS, remark=remark or msg)
         await db.commit()
@@ -263,6 +267,10 @@ class AuditService:
 
         audit.current_status = AuditStatus.CANCELED
         workflow.status = WorkflowStatus.ABORT
+        if audit.workflow_type == int(WorkflowType.ARCHIVE):
+            from app.services.archive import ArchiveService
+
+            await ArchiveService.mark_workflow_canceled(db, workflow.id)
 
         await AuditService._write_log(
             db, audit.id, operator, OP_CANCEL, remark=remark or "提交人/超管取消工单"
@@ -289,10 +297,11 @@ class AuditService:
         approver_ids: list[int] = node.get("approver_ids", [])
 
         if approver_type == "any_reviewer":
-            # 任何拥有 sql_review 权限的用户
-            if "sql_review" not in operator.get("permissions", []):
+            # 任何拥有指定审批权限的用户；SQL 工单默认 sql_review，归档工单使用 archive_review。
+            required_permission = node.get("required_permission", "sql_review")
+            if required_permission not in operator.get("permissions", []):
                 raise AppException(
-                    f"您没有审批权限（节点「{node.get('node_name', '')}」要求 sql_review 权限）",
+                    f"您没有审批权限（节点「{node.get('node_name', '')}」要求 {required_permission} 权限）",
                     code=403,
                 )
 

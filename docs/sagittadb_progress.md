@@ -230,10 +230,13 @@
 
 **数据归档**
 - 全数据库支持矩阵（不支持的返回明确提示）
-- purge 模式：分批删除，各数据库语法适配
-- dest 模式：跨实例迁移（INSERT + DELETE）
-- dry_run 预估影响行数（默认开启）
-- 前端三步引导（配置→估算→确认执行）
+- 归档提交后创建 `WorkflowType.ARCHIVE` 审批工单，`archive_review` 用于审批
+- 后台作业化执行：`archive_job / archive_batch_log` 记录状态、估算行数、真实处理行数、批次日志、错误信息和 Celery task
+- purge 模式：分批删除，各数据库语法适配，优先使用真实 affected rows 统计
+- dest 模式：跨实例迁移（INSERT + DELETE），按批记录插入/删除结果和失败补偿提示
+- 支持作业启动、暂停、继续、取消；暂停/取消在当前批次完成后生效
+- SQL 条件安全校验：禁止空条件、多语句、注释绕过和明显全表条件；MongoDB 条件必须为非空 JSON
+- 前端作业工作台：提交审批、作业列表、进度、批次日志、状态控制和恢复提示
 
 **SQL 回滚辅助**
 - sqlglot 静态逆向 SQL 生成（INSERT↔DELETE↔UPDATE）

@@ -1,114 +1,137 @@
-"""
-数据归档服务（Pack E 重写）。
-
-设计原则：
-1. 通过引擎层适配所有数据库，不支持的直接返回明确提示
-2. purge 模式：分批删除（各数据库语法不同，统一抽象）
-3. dest 模式：跨实例迁移（INSERT + DELETE）
-4. dry_run：先估算，再执行，防止误操作
-
-各数据库支持情况：
-  MySQL/TiDB/Doris  purge + dest  DELETE ... LIMIT N
-  PostgreSQL        purge + dest  DELETE WHERE ctid IN (LIMIT N)
-  Oracle            purge + dest  DELETE WHERE ROWNUM <= N
-  MSSQL             purge + dest  DELETE TOP(N) FROM ...
-  StarRocks         purge only    DELETE FROM ... WHERE ...
-  ClickHouse        purge only    ALTER TABLE ... DELETE WHERE (异步)
-  MongoDB           purge + dest  deleteMany with limit
-  Cassandra         purge only    DELETE + IF EXISTS（无 LIMIT，需用 SELECT+批量DELETE）
-  Redis             不支持        直接返回提示
-  Elasticsearch     不支持        直接返回提示
-"""
+"""Data archive service with approval-backed background jobs."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+import sqlglot
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import AppException, NotFoundException
 from app.engines.registry import get_engine
+from app.models.archive import ArchiveBatchLog, ArchiveBatchStatus, ArchiveJob, ArchiveJobStatus
 from app.models.instance import Instance
+from app.models.workflow import SqlWorkflow, SqlWorkflowContent, WorkflowStatus, WorkflowType
+from app.services.audit import AuditService
+from app.services.workflow import WorkflowService
 
 logger = logging.getLogger(__name__)
 
-# ── 各数据库支持配置 ──────────────────────────────────────────
-ARCHIVE_SUPPORT: dict[str, dict] = {
-    "mysql":         {"purge": True,  "dest": True,  "batch_delete": "limit"},
-    "tidb":          {"purge": True,  "dest": True,  "batch_delete": "limit"},
-    "doris":         {"purge": True,  "dest": False, "batch_delete": "limit"},
-    "pgsql":         {"purge": True,  "dest": True,  "batch_delete": "ctid"},
-    "oracle":        {"purge": True,  "dest": True,  "batch_delete": "rownum"},
-    "mssql":         {"purge": True,  "dest": True,  "batch_delete": "top"},
-    "starrocks":     {"purge": True,  "dest": False, "batch_delete": "where"},
-    "clickhouse":    {"purge": True,  "dest": False, "batch_delete": "ch_alter"},
-    "mongo":         {"purge": True,  "dest": True,  "batch_delete": "mongo"},
-    "cassandra":     {"purge": True,  "dest": False, "batch_delete": "cassandra"},
-    "redis":         {"purge": False, "dest": False, "reason": "Redis 为键值存储，不支持条件归档"},
+ARCHIVE_SUPPORT: dict[str, dict[str, Any]] = {
+    "mysql": {"purge": True, "dest": True, "batch_delete": "limit", "verified": True},
+    "tidb": {"purge": True, "dest": True, "batch_delete": "limit", "verified": False},
+    "doris": {"purge": False, "dest": False, "batch_delete": "limit", "reason": "Doris 引擎仍待真实环境验证"},
+    "pgsql": {"purge": True, "dest": True, "batch_delete": "ctid", "verified": True},
+    "oracle": {"purge": True, "dest": True, "batch_delete": "rownum", "verified": False},
+    "mssql": {"purge": True, "dest": True, "batch_delete": "top", "verified": False},
+    "starrocks": {"purge": True, "dest": False, "batch_delete": "where", "verified": False},
+    "clickhouse": {"purge": True, "dest": False, "batch_delete": "ch_alter", "verified": False},
+    "mongo": {"purge": True, "dest": True, "batch_delete": "mongo", "verified": True},
+    "cassandra": {"purge": False, "dest": False, "reason": "Cassandra 归档需主键发现，首轮默认关闭"},
+    "redis": {"purge": False, "dest": False, "reason": "Redis 为键值存储，不支持条件归档"},
     "elasticsearch": {"purge": False, "dest": False, "reason": "Elasticsearch 请使用 ILM 生命周期管理"},
-    "opensearch":    {"purge": False, "dest": False, "reason": "OpenSearch 请使用 ISM 策略管理"},
+    "opensearch": {"purge": False, "dest": False, "reason": "OpenSearch 请使用 ISM 策略管理"},
 }
+
+SQLGLOT_DIALECTS = {
+    "mysql": "mysql",
+    "tidb": "mysql",
+    "doris": "mysql",
+    "starrocks": "mysql",
+    "pgsql": "postgres",
+    "postgres": "postgres",
+    "postgresql": "postgres",
+    "oracle": "oracle",
+    "mssql": "tsql",
+    "clickhouse": "clickhouse",
+}
+
+IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+ALWAYS_TRUE_RE = re.compile(
+    r"^\s*(?:1\s*=\s*1|true|TRUE)(?:\s+AND\s+(?:1\s*=\s*1|true|TRUE))*\s*$"
+)
 
 
 def check_support(db_type: str, mode: str) -> tuple[bool, str]:
-    """检查数据库类型是否支持指定归档模式。"""
     cfg = ARCHIVE_SUPPORT.get(db_type.lower())
     if not cfg:
         return False, f"数据库类型 {db_type} 未在支持列表中，暂不支持数据归档"
     if not cfg.get(mode):
-        reason = cfg.get("reason", f"{db_type} 不支持 {mode} 归档模式")
-        return False, reason
+        return False, cfg.get("reason", f"{db_type} 不支持 {mode} 归档模式")
     return True, ""
 
 
-def build_batch_delete_sql(db_type: str, table_name: str, condition: str, batch_size: int) -> str:
-    """根据数据库类型构建分批删除 SQL。"""
+def _quote_identifier(db_type: str, name: str) -> str:
+    if not IDENT_RE.match(name):
+        raise AppException(f"非法标识符：{name}", code=400)
     dt = db_type.lower()
-    t = table_name
+    if dt in ("pgsql", "oracle"):
+        return f'"{name}"'
+    if dt == "mssql":
+        return f"[{name}]"
+    if dt == "clickhouse":
+        return f"`{name}`"
+    return f"`{name}`"
 
-    if dt in ("mysql", "tidb", "doris"):
-        return f"DELETE FROM `{t}` WHERE {condition} LIMIT {batch_size}"
 
-    elif dt == "pgsql":
-        return (f'DELETE FROM "{t}" WHERE ctid IN '
-                f'(SELECT ctid FROM "{t}" WHERE {condition} LIMIT {batch_size})')
-
-    elif dt == "oracle":
-        return (f'DELETE FROM "{t}" WHERE ROWID IN '
-                f'(SELECT ROWID FROM "{t}" WHERE {condition} AND ROWNUM <= {batch_size})')
-
-    elif dt == "mssql":
-        return f"DELETE TOP({batch_size}) FROM [{t}] WHERE {condition}"
-
-    elif dt == "starrocks":
-        return f"DELETE FROM `{t}` WHERE {condition}"
-
-    elif dt == "clickhouse":
-        # ClickHouse ALTER TABLE DELETE 是异步的，无法精确分批
+def build_batch_delete_sql(db_type: str, table_name: str, condition: str, batch_size: int) -> str:
+    dt = db_type.lower()
+    t = _quote_identifier(dt, table_name)
+    if dt in ("mysql", "tidb"):
+        return f"DELETE FROM {t} WHERE {condition} LIMIT {batch_size}"
+    if dt == "pgsql":
+        return f"DELETE FROM {t} WHERE ctid IN (SELECT ctid FROM {t} WHERE {condition} LIMIT {batch_size})"
+    if dt == "oracle":
+        return f"DELETE FROM {t} WHERE ROWID IN (SELECT ROWID FROM {t} WHERE {condition} AND ROWNUM <= {batch_size})"
+    if dt == "mssql":
+        return f"DELETE TOP({batch_size}) FROM {t} WHERE {condition}"
+    if dt == "starrocks":
+        return f"DELETE FROM {t} WHERE {condition}"
+    if dt == "clickhouse":
         return f"ALTER TABLE {t} DELETE WHERE {condition}"
-
-    elif dt == "cassandra":
-        # Cassandra 无 LIMIT DELETE，返回标记让调用方特殊处理
-        return f"__CASSANDRA_DELETE__{t}|{condition}|{batch_size}"
-
     return f"DELETE FROM {t} WHERE {condition} LIMIT {batch_size}"
 
 
 def build_count_sql(db_type: str, table_name: str, condition: str) -> str:
-    """构建 COUNT 估算 SQL。"""
     dt = db_type.lower()
-    t = table_name
-
-    if dt in ("mysql", "tidb", "doris", "starrocks"):
-        return f"SELECT COUNT(*) FROM `{t}` WHERE {condition}"
-    elif dt in ("pgsql", "oracle", "mssql"):
-        return f'SELECT COUNT(*) FROM "{t}" WHERE {condition}'
-    elif dt == "clickhouse":
+    t = _quote_identifier(dt, table_name)
+    if dt == "clickhouse":
         return f"SELECT count() FROM {t} WHERE {condition}"
-    else:
-        return f"SELECT COUNT(*) FROM {t} WHERE {condition}"
+    return f"SELECT COUNT(*) FROM {t} WHERE {condition}"
+
+
+def validate_archive_condition(db_type: str, table_name: str, condition: str) -> None:
+    """Reject unsafe archive predicates before they reach engine execution."""
+    if db_type == "mongo":
+        try:
+            parsed = json.loads(condition)
+        except Exception as exc:
+            raise AppException("MongoDB 归档条件必须是合法 JSON", code=400) from exc
+        if not isinstance(parsed, dict) or not parsed:
+            raise AppException("MongoDB 归档条件不能为空对象", code=400)
+        return
+
+    cond = condition.strip()
+    if not cond:
+        raise AppException("归档条件不能为空", code=400)
+    if ";" in cond or "--" in cond or "/*" in cond or "*/" in cond:
+        raise AppException("归档条件不能包含多语句或注释", code=400)
+    if ALWAYS_TRUE_RE.match(cond):
+        raise AppException("归档条件不能是明显全表条件", code=400)
+    if not IDENT_RE.match(table_name):
+        raise AppException(f"非法表名：{table_name}", code=400)
+
+    dialect = SQLGLOT_DIALECTS.get(db_type.lower(), "mysql")
+    try:
+        sqlglot.parse_one(f"SELECT 1 FROM {_quote_identifier(db_type, table_name)} WHERE {cond}", dialect=dialect)
+    except Exception as exc:
+        raise AppException(f"归档条件 SQL 解析失败：{str(exc)}", code=400) from exc
 
 
 class ArchiveService:
@@ -121,14 +144,36 @@ class ArchiveService:
         return row
 
     @staticmethod
+    def _review_affected_rows(review_set: Any, fallback: int = 0) -> tuple[int, bool]:
+        rows = getattr(review_set, "rows", []) or []
+        affected = sum(max(int(getattr(item, "affected_rows", 0) or 0), 0) for item in rows)
+        if affected > 0:
+            return affected, False
+        return fallback, True
+
+    @staticmethod
     async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
-        result = await db.execute(select(Instance).where(Instance.id == instance_id))
+        result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == instance_id)
+        )
         inst = result.scalar_one_or_none()
         if not inst:
             raise NotFoundException(f"实例 ID={instance_id} 不存在")
         return inst
 
-    # ── 估算影响行数 ──────────────────────────────────────────
+    @staticmethod
+    def _assert_instance_scope(inst: Instance, user: dict) -> tuple[int, str]:
+        if user.get("is_superuser"):
+            rgs = [rg for rg in inst.resource_groups if rg.is_active]
+            return (rgs[0].id, rgs[0].group_name) if rgs else (0, "默认资源组")
+        user_rg_ids = set(user.get("resource_groups", []))
+        matched = [rg for rg in inst.resource_groups if rg.is_active and rg.id in user_rg_ids]
+        if not matched:
+            raise AppException("目标实例不在你的资源组访问范围内", code=403)
+        rg = sorted(matched, key=lambda item: item.id)[0]
+        return rg.id, rg.group_name
 
     @staticmethod
     async def estimate_rows(
@@ -142,338 +187,552 @@ class ArchiveService:
         supported, reason = check_support(inst.db_type, "purge")
         if not supported:
             return {"count": -1, "supported": False, "msg": reason}
-
+        validate_archive_condition(inst.db_type, table_name, condition)
         engine = get_engine(inst)
 
-        # MongoDB 特殊处理
         if inst.db_type == "mongo":
-            try:
-                client = await engine.get_connection(db_name)
-                col = client[db_name][table_name]
-                import json
-                try:
-                    filter_dict = json.loads(condition)
-                except Exception:
-                    filter_dict = {}
-                count = await col.count_documents(filter_dict)
-                return {"count": count, "supported": True, "msg": f"符合条件：{count} 条文档",
-                        "table": table_name, "condition": condition}
-            except Exception as e:
-                return {"count": -1, "supported": True, "msg": f"估算失败：{str(e)}"}
+            client = await engine.get_connection(db_name)
+            count = await client[db_name][table_name].count_documents(json.loads(condition))
+            return {"count": count, "supported": True, "msg": f"符合条件：{count} 条文档", "db_type": inst.db_type}
 
         count_sql = build_count_sql(inst.db_type, table_name, condition)
         rs = await engine.query(db_name=db_name, sql=count_sql, limit_num=1)
         if rs.error:
             return {"count": -1, "supported": True, "msg": f"估算失败：{rs.error}"}
-
-        count = ArchiveService._first_value(rs.rows[0]) if rs.rows else 0
-        return {
-            "count": count,
-            "supported": True,
-            "msg": f"符合条件的数据：{count} 行",
-            "table": table_name,
-            "condition": condition,
-            "db_type": inst.db_type,
-        }
-
-    # ── purge 模式（分批删除）────────────────────────────────
+        count = int(ArchiveService._first_value(rs.rows[0]) if rs.rows else 0)
+        return {"count": count, "supported": True, "msg": f"符合条件的数据：{count} 行", "db_type": inst.db_type}
 
     @staticmethod
-    async def run_purge(
-        db: AsyncSession,
-        instance_id: int,
-        db_name: str,
-        table_name: str,
-        condition: str,
-        batch_size: int = 1000,
-        sleep_ms: int = 100,
-        dry_run: bool = False,
-    ) -> dict:
-        inst = await ArchiveService._load_instance(db, instance_id)
-        supported, reason = check_support(inst.db_type, "purge")
+    async def submit_job(db: AsyncSession, data: Any, operator: dict) -> ArchiveJob:
+        src_inst = await ArchiveService._load_instance(db, data.source_instance_id)
+        rg_id, rg_name = ArchiveService._assert_instance_scope(src_inst, operator)
+        supported, reason = check_support(src_inst.db_type, data.archive_mode)
         if not supported:
-            return {"success": False, "supported": False, "msg": reason}
+            raise AppException(reason, code=400)
+        validate_archive_condition(src_inst.db_type, data.source_table, data.condition)
 
-        # 先估算
-        estimate = await ArchiveService.estimate_rows(db, instance_id, db_name, table_name, condition)
-        if dry_run:
-            return {**estimate, "dry_run": True, "mode": "purge"}
+        if data.archive_mode == "dest":
+            if not data.dest_instance_id:
+                raise AppException("归档模式为 dest 时必须填写目标实例", code=400)
+            dest_inst = await ArchiveService._load_instance(db, data.dest_instance_id)
+            ArchiveService._assert_instance_scope(dest_inst, operator)
 
-        if estimate["count"] < 0:
-            return {"success": False, "supported": True, "msg": estimate.get("msg", "归档估算失败")}
+        estimate = await ArchiveService.estimate_rows(
+            db, data.source_instance_id, data.source_db, data.source_table, data.condition
+        )
+        if estimate.get("count", -1) < 0:
+            raise AppException(estimate.get("msg", "归档估算失败"), code=400)
 
-        if estimate["count"] == 0:
-            return {"success": True, "total_deleted": 0, "msg": "没有符合条件的数据，无需归档"}
+        workflow = await ArchiveService._create_archive_workflow(
+            db, data, operator, rg_id, rg_name, int(estimate["count"])
+        )
+        job = ArchiveJob(
+            workflow_id=workflow.id,
+            status=ArchiveJobStatus.PENDING_REVIEW,
+            archive_mode=data.archive_mode,
+            source_instance_id=data.source_instance_id,
+            source_db=data.source_db,
+            source_table=data.source_table,
+            condition=data.condition,
+            dest_instance_id=data.dest_instance_id,
+            dest_db=data.dest_db or data.source_db,
+            dest_table=data.dest_table or data.source_table,
+            batch_size=data.batch_size,
+            sleep_ms=data.sleep_ms,
+            estimated_rows=int(estimate["count"]),
+            apply_reason=data.apply_reason or "",
+            created_by=operator.get("username", ""),
+            created_by_id=operator.get("id", 0),
+        )
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+        return job
 
+    @staticmethod
+    async def _create_archive_workflow(
+        db: AsyncSession,
+        data: Any,
+        operator: dict,
+        rg_id: int,
+        rg_name: str,
+        estimated_rows: int,
+    ) -> SqlWorkflow:
+        nodes_snapshot = None
+        if data.flow_id:
+            from app.services.approval_flow import ApprovalFlowService
+
+            nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, data.flow_id)
+            nodes_snapshot = WorkflowService._decorate_snapshot_for_applicant(nodes_snapshot, operator)
+            for node in nodes_snapshot:
+                if node.get("approver_type") == "any_reviewer":
+                    node["required_permission"] = "archive_review"
+        else:
+            nodes_snapshot = [
+                {
+                    "order": 1,
+                    "node_id": None,
+                    "node_name": "归档审批",
+                    "approver_type": "any_reviewer",
+                    "approver_ids": [],
+                    "required_permission": "archive_review",
+                    "status": 0,
+                    "operator": None,
+                    "operated_at": None,
+                }
+            ]
+
+        title = f"数据归档-{data.source_table}"
+        sql_content = json.dumps(
+            {
+                "archive_mode": data.archive_mode,
+                "source": {
+                    "instance_id": data.source_instance_id,
+                    "db": data.source_db,
+                    "table": data.source_table,
+                    "condition": data.condition,
+                },
+                "dest": {
+                    "instance_id": data.dest_instance_id,
+                    "db": data.dest_db or data.source_db,
+                    "table": data.dest_table or data.source_table,
+                } if data.archive_mode == "dest" else None,
+                "batch_size": data.batch_size,
+                "sleep_ms": data.sleep_ms,
+                "estimated_rows": estimated_rows,
+                "apply_reason": data.apply_reason,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        workflow = SqlWorkflow(
+            workflow_name=title[:50],
+            group_id=rg_id,
+            group_name=rg_name,
+            instance_id=data.source_instance_id,
+            db_name=data.source_db,
+            syntax_type=2,
+            is_backup=True,
+            engineer=operator.get("username", ""),
+            engineer_display=operator.get("display_name", ""),
+            engineer_id=operator.get("id", 0),
+            status=WorkflowStatus.PENDING_REVIEW,
+            audit_auth_groups=str(rg_id),
+            flow_id=data.flow_id,
+        )
+        db.add(workflow)
+        await db.flush()
+        db.add(SqlWorkflowContent(workflow_id=workflow.id, sql_content=sql_content, review_content="", execute_result=""))
+        await db.flush()
+        await AuditService(workflow, WorkflowType.ARCHIVE).create_audit(db, operator, nodes_snapshot=nodes_snapshot)
+        return workflow
+
+    @staticmethod
+    async def start_job(db: AsyncSession, job_id: int, operator: dict) -> ArchiveJob:
+        job = await ArchiveService.get_job_obj(db, job_id)
+        if not (operator.get("is_superuser") or "archive_apply" in operator.get("permissions", [])):
+            raise AppException("没有归档执行权限", code=403)
+        if job.status not in (ArchiveJobStatus.APPROVED, ArchiveJobStatus.PAUSED, ArchiveJobStatus.QUEUED):
+            raise AppException(f"当前状态 {job.status} 不能执行", code=400)
+        job.status = ArchiveJobStatus.QUEUED
+        await db.commit()
+        try:
+            from app.tasks.archive import execute_archive_job_task
+
+            task = execute_archive_job_task.delay(job.id, operator.get("id", 0))
+            job.celery_task_id = task.id
+            await db.commit()
+        except Exception as exc:
+            logger.warning("archive celery unavailable: %s", str(exc))
+            await ArchiveService.execute_job(db, job.id, operator.get("id", 0))
+        await db.refresh(job)
+        return job
+
+    @staticmethod
+    async def set_job_control_state(db: AsyncSession, job_id: int, action: str, operator: dict) -> ArchiveJob:
+        job = await ArchiveService.get_job_obj(db, job_id)
+        if not (operator.get("is_superuser") or operator.get("id") == job.created_by_id or "archive_apply" in operator.get("permissions", [])):
+            raise AppException("没有操作该归档作业的权限", code=403)
+
+        if action == "pause":
+            if job.status not in (ArchiveJobStatus.QUEUED, ArchiveJobStatus.RUNNING):
+                raise AppException("只有队列中或执行中的作业可以暂停", code=400)
+            job.status = ArchiveJobStatus.PAUSING
+        elif action == "resume":
+            if job.status != ArchiveJobStatus.PAUSED:
+                raise AppException("只有已暂停的作业可以继续", code=400)
+            job.status = ArchiveJobStatus.QUEUED
+        elif action == "cancel":
+            if job.status in (
+                ArchiveJobStatus.PENDING_REVIEW,
+                ArchiveJobStatus.APPROVED,
+                ArchiveJobStatus.QUEUED,
+                ArchiveJobStatus.RUNNING,
+                ArchiveJobStatus.PAUSING,
+                ArchiveJobStatus.PAUSED,
+            ):
+                job.status = ArchiveJobStatus.CANCELING if job.status in (ArchiveJobStatus.RUNNING, ArchiveJobStatus.PAUSING) else ArchiveJobStatus.CANCELED
+                job.finished_at = datetime.now(UTC) if job.status == ArchiveJobStatus.CANCELED else None
+                if job.workflow_id and job.status == ArchiveJobStatus.CANCELED:
+                    wf = await db.get(SqlWorkflow, job.workflow_id)
+                    if wf and wf.status in (WorkflowStatus.PENDING_REVIEW, WorkflowStatus.REVIEW_PASS, WorkflowStatus.QUEUING):
+                        wf.status = WorkflowStatus.ABORT
+            else:
+                raise AppException("当前作业状态不能取消", code=400)
+        else:
+            raise AppException(f"不支持的操作：{action}", code=400)
+        await db.commit()
+        await db.refresh(job)
+        return job
+
+    @staticmethod
+    async def list_jobs(db: AsyncSession, user: dict, page: int = 1, page_size: int = 20) -> tuple[int, list[dict]]:
+        conditions = []
+        if not user.get("is_superuser") and "archive_review" not in user.get("permissions", []):
+            conditions.append(ArchiveJob.created_by_id == user.get("id"))
+        count_stmt = select(func.count()).select_from(ArchiveJob).where(and_(*conditions)) if conditions else select(func.count()).select_from(ArchiveJob)
+        total = int((await db.execute(count_stmt)).scalar() or 0)
+        stmt = select(ArchiveJob).order_by(ArchiveJob.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        rows = (await db.execute(stmt)).scalars().all()
+        return total, [ArchiveService.fmt_job(job) for job in rows]
+
+    @staticmethod
+    async def get_job_obj(db: AsyncSession, job_id: int) -> ArchiveJob:
+        result = await db.execute(select(ArchiveJob).options(selectinload(ArchiveJob.batches)).where(ArchiveJob.id == job_id))
+        job = result.scalar_one_or_none()
+        if not job:
+            raise NotFoundException(f"归档作业 ID={job_id} 不存在")
+        return job
+
+    @staticmethod
+    async def get_job(db: AsyncSession, job_id: int, user: dict) -> dict:
+        job = await ArchiveService.get_job_obj(db, job_id)
+        if not (user.get("is_superuser") or "archive_review" in user.get("permissions", []) or user.get("id") == job.created_by_id):
+            raise AppException("没有查看该归档作业的权限", code=403)
+        data = ArchiveService.fmt_job(job)
+        data["batches"] = [
+            {
+                "id": b.id,
+                "batch_no": b.batch_no,
+                "status": b.status,
+                "selected_rows": b.selected_rows,
+                "inserted_rows": b.inserted_rows,
+                "deleted_rows": b.deleted_rows,
+                "message": b.message,
+                "started_at": b.started_at.isoformat() if b.started_at else None,
+                "finished_at": b.finished_at.isoformat() if b.finished_at else None,
+            }
+            for b in sorted(job.batches, key=lambda item: item.batch_no)
+        ]
+        return data
+
+    @staticmethod
+    def fmt_job(job: ArchiveJob) -> dict:
+        return {
+            "id": job.id,
+            "workflow_id": job.workflow_id,
+            "celery_task_id": job.celery_task_id,
+            "status": job.status,
+            "archive_mode": job.archive_mode,
+            "source_instance_id": job.source_instance_id,
+            "source_db": job.source_db,
+            "source_table": job.source_table,
+            "condition": job.condition,
+            "dest_instance_id": job.dest_instance_id,
+            "dest_db": job.dest_db,
+            "dest_table": job.dest_table,
+            "batch_size": job.batch_size,
+            "sleep_ms": job.sleep_ms,
+            "estimated_rows": job.estimated_rows,
+            "processed_rows": job.processed_rows,
+            "current_batch": job.current_batch,
+            "row_count_is_estimated": job.row_count_is_estimated,
+            "apply_reason": job.apply_reason,
+            "error_message": job.error_message,
+            "created_by": job.created_by,
+            "created_by_id": job.created_by_id,
+            "started_at": job.started_at.isoformat() if job.started_at else None,
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            "created_at": job.created_at.isoformat() if job.created_at else None,
+        }
+
+    @staticmethod
+    async def mark_workflow_approved(db: AsyncSession, workflow_id: int) -> None:
+        result = await db.execute(select(ArchiveJob).where(ArchiveJob.workflow_id == workflow_id))
+        job = result.scalar_one_or_none()
+        if job and job.status == ArchiveJobStatus.PENDING_REVIEW:
+            job.status = ArchiveJobStatus.APPROVED
+
+    @staticmethod
+    async def mark_workflow_canceled(db: AsyncSession, workflow_id: int) -> None:
+        result = await db.execute(select(ArchiveJob).where(ArchiveJob.workflow_id == workflow_id))
+        job = result.scalar_one_or_none()
+        if job and job.status in (ArchiveJobStatus.PENDING_REVIEW, ArchiveJobStatus.APPROVED, ArchiveJobStatus.QUEUED):
+            job.status = ArchiveJobStatus.CANCELED
+            job.finished_at = datetime.now(UTC)
+
+    @staticmethod
+    async def execute_job(db: AsyncSession, job_id: int, operator_id: int) -> None:
+        job = await ArchiveService.get_job_obj(db, job_id)
+        if job.status not in (ArchiveJobStatus.QUEUED, ArchiveJobStatus.PAUSED):
+            return
+        job.status = ArchiveJobStatus.RUNNING
+        job.started_at = job.started_at or datetime.now(UTC)
+        await db.commit()
+        try:
+            if job.archive_mode == "purge":
+                await ArchiveService._execute_purge_job(db, job)
+            else:
+                await ArchiveService._execute_dest_job(db, job)
+        except Exception as exc:
+            job.status = ArchiveJobStatus.FAILED
+            job.error_message = str(exc)
+            job.finished_at = datetime.now(UTC)
+        finally:
+            await db.commit()
+
+    @staticmethod
+    async def _post_batch_control(db: AsyncSession, job: ArchiveJob) -> bool:
+        await db.refresh(job)
+        if job.status == ArchiveJobStatus.PAUSING:
+            job.status = ArchiveJobStatus.PAUSED
+            await db.commit()
+            return False
+        if job.status == ArchiveJobStatus.CANCELING:
+            job.status = ArchiveJobStatus.CANCELED
+            job.finished_at = datetime.now(UTC)
+            await db.commit()
+            return False
+        return True
+
+    @staticmethod
+    async def _execute_purge_job(db: AsyncSession, job: ArchiveJob) -> None:
+        inst = await ArchiveService._load_instance(db, job.source_instance_id)
+        validate_archive_condition(inst.db_type, job.source_table, job.condition)
         engine = get_engine(inst)
 
-        # MongoDB 单独处理
         if inst.db_type == "mongo":
-            return await ArchiveService._purge_mongo(
-                engine, db_name, table_name, condition, batch_size, sleep_ms
-            )
+            await ArchiveService._execute_purge_mongo(db, job, engine)
+            return
+        if inst.db_type in ("clickhouse", "starrocks"):
+            await ArchiveService._execute_single_delete(db, job, engine, inst.db_type)
+            return
 
-        # ClickHouse：ALTER TABLE DELETE（异步，不分批）
-        if inst.db_type == "clickhouse":
-            delete_sql = f"ALTER TABLE {table_name} DELETE WHERE {condition}"
-            rs = await engine.execute(db_name=db_name, sql=delete_sql)
+        delete_sql = build_batch_delete_sql(inst.db_type, job.source_table, job.condition, job.batch_size)
+        for _ in range(10000):
+            batch_no = job.current_batch + 1
+            started = datetime.now(UTC)
+            rs = await engine.execute(db_name=job.source_db, sql=delete_sql)
             if rs.error:
-                return {"success": False, "msg": f"ClickHouse 归档失败：{rs.error}"}
-            return {
-                "success": True, "mode": "purge",
-                "msg": "ClickHouse DELETE 已提交（异步执行，请通过 system.mutations 查看进度）",
-                "total_deleted": estimate["count"],
-            }
+                await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.FAILED, 0, 0, 0, rs.error, started)
+                raise AppException(f"第 {batch_no} 批执行失败：{rs.error}", code=500)
+            deleted, estimated = ArchiveService._review_affected_rows(rs, min(job.batch_size, max(job.estimated_rows - job.processed_rows, 0)))
+            job.current_batch = batch_no
+            job.processed_rows += deleted
+            job.row_count_is_estimated = job.row_count_is_estimated or estimated
+            await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.SUCCESS, deleted, 0, deleted, "", started)
+            await db.commit()
+            if deleted <= 0 or deleted < job.batch_size or job.processed_rows >= job.estimated_rows:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            if not await ArchiveService._post_batch_control(db, job):
+                return
+            if job.sleep_ms > 0:
+                await asyncio.sleep(job.sleep_ms / 1000)
 
-        # StarRocks：DELETE 必须带 WHERE，不使用 MySQL DELETE ... LIMIT 分批模型。
-        if inst.db_type == "starrocks":
-            delete_sql = build_batch_delete_sql(inst.db_type, table_name, condition, batch_size)
-            rs = await engine.execute(db_name=db_name, sql=delete_sql)
-            if rs.error:
-                return {"success": False, "msg": f"StarRocks 归档失败：{rs.error}"}
-            return {
-                "success": True,
-                "mode": "purge",
-                "total_deleted": estimate["count"],
-                "msg": f"StarRocks 归档完成，共删除约 {estimate['count']} 行",
-            }
-
-        # Cassandra：SELECT + 批量 DELETE
-        if inst.db_type == "cassandra":
-            return await ArchiveService._purge_cassandra(
-                engine, db_name, table_name, condition, batch_size, sleep_ms
-            )
-
-        # 通用分批 DELETE（MySQL/PgSQL/Oracle/MSSQL/TiDB/Doris）
-        delete_sql = build_batch_delete_sql(inst.db_type, table_name, condition, batch_size)
-        count_sql = build_count_sql(inst.db_type, table_name, condition)
-        total_deleted = 0
-
-        for batch in range(10000):
-            rs = await engine.execute(db_name=db_name, sql=delete_sql)
-            if rs.error:
-                return {
-                    "success": False,
-                    "total_deleted": total_deleted,
-                    "msg": f"第 {batch+1} 批执行失败：{rs.error}",
-                }
-            total_deleted += batch_size
-
-            # 检查剩余行数
-            count_rs = await engine.query(db_name=db_name, sql=count_sql, limit_num=1)
-            remaining = ArchiveService._first_value(count_rs.rows[0]) if count_rs.rows else 0
-            logger.info("archive_purge: batch=%d total_deleted=%d remaining=%d",
-                        batch+1, total_deleted, remaining)
-
-            if remaining == 0:
-                break
-            if sleep_ms > 0:
-                await asyncio.sleep(sleep_ms / 1000)
-
-        return {
-            "success": True, "mode": "purge",
-            "total_deleted": total_deleted,
-            "msg": f"归档完成，共删除约 {total_deleted} 行",
-        }
+        raise AppException("归档超过最大批次数限制", code=500)
 
     @staticmethod
-    async def _purge_mongo(engine: Any, db_name: str, collection: str,
-                           condition: str, batch_size: int, sleep_ms: int) -> dict:
-        """MongoDB 分批删除。"""
-        import json
-        try:
-            filter_dict = json.loads(condition)
-        except Exception:
-            return {"success": False, "msg": "MongoDB 归档条件必须是合法的 JSON 格式，如 {\"created_at\": {\"$lt\": ...}}"}
-
-        total_deleted = 0
-        try:
-            client = await engine.get_connection(db_name)
-            col = client[db_name][collection]
-            for _ in range(10000):
-                # 分批：先查出 _id 列表，再删除
-                cursor = col.find(filter_dict, {"_id": 1}).limit(batch_size)
-                ids = [doc["_id"] async for doc in cursor]
-                if not ids:
-                    break
-                result = await col.delete_many({"_id": {"$in": ids}})
-                total_deleted += result.deleted_count
-                if result.deleted_count < batch_size:
-                    break
-                if sleep_ms > 0:
-                    await asyncio.sleep(sleep_ms / 1000)
-        except Exception as e:
-            return {"success": False, "total_deleted": total_deleted, "msg": str(e)}
-
-        return {"success": True, "mode": "purge", "total_deleted": total_deleted,
-                "msg": f"MongoDB 归档完成，共删除 {total_deleted} 条文档"}
+    async def _execute_single_delete(db: AsyncSession, job: ArchiveJob, engine: Any, db_type: str) -> None:
+        started = datetime.now(UTC)
+        sql = build_batch_delete_sql(db_type, job.source_table, job.condition, job.batch_size)
+        rs = await engine.execute(db_name=job.source_db, sql=sql)
+        if rs.error:
+            await ArchiveService._log_batch(db, job, job.current_batch + 1, ArchiveBatchStatus.FAILED, 0, 0, 0, rs.error, started)
+            raise AppException(rs.error, code=500)
+        affected, estimated = ArchiveService._review_affected_rows(rs, job.estimated_rows)
+        job.current_batch += 1
+        job.processed_rows += affected
+        job.row_count_is_estimated = job.row_count_is_estimated or estimated
+        job.status = ArchiveJobStatus.SUCCESS
+        job.finished_at = datetime.now(UTC)
+        await ArchiveService._log_batch(db, job, job.current_batch, ArchiveBatchStatus.SUCCESS, affected, 0, affected, "", started)
 
     @staticmethod
-    async def _purge_cassandra(engine: Any, db_name: str, table: str,
-                                condition: str, batch_size: int, sleep_ms: int) -> dict:
-        """Cassandra 通过 SELECT + DELETE 分批归档。"""
-        total_deleted = 0
-        try:
-            for _ in range(10000):
-                # 查出一批主键
-                select_rs = await engine.query(
-                    db_name=db_name,
-                    sql=f"SELECT * FROM {table} WHERE {condition} LIMIT {batch_size}",
-                    limit_num=batch_size,
-                )
-                if not select_rs.rows:
-                    break
-                # 逐行删除（Cassandra 需要主键删除）
-                pk_cols = select_rs.column_list[:1]  # 取第一列作为主键（简化处理）
-                for row in select_rs.rows:
-                    pk_val = row[0]
-                    del_sql = f"DELETE FROM {table} WHERE {pk_cols[0]} = '{pk_val}'"
-                    await engine.execute(db_name=db_name, sql=del_sql)
-                total_deleted += len(select_rs.rows)
-                if len(select_rs.rows) < batch_size:
-                    break
-                if sleep_ms > 0:
-                    await asyncio.sleep(sleep_ms / 1000)
-        except Exception as e:
-            return {"success": False, "total_deleted": total_deleted, "msg": str(e)}
-
-        return {"success": True, "mode": "purge", "total_deleted": total_deleted,
-                "msg": f"Cassandra 归档完成，共删除 {total_deleted} 行"}
-
-    # ── dest 模式（INSERT 到目标 + DELETE 源）────────────────
+    async def _execute_purge_mongo(db: AsyncSession, job: ArchiveJob, engine: Any) -> None:
+        filter_dict = json.loads(job.condition)
+        client = await engine.get_connection(job.source_db)
+        col = client[job.source_db][job.source_table]
+        for _ in range(10000):
+            batch_no = job.current_batch + 1
+            started = datetime.now(UTC)
+            ids = [doc["_id"] async for doc in col.find(filter_dict, {"_id": 1}).limit(job.batch_size)]
+            if not ids:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            result = await col.delete_many({"_id": {"$in": ids}})
+            deleted = int(result.deleted_count)
+            job.current_batch = batch_no
+            job.processed_rows += deleted
+            await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.SUCCESS, len(ids), 0, deleted, "", started)
+            await db.commit()
+            if deleted < job.batch_size:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            if not await ArchiveService._post_batch_control(db, job):
+                return
+            if job.sleep_ms > 0:
+                await asyncio.sleep(job.sleep_ms / 1000)
 
     @staticmethod
-    async def run_to_dest(
-        db: AsyncSession,
-        src_instance_id: int, src_db: str, src_table: str, condition: str,
-        dest_instance_id: int, dest_db: str, dest_table: str,
-        batch_size: int = 1000, sleep_ms: int = 100,
-        dry_run: bool = False,
-    ) -> dict:
-        src_inst = await ArchiveService._load_instance(db, src_instance_id)
-        supported, reason = check_support(src_inst.db_type, "dest")
-        if not supported:
-            return {"success": False, "supported": False, "msg": reason}
+    async def _execute_dest_job(db: AsyncSession, job: ArchiveJob) -> None:
+        src_inst = await ArchiveService._load_instance(db, job.source_instance_id)
+        dest_inst = await ArchiveService._load_instance(db, job.dest_instance_id or 0)
+        validate_archive_condition(src_inst.db_type, job.source_table, job.condition)
+        if src_inst.db_type == "mongo":
+            await ArchiveService._execute_dest_mongo(db, job, get_engine(src_inst), get_engine(dest_inst))
+            return
+        if src_inst.db_type not in ("mysql", "tidb", "pgsql", "oracle", "mssql"):
+            raise AppException(f"{src_inst.db_type} 的 dest 模式暂不支持", code=400)
 
-        # dry_run 只估算
-        if dry_run:
-            return await ArchiveService.estimate_rows(
-                db, src_instance_id, src_db, src_table, condition
-            ) | {"dry_run": True, "mode": "dest"}
-
-        dest_inst = await ArchiveService._load_instance(db, dest_instance_id)
         src_engine = get_engine(src_inst)
         dest_engine = get_engine(dest_inst)
-
-        # MongoDB 单独处理
-        if src_inst.db_type == "mongo":
-            return await ArchiveService._dest_mongo(
-                src_engine, dest_engine, src_db, src_table, condition,
-                dest_db, dest_table, batch_size, sleep_ms,
-            )
-
-        # 通用 SELECT + INSERT + DELETE
-        dt = src_inst.db_type
-        if dt in ("mysql", "tidb", "doris"):
-            select_sql = f"SELECT * FROM `{src_table}` WHERE {condition} LIMIT {batch_size}"
-            delete_sql = f"DELETE FROM `{src_table}` WHERE {condition} LIMIT {batch_size}"
-        elif dt == "pgsql":
-            select_sql = f'SELECT * FROM "{src_table}" WHERE {condition} LIMIT {batch_size}'
-            delete_sql = (f'DELETE FROM "{src_table}" WHERE ctid IN '
-                          f'(SELECT ctid FROM "{src_table}" WHERE {condition} LIMIT {batch_size})')
-        elif dt == "oracle":
-            select_sql = f'SELECT * FROM "{src_table}" WHERE {condition} AND ROWNUM <= {batch_size}'
-            delete_sql = (f'DELETE FROM "{src_table}" WHERE ROWID IN '
-                          f'(SELECT ROWID FROM "{src_table}" WHERE {condition} AND ROWNUM <= {batch_size})')
-        elif dt == "mssql":
-            select_sql = f"SELECT TOP {batch_size} * FROM [{src_table}] WHERE {condition}"
-            delete_sql = f"DELETE TOP({batch_size}) FROM [{src_table}] WHERE {condition}"
-        else:
-            return {"success": False, "msg": f"{dt} 的 dest 模式暂不支持"}
-
-        total_moved = 0
-        for batch in range(10000):
-            rs = await src_engine.query(db_name=src_db, sql=select_sql, limit_num=batch_size)
-            if rs.error or not rs.rows:
-                break
-
-            # 构建 INSERT
-            cols = ArchiveService._quote_cols(rs.column_list, dt)
-            rows_values = []
-            for row in rs.rows:
-                parts = []
-                for v in row:
-                    if v is None:
-                        parts.append("NULL")
-                    else:
-                        safe = str(v).replace("'", "''")
-                        parts.append(f"'{safe}'")
-                rows_values.append("(" + ", ".join(parts) + ")")
-
-            tbl_dest = f'"{dest_table}"' if dt in ("pgsql", "oracle") else f"`{dest_table}`"
-            insert_sql = f"INSERT INTO {tbl_dest} ({cols}) VALUES " + ", ".join(rows_values)
-
-            insert_rs = await dest_engine.execute(db_name=dest_db, sql=insert_sql)
+        select_sql, delete_sql = ArchiveService._build_dest_batch_sql(src_inst.db_type, job)
+        for _ in range(10000):
+            batch_no = job.current_batch + 1
+            started = datetime.now(UTC)
+            rs = await src_engine.query(db_name=job.source_db, sql=select_sql, limit_num=job.batch_size)
+            if rs.error:
+                await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.FAILED, 0, 0, 0, rs.error, started)
+                raise AppException(rs.error, code=500)
+            if not rs.rows:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            insert_sql = ArchiveService._build_insert_sql(dest_inst.db_type, job.dest_table, rs.column_list, rs.rows)
+            insert_rs = await dest_engine.execute(db_name=job.dest_db, sql=insert_sql)
             if insert_rs.error:
-                return {"success": False, "total_moved": total_moved,
-                        "msg": f"第 {batch+1} 批插入失败：{insert_rs.error}"}
-
-            del_rs = await src_engine.execute(db_name=src_db, sql=delete_sql)
+                await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.FAILED, len(rs.rows), 0, 0, insert_rs.error, started)
+                raise AppException(f"第 {batch_no} 批插入失败：{insert_rs.error}", code=500)
+            del_rs = await src_engine.execute(db_name=job.source_db, sql=delete_sql)
             if del_rs.error:
-                return {"success": False, "total_moved": total_moved,
-                        "msg": f"第 {batch+1} 批删除源数据失败：{del_rs.error}（已插入目标表，需手动处理重复数据）"}
-
-            total_moved += len(rs.rows)
-            if len(rs.rows) < batch_size:
-                break
-            if sleep_ms > 0:
-                await asyncio.sleep(sleep_ms / 1000)
-
-        return {"success": True, "mode": "dest", "total_moved": total_moved,
-                "msg": f"归档完成，共迁移 {total_moved} 行至 {dest_db}.{dest_table}"}
-
-    @staticmethod
-    async def _dest_mongo(
-        src_engine: Any, dest_engine: Any,
-        src_db: str, src_col: str, condition: str,
-        dest_db: str, dest_col: str,
-        batch_size: int, sleep_ms: int,
-    ) -> dict:
-        """MongoDB dest 模式。"""
-        import json
-        try:
-            filter_dict = json.loads(condition)
-        except Exception:
-            return {"success": False, "msg": "MongoDB 归档条件需为合法 JSON"}
-
-        total_moved = 0
-        try:
-            src_client = await src_engine.get_connection(src_db)
-            dest_client = await dest_engine.get_connection(dest_db)
-            src_collection = src_client[src_db][src_col]
-            dest_collection = dest_client[dest_db][dest_col]
-
-            for _ in range(10000):
-                docs = await src_collection.find(filter_dict).limit(batch_size).to_list(batch_size)
-                if not docs:
-                    break
-                await dest_collection.insert_many(docs)
-                ids = [doc["_id"] for doc in docs]
-                await src_collection.delete_many({"_id": {"$in": ids}})
-                total_moved += len(docs)
-                if len(docs) < batch_size:
-                    break
-                if sleep_ms > 0:
-                    await asyncio.sleep(sleep_ms / 1000)
-        except Exception as e:
-            return {"success": False, "total_moved": total_moved, "msg": str(e)}
-
-        return {"success": True, "mode": "dest", "total_moved": total_moved,
-                "msg": f"MongoDB 归档完成，共迁移 {total_moved} 条文档"}
+                msg = f"第 {batch_no} 批删除源数据失败：{del_rs.error}（目标可能已插入，需人工核对）"
+                await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.FAILED, len(rs.rows), len(rs.rows), 0, msg, started)
+                raise AppException(msg, code=500)
+            deleted, estimated = ArchiveService._review_affected_rows(del_rs, len(rs.rows))
+            job.current_batch = batch_no
+            job.processed_rows += deleted
+            job.row_count_is_estimated = job.row_count_is_estimated or estimated
+            await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.SUCCESS, len(rs.rows), len(rs.rows), deleted, "", started)
+            await db.commit()
+            if len(rs.rows) < job.batch_size:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            if not await ArchiveService._post_batch_control(db, job):
+                return
+            if job.sleep_ms > 0:
+                await asyncio.sleep(job.sleep_ms / 1000)
 
     @staticmethod
-    def _quote_cols(columns: list[str], db_type: str) -> str:
-        """按数据库类型引用列名。"""
-        if db_type in ("pgsql", "oracle", "mssql"):
-            return ", ".join(f'"{c}"' for c in columns)
-        return ", ".join(f"`{c}`" for c in columns)
+    async def _execute_dest_mongo(db: AsyncSession, job: ArchiveJob, src_engine: Any, dest_engine: Any) -> None:
+        filter_dict = json.loads(job.condition)
+        src = (await src_engine.get_connection(job.source_db))[job.source_db][job.source_table]
+        dest = (await dest_engine.get_connection(job.dest_db))[job.dest_db][job.dest_table]
+        for _ in range(10000):
+            batch_no = job.current_batch + 1
+            started = datetime.now(UTC)
+            docs = await src.find(filter_dict).limit(job.batch_size).to_list(job.batch_size)
+            if not docs:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            await dest.insert_many(docs)
+            ids = [doc["_id"] for doc in docs]
+            result = await src.delete_many({"_id": {"$in": ids}})
+            deleted = int(result.deleted_count)
+            job.current_batch = batch_no
+            job.processed_rows += deleted
+            await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.SUCCESS, len(docs), len(docs), deleted, "", started)
+            await db.commit()
+            if len(docs) < job.batch_size:
+                job.status = ArchiveJobStatus.SUCCESS
+                job.finished_at = datetime.now(UTC)
+                await db.commit()
+                return
+            if not await ArchiveService._post_batch_control(db, job):
+                return
+            if job.sleep_ms > 0:
+                await asyncio.sleep(job.sleep_ms / 1000)
+
+    @staticmethod
+    def _build_dest_batch_sql(db_type: str, job: ArchiveJob) -> tuple[str, str]:
+        dt = db_type.lower()
+        t = _quote_identifier(dt, job.source_table)
+        if dt in ("mysql", "tidb"):
+            return f"SELECT * FROM {t} WHERE {job.condition} LIMIT {job.batch_size}", f"DELETE FROM {t} WHERE {job.condition} LIMIT {job.batch_size}"
+        if dt == "pgsql":
+            return (
+                f"SELECT * FROM {t} WHERE {job.condition} LIMIT {job.batch_size}",
+                f"DELETE FROM {t} WHERE ctid IN (SELECT ctid FROM {t} WHERE {job.condition} LIMIT {job.batch_size})",
+            )
+        if dt == "oracle":
+            return (
+                f"SELECT * FROM {t} WHERE {job.condition} AND ROWNUM <= {job.batch_size}",
+                f"DELETE FROM {t} WHERE ROWID IN (SELECT ROWID FROM {t} WHERE {job.condition} AND ROWNUM <= {job.batch_size})",
+            )
+        if dt == "mssql":
+            return f"SELECT TOP {job.batch_size} * FROM {t} WHERE {job.condition}", f"DELETE TOP({job.batch_size}) FROM {t} WHERE {job.condition}"
+        raise AppException(f"{db_type} 的 dest 模式暂不支持", code=400)
+
+    @staticmethod
+    def _build_insert_sql(db_type: str, table: str, columns: list[str], rows: list[Any]) -> str:
+        cols = ", ".join(_quote_identifier(db_type, col) for col in columns)
+        values = []
+        for row in rows:
+            row_values = [row.get(col) for col in columns] if isinstance(row, dict) else list(row)
+            parts = []
+            for value in row_values:
+                if value is None:
+                    parts.append("NULL")
+                else:
+                    parts.append("'" + str(value).replace("'", "''") + "'")
+            values.append("(" + ", ".join(parts) + ")")
+        return f"INSERT INTO {_quote_identifier(db_type, table)} ({cols}) VALUES " + ", ".join(values)
+
+    @staticmethod
+    async def _log_batch(
+        db: AsyncSession,
+        job: ArchiveJob,
+        batch_no: int,
+        status: ArchiveBatchStatus,
+        selected_rows: int,
+        inserted_rows: int,
+        deleted_rows: int,
+        message: str,
+        started_at: datetime,
+    ) -> None:
+        db.add(
+            ArchiveBatchLog(
+                job_id=job.id,
+                batch_no=batch_no,
+                status=status,
+                selected_rows=selected_rows,
+                inserted_rows=inserted_rows,
+                deleted_rows=deleted_rows,
+                message=message,
+                started_at=started_at,
+                finished_at=datetime.now(UTC),
+            )
+        )

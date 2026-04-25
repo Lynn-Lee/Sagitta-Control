@@ -75,7 +75,8 @@ app/
 - StarRocks 已从 MySQL 映射改为独立 `StarRocksEngine`，查询、元数据、审核、监控能力按 StarRocks 语义实现，归档首版支持 dry-run 与 purge 模式
 - 会话诊断新增 `SessionSnapshot` 和 `collect_session_snapshots`，支持在线会话、历史快照和 Oracle ASH/AWR 历史入口
 - 慢日志分析新增 `SlowQueryLog / SlowQueryConfig`，支持平台查询历史同步、原生慢日志采集、实例级阈值/周期/保留配置、SQL 指纹详情和 MySQL/PostgreSQL 执行计划分析
-- Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`
+- 数据归档升级为审批作业：`archive_job / archive_batch_log` 记录进度和批次日志，Celery `archive` 队列执行，支持暂停、继续、取消
+- Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`
 
 ## 权限实现口径（v2-lite）
 

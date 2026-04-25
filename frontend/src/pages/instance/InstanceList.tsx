@@ -409,7 +409,11 @@ export default function InstanceList() {
           <Space>
             <DatabaseOutlined />
             <span>数据库管理</span>
-            {selectedInstance && <Tag color={DB_TYPE_COLORS[selectedInstance.db_type]}>{selectedInstance.instance_name}</Tag>}
+            {selectedInstance && (
+              <Tag color={DB_TYPE_COLORS[selectedInstance.db_type]}>
+                {formatDbTypeLabel(selectedInstance.db_type)} · {selectedInstance.instance_name}
+              </Tag>
+            )}
           </Space>
         }
         open={dbModalOpen}

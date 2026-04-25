@@ -1,10 +1,12 @@
 """StarRocks 归档策略测试。"""
 
+from app.core.exceptions import AppException
 from app.services.archive import (
     ARCHIVE_SUPPORT,
     build_batch_delete_sql,
     build_count_sql,
     check_support,
+    validate_archive_condition,
 )
 
 
@@ -30,3 +32,30 @@ def test_starrocks_count_uses_backtick_identifier():
     sql = build_count_sql("starrocks", "orders", "dt < '2024-01-01'")
 
     assert sql == "SELECT COUNT(*) FROM `orders` WHERE dt < '2024-01-01'"
+
+
+def test_archive_condition_rejects_multi_statement():
+    try:
+        validate_archive_condition("mysql", "orders", "dt < '2024-01-01'; DROP TABLE orders")
+    except AppException as exc:
+        assert "多语句" in exc.message
+    else:
+        raise AssertionError("expected AppException")
+
+
+def test_archive_condition_rejects_obvious_full_table_condition():
+    try:
+        validate_archive_condition("mysql", "orders", "1=1")
+    except AppException as exc:
+        assert "全表" in exc.message
+    else:
+        raise AssertionError("expected AppException")
+
+
+def test_archive_condition_requires_valid_mongo_json():
+    try:
+        validate_archive_condition("mongo", "orders", "{bad json")
+    except AppException as exc:
+        assert "合法 JSON" in exc.message
+    else:
+        raise AssertionError("expected AppException")

@@ -15,15 +15,45 @@ from app.core.database import get_db
 from app.core.deps import current_user
 from app.engines.registry import get_engine
 from app.models.instance import Instance
+from app.schemas.optimize import OptimizeAnalyzeRequest, OptimizeAnalyzeResponse
+from app.services.optimize import OptimizeService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+_DB_TYPE_LABELS = {
+    "mysql": "MySQL",
+    "tidb": "TiDB",
+    "starrocks": "StarRocks",
+    "pgsql": "PostgreSQL",
+    "postgres": "PostgreSQL",
+    "postgresql": "PostgreSQL",
+    "oracle": "Oracle",
+    "mssql": "MSSQL",
+    "sqlserver": "MSSQL",
+    "clickhouse": "ClickHouse",
+    "doris": "Doris",
+}
+
+
+def _db_type_label(db_type: str) -> str:
+    return _DB_TYPE_LABELS.get(db_type.lower(), db_type)
 
 
 class OptimizeRequest(BaseModel):
     instance_id: int
     db_name: str
     sql: str
+
+
+@router.post("/analyze/", response_model=OptimizeAnalyzeResponse, summary="SQL 优化 v2 统一诊断")
+async def analyze_sql(
+    data: OptimizeAnalyzeRequest,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await OptimizeService.analyze(db, user, data)
 
 
 @router.post("/explain/", summary="EXPLAIN 执行计划")
@@ -48,7 +78,7 @@ async def explain_sql(
         explain_sql = f"EXPLAIN {data.sql.rstrip(';')}"
         rs = await engine.query(db_name=data.db_name, sql=explain_sql, limit_num=100)
     else:
-        return {"error": f"{inst.db_type} 暂不支持 EXPLAIN"}
+        return {"error": f"{_db_type_label(inst.db_type)} 暂不支持 EXPLAIN"}
 
     if rs.error:
         raise HTTPException(400, f"EXPLAIN 失败：{rs.error}")

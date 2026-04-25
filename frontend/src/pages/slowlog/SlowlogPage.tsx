@@ -395,7 +395,7 @@ export default function SlowlogPage() {
             onChange={(v) => { setInstanceId(v); setPage(1) }}
             options={(instanceData?.items || []).map(inst => ({
               value: inst.id,
-              label: `${inst.instance_name} ${inst.db_type}`,
+              label: `${inst.instance_name} ${formatDbTypeLabel(inst.db_type)}`,
               children: `${formatDbTypeLabel(inst.db_type)} ${inst.instance_name}`,
             }))}
           />
@@ -680,7 +680,7 @@ export default function SlowlogPage() {
           <Form.Item name="instance_id" label="实例" rules={[{ required: true }]}>
             <Select placeholder="选择实例" showSearch optionFilterProp="label">
               {instanceData?.items?.map((inst) => (
-                <Select.Option key={inst.id} value={inst.id} label={`${inst.instance_name} ${inst.db_type}`}>
+                <Select.Option key={inst.id} value={inst.id} label={`${inst.instance_name} ${formatDbTypeLabel(inst.db_type)}`}>
                   {formatDbTypeLabel(inst.db_type)} {inst.instance_name}
                 </Select.Option>
               ))}

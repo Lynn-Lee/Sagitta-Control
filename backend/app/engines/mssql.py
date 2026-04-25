@@ -283,6 +283,10 @@ class MssqlEngine:
         filtered_sql = self.filter_sql(sql, limit_num)
         return await asyncio.to_thread(self._run_query_sync, filtered_sql, parameters, db_name)
 
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        explain_sql = f"SET SHOWPLAN_XML ON; {sql.strip().rstrip(';')}; SET SHOWPLAN_XML OFF;"
+        return await asyncio.to_thread(self._run_query_sync, explain_sql, None, db_name)
+
     def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet:
         return resultset
 

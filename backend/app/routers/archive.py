@@ -1,10 +1,7 @@
-"""
-数据归档路由（Pack E 重写）。
-支持所有平台接入的数据库类型，不支持的返回明确提示。
-"""
-import logging
+"""Data archive routes."""
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +9,6 @@ from app.core.database import get_db
 from app.core.deps import current_user, require_perm
 from app.services.archive import ARCHIVE_SUPPORT, ArchiveService
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -27,79 +23,128 @@ class ArchiveRequest(BaseModel):
     dest_table: str | None = None
     batch_size: int = Field(default=1000, ge=1, le=10000)
     sleep_ms: int = Field(default=100, ge=0, le=10000)
-    dry_run: bool = Field(default=True, description="True=只估算不执行，默认开启防止误操作")
-    apply_reason: str = ""
+    dry_run: bool = Field(default=True, description="兼容旧字段；run 接口不再同步执行")
+    apply_reason: str = Field(default="", max_length=500)
+    flow_id: int | None = Field(default=None, description="审批流模板 ID")
 
 
 @router.get("/support/", summary="查询数据库归档支持情况")
 async def get_archive_support(_user=Depends(current_user)):
-    """返回所有数据库类型的归档支持情况，前端用于展示提示信息。"""
-    result = {}
-    for db_type, cfg in ARCHIVE_SUPPORT.items():
-        result[db_type] = {
-            "purge": cfg.get("purge", False),
-            "dest": cfg.get("dest", False),
-            "reason": cfg.get("reason", ""),
+    return {
+        "support": {
+            db_type: {
+                "purge": cfg.get("purge", False),
+                "dest": cfg.get("dest", False),
+                "reason": cfg.get("reason", ""),
+                "verified": cfg.get("verified", False),
+            }
+            for db_type, cfg in ARCHIVE_SUPPORT.items()
         }
-    return {"support": result}
+    }
 
 
 @router.post("/estimate/", summary="估算归档影响行数（不执行）")
 async def estimate_archive(
     data: ArchiveRequest,
-    user=Depends(require_perm("archive_apply")),
+    _user=Depends(require_perm("archive_apply")),
     db: AsyncSession = Depends(get_db),
 ):
     return await ArchiveService.estimate_rows(
-        db, data.source_instance_id, data.source_db,
-        data.source_table, data.condition,
+        db, data.source_instance_id, data.source_db, data.source_table, data.condition
     )
 
 
-@router.post("/run/", summary="执行数据归档")
-async def run_archive(
+@router.post("/run/", summary="提交归档作业并进入审批")
+async def submit_archive_job(
     data: ArchiveRequest,
     user=Depends(require_perm("archive_apply")),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    执行数据归档。
+    job = await ArchiveService.submit_job(db, data, user)
+    return {
+        "success": True,
+        "msg": "归档作业已提交审批",
+        "job_id": job.id,
+        "workflow_id": job.workflow_id,
+        "status": job.status,
+        "estimated_rows": job.estimated_rows,
+    }
 
-    **重要：默认 dry_run=True，只估算不执行。**
-    确认行数后将 dry_run 改为 false 再提交。
 
-    归档模式说明：
-    - purge：直接分批删除源数据（支持大多数数据库）
-    - dest：先插入到目标实例，再删除源数据（跨实例归档）
-    """
-    if data.archive_mode == "dest" and not data.dest_instance_id:
-        raise HTTPException(400, "归档模式为 dest 时必须填写目标实例 dest_instance_id")
+@router.get("/jobs/", summary="归档作业列表")
+async def list_archive_jobs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await ArchiveService.list_jobs(db, user, page, page_size)
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
 
-    if data.archive_mode not in ("purge", "dest"):
-        raise HTTPException(400, f"不支持的归档模式：{data.archive_mode}")
 
-    if data.archive_mode == "purge":
-        return await ArchiveService.run_purge(
-            db=db,
-            instance_id=data.source_instance_id,
-            db_name=data.source_db,
-            table_name=data.source_table,
-            condition=data.condition,
-            batch_size=data.batch_size,
-            sleep_ms=data.sleep_ms,
-            dry_run=data.dry_run,
-        )
-    else:  # dest
-        return await ArchiveService.run_to_dest(
-            db=db,
-            src_instance_id=data.source_instance_id,
-            src_db=data.source_db,
-            src_table=data.source_table,
-            condition=data.condition,
-            dest_instance_id=data.dest_instance_id,
-            dest_db=data.dest_db or data.source_db,
-            dest_table=data.dest_table or data.source_table,
-            batch_size=data.batch_size,
-            sleep_ms=data.sleep_ms,
-            dry_run=data.dry_run,
-        )
+@router.get("/jobs/{job_id}/", summary="归档作业详情")
+async def get_archive_job(
+    job_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await ArchiveService.get_job(db, job_id, user)
+
+
+@router.get("/jobs/{job_id}/status/", summary="归档作业状态")
+async def get_archive_job_status(
+    job_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ArchiveService.get_job(db, job_id, user)
+    return {
+        "job_id": job["id"],
+        "workflow_id": job["workflow_id"],
+        "status": job["status"],
+        "estimated_rows": job["estimated_rows"],
+        "processed_rows": job["processed_rows"],
+        "current_batch": job["current_batch"],
+        "error_message": job["error_message"],
+    }
+
+
+@router.post("/jobs/{job_id}/start/", summary="启动已审批归档作业")
+async def start_archive_job(
+    job_id: int,
+    user=Depends(require_perm("archive_apply")),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ArchiveService.start_job(db, job_id, user)
+    return {"success": True, "msg": "归档作业已加入后台队列", "job_id": job.id, "status": job.status}
+
+
+@router.post("/jobs/{job_id}/pause/", summary="暂停归档作业")
+async def pause_archive_job(
+    job_id: int,
+    user=Depends(require_perm("archive_apply")),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ArchiveService.set_job_control_state(db, job_id, "pause", user)
+    return {"success": True, "msg": "暂停请求已提交，将在当前批次完成后生效", "job_id": job.id, "status": job.status}
+
+
+@router.post("/jobs/{job_id}/resume/", summary="继续归档作业")
+async def resume_archive_job(
+    job_id: int,
+    user=Depends(require_perm("archive_apply")),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ArchiveService.set_job_control_state(db, job_id, "resume", user)
+    job = await ArchiveService.start_job(db, job.id, user)
+    return {"success": True, "msg": "归档作业已继续执行", "job_id": job.id, "status": job.status}
+
+
+@router.post("/jobs/{job_id}/cancel/", summary="取消归档作业")
+async def cancel_archive_job(
+    job_id: int,
+    user=Depends(require_perm("archive_apply")),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ArchiveService.set_job_control_state(db, job_id, "cancel", user)
+    return {"success": True, "msg": "取消请求已提交；执行中作业将在当前批次完成后停止", "job_id": job.id, "status": job.status}
