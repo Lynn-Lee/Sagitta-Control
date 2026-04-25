@@ -1,6 +1,6 @@
 """
 MySQL 引擎实现。
-支持：MySQL 5.7+ / MariaDB / TiDB / OceanBase
+支持：MySQL 5.7+ / MariaDB / OceanBase
 
 安全修复：
 - P0-2：基础审核用 sqlglot，goInception 降级为可选增强（不再在 SQL 中传密码）
@@ -442,9 +442,20 @@ class MysqlEngine:
         self, command_type: str = "Query", **kwargs: Any
     ) -> ResultSet:
         sql = (
-            "SELECT ID, USER, HOST, DB, COMMAND, TIME, STATE, INFO "
+            "SELECT "
+            "ID AS session_id, "
+            "USER AS username, "
+            "HOST AS host, "
+            "DB AS db_name, "
+            "COMMAND AS command, "
+            "TIME AS time_seconds, "
+            "TIME * 1000 AS state_duration_ms, "
+            "TIME * 1000 AS duration_ms, "
+            "'processlist_time' AS duration_source, "
+            "STATE AS state, "
+            "INFO AS sql_text "
             "FROM information_schema.PROCESSLIST "
-            "WHERE COMMAND != 'Sleep'"
+            "WHERE 1 = 1"
         )
         if command_type and command_type != "ALL":
             sql += f" AND COMMAND = '{self.escape_string(command_type)}'"

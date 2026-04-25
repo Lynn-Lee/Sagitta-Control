@@ -4,7 +4,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.engines.models import ResultSet
+from app.engines.mysql import MysqlEngine
 from app.engines.oracle import OracleEngine
+from app.engines.pgsql import PgSQLEngine
+from app.engines.tidb import TidbEngine
+from app.routers.diagnostic import _parse_oracle_dt
 from app.services.session_diagnostic import is_collect_due, normalize_session_row
 
 
@@ -41,12 +45,15 @@ def test_normalize_session_row_prefers_millisecond_duration():
     inst = _Instance(db_type="pgsql")
     item = normalize_session_row(
         instance=inst,
-        columns=["pid", "usename", "duration_ms", "query"],
-        row=(10, "app", 358.7, "select 1"),
+        columns=["pid", "usename", "connection_age_ms", "state_duration_ms", "active_duration_ms", "query"],
+        row=(10, "app", 1000, 358.7, 200, "select 1"),
     )
 
     assert item.session_id == "10"
     assert item.duration_ms == 359
+    assert item.connection_age_ms == 1000
+    assert item.state_duration_ms == 359
+    assert item.active_duration_ms == 200
     assert item.time_seconds == 0
 
 
@@ -67,6 +74,89 @@ def test_normalize_session_row_converts_microseconds_and_decimal_seconds():
     assert item.time_seconds == 1
     assert decimal.duration_ms == 420
     assert decimal.time_seconds == 0
+
+
+@pytest.mark.asyncio
+async def test_mysql_processlist_outputs_state_duration(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        return ResultSet()
+
+    monkeypatch.setattr(MysqlEngine, "query", fake_query)
+    engine = MysqlEngine(_Instance(db_type="mysql"))
+
+    await engine.processlist(command_type="ALL")
+
+    assert "TIME AS time_seconds" in calls[0]
+    assert "TIME * 1000 AS state_duration_ms" in calls[0]
+    assert "TIME * 1000 AS duration_ms" in calls[0]
+    assert "COMMAND != 'Sleep'" not in calls[0]
+
+
+@pytest.mark.asyncio
+async def test_tidb_processlist_prefers_cluster_processlist(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        return ResultSet(column_list=["session_id"], rows=[(1,)])
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert "information_schema.CLUSTER_PROCESSLIST" in calls[0]
+    assert "INSTANCE AS instance" in calls[0]
+    assert "TIME * 1000 AS state_duration_ms" in calls[0]
+    assert "TIME * 1000 AS duration_ms" in calls[0]
+    assert "COMMAND != 'Sleep'" not in calls[0]
+
+
+@pytest.mark.asyncio
+async def test_tidb_processlist_falls_back_to_local_processlist(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        if "CLUSTER_PROCESSLIST" in sql:
+            return ResultSet(error="access denied")
+        return ResultSet(column_list=["session_id"], rows=[(1,)])
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert "information_schema.CLUSTER_PROCESSLIST" in calls[0]
+    assert "information_schema.PROCESSLIST" in calls[1]
+    assert "已降级为本节点 PROCESSLIST" in rs.warning
+
+
+@pytest.mark.asyncio
+async def test_pgsql_processlist_uses_state_change_for_duration(monkeypatch):
+    monkeypatch.setattr("app.engines.pgsql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_raw_query(self, db_name, sql, args):
+        calls.append(sql)
+        return ResultSet()
+
+    monkeypatch.setattr(PgSQLEngine, "_raw_query", fake_raw_query)
+    engine = PgSQLEngine(_Instance(db_type="pgsql", port=5432, db_name="postgres"))
+
+    await engine.processlist()
+
+    assert "now()-backend_start" in calls[0]
+    assert "now()-state_change" in calls[0]
+    assert "now()-query_start" in calls[0]
 
 
 def test_session_collect_due_uses_instance_interval():
@@ -119,6 +209,10 @@ async def test_oracle_processlist_uses_v_session_and_vsql(monkeypatch):
     assert rs.is_success
     assert "FROM v$session s" in calls[0]
     assert "LEFT JOIN v$sql q" in calls[0]
+    assert "SYSDATE - s.logon_time" in calls[0]
+    assert "s.last_call_et * 1000 AS state_duration_ms" in calls[0]
+    assert "SYSDATE - s.sql_exec_start" in calls[0]
+    assert "s.last_call_et * 1000 AS duration_ms" in calls[0]
 
 
 @pytest.mark.asyncio
@@ -158,6 +252,33 @@ async def test_oracle_ash_history_uses_available_duration_column(monkeypatch):
     assert rs.is_success
     assert "TIME_WAITED" in calls[1]
     assert " AS duration_ms" in calls[1]
+
+
+@pytest.mark.asyncio
+async def test_oracle_ash_history_uses_zero_duration_when_no_duration_columns(monkeypatch):
+    monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    def fake_run(self, sql, params=None):
+        calls.append(sql)
+        if "WHERE 1 = 0" in sql:
+            return ResultSet(column_list=["SAMPLE_TIME", "SESSION_ID", "SESSION_SERIAL#", "USER_ID"])
+        return ResultSet(column_list=["DURATION_MS"], rows=[(0,)])
+
+    monkeypatch.setattr(OracleEngine, "_run_query_sync", fake_run)
+    engine = OracleEngine(_Instance(db_type="oracle", port=1521, db_name="FREEPDB1"))
+
+    rs = await engine.ash_history(source="awr")
+
+    assert rs.is_success
+    assert "0 AS duration_ms" in calls[1]
+
+
+def test_parse_oracle_dt_converts_iso_timezone_to_naive_local_datetime():
+    parsed = _parse_oracle_dt("2026-04-25T05:11:18.000Z")
+
+    assert parsed is not None
+    assert parsed.tzinfo is None
 
 
 @pytest.mark.asyncio

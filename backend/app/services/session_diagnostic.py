@@ -32,6 +32,10 @@ _ONLINE_COLUMNS = [
     "command",
     "state",
     "time_seconds",
+    "connection_age_ms",
+    "state_duration_ms",
+    "active_duration_ms",
+    "transaction_age_ms",
     "sql_id",
     "sql_text",
     "event",
@@ -90,6 +94,13 @@ def _duration_ms(raw: dict[str, Any]) -> int:
     return 0
 
 
+def _optional_duration_ms(raw: dict[str, Any], *keys: str) -> int | None:
+    value = _float(_pick(raw, *keys))
+    if value is None:
+        return None
+    return max(0, int(round(value)))
+
+
 def row_to_dict(columns: list[str], row: Any) -> dict[str, Any]:
     if isinstance(row, dict):
         return {str(k): v for k, v in row.items()}
@@ -135,7 +146,14 @@ def normalize_session_row(
     item.db_name = _string(_pick(raw, "db_name", "db", "datname", "schema", "ns"))
     item.command = _string(_pick(raw, "command", "cmd", "type"))
     item.state = _string(_pick(raw, "state", "status", "wait_class"))
-    item.duration_ms = _duration_ms(raw)
+    item.connection_age_ms = _optional_duration_ms(raw, "connection_age_ms", "connection_ms", "session_age_ms")
+    item.state_duration_ms = _optional_duration_ms(raw, "state_duration_ms", "duration_ms", "elapsed_ms", "time_ms")
+    if item.state_duration_ms is None:
+        item.state_duration_ms = _duration_ms(raw)
+    item.active_duration_ms = _optional_duration_ms(raw, "active_duration_ms", "query_duration_ms", "sql_duration_ms")
+    item.transaction_age_ms = _optional_duration_ms(raw, "transaction_age_ms", "xact_age_ms")
+    item.duration_source = _string(_pick(raw, "duration_source"))
+    item.duration_ms = item.state_duration_ms or 0
     item.time_seconds = item.duration_ms // 1000
     item.sql_id = _string(_pick(raw, "sql_id", "query_id"))
     item.sql_text = _string(_pick(raw, "sql_text", "sql_fulltext", "query", "info"))
@@ -347,6 +365,11 @@ class SessionDiagnosticService:
                     state=item.state,
                     time_seconds=item.time_seconds,
                     duration_ms=item.duration_ms,
+                    connection_age_ms=item.connection_age_ms,
+                    state_duration_ms=item.state_duration_ms,
+                    active_duration_ms=item.active_duration_ms,
+                    transaction_age_ms=item.transaction_age_ms,
+                    duration_source=item.duration_source,
                     sql_id=item.sql_id,
                     sql_text=item.sql_text,
                     event=item.event,
@@ -367,11 +390,16 @@ class SessionDiagnosticService:
         db_type: str | None = None,
         username: str | None = None,
         db_name: str | None = None,
+        state: str | None = None,
+        command: str | None = None,
         sql_keyword: str | None = None,
         date_start: datetime | None = None,
         date_end: datetime | None = None,
         min_seconds: int | None = None,
         min_duration_ms: int | None = None,
+        min_connection_age_ms: int | None = None,
+        min_state_duration_ms: int | None = None,
+        min_active_duration_ms: int | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[int, list[SessionItem]]:
@@ -384,12 +412,22 @@ class SessionDiagnosticService:
             stmt = stmt.where(SessionSnapshot.username.ilike(f"%{username}%"))
         if db_name:
             stmt = stmt.where(SessionSnapshot.db_name.ilike(f"%{db_name}%"))
+        if state:
+            stmt = stmt.where(SessionSnapshot.state.ilike(f"%{state}%"))
+        if command:
+            stmt = stmt.where(SessionSnapshot.command.ilike(f"%{command}%"))
         if sql_keyword:
             stmt = stmt.where(SessionSnapshot.sql_text.ilike(f"%{sql_keyword}%"))
         if date_start:
             stmt = stmt.where(SessionSnapshot.collected_at >= date_start)
         if date_end:
             stmt = stmt.where(SessionSnapshot.collected_at <= date_end)
+        if min_connection_age_ms is not None:
+            stmt = stmt.where(SessionSnapshot.connection_age_ms >= min_connection_age_ms)
+        if min_state_duration_ms is not None:
+            stmt = stmt.where(SessionSnapshot.state_duration_ms >= min_state_duration_ms)
+        if min_active_duration_ms is not None:
+            stmt = stmt.where(SessionSnapshot.active_duration_ms >= min_active_duration_ms)
         if min_duration_ms is not None:
             stmt = stmt.where(SessionSnapshot.duration_ms >= min_duration_ms)
         elif min_seconds is not None:
@@ -419,6 +457,11 @@ class SessionDiagnosticService:
                 state=row.state,
                 time_seconds=row.time_seconds,
                 duration_ms=row.duration_ms,
+                connection_age_ms=row.connection_age_ms,
+                state_duration_ms=row.state_duration_ms if row.state_duration_ms is not None else row.duration_ms,
+                active_duration_ms=row.active_duration_ms,
+                transaction_age_ms=row.transaction_age_ms,
+                duration_source=row.duration_source,
                 sql_id=row.sql_id,
                 sql_text=row.sql_text,
                 event=row.event,

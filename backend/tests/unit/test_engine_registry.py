@@ -44,7 +44,8 @@ class TestEngineRegistry:
     def test_get_tidb_engine(self):
         instance = MockInstance("tidb")
         engine = get_engine(instance)
-        assert engine.name == "MysqlEngine"
+        assert engine.name == "TidbEngine"
+        assert engine.db_type == "tidb"
 
     def test_get_starrocks_engine(self):
         instance = MockInstance("starrocks")

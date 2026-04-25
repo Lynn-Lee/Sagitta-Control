@@ -590,6 +590,20 @@ class OracleEngine:
               ELSE TO_CHAR(s.command)
             END AS command,
             s.last_call_et AS time_seconds,
+            ROUND((SYSDATE - s.logon_time) * 86400000) AS connection_age_ms,
+            s.last_call_et * 1000 AS state_duration_ms,
+            CASE
+              WHEN s.sql_exec_start IS NOT NULL
+              THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
+              ELSE NULL
+            END AS active_duration_ms,
+            CASE
+              WHEN t.start_date IS NOT NULL
+              THEN ROUND((SYSDATE - t.start_date) * 86400000)
+              ELSE NULL
+            END AS transaction_age_ms,
+            s.last_call_et * 1000 AS duration_ms,
+            'v$session' AS duration_source,
             s.sql_id AS sql_id,
             DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
             s.event AS event,
@@ -598,6 +612,8 @@ class OracleEngine:
         LEFT JOIN v$sql q
           ON s.sql_id = q.sql_id
          AND s.sql_child_number = q.child_number
+        LEFT JOIN v$transaction t
+          ON s.taddr = t.addr
         WHERE s.type = 'USER'
           AND s.audsid != USERENV('SESSIONID')
         ORDER BY s.last_call_et DESC
@@ -628,6 +644,16 @@ class OracleEngine:
               ELSE TO_CHAR(s.command)
             END AS command,
             s.last_call_et AS time_seconds,
+            ROUND((SYSDATE - s.logon_time) * 86400000) AS connection_age_ms,
+            s.last_call_et * 1000 AS state_duration_ms,
+            CASE
+              WHEN s.sql_exec_start IS NOT NULL
+              THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
+              ELSE NULL
+            END AS active_duration_ms,
+            CAST(NULL AS NUMBER) AS transaction_age_ms,
+            s.last_call_et * 1000 AS duration_ms,
+            'v$session' AS duration_source,
             s.sql_id AS sql_id,
             CAST(NULL AS VARCHAR2(4000)) AS sql_text,
             s.event AS event,
@@ -652,11 +678,33 @@ class OracleEngine:
             if column in columns
         ]
         if not candidates:
-            return "CAST(NULL AS NUMBER)"
+            return "0"
         values = [f"NULLIF(ash.{column}, 0)" for column in candidates]
         if len(values) == 1:
             return f"ROUND({values[0]} / 1000)"
         return f"ROUND(COALESCE({', '.join(values)}) / 1000)"
+
+    def _ash_column_expr(
+        self,
+        columns: set[str],
+        candidates: tuple[str, ...],
+        fallback: str,
+    ) -> str:
+        for column in candidates:
+            if column in columns:
+                return f"ash.{column}"
+        return fallback
+
+    def _ash_sql_text_join(self, source: str) -> tuple[str, str]:
+        if source == "awr":
+            return (
+                "LEFT JOIN dba_hist_sqltext q ON ash.sql_id = q.sql_id",
+                "DBMS_LOB.SUBSTR(q.sql_text, 4000, 1)",
+            )
+        return (
+            "LEFT JOIN v$sql q ON ash.sql_id = q.sql_id",
+            "DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1)",
+        )
 
     async def _ash_view_columns(self, view_name: str, source: str) -> ResultSet:
         rs = await asyncio.to_thread(
@@ -688,32 +736,45 @@ class OracleEngine:
         if columns_rs.error:
             return columns_rs
 
-        duration_expr = self._ash_duration_expr({col.upper() for col in columns_rs.column_list})
-        sql_text_join = "LEFT JOIN v$sql q ON ash.sql_id = q.sql_id"
+        columns = {col.upper() for col in columns_rs.column_list}
+        duration_expr = self._ash_duration_expr(columns)
+        sql_text_join, sql_text_expr = self._ash_sql_text_join(source)
+        serial_expr = self._ash_column_expr(columns, ("SESSION_SERIAL#", "SESSION_SERIAL"), "NULL")
+        host_expr = self._ash_column_expr(columns, ("MACHINE",), "CAST(NULL AS VARCHAR2(255))")
+        program_expr = self._ash_column_expr(columns, ("PROGRAM", "MODULE"), "CAST(NULL AS VARCHAR2(255))")
+        state_expr = self._ash_column_expr(columns, ("SESSION_STATE",), "CAST(NULL AS VARCHAR2(255))")
+        sql_id_expr = self._ash_column_expr(columns, ("SQL_ID",), "CAST(NULL AS VARCHAR2(255))")
+        event_expr = self._ash_column_expr(columns, ("EVENT",), "CAST(NULL AS VARCHAR2(255))")
+        blocking_expr = self._ash_column_expr(columns, ("BLOCKING_SESSION",), "CAST(NULL AS NUMBER)")
         sql = f"""
         SELECT * FROM (
             SELECT inner_q.*, ROWNUM AS rn FROM (
                 SELECT
                     ash.sample_time AS collected_at,
                     ash.session_id AS session_id,
-                    ash.session_serial# AS serial,
+                    {serial_expr} AS serial,
                     COALESCE(u.username, TO_CHAR(ash.user_id)) AS username,
-                    ash.machine AS host,
-                    ash.program AS program,
-                    ash.session_state AS state,
-                    ash.sql_id AS sql_id,
-                    DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
-                    ash.event AS event,
-                    ash.blocking_session AS blocking_session,
+                    {host_expr} AS host,
+                    {program_expr} AS program,
+                    {state_expr} AS state,
+                    {sql_id_expr} AS sql_id,
+                    {sql_text_expr} AS sql_text,
+                    {event_expr} AS event,
+                    {blocking_expr} AS blocking_session,
+                    CAST(NULL AS NUMBER) AS connection_age_ms,
+                    {duration_expr} AS active_duration_ms,
+                    {duration_expr} AS state_duration_ms,
+                    CAST(NULL AS NUMBER) AS transaction_age_ms,
                     {duration_expr} AS duration_ms,
-                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds
+                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds,
+                    'oracle_{source}_sample' AS duration_source
                 FROM {view_name} ash
                 {sql_text_join}
                 LEFT JOIN all_users u ON ash.user_id = u.user_id
                 WHERE 1 = 1
                   AND (:date_start IS NULL OR ash.sample_time >= :date_start)
                   AND (:date_end IS NULL OR ash.sample_time <= :date_end)
-                  AND (:sql_keyword IS NULL OR LOWER(DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1)) LIKE :sql_keyword)
+                  AND (:sql_keyword IS NULL OR LOWER({sql_text_expr}) LIKE :sql_keyword)
                   AND (:min_duration_ms IS NULL OR ({duration_expr}) >= :min_duration_ms)
                 ORDER BY ash.sample_time DESC
             ) inner_q
@@ -740,17 +801,22 @@ class OracleEngine:
                 SELECT
                     ash.sample_time AS collected_at,
                     ash.session_id AS session_id,
-                    ash.session_serial# AS serial,
+                    {serial_expr} AS serial,
                     COALESCE(u.username, TO_CHAR(ash.user_id)) AS username,
                     CAST(NULL AS VARCHAR2(255)) AS host,
                     CAST(NULL AS VARCHAR2(255)) AS program,
-                    ash.session_state AS state,
-                    ash.sql_id AS sql_id,
+                    {state_expr} AS state,
+                    {sql_id_expr} AS sql_id,
                     CAST(NULL AS VARCHAR2(4000)) AS sql_text,
-                    ash.event AS event,
-                    ash.blocking_session AS blocking_session,
+                    {event_expr} AS event,
+                    {blocking_expr} AS blocking_session,
+                    CAST(NULL AS NUMBER) AS connection_age_ms,
+                    {duration_expr} AS active_duration_ms,
+                    {duration_expr} AS state_duration_ms,
+                    CAST(NULL AS NUMBER) AS transaction_age_ms,
                     {duration_expr} AS duration_ms,
-                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds
+                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds,
+                    'oracle_{source}_sample' AS duration_source
                 FROM {view_name} ash
                 LEFT JOIN all_users u ON ash.user_id = u.user_id
                 WHERE 1 = 1

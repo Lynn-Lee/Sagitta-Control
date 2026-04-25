@@ -46,6 +46,15 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise HTTPException(400, f"时间格式错误：{value}") from exc
 
 
+def _parse_oracle_dt(value: str | None) -> datetime | None:
+    parsed = _parse_dt(value)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        return parsed
+    return parsed.astimezone().replace(tzinfo=None)
+
+
 @router.get(
     "/processlist/",
     summary="查看会话列表",
@@ -84,11 +93,16 @@ async def list_session_history(
     db_type: str | None = None,
     username: str | None = None,
     db_name: str | None = None,
+    state: str | None = None,
+    command: str | None = None,
     sql_keyword: str | None = None,
     date_start: str | None = None,
     date_end: str | None = None,
     min_seconds: int | None = QParam(default=None, ge=0),
     min_duration_ms: int | None = QParam(default=None, ge=0),
+    min_connection_age_ms: int | None = QParam(default=None, ge=0),
+    min_state_duration_ms: int | None = QParam(default=None, ge=0),
+    min_active_duration_ms: int | None = QParam(default=None, ge=0),
     page: int = QParam(default=1, ge=1),
     page_size: int = QParam(default=50, ge=1, le=200),
     user: dict = Depends(current_user),
@@ -100,11 +114,16 @@ async def list_session_history(
         db_type=db_type,
         username=username,
         db_name=db_name,
+        state=state,
+        command=command,
         sql_keyword=sql_keyword,
         date_start=_parse_dt(date_start),
         date_end=_parse_dt(date_end),
         min_seconds=min_seconds,
         min_duration_ms=min_duration_ms,
+        min_connection_age_ms=min_connection_age_ms,
+        min_state_duration_ms=min_state_duration_ms,
+        min_active_duration_ms=min_active_duration_ms,
         page=page,
         page_size=page_size,
     )
@@ -210,8 +229,8 @@ async def list_oracle_ash_history(
         raise HTTPException(400, "当前 Oracle 引擎暂不支持 ASH/AWR 历史")
     rs = await engine.ash_history(
         source=source,
-        date_start=_parse_dt(date_start),
-        date_end=_parse_dt(date_end),
+        date_start=_parse_oracle_dt(date_start),
+        date_end=_parse_oracle_dt(date_end),
         sql_keyword=sql_keyword,
         min_duration_ms=min_duration_ms,
         limit_num=page_size,
@@ -220,7 +239,7 @@ async def list_oracle_ash_history(
     if rs.error:
         raise HTTPException(400, f"获取 Oracle ASH/AWR 历史失败：{rs.error}")
     items = SessionDiagnosticService.normalize_result(inst, rs, source=f"oracle_{source}")
-    return {"total": rs.affected_rows or len(items), "items": items}
+    return {"total": len(items), "items": items}
 
 
 @router.post("/kill/", summary="Kill 会话", dependencies=[Depends(require_perm("process_kill"))])

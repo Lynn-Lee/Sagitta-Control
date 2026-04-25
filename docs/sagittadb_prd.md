@@ -269,12 +269,13 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 #### 2.5.1 会话管理
 
-- 查看数据库当前活跃会话（processlist）
-- 显示：会话 ID、用户、来源 IP、执行时长、当前 SQL
+- 查看数据库当前在线连接/会话/线程/进程（processlist / pg_stat_activity / v$session）
+- 默认展示完整连接清单（含空闲连接），可快速隐藏空闲会话
+- 显示：会话 ID、用户、来源 IP、客户端程序、库/Schema、命令、状态、连接时长、状态时长、当前操作时长、事务时长、等待事件、阻塞会话、SQL 上下文
 - 支持 Kill 指定会话（需 `process_kill` 权限）
-- 支持引擎：MySQL/PostgreSQL/Oracle/MongoDB/ClickHouse/Redis
-- 平台定时采集会话快照，支持按时间范围、实例、用户、数据库、SQL 关键字和运行时长查询历史会话
-- Oracle 支持 ASH/AWR 历史入口，适用于已结束会话和历史性能排查
+- 支持引擎：MySQL/TiDB/PostgreSQL/Oracle/MongoDB/ClickHouse/Redis/StarRocks 等已实现 `processlist` 能力的实例类型
+- 平台定时采集会话快照，支持按时间范围、实例、用户、数据库、状态、命令、SQL 关键字和多种时长查询历史会话
+- Oracle 支持 ASH/AWR 活跃采样入口，适用于历史活跃会话与性能排查，但不等同于全量连接历史
 
 #### 2.5.2 慢日志分析
 

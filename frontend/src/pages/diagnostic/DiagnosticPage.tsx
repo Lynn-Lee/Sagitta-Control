@@ -19,15 +19,21 @@ type HistorySource = 'platform' | 'ash' | 'awr'
 
 const renderDate = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
 const defaultHistoryRange = () => [dayjs().subtract(24, 'hour'), dayjs()] as [Dayjs, Dayjs]
-const sessionDurationMs = (row: SessionItem) => {
+const durationValue = (value?: number | null) => Number.isFinite(Number(value)) ? Number(value) : null
+const stateDurationMs = (row: SessionItem) => {
+  const stateMs = durationValue(row.state_duration_ms)
+  if (stateMs !== null) return stateMs
   if (Number.isFinite(Number(row.duration_ms))) return Number(row.duration_ms)
   return Number(row.time_seconds || 0) * 1000
 }
-const hasDurationValue = (row: SessionItem) => {
-  if (sessionDurationMs(row) > 0) return true
-  if (!row.source?.startsWith('oracle_')) return true
-  const rawDuration = row.raw?.duration_ms
-  return rawDuration !== undefined && rawDuration !== null && rawDuration !== ''
+const renderDuration = (value?: number | null) => {
+  const numeric = durationValue(value)
+  return numeric === null ? '-' : numeric.toLocaleString()
+}
+const isIdleSession = (row: SessionItem) => {
+  const command = row.command?.toLowerCase() || ''
+  const state = row.state?.toLowerCase() || ''
+  return command === 'sleep' || command === 'inactive' || state === 'idle' || state === 'inactive' || state === 'sleep'
 }
 const defaultHistoryFilters = () => {
   const range = defaultHistoryRange()
@@ -43,6 +49,7 @@ export default function DiagnosticPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(50)
   const [historyFilters, setHistoryFilters] = useState<any>(() => defaultHistoryFilters())
+  const [hideIdle, setHideIdle] = useState(false)
   const [sqlDetail, setSqlDetail] = useState<SessionItem | null>(null)
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<SessionCollectConfigItem | null>(null)
@@ -127,13 +134,18 @@ export default function DiagnosticPage() {
         date_start: params.date_start,
         date_end: params.date_end,
         sql_keyword: params.sql_keyword,
-        min_duration_ms: params.min_duration_ms,
+        min_duration_ms: params.min_active_duration_ms ?? params.min_state_duration_ms ?? params.min_duration_ms,
         page: historyPage,
         page_size: historyPageSize,
       })
     },
     enabled: historySource === 'platform' || (!!instanceId && isOracle),
   })
+
+  const onlineItems = useMemo(
+    () => (processData?.items ?? []).filter(item => !hideIdle || !isIdleSession(item)),
+    [hideIdle, processData?.items],
+  )
 
   const sessionColumns: ColumnsType<SessionItem> = [
     { title: '会话ID', dataIndex: 'session_id', width: 110, fixed: 'left' },
@@ -145,12 +157,27 @@ export default function DiagnosticPage() {
     { title: '命令', dataIndex: 'command', width: 100, render: (v) => v ? <Tag>{v}</Tag> : '-' },
     { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
     {
-      title: '耗时(ms)',
-      dataIndex: 'duration_ms',
-      width: 105,
-      sorter: (a, b) => sessionDurationMs(a) - sessionDurationMs(b),
-      render: (_: number, row) => hasDurationValue(row) ? sessionDurationMs(row).toLocaleString() : '-',
+      title: '连接时长(ms)',
+      dataIndex: 'connection_age_ms',
+      width: 130,
+      sorter: (a, b) => (durationValue(a.connection_age_ms) ?? -1) - (durationValue(b.connection_age_ms) ?? -1),
+      render: renderDuration,
     },
+    {
+      title: '状态时长(ms)',
+      dataIndex: 'state_duration_ms',
+      width: 130,
+      sorter: (a, b) => stateDurationMs(a) - stateDurationMs(b),
+      render: (_: number, row) => renderDuration(row.state_duration_ms ?? row.duration_ms),
+    },
+    {
+      title: '当前操作(ms)',
+      dataIndex: 'active_duration_ms',
+      width: 130,
+      sorter: (a, b) => (durationValue(a.active_duration_ms) ?? -1) - (durationValue(b.active_duration_ms) ?? -1),
+      render: renderDuration,
+    },
+    { title: '事务时长(ms)', dataIndex: 'transaction_age_ms', width: 130, render: renderDuration },
     { title: 'SQL ID', dataIndex: 'sql_id', width: 130, ellipsis: true },
     {
       title: 'SQL',
@@ -196,13 +223,19 @@ export default function DiagnosticPage() {
 
   const applyHistoryFilters = (values: any) => {
     const range = values.range as [Dayjs, Dayjs] | undefined
-    const minDurationMs = values.min_duration_ms
+    const minConnectionAgeMs = values.min_connection_age_ms
+    const minStateDurationMs = values.min_state_duration_ms
+    const minActiveDurationMs = values.min_active_duration_ms
     setHistoryPage(1)
     setHistoryFilters({
       username: values.username || undefined,
       db_name: values.db_name || undefined,
+      state: values.state || undefined,
+      command: values.command || undefined,
       sql_keyword: values.sql_keyword || undefined,
-      min_duration_ms: minDurationMs === undefined || minDurationMs === null ? undefined : Number(minDurationMs),
+      min_connection_age_ms: minConnectionAgeMs === undefined || minConnectionAgeMs === null ? undefined : Number(minConnectionAgeMs),
+      min_state_duration_ms: minStateDurationMs === undefined || minStateDurationMs === null ? undefined : Number(minStateDurationMs),
+      min_active_duration_ms: minActiveDurationMs === undefined || minActiveDurationMs === null ? undefined : Number(minActiveDurationMs),
       date_start: range?.[0]?.toISOString(),
       date_end: range?.[1]?.toISOString(),
     })
@@ -214,8 +247,12 @@ export default function DiagnosticPage() {
       range,
       username: undefined,
       db_name: undefined,
+      state: undefined,
+      command: undefined,
       sql_keyword: undefined,
-      min_duration_ms: undefined,
+      min_connection_age_ms: undefined,
+      min_state_duration_ms: undefined,
+      min_active_duration_ms: undefined,
     })
     setHistoryPage(1)
     setHistoryFilters({
@@ -295,8 +332,9 @@ export default function DiagnosticPage() {
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => refetch()} disabled={!instanceId}>刷新</Button>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            在线 {processData?.total ?? 0} 个会话
+            在线 {processData?.total ?? 0} 个会话{hideIdle ? `，当前显示 ${onlineItems.length} 个非空闲会话` : ''}
           </Text>
+          <Switch checked={hideIdle} onChange={setHideIdle} checkedChildren="隐藏空闲" unCheckedChildren="显示全部" />
         </Space>
       </FilterCard>
 
@@ -309,13 +347,13 @@ export default function DiagnosticPage() {
               <Card style={{ borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey={(row) => `${row.db_type}-${row.session_id}-${row.serial}`}
-                  dataSource={processData?.items ?? []}
+                  dataSource={onlineItems}
                   columns={sessionColumns}
                   loading={processLoading}
                   size="small"
                   tableLayout="fixed"
                   scroll={{ x: 2100 }}
-                  locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无活跃会话' : '请先选择实例'} /> }}
+                  locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无会话' : '请先选择实例'} /> }}
                   pagination={{ pageSize: 50, showSizeChanger: false }}
                 />
               </Card>
@@ -366,15 +404,27 @@ export default function DiagnosticPage() {
                     <Form.Item name="sql_keyword" style={{ margin: 0, flex: '0 0 180px' }}>
                       <Input placeholder="SQL 关键字" allowClear style={{ width: '100%' }} />
                     </Form.Item>
-                    <Form.Item name="min_duration_ms" style={{ margin: 0, flex: '0 0 140px' }}>
-                      <InputNumber placeholder="最小耗时(ms)" min={0} step={100} style={{ width: '100%' }} />
+                    <Form.Item name="state" style={{ margin: 0, flex: '0 0 120px' }}>
+                      <Input placeholder="状态" allowClear style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="command" style={{ margin: 0, flex: '0 0 120px' }}>
+                      <Input placeholder="命令" allowClear style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="min_connection_age_ms" style={{ margin: 0, flex: '0 0 150px' }}>
+                      <InputNumber placeholder="最小连接时长(ms)" min={0} step={100} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="min_state_duration_ms" style={{ margin: 0, flex: '0 0 150px' }}>
+                      <InputNumber placeholder="最小状态时长(ms)" min={0} step={100} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="min_active_duration_ms" style={{ margin: 0, flex: '0 0 150px' }}>
+                      <InputNumber placeholder="最小操作时长(ms)" min={0} step={100} style={{ width: '100%' }} />
                     </Form.Item>
                     {isOracle && instanceId && (
                       <Form.Item style={{ margin: 0, flex: '0 0 140px' }}>
                         <Select value={historySource} onChange={setHistorySource} style={{ width: '100%' }}>
-                          <Select.Option value="platform">平台采样</Select.Option>
-                          <Select.Option value="ash">Oracle ASH</Select.Option>
-                          <Select.Option value="awr">Oracle AWR</Select.Option>
+                          <Select.Option value="platform">平台采样快照</Select.Option>
+                          <Select.Option value="ash">Oracle ASH 活跃采样</Select.Option>
+                          <Select.Option value="awr">Oracle AWR 活跃采样</Select.Option>
                         </Select>
                       </Form.Item>
                     )}

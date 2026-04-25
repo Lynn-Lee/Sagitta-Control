@@ -388,13 +388,32 @@ class PgSQLEngine:
     # ── 可选能力 ──────────────────────────────────────────────
 
     async def processlist(self, command_type: str = "Query", **kwargs: Any) -> ResultSet:
-        sql = """SELECT pid, usename, datname, state,
-                        extract(epoch from (now()-query_start))::int AS seconds,
-                        round(extract(epoch from (now()-query_start)) * 1000)::bigint AS duration_ms,
-                        query
+        sql = """SELECT pid AS session_id,
+                        usename AS username,
+                        client_addr::text AS host,
+                        application_name AS program,
+                        datname AS db_name,
+                        state,
+                        CASE WHEN state = 'active' THEN 'Query' ELSE state END AS command,
+                        round(extract(epoch from (now()-backend_start)) * 1000)::bigint AS connection_age_ms,
+                        extract(epoch from (now()-state_change))::int AS time_seconds,
+                        round(extract(epoch from (now()-state_change)) * 1000)::bigint AS state_duration_ms,
+                        CASE
+                          WHEN state = 'active' AND query_start IS NOT NULL
+                          THEN round(extract(epoch from (now()-query_start)) * 1000)::bigint
+                          ELSE NULL
+                        END AS active_duration_ms,
+                        CASE
+                          WHEN xact_start IS NOT NULL
+                          THEN round(extract(epoch from (now()-xact_start)) * 1000)::bigint
+                          ELSE NULL
+                        END AS transaction_age_ms,
+                        round(extract(epoch from (now()-state_change)) * 1000)::bigint AS duration_ms,
+                        'pg_stat_activity' AS duration_source,
+                        query AS sql_text
                  FROM pg_stat_activity
-                 WHERE state != 'idle' AND pid != pg_backend_pid()
-                 ORDER BY query_start"""
+                 WHERE pid != pg_backend_pid()
+                 ORDER BY state_change"""
         return await self._raw_query(db_name=self._db_name, sql=sql, args=[])
 
     async def kill_connection(self, thread_id: int) -> ResultSet:

@@ -47,7 +47,7 @@
 | 密码安全策略 | 本地账号复杂度、默认/过期密码强制改密、30 天轮换、到期前 7 天提醒 | ✅ | 100% |
 | 统一治理视角 | Dashboard、查询权限、SQL 工单统一 self/group/instance_scope/global 视角 | ✅ | 100% |
 | 查询权限撤销审计 | 已生效查询权限撤销、撤销记录、历史软删除回填、Dashboard 撤销统计 | ✅ | 100% |
-| 会话诊断与慢日志分析 | 在线/历史会话、Oracle ASH、慢日志采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
+| 会话诊断与慢日志分析 | 连接/会话视角在线与历史快照、Oracle ASH/AWR 活跃采样、慢日志采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
 
 **总体完成度：100%（v1.0-GA），v2-lite 首发范围已完成并进入体验收口与持续验收阶段**
 
@@ -148,7 +148,7 @@
 - 系统配置中配置 API Key
 
 **运维工具**
-- 会话管理（processlist / kill），并已扩展到平台历史会话快照与 Oracle ASH/AWR 历史查询
+- 会话管理（processlist / kill）已重做为连接/会话视角，支持完整在线连接清单、平台历史会话快照与 Oracle ASH/AWR 活跃采样
 - 慢日志分析 v2：平台查询历史同步、原生慢日志采集、SQL 指纹聚合、实例级采集配置、指纹详情、结构化优化建议、MySQL/PostgreSQL 执行计划分析
 - SQL 优化建议（sqlglot 规则）
 - 数据字典（三级浏览：实例→数据库→表→字段结构）
@@ -168,8 +168,8 @@
 - 监控队列新增 `collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入 `session_snapshot` 和 `slow_query_log`
 
 **会话诊断与慢日志补充**
-- Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`
-- `session_snapshot` 保存实例、DB 类型、会话 ID、用户、主机、运行秒数、SQL 文本、等待事件、阻塞会话、采集来源与采集错误
+- Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0024_session_duration_ms`、`0025_session_duration_fields`
+- `session_snapshot` 保存实例、DB 类型、会话 ID、用户、主机、命令、状态、连接时长、状态时长、当前操作时长、事务时长、SQL 上下文、等待事件、阻塞会话、采集来源与采集错误
 - `slow_query_log` 统一保存 `platform / mysql_slowlog / pgsql_statements / redis_slowlog` 来源慢 SQL
 - `slow_query_config` 保存实例级启用状态、慢 SQL 阈值、采集间隔、保留天数、采集上限与最近采集状态
 - 慢日志页面新增 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`
@@ -224,7 +224,7 @@
 - 表约束：主键、唯一键、外键、引用表/列
 - 索引信息：主键索引、唯一索引、普通索引、是否联合索引、索引列
 - 当前关系型数据库优先支持：`MySQL / TiDB / StarRocks / PostgreSQL / Oracle / MSSQL`
-- TiDB 复用 MySQL 元数据实现；Doris / Cassandra / Elasticsearch 仍待补齐或验证
+- TiDB 会话诊断已拆为独立 `TidbEngine`，元数据仍复用 MySQL 兼容能力；Doris / Cassandra / Elasticsearch 仍待补齐或验证
 - PostgreSQL / Oracle 列注释链路已补齐：数据字典字段详情可直接展示 `column_comment`
 - PostgreSQL / Oracle 生成 DDL 会补充 `COMMENT ON COLUMN ...`；Oracle `简化 DDL` 会剥离 storage/tablespace 等物理属性，`原始 DDL` 保留 `DBMS_METADATA.GET_DDL` 原始版本供 DBA 查看；PostgreSQL `简化 DDL` 会追加普通索引定义并跳过主键/唯一约束重复索引
 

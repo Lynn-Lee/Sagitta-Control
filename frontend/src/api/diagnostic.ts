@@ -14,6 +14,11 @@ export interface SessionItem {
   state: string
   time_seconds: number
   duration_ms: number
+  connection_age_ms?: number | null
+  state_duration_ms?: number | null
+  active_duration_ms?: number | null
+  transaction_age_ms?: number | null
+  duration_source?: string
   sql_id: string
   sql_text: string
   event: string
@@ -68,11 +73,16 @@ export const diagnosticApi = {
     db_type?: string
     username?: string
     db_name?: string
+    state?: string
+    command?: string
     sql_keyword?: string
     date_start?: string
     date_end?: string
     min_seconds?: number
     min_duration_ms?: number
+    min_connection_age_ms?: number
+    min_state_duration_ms?: number
+    min_active_duration_ms?: number
     page?: number
     page_size?: number
   }) =>

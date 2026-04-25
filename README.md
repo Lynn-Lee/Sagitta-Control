@@ -179,13 +179,14 @@ SagittaDB/
 
 ## 运维诊断近况
 
-- 会话管理已扩展为在线会话 + 历史会话诊断：周期性 `collect_session_snapshots` 会写入 `session_snapshot`，前端可按实例、来源、用户、数据库、SQL 关键字和运行时长筛选历史会话。
-- Oracle 会话诊断新增 ASH/AWR 历史入口；普通在线会话仍通过统一 `processlist / kill_connection` 能力处理。
+- 会话管理已重做为连接/会话视角：在线会话默认展示完整连接清单（含空闲连接），SQL 仅作为会话上下文；前端展示连接时长、状态时长、当前操作时长和事务时长，并支持隐藏空闲会话。
+- 历史会话分为平台采样快照和 Oracle ASH/AWR 活跃采样：周期性 `collect_session_snapshots` 会写入 `session_snapshot`，前端可按实例、来源、用户、数据库、状态、命令、SQL 关键字和多种时长筛选历史会话。
+- TiDB 已拆为独立 `TidbEngine`，复用 MySQL 协议连接能力但使用 TiDB 专属会话采集，优先读取 `information_schema.CLUSTER_PROCESSLIST`。
 - 慢日志分析已升级到 v2：新增 `slow_query_log` 与 `slow_query_config`，支持平台查询历史同步、MySQL/PG/Redis 原生采集、SQL 指纹聚合、实例级采集配置和最近采集状态。
 - MySQL / PostgreSQL 慢 SQL 详情支持执行计划分析：MySQL 使用 `EXPLAIN FORMAT=JSON`，PostgreSQL 使用 `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`；其他引擎保留入口并返回明确的不支持提示。
 - 慢日志页面包含 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
 - 数据归档已升级为审批作业：提交后生成归档审批工单，审批通过后由 Celery `archive` 队列分批执行，并支持暂停、继续、取消和批次日志查看。
-- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`。
+- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`。
 - 详细说明见 [docs/slowlog_diagnostic_v2.md](docs/slowlog_diagnostic_v2.md)。
 
 ## 最近验证

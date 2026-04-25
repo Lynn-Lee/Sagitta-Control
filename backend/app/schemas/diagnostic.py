@@ -20,6 +20,11 @@ class SessionItem(BaseModel):
     state: str = ""
     time_seconds: int = 0
     duration_ms: int = 0
+    connection_age_ms: int | None = None
+    state_duration_ms: int | None = None
+    active_duration_ms: int | None = None
+    transaction_age_ms: int | None = None
+    duration_source: str = ""
     sql_id: str = ""
     sql_text: str = ""
     event: str = ""
