@@ -26,7 +26,7 @@ def upgrade() -> None:
             comment="运行耗时(毫秒)",
         ),
     )
-    op.execute("UPDATE session_snapshot SET duration_ms = COALESCE(time_seconds, 0) * 1000")
+    op.execute("UPDATE session_snapshot SET duration_ms = COALESCE(time_seconds, 0)::bigint * 1000")
 
 
 def downgrade() -> None:
