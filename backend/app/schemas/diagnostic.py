@@ -19,6 +19,7 @@ class SessionItem(BaseModel):
     command: str = ""
     state: str = ""
     time_seconds: int = 0
+    duration_ms: int = 0
     sql_id: str = ""
     sql_text: str = ""
     event: str = ""

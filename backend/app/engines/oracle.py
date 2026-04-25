@@ -645,12 +645,37 @@ class OracleEngine:
         sql = f"ALTER SYSTEM KILL SESSION '{int(thread_id)},{int(serial)}' IMMEDIATE"
         return await asyncio.to_thread(self._run_statement_sync, sql, None)
 
+    def _ash_duration_expr(self, columns: set[str]) -> str:
+        candidates = [
+            column
+            for column in ("TIME_WAITED", "TM_DELTA_TIME", "USECS_PER_ROW")
+            if column in columns
+        ]
+        if not candidates:
+            return "CAST(NULL AS NUMBER)"
+        values = [f"NULLIF(ash.{column}, 0)" for column in candidates]
+        if len(values) == 1:
+            return f"ROUND({values[0]} / 1000)"
+        return f"ROUND(COALESCE({', '.join(values)}) / 1000)"
+
+    async def _ash_view_columns(self, view_name: str, source: str) -> ResultSet:
+        rs = await asyncio.to_thread(
+            self._run_query_sync,
+            f"SELECT * FROM {view_name} WHERE 1 = 0",
+            None,
+        )
+        if rs.error:
+            label = "AWR" if source == "awr" else "ASH"
+            rs.error = f"缺少 {label} 视图权限或视图不可用：{rs.error}"
+        return rs
+
     async def ash_history(
         self,
         source: str = "ash",
         date_start: Any | None = None,
         date_end: Any | None = None,
         sql_keyword: str | None = None,
+        min_duration_ms: int | None = None,
         limit_num: int = 50,
         offset: int = 0,
     ) -> ResultSet:
@@ -659,6 +684,11 @@ class OracleEngine:
             if source == "awr"
             else "v$active_session_history"
         )
+        columns_rs = await self._ash_view_columns(view_name, source)
+        if columns_rs.error:
+            return columns_rs
+
+        duration_expr = self._ash_duration_expr({col.upper() for col in columns_rs.column_list})
         sql_text_join = "LEFT JOIN v$sql q ON ash.sql_id = q.sql_id"
         sql = f"""
         SELECT * FROM (
@@ -675,7 +705,8 @@ class OracleEngine:
                     DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
                     ash.event AS event,
                     ash.blocking_session AS blocking_session,
-                    0 AS time_seconds
+                    {duration_expr} AS duration_ms,
+                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds
                 FROM {view_name} ash
                 {sql_text_join}
                 LEFT JOIN all_users u ON ash.user_id = u.user_id
@@ -683,6 +714,7 @@ class OracleEngine:
                   AND (:date_start IS NULL OR ash.sample_time >= :date_start)
                   AND (:date_end IS NULL OR ash.sample_time <= :date_end)
                   AND (:sql_keyword IS NULL OR LOWER(DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1)) LIKE :sql_keyword)
+                  AND (:min_duration_ms IS NULL OR ({duration_expr}) >= :min_duration_ms)
                 ORDER BY ash.sample_time DESC
             ) inner_q
             WHERE ROWNUM <= :row_limit
@@ -693,6 +725,7 @@ class OracleEngine:
             "date_start": date_start,
             "date_end": date_end,
             "sql_keyword": f"%{sql_keyword.lower()}%" if sql_keyword else None,
+            "min_duration_ms": min_duration_ms,
             "row_limit": int(offset + limit_num),
             "row_offset": int(offset),
         }
@@ -716,12 +749,14 @@ class OracleEngine:
                     CAST(NULL AS VARCHAR2(4000)) AS sql_text,
                     ash.event AS event,
                     ash.blocking_session AS blocking_session,
-                    0 AS time_seconds
+                    {duration_expr} AS duration_ms,
+                    FLOOR(NVL(({duration_expr}), 0) / 1000) AS time_seconds
                 FROM {view_name} ash
                 LEFT JOIN all_users u ON ash.user_id = u.user_id
                 WHERE 1 = 1
                   AND (:date_start IS NULL OR ash.sample_time >= :date_start)
                   AND (:date_end IS NULL OR ash.sample_time <= :date_end)
+                  AND (:min_duration_ms IS NULL OR ({duration_expr}) >= :min_duration_ms)
                 ORDER BY ash.sample_time DESC
             ) inner_q
             WHERE ROWNUM <= :row_limit

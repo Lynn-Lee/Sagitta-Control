@@ -19,25 +19,15 @@ type HistorySource = 'platform' | 'ash' | 'awr'
 
 const renderDate = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
 const defaultHistoryRange = () => [dayjs().subtract(24, 'hour'), dayjs()] as [Dayjs, Dayjs]
-const numericRawValue = (raw: Record<string, unknown> | undefined, keys: string[]) => {
-  if (!raw) return undefined
-  const entries = Object.entries(raw)
-  for (const key of keys) {
-    const found = entries.find(([rawKey]) => rawKey.toLowerCase() === key)
-    if (!found) continue
-    const value = Number(found[1])
-    if (Number.isFinite(value)) return value
-  }
-  return undefined
-}
 const sessionDurationMs = (row: SessionItem) => {
-  const directMs = numericRawValue(row.raw, ['duration_ms', 'elapsed_ms', 'time_ms'])
-  if (directMs !== undefined) return Math.round(directMs)
-  const durationUs = numericRawValue(row.raw, ['duration_us', 'elapsed_us', 'time_us'])
-  if (durationUs !== undefined) return Math.round(durationUs / 1000)
-  const elapsedSec = numericRawValue(row.raw, ['elapsed_sec', 'seconds', 'time_seconds', 'time', 'last_call_et', 'secs_running', 'elapsed'])
-  if (elapsedSec !== undefined) return Math.round(elapsedSec * 1000)
+  if (Number.isFinite(Number(row.duration_ms))) return Number(row.duration_ms)
   return Number(row.time_seconds || 0) * 1000
+}
+const hasDurationValue = (row: SessionItem) => {
+  if (sessionDurationMs(row) > 0) return true
+  if (!row.source?.startsWith('oracle_')) return true
+  const rawDuration = row.raw?.duration_ms
+  return rawDuration !== undefined && rawDuration !== null && rawDuration !== ''
 }
 const defaultHistoryFilters = () => {
   const range = defaultHistoryRange()
@@ -137,6 +127,7 @@ export default function DiagnosticPage() {
         date_start: params.date_start,
         date_end: params.date_end,
         sql_keyword: params.sql_keyword,
+        min_duration_ms: params.min_duration_ms,
         page: historyPage,
         page_size: historyPageSize,
       })
@@ -155,10 +146,10 @@ export default function DiagnosticPage() {
     { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
     {
       title: '耗时(ms)',
-      dataIndex: 'time_seconds',
+      dataIndex: 'duration_ms',
       width: 105,
       sorter: (a, b) => sessionDurationMs(a) - sessionDurationMs(b),
-      render: (_: number, row) => sessionDurationMs(row).toLocaleString(),
+      render: (_: number, row) => hasDurationValue(row) ? sessionDurationMs(row).toLocaleString() : '-',
     },
     { title: 'SQL ID', dataIndex: 'sql_id', width: 130, ellipsis: true },
     {
@@ -211,7 +202,7 @@ export default function DiagnosticPage() {
       username: values.username || undefined,
       db_name: values.db_name || undefined,
       sql_keyword: values.sql_keyword || undefined,
-      min_seconds: minDurationMs === undefined || minDurationMs === null ? undefined : Math.ceil(Number(minDurationMs) / 1000),
+      min_duration_ms: minDurationMs === undefined || minDurationMs === null ? undefined : Number(minDurationMs),
       date_start: range?.[0]?.toISOString(),
       date_end: range?.[1]?.toISOString(),
     })
@@ -239,11 +230,12 @@ export default function DiagnosticPage() {
   }
 
   const openConfigModal = (row?: SessionCollectConfigItem) => {
-    setEditingConfig(row || null)
+    const currentConfig = row || configQuery.data?.items.find(item => item.instance_id === instanceId)
+    setEditingConfig(currentConfig || null)
     configForm.setFieldsValue({
-      is_enabled: row?.is_enabled ?? true,
-      collect_interval: row?.collect_interval ?? 60,
-      retention_days: row?.retention_days ?? 30,
+      is_enabled: currentConfig?.is_enabled ?? true,
+      collect_interval: currentConfig?.collect_interval ?? 60,
+      retention_days: currentConfig?.retention_days ?? 30,
     })
     setConfigModalOpen(true)
   }
@@ -337,52 +329,59 @@ export default function DiagnosticPage() {
                 <FilterCard>
                   <Form
                     form={historyForm}
-                    layout="inline"
                     onFinish={applyHistoryFilters}
                     initialValues={{ range: defaultHistoryRange() }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      overflowX: 'auto',
+                      paddingBottom: 2,
+                      whiteSpace: 'nowrap',
+                    }}
                   >
-                    <Form.Item name="range">
+                    <Form.Item name="range" style={{ margin: 0, flex: '0 0 430px' }}>
                       <RangePicker
                         showTime
                         className="query-history-range-picker"
-                        style={{ width: 430, minWidth: 430 }}
+                        style={{ width: '100%' }}
                       />
                     </Form.Item>
-                    <Form.Item name="username">
-                      <Input placeholder="用户" allowClear style={{ width: 120 }} />
+                    <Form.Item name="username" style={{ margin: 0, flex: '0 0 120px' }}>
+                      <Input placeholder="用户" allowClear style={{ width: '100%' }} />
                     </Form.Item>
-                    <Form.Item name="db_name">
+                    <Form.Item name="db_name" style={{ margin: 0, flex: '0 0 160px' }}>
                       <Select
                         placeholder="库/Schema"
                         allowClear
                         showSearch
                         optionFilterProp="label"
                         disabled={!instanceId}
-                        style={{ width: 160 }}
+                        style={{ width: '100%' }}
                         options={(dbData?.databases || [])
                           .filter(db => db.is_active)
                           .map(db => ({ value: db.db_name, label: db.db_name }))}
                       />
                     </Form.Item>
-                    <Form.Item name="sql_keyword">
-                      <Input placeholder="SQL 关键字" allowClear style={{ width: 180 }} />
+                    <Form.Item name="sql_keyword" style={{ margin: 0, flex: '0 0 180px' }}>
+                      <Input placeholder="SQL 关键字" allowClear style={{ width: '100%' }} />
                     </Form.Item>
-                    <Form.Item name="min_duration_ms">
-                      <InputNumber placeholder="最小耗时(ms)" min={0} step={100} style={{ width: 140 }} />
+                    <Form.Item name="min_duration_ms" style={{ margin: 0, flex: '0 0 140px' }}>
+                      <InputNumber placeholder="最小耗时(ms)" min={0} step={100} style={{ width: '100%' }} />
                     </Form.Item>
                     {isOracle && instanceId && (
-                      <Form.Item>
-                        <Select value={historySource} onChange={setHistorySource} style={{ width: 140 }}>
+                      <Form.Item style={{ margin: 0, flex: '0 0 140px' }}>
+                        <Select value={historySource} onChange={setHistorySource} style={{ width: '100%' }}>
                           <Select.Option value="platform">平台采样</Select.Option>
                           <Select.Option value="ash">Oracle ASH</Select.Option>
                           <Select.Option value="awr">Oracle AWR</Select.Option>
                         </Select>
                       </Form.Item>
                     )}
-                    <Form.Item>
+                    <Form.Item style={{ margin: 0, flex: '0 0 auto' }}>
                       <Button type="primary" htmlType="submit">查询</Button>
                     </Form.Item>
-                    <Form.Item>
+                    <Form.Item style={{ margin: 0, flex: '0 0 auto' }}>
                       <Button onClick={resetHistoryFilters}>重置条件</Button>
                     </Form.Item>
                   </Form>
@@ -416,7 +415,12 @@ export default function DiagnosticPage() {
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <FilterCard>
                   <Space>
-                    <Button type="primary" disabled={!instanceId || !canKill} onClick={() => openConfigModal()}>
+                    <Button
+                      type="primary"
+                      disabled={!instanceId || !canKill}
+                      loading={configQuery.isLoading}
+                      onClick={() => openConfigModal()}
+                    >
                       为当前实例配置
                     </Button>
                     <Text type="secondary" style={{ fontSize: 12 }}>
@@ -453,7 +457,7 @@ export default function DiagnosticPage() {
       </Drawer>
 
       <Modal
-        title={editingConfig ? `编辑采集配置：${editingConfig.instance_name}` : '配置当前实例采集'}
+        title={`配置采集：${editingConfig?.instance_name || selectedInstance?.instance_name || '当前实例'}`}
         open={configModalOpen}
         onCancel={() => {
           setConfigModalOpen(false)

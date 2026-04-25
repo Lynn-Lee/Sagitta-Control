@@ -88,6 +88,7 @@ async def list_session_history(
     date_start: str | None = None,
     date_end: str | None = None,
     min_seconds: int | None = QParam(default=None, ge=0),
+    min_duration_ms: int | None = QParam(default=None, ge=0),
     page: int = QParam(default=1, ge=1),
     page_size: int = QParam(default=50, ge=1, le=200),
     user: dict = Depends(current_user),
@@ -103,6 +104,7 @@ async def list_session_history(
         date_start=_parse_dt(date_start),
         date_end=_parse_dt(date_end),
         min_seconds=min_seconds,
+        min_duration_ms=min_duration_ms,
         page=page,
         page_size=page_size,
     )
@@ -194,6 +196,7 @@ async def list_oracle_ash_history(
     date_start: str | None = None,
     date_end: str | None = None,
     sql_keyword: str | None = None,
+    min_duration_ms: int | None = QParam(default=None, ge=0),
     page: int = QParam(default=1, ge=1),
     page_size: int = QParam(default=50, ge=1, le=200),
     user: dict = Depends(current_user),
@@ -210,6 +213,7 @@ async def list_oracle_ash_history(
         date_start=_parse_dt(date_start),
         date_end=_parse_dt(date_end),
         sql_keyword=sql_keyword,
+        min_duration_ms=min_duration_ms,
         limit_num=page_size,
         offset=(page - 1) * page_size,
     )

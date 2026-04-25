@@ -13,6 +13,7 @@ export interface SessionItem {
   command: string
   state: string
   time_seconds: number
+  duration_ms: number
   sql_id: string
   sql_text: string
   event: string
@@ -71,6 +72,7 @@ export const diagnosticApi = {
     date_start?: string
     date_end?: string
     min_seconds?: number
+    min_duration_ms?: number
     page?: number
     page_size?: number
   }) =>
@@ -82,6 +84,7 @@ export const diagnosticApi = {
     date_start?: string
     date_end?: string
     sql_keyword?: string
+    min_duration_ms?: number
     page?: number
     page_size?: number
   }) =>

@@ -63,6 +63,33 @@ def _int(value: Any) -> int:
         return 0
 
 
+def _float(value: Any) -> float | None:
+    try:
+        if value in (None, ""):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _duration_ms(raw: dict[str, Any]) -> int:
+    direct_ms = _float(_pick(raw, "duration_ms", "elapsed_ms", "time_ms"))
+    if direct_ms is not None:
+        return max(0, int(round(direct_ms)))
+
+    duration_us = _float(_pick(raw, "duration_us", "elapsed_us", "time_us"))
+    if duration_us is not None:
+        return max(0, int(round(duration_us / 1000)))
+
+    elapsed_sec = _float(
+        _pick(raw, "elapsed_sec", "seconds", "time_seconds", "time", "last_call_et", "secs_running", "elapsed")
+    )
+    if elapsed_sec is not None:
+        return max(0, int(round(elapsed_sec * 1000)))
+
+    return 0
+
+
 def row_to_dict(columns: list[str], row: Any) -> dict[str, Any]:
     if isinstance(row, dict):
         return {str(k): v for k, v in row.items()}
@@ -108,7 +135,8 @@ def normalize_session_row(
     item.db_name = _string(_pick(raw, "db_name", "db", "datname", "schema", "ns"))
     item.command = _string(_pick(raw, "command", "cmd", "type"))
     item.state = _string(_pick(raw, "state", "status", "wait_class"))
-    item.time_seconds = _int(_pick(raw, "time_seconds", "seconds", "time", "last_call_et", "secs_running", "elapsed_sec", "elapsed"))
+    item.duration_ms = _duration_ms(raw)
+    item.time_seconds = item.duration_ms // 1000
     item.sql_id = _string(_pick(raw, "sql_id", "query_id"))
     item.sql_text = _string(_pick(raw, "sql_text", "sql_fulltext", "query", "info"))
     item.event = _string(_pick(raw, "event"))
@@ -318,6 +346,7 @@ class SessionDiagnosticService:
                     command=item.command,
                     state=item.state,
                     time_seconds=item.time_seconds,
+                    duration_ms=item.duration_ms,
                     sql_id=item.sql_id,
                     sql_text=item.sql_text,
                     event=item.event,
@@ -342,6 +371,7 @@ class SessionDiagnosticService:
         date_start: datetime | None = None,
         date_end: datetime | None = None,
         min_seconds: int | None = None,
+        min_duration_ms: int | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[int, list[SessionItem]]:
@@ -360,7 +390,9 @@ class SessionDiagnosticService:
             stmt = stmt.where(SessionSnapshot.collected_at >= date_start)
         if date_end:
             stmt = stmt.where(SessionSnapshot.collected_at <= date_end)
-        if min_seconds is not None:
+        if min_duration_ms is not None:
+            stmt = stmt.where(SessionSnapshot.duration_ms >= min_duration_ms)
+        elif min_seconds is not None:
             stmt = stmt.where(SessionSnapshot.time_seconds >= min_seconds)
 
         total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
@@ -386,6 +418,7 @@ class SessionDiagnosticService:
                 command=row.command,
                 state=row.state,
                 time_seconds=row.time_seconds,
+                duration_ms=row.duration_ms,
                 sql_id=row.sql_id,
                 sql_text=row.sql_text,
                 event=row.event,
