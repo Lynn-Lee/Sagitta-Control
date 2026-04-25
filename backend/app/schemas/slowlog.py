@@ -44,6 +44,29 @@ class SlowQueryTrendPoint(BaseModel):
     failed_count: int = 0
 
 
+class SlowQueryGroupStat(BaseModel):
+    group_key: str
+    group_name: str
+    instance_id: int | None = None
+    instance_name: str = ""
+    db_type: str = ""
+    db_name: str = ""
+    total: int = 0
+    fingerprint_count: int = 0
+    database_count: int = 0
+    failed_count: int = 0
+    avg_duration_ms: int = 0
+    p95_duration_ms: int = 0
+    max_duration_ms: int = 0
+    last_seen_at: datetime | None = None
+
+
+class SlowQueryGroupTrend(BaseModel):
+    group_key: str
+    group_name: str
+    points: list[SlowQueryTrendPoint] = Field(default_factory=list)
+
+
 class SlowQueryOverviewResponse(BaseModel):
     total: int = 0
     fingerprint_count: int = 0
@@ -56,6 +79,9 @@ class SlowQueryOverviewResponse(BaseModel):
     unsupported_msg: str = ""
     trends: list[SlowQueryTrendPoint] = Field(default_factory=list)
     source_distribution: list[SlowQueryDistributionItem] = Field(default_factory=list)
+    instance_stats: list[SlowQueryGroupStat] = Field(default_factory=list)
+    database_stats: list[SlowQueryGroupStat] = Field(default_factory=list)
+    group_trends: list[SlowQueryGroupTrend] = Field(default_factory=list)
 
 
 class SlowQueryFingerprintItem(BaseModel):

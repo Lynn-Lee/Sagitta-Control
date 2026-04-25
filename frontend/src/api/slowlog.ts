@@ -34,6 +34,29 @@ export interface SlowQueryTrendPoint {
   failed_count: number
 }
 
+export interface SlowQueryGroupStat {
+  group_key: string
+  group_name: string
+  instance_id?: number | null
+  instance_name: string
+  db_type: string
+  db_name: string
+  total: number
+  fingerprint_count: number
+  database_count: number
+  failed_count: number
+  avg_duration_ms: number
+  p95_duration_ms: number
+  max_duration_ms: number
+  last_seen_at?: string | null
+}
+
+export interface SlowQueryGroupTrend {
+  group_key: string
+  group_name: string
+  points: SlowQueryTrendPoint[]
+}
+
 export interface SlowQueryOverviewResponse {
   total: number
   fingerprint_count: number
@@ -46,6 +69,9 @@ export interface SlowQueryOverviewResponse {
   unsupported_msg: string
   trends: SlowQueryTrendPoint[]
   source_distribution: SlowQueryDistributionItem[]
+  instance_stats: SlowQueryGroupStat[]
+  database_stats: SlowQueryGroupStat[]
+  group_trends: SlowQueryGroupTrend[]
 }
 
 export interface SlowQueryFingerprintItem {

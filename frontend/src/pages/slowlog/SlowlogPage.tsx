@@ -16,6 +16,8 @@ import {
   type SlowQueryConfigItem,
   type SlowQueryExplainResponse,
   type SlowQueryFingerprintItem,
+  type SlowQueryGroupStat,
+  type SlowQueryGroupTrend,
   type SlowQueryLogItem,
   type SlowQueryParams,
 } from '@/api/slowlog'
@@ -55,6 +57,18 @@ const SEVERITY_COLOR: Record<string, string> = {
 const sourceLabel = (source: string) => SOURCE_OPTIONS.find(i => i.value === source)?.label || source
 const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD HH:mm:ss') : '—'
 const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
+const TREND_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
+
+function buildTrendRows(groups: SlowQueryGroupTrend[], metric: 'count' | 'avg_duration_ms') {
+  const buckets = Array.from(new Set(groups.flatMap(group => group.points.map(point => point.bucket)))).sort()
+  return buckets.map(bucket => {
+    const row: Record<string, string | number> = { bucket }
+    groups.forEach(group => {
+      row[group.group_key] = group.points.find(point => point.bucket === bucket)?.[metric] || 0
+    })
+    return row
+  })
+}
 
 export default function SlowlogPage() {
   const screens = useBreakpoint()
@@ -177,10 +191,10 @@ export default function SlowlogPage() {
   })
 
   const overview = overviewQuery.data
-  const detailData = detailQuery.data
-  const activeSql = sqlDetail?.sql_text || detailData?.fingerprint?.sample_sql || diagnosis?.sql || ''
-  const activeInstanceId = sqlDetail?.instance_id || instanceId
-  const activeDbName = sqlDetail?.db_name || detailData?.samples?.[0]?.db_name || dbName
+  const primaryStats = instanceId ? (overview?.database_stats || []) : (overview?.instance_stats || [])
+  const primaryStatsTitle = instanceId ? '数据库 / Schema 统计' : '实例统计'
+  const primaryStatsEmptyTitle = instanceId ? '暂无数据库 / Schema 统计' : '暂无实例统计'
+  const groupTrendTitle = instanceId ? '数据库 / Schema 趋势' : '实例趋势'
 
   const collectMut = useMutation<SlowQueryCollectResponse>({
     mutationFn: () => slowlogApi.collect({ instance_id: instanceId, limit: 100 }),
@@ -262,15 +276,6 @@ export default function SlowlogPage() {
     setPage(1)
   }
 
-  const openManualDiagnosisTab = () => {
-    manualForm.setFieldsValue({
-      instance_id: activeInstanceId,
-      db_name: activeDbName,
-      sql: activeSql || '',
-    })
-    setActiveTab('manual')
-  }
-
   const runManualDiagnosis = (values: any) => {
     manualDiagnoseMut.mutate({
       instance_id: values.instance_id,
@@ -281,14 +286,6 @@ export default function SlowlogPage() {
     setDetailFingerprint(null)
     setExplainResult(null)
     setDiagnosis(null)
-  }
-
-  const runActiveDiagnosis = () => {
-    if (!activeInstanceId || !activeSql.trim()) {
-      msgApi.warning('请选择实例和 SQL 后再诊断')
-      return
-    }
-    diagnoseMut.mutate({ instance_id: activeInstanceId, db_name: activeDbName || '', sql: activeSql })
   }
 
   const openLogDetail = (row: SlowQueryLogItem, withDiagnosis = false) => {
@@ -393,6 +390,53 @@ export default function SlowlogPage() {
           <Button size="small" icon={<EyeOutlined />} onClick={() => openLogDetail(row)} />
           <Button size="small" icon={<BulbOutlined />} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)} />
         </Space>
+      ),
+    },
+  ]
+
+  const groupStatColumns: ColumnsType<SlowQueryGroupStat> = [
+    {
+      title: instanceId ? '数据库 / Schema' : '实例',
+      key: 'target',
+      width: 240,
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Text strong ellipsis style={{ maxWidth: 210 }}>{row.group_name}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {instanceId ? (row.instance_name || '当前实例') : formatDbTypeLabel(row.db_type)}
+          </Text>
+        </Space>
+      ),
+    },
+    { title: '样本', dataIndex: 'total', width: 90, sorter: (a, b) => a.total - b.total },
+    { title: '指纹', dataIndex: 'fingerprint_count', width: 90, sorter: (a, b) => a.fingerprint_count - b.fingerprint_count },
+    ...(!instanceId ? [{ title: '库/Schema', dataIndex: 'database_count', width: 110, sorter: (a: SlowQueryGroupStat, b: SlowQueryGroupStat) => a.database_count - b.database_count }] : []),
+    { title: '平均耗时', dataIndex: 'avg_duration_ms', width: 120, render: formatMs, sorter: (a, b) => a.avg_duration_ms - b.avg_duration_ms },
+    { title: 'P95', dataIndex: 'p95_duration_ms', width: 110, render: formatMs, sorter: (a, b) => a.p95_duration_ms - b.p95_duration_ms },
+    { title: '最高耗时', dataIndex: 'max_duration_ms', width: 120, render: (v: number) => <Text type={v >= 10000 ? 'danger' : undefined}>{formatMs(v)}</Text>, sorter: (a, b) => a.max_duration_ms - b.max_duration_ms },
+    { title: '异常', dataIndex: 'failed_count', width: 90, sorter: (a, b) => a.failed_count - b.failed_count },
+    { title: '最近出现', dataIndex: 'last_seen_at', width: 150, render: formatTime },
+    {
+      title: '操作',
+      key: 'actions',
+      fixed: 'right',
+      width: 110,
+      render: (_, row) => (
+        <Button
+          size="small"
+          icon={<SearchOutlined />}
+          onClick={() => {
+            if (instanceId) {
+              setDbName(row.db_name || '')
+            } else if (row.instance_id) {
+              setInstanceId(row.instance_id)
+              setDbName('')
+            }
+            setPage(1)
+          }}
+        >
+          查看
+        </Button>
       ),
     },
   ]
@@ -532,6 +576,39 @@ export default function SlowlogPage() {
     },
   ]
 
+  const renderGroupTrend = (metric: 'count' | 'avg_duration_ms', title: string) => {
+    const trends = overview?.group_trends || []
+    const data = buildTrendRows(trends, metric)
+    return (
+      <Card title={title} loading={overviewQuery.isLoading}>
+        <div style={{ height: 240 }}>
+          {trends.length ? (
+            <ResponsiveContainer>
+              <LineChart data={data}>
+                <XAxis dataKey="bucket" tick={{ fontSize: 11 }} minTickGap={24} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <ChartTooltip />
+                {trends.map((group, idx) => (
+                  <Line
+                    key={group.group_key}
+                    type="monotone"
+                    dataKey={group.group_key}
+                    name={group.group_name}
+                    stroke={TREND_COLORS[idx % TREND_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <TableEmptyState title="暂无趋势数据" />
+          )}
+        </div>
+      </Card>
+    )
+  }
+
   const findingColumns: ColumnsType<OptimizeFinding> = [
     { title: '级别', dataIndex: 'severity', width: 92, render: (v: string) => <Tag color={SEVERITY_COLOR[v]}>{v?.toUpperCase()}</Tag> },
     { title: '问题', dataIndex: 'title', width: 170 },
@@ -619,11 +696,6 @@ export default function SlowlogPage() {
       <PageHeader
         title="SQL 分析"
         meta={`共 ${overview?.total ?? 0} 条 SQL 样本，${overview?.fingerprint_count ?? 0} 个指纹`}
-        actions={(
-          <Button icon={<BulbOutlined />} type="primary" onClick={openManualDiagnosisTab}>
-            手工诊断
-          </Button>
-        )}
       />
 
       <FilterCard marginBottom={16}>
@@ -697,7 +769,7 @@ export default function SlowlogPage() {
             label: '总览',
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: 12 }}>
                   <Card><Statistic title="SQL 样本" value={overview?.total || 0} /></Card>
                   <Card><Statistic title="SQL 指纹" value={overview?.fingerprint_count || 0} /></Card>
                   <Card><Statistic title="影响实例" value={overview?.instance_count || 0} /></Card>
@@ -705,30 +777,33 @@ export default function SlowlogPage() {
                   <Card><Statistic title="P95 耗时" value={overview?.p95_duration_ms || 0} suffix="ms" /></Card>
                   <Card><Statistic title="异常样本" value={overview?.failed_count || 0} /></Card>
                 </div>
-                <Card title="趋势" loading={overviewQuery.isLoading}>
-                  <div style={{ height: 260 }}>
-                    <ResponsiveContainer>
-                      <LineChart data={overview?.trends || []}>
-                        <XAxis dataKey="bucket" tick={{ fontSize: 11 }} minTickGap={24} />
-                        <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                        <ChartTooltip />
-                        <Line yAxisId="left" type="monotone" dataKey="count" name="数量" stroke="#1677ff" strokeWidth={2} dot={false} />
-                        <Line yAxisId="right" type="monotone" dataKey="avg_duration_ms" name="平均耗时(ms)" stroke="#fa8c16" strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                <Card title={primaryStatsTitle} styles={{ body: { padding: 0 } }}>
+                  <Table
+                    dataSource={primaryStats.map(row => ({ ...row, key: row.group_key }))}
+                    columns={groupStatColumns}
+                    loading={overviewQuery.isLoading || overviewQuery.isFetching}
+                    size="small"
+                    tableLayout="fixed"
+                    scroll={{ x: instanceId ? 1120 : 1230 }}
+                    pagination={false}
+                    locale={{ emptyText: <TableEmptyState title={primaryStatsEmptyTitle} /> }}
+                  />
                 </Card>
-                <Card title="来源分布">
-                  <Space wrap>
-                    {(overview?.source_distribution || []).map(item => (
-                      <Tag key={item.name} color={SOURCE_COLOR[item.name] || 'default'}>
-                        {sourceLabel(item.name)} {item.count}
-                      </Tag>
-                    ))}
-                    {!(overview?.source_distribution || []).length && <Text type="secondary">暂无来源数据</Text>}
-                  </Space>
-                </Card>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+                  {renderGroupTrend('count', `${groupTrendTitle}（数量）`)}
+                  {renderGroupTrend('avg_duration_ms', `${groupTrendTitle}（平均耗时）`)}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(280px, 0.8fr) minmax(360px, 1.2fr)', gap: 16 }}>
+                  <Card title="来源分布">
+                    <Space wrap>
+                      {(overview?.source_distribution || []).map(item => (
+                        <Tag key={item.name} color={SOURCE_COLOR[item.name] || 'default'}>
+                          {sourceLabel(item.name)} {item.count}
+                        </Tag>
+                      ))}
+                      {!(overview?.source_distribution || []).length && <Text type="secondary">暂无来源数据</Text>}
+                    </Space>
+                  </Card>
                 <Card title="最高耗时 SQL">
                   {overview?.slowest ? (
                     <Space direction="vertical" style={{ width: '100%' }}>
@@ -741,12 +816,13 @@ export default function SlowlogPage() {
                     </Space>
                   ) : <TableEmptyState title="暂无 SQL 样本" />}
                 </Card>
+                </div>
               </Space>
             ),
           },
           {
             key: 'logs',
-            label: 'SQL 样本',
+            label: 'SQL 样本（明细）',
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table
@@ -770,7 +846,7 @@ export default function SlowlogPage() {
           },
           {
             key: 'fingerprints',
-            label: 'SQL 指纹',
+            label: 'SQL 指纹（聚合）',
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table

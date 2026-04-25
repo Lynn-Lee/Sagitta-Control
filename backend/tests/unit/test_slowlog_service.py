@@ -92,6 +92,82 @@ def test_slow_query_config_allows_30_second_interval():
     assert updated.collect_interval == 30
 
 
+def test_slowlog_instance_and_database_stats_are_grouped():
+    rows = [
+        SimpleNamespace(
+            instance_id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            db_name="orders",
+            sql_fingerprint="fp-1",
+            duration_ms=40,
+            collect_error="",
+            occurred_at=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            instance_id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            db_name="crm",
+            sql_fingerprint="fp-2",
+            duration_ms=120,
+            collect_error="timeout",
+            occurred_at=datetime(2026, 4, 24, 9, 0, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            instance_id=2,
+            instance_name="pg-prod",
+            db_type="pgsql",
+            db_name="analytics",
+            sql_fingerprint="fp-3",
+            duration_ms=80,
+            collect_error="",
+            occurred_at=datetime(2026, 4, 24, 10, 0, tzinfo=UTC),
+        ),
+    ]
+
+    instance_stats = SlowLogService._instance_stats(rows)
+    database_stats = SlowLogService._database_stats(rows)
+
+    assert [item.group_name for item in instance_stats] == ["mysql-prod", "pg-prod"]
+    assert instance_stats[0].total == 2
+    assert instance_stats[0].database_count == 2
+    assert instance_stats[0].failed_count == 1
+    assert {item.group_name for item in database_stats} == {"orders", "crm", "analytics"}
+
+
+def test_slowlog_group_trends_follow_selected_grouping():
+    rows = [
+        SimpleNamespace(
+            instance_id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            db_name="orders",
+            sql_fingerprint="fp-1",
+            duration_ms=40,
+            collect_error="",
+            occurred_at=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            instance_id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            db_name="crm",
+            sql_fingerprint="fp-2",
+            duration_ms=120,
+            collect_error="",
+            occurred_at=datetime(2026, 4, 24, 8, 30, tzinfo=UTC),
+        ),
+    ]
+
+    instance_trends = SlowLogService._group_trends(rows, SlowLogService._instance_stats(rows))
+    database_trends = SlowLogService._group_trends(rows, SlowLogService._database_stats(rows), by_database=True)
+
+    assert instance_trends[0].group_name == "mysql-prod"
+    assert instance_trends[0].points[0].count == 2
+    assert {item.group_name for item in database_trends} == {"orders", "crm"}
+
+
 def test_analyze_plan_detects_mysql_full_scan_and_filesort():
     raw_plan = {
         "query_block": {

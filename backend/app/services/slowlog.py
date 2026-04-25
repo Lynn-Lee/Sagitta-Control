@@ -28,6 +28,8 @@ from app.schemas.slowlog import (
     SlowQueryExplainResponse,
     SlowQueryFingerprintDetailResponse,
     SlowQueryFingerprintItem,
+    SlowQueryGroupStat,
+    SlowQueryGroupTrend,
     SlowQueryOverviewResponse,
     SlowQueryRecommendation,
     SlowQueryTrendPoint,
@@ -512,6 +514,9 @@ class SlowLogService:
             for bucket, items in sorted(by_bucket.items())[-48:]
         ]
         slowest = max(rows, key=lambda r: _as_int(r.duration_ms))
+        instance_stats = SlowLogService._instance_stats(list(rows))
+        database_stats = SlowLogService._database_stats(list(rows)) if filters.get("instance_id") else []
+        grouped_basis = database_stats if filters.get("instance_id") else instance_stats
         return SlowQueryOverviewResponse(
             total=len(rows),
             fingerprint_count=fingerprint_count,
@@ -523,6 +528,13 @@ class SlowLogService:
             slowest=slowest,
             trends=trends,
             source_distribution=SlowLogService._distribution(list(rows), "source"),
+            instance_stats=instance_stats,
+            database_stats=database_stats,
+            group_trends=SlowLogService._group_trends(
+                list(rows),
+                grouped_basis,
+                by_database=bool(filters.get("instance_id")),
+            ),
         )
 
     @staticmethod
@@ -606,6 +618,110 @@ class SlowLogService:
             for name, items in grouped.items()
         ]
         return sorted(items, key=lambda item: item.count, reverse=True)[:10]
+
+    @staticmethod
+    def _group_stat(
+        key: str,
+        name: str,
+        rows: list[SlowQueryLog],
+        *,
+        instance_id: int | None = None,
+        instance_name: str = "",
+        db_type: str = "",
+        db_name: str = "",
+    ) -> SlowQueryGroupStat:
+        durations = sorted(_as_int(row.duration_ms) for row in rows)
+        p95_idx = min(len(durations) - 1, int(len(durations) * 0.95))
+        latest = max(rows, key=lambda row: row.occurred_at)
+        return SlowQueryGroupStat(
+            group_key=key,
+            group_name=name,
+            instance_id=instance_id,
+            instance_name=instance_name,
+            db_type=db_type,
+            db_name=db_name,
+            total=len(rows),
+            fingerprint_count=len({row.sql_fingerprint for row in rows}),
+            database_count=len({row.db_name for row in rows if row.db_name}),
+            failed_count=sum(1 for row in rows if row.collect_error),
+            avg_duration_ms=int(sum(durations) / len(durations)),
+            p95_duration_ms=durations[p95_idx],
+            max_duration_ms=durations[-1],
+            last_seen_at=latest.occurred_at,
+        )
+
+    @staticmethod
+    def _instance_stats(rows: list[SlowQueryLog]) -> list[SlowQueryGroupStat]:
+        grouped: dict[int, list[SlowQueryLog]] = defaultdict(list)
+        for row in rows:
+            if row.instance_id is not None:
+                grouped[row.instance_id].append(row)
+        stats: list[SlowQueryGroupStat] = []
+        for inst_id, inst_rows in grouped.items():
+            latest = max(inst_rows, key=lambda row: row.occurred_at)
+            name = latest.instance_name or f"#{inst_id}"
+            stats.append(SlowLogService._group_stat(
+                f"instance:{inst_id}",
+                name,
+                inst_rows,
+                instance_id=inst_id,
+                instance_name=name,
+                db_type=latest.db_type,
+            ))
+        return sorted(stats, key=lambda item: (item.total, item.max_duration_ms), reverse=True)
+
+    @staticmethod
+    def _database_stats(rows: list[SlowQueryLog]) -> list[SlowQueryGroupStat]:
+        grouped: dict[tuple[int | None, str], list[SlowQueryLog]] = defaultdict(list)
+        for row in rows:
+            grouped[(row.instance_id, row.db_name or "默认库")].append(row)
+        stats: list[SlowQueryGroupStat] = []
+        for (inst_id, db_name), db_rows in grouped.items():
+            latest = max(db_rows, key=lambda row: row.occurred_at)
+            inst_name = latest.instance_name or (f"#{inst_id}" if inst_id else "")
+            stats.append(SlowLogService._group_stat(
+                f"database:{inst_id or 0}:{db_name}",
+                db_name,
+                db_rows,
+                instance_id=inst_id,
+                instance_name=inst_name,
+                db_type=latest.db_type,
+                db_name=db_name,
+            ))
+        return sorted(stats, key=lambda item: (item.total, item.max_duration_ms), reverse=True)
+
+    @staticmethod
+    def _group_trends(rows: list[SlowQueryLog], stats: list[SlowQueryGroupStat], *, by_database: bool = False) -> list[SlowQueryGroupTrend]:
+        top_keys = {stat.group_key for stat in stats[:6]}
+        if not top_keys:
+            return []
+
+        grouped: dict[str, dict[str, list[SlowQueryLog]]] = defaultdict(lambda: defaultdict(list))
+        for row in rows:
+            if by_database:
+                key = f"database:{row.instance_id or 0}:{row.db_name or '默认库'}"
+            else:
+                if row.instance_id is None:
+                    continue
+                key = f"instance:{row.instance_id}"
+            if key not in top_keys:
+                continue
+            grouped[key][row.occurred_at.strftime("%Y-%m-%d %H:00")].append(row)
+
+        names = {stat.group_key: stat.group_name for stat in stats}
+        trends: list[SlowQueryGroupTrend] = []
+        for key in [stat.group_key for stat in stats[:6]]:
+            points = [
+                SlowQueryTrendPoint(
+                    bucket=bucket,
+                    count=len(items),
+                    avg_duration_ms=int(sum(_as_int(item.duration_ms) for item in items) / len(items)),
+                    failed_count=sum(1 for item in items if item.collect_error),
+                )
+                for bucket, items in sorted(grouped.get(key, {}).items())[-48:]
+            ]
+            trends.append(SlowQueryGroupTrend(group_key=key, group_name=names.get(key, key), points=points))
+        return trends
 
     @staticmethod
     async def fingerprint_detail(
