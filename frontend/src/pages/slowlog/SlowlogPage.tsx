@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
   Alert, Button, Card, DatePicker, Drawer, Form, Grid, Input, InputNumber, Modal, Select,
-  Space, Statistic, Switch, Table, Tabs, Tag, Typography, message,
+  Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CloudDownloadOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts'
 import { instanceApi } from '@/api/instance'
 import {
   slowlogApi,
@@ -152,9 +152,14 @@ export default function SlowlogPage() {
       if (data.errors?.length) {
         Modal.info({
           title: '采集提示',
+          width: 'min(680px, calc(100vw - 32px))',
           content: (
-            <Space direction="vertical">
-              {data.errors.slice(0, 8).map((item) => <Text key={item}>{item}</Text>)}
+            <Space direction="vertical" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+              {data.errors.slice(0, 8).map((item) => (
+                <Text key={item} style={{ whiteSpace: 'nowrap' }}>
+                  {item}
+                </Text>
+              ))}
             </Space>
           ),
         })
@@ -341,9 +346,11 @@ export default function SlowlogPage() {
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>{formatTime(row.last_collect_at)}</Text>
           {row.last_collect_error && (
-            <Text type="danger" ellipsis style={{ maxWidth: 230, fontSize: 12 }}>
-              {row.last_collect_error}
-            </Text>
+            <Tooltip title={row.last_collect_error}>
+              <Text type="danger" ellipsis style={{ width: 230, display: 'block', fontSize: 12 }}>
+                {row.last_collect_error}
+              </Text>
+            </Tooltip>
           )}
         </Space>
       ),
@@ -460,7 +467,7 @@ export default function SlowlogPage() {
                         <XAxis dataKey="bucket" tick={{ fontSize: 11 }} minTickGap={24} />
                         <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                        <Tooltip />
+                        <ChartTooltip />
                         <Line yAxisId="left" type="monotone" dataKey="count" name="数量" stroke="#1677ff" strokeWidth={2} dot={false} />
                         <Line yAxisId="right" type="monotone" dataKey="avg_duration_ms" name="平均耗时(ms)" stroke="#fa8c16" strokeWidth={2} dot={false} />
                       </LineChart>
@@ -646,7 +653,7 @@ export default function SlowlogPage() {
                   <LineChart data={detailQuery.data.trends}>
                     <XAxis dataKey="bucket" tick={{ fontSize: 11 }} minTickGap={24} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
+                    <ChartTooltip />
                     <Line type="monotone" dataKey="count" name="次数" stroke="#1677ff" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="avg_duration_ms" name="平均耗时(ms)" stroke="#fa8c16" strokeWidth={2} dot={false} />
                   </LineChart>

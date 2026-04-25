@@ -124,6 +124,26 @@ class TestPgsqlDataDictSql:
         assert "indexdef ILIKE" in captured["sql"]
         assert captured["args"] == ["public", "users"]
 
+    async def test_collect_slow_queries_supports_legacy_pg_stat_statements(self, monkeypatch):
+        engine = PgSQLEngine(instance=MockPgInstance())
+        calls: list[dict] = []
+
+        async def fake_raw_query(db_name, sql, args):
+            calls.append({"db_name": db_name, "sql": sql, "args": args})
+            if len(calls) == 1:
+                return ResultSet(rows=[("queryid",), ("query",), ("mean_time",), ("rows",), ("calls",)])
+            return ResultSet()
+
+        monkeypatch.setattr(engine, "_raw_query", fake_raw_query)
+
+        await engine.collect_slow_queries(limit=25)
+
+        assert "to_regclass('pg_stat_statements')" in calls[0]["sql"]
+        assert "round((mean_time)::numeric)::bigint AS duration_ms" in calls[1]["sql"]
+        assert "WHERE mean_time >= 1000" in calls[1]["sql"]
+        assert "mean_exec_time" not in calls[1]["sql"]
+        assert calls[1]["args"] == [25]
+
 
 class TestOracleDataDictSql:
     async def test_get_table_constraints_uses_all_constraints(self, monkeypatch):

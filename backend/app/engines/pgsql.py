@@ -418,18 +418,47 @@ class PgSQLEngine:
 
     async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
         """Collect PostgreSQL slow statement summaries from pg_stat_statements."""
-        sql = """
+        columns_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="""
+                SELECT attname
+                FROM pg_attribute
+                WHERE attrelid = to_regclass('pg_stat_statements')
+                  AND attnum > 0
+                  AND NOT attisdropped
+            """,
+            args=[],
+        )
+        if columns_rs.error:
+            return columns_rs
+
+        columns = {str(row[0]) for row in columns_rs.rows}
+        if not columns:
+            return ResultSet(error="pg_stat_statements extension is not available")
+
+        if "mean_exec_time" in columns:
+            duration_expr = "mean_exec_time"
+        elif "mean_time" in columns:
+            duration_expr = "mean_time"
+        elif "total_exec_time" in columns and "calls" in columns:
+            duration_expr = "total_exec_time / NULLIF(calls, 0)"
+        elif "total_time" in columns and "calls" in columns:
+            duration_expr = "total_time / NULLIF(calls, 0)"
+        else:
+            return ResultSet(error="pg_stat_statements does not expose execution time columns")
+
+        sql = f"""
             SELECT
               'pgsql_statements' AS source,
               queryid::text AS source_ref,
               current_database() AS db_name,
               query AS sql_text,
-              round(mean_exec_time::numeric)::bigint AS duration_ms,
+              round(({duration_expr})::numeric)::bigint AS duration_ms,
               rows AS rows_sent,
               calls
             FROM pg_stat_statements
-            WHERE mean_exec_time >= 1000
-            ORDER BY mean_exec_time DESC
+            WHERE {duration_expr} >= 1000
+            ORDER BY {duration_expr} DESC
             LIMIT $1
         """
         return await self._raw_query(db_name=self._db_name, sql=sql, args=[int(limit)])
