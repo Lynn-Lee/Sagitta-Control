@@ -202,8 +202,7 @@ const NAV_ITEMS: NavItem[] = [
     key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', permission: 'menu_ops',
     children: [
       { key: '/diagnostic', icon: <MenuIcon component={DiagnosticMenuSvg} label="会话管理" />, label: '会话管理' },
-      { key: '/slowlog', icon: <MenuIcon component={SlowlogMenuSvg} label="慢日志分析" />, label: '慢日志分析' },
-      { key: '/optimize', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 优化" />, label: 'SQL 优化' },
+      { key: '/sql-analysis', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 分析" />, label: 'SQL 分析' },
       { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档' },
       { key: '/binlog', icon: <MenuIcon component={BinlogMenuSvg} label="回滚辅助" />, label: '回滚辅助' },
     ],

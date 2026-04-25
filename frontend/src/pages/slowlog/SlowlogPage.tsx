@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
-  Alert, Button, Card, DatePicker, Drawer, Form, Grid, Input, InputNumber, Modal, Select,
+  Alert, Button, Card, DatePicker, Descriptions, Drawer, Form, Grid, Input, InputNumber, Modal, Progress, Select,
   Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CloudDownloadOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { BulbOutlined, CloudDownloadOutlined, CopyOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts'
 import { instanceApi } from '@/api/instance'
+import { optimizeApi, type OptimizeAnalyzeResponse, type OptimizeFinding, type OptimizeRecommendation } from '@/api/optimize'
 import {
   slowlogApi,
   type SlowQueryCollectResponse,
@@ -32,6 +33,7 @@ const SOURCE_OPTIONS = [
   { label: 'MySQL 原生', value: 'mysql_slowlog' },
   { label: 'PG 统计', value: 'pgsql_statements' },
   { label: 'Redis SLOWLOG', value: 'redis_slowlog' },
+  { label: '会话采样', value: 'session_history' },
 ]
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -39,6 +41,15 @@ const SOURCE_COLOR: Record<string, string> = {
   mysql_slowlog: 'orange',
   pgsql_statements: 'green',
   redis_slowlog: 'red',
+  session_history: 'purple',
+}
+
+const RISK_COLOR = (value: number) => value >= 70 ? 'red' : value >= 35 ? 'gold' : 'green'
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: 'error',
+  warning: 'warning',
+  info: 'processing',
+  ok: 'success',
 }
 
 const sourceLabel = (source: string) => SOURCE_OPTIONS.find(i => i.value === source)?.label || source
@@ -55,6 +66,8 @@ export default function SlowlogPage() {
   const [dbName, setDbName] = useState('')
   const [source, setSource] = useState<string | undefined>()
   const [sqlKeyword, setSqlKeyword] = useState('')
+  const [username, setUsername] = useState('')
+  const [tag, setTag] = useState<string | undefined>()
   const [minDurationMs, setMinDurationMs] = useState(1000)
   const [dateRange, setDateRange] = useState<[string, string] | null>([
     dayjs().subtract(24, 'hour').toISOString(),
@@ -63,6 +76,9 @@ export default function SlowlogPage() {
   const [sqlDetail, setSqlDetail] = useState<SlowQueryLogItem | null>(null)
   const [sampleFingerprint, setSampleFingerprint] = useState<string | null>(null)
   const [detailFingerprint, setDetailFingerprint] = useState<string | null>(null)
+  const [diagnosis, setDiagnosis] = useState<OptimizeAnalyzeResponse | null>(null)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualForm] = Form.useForm()
   const [configOpen, setConfigOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<SlowQueryConfigItem | null>(null)
   const [explainResult, setExplainResult] = useState<SlowQueryExplainResponse | null>(null)
@@ -89,10 +105,12 @@ export default function SlowlogPage() {
     db_name: dbName || undefined,
     source,
     sql_keyword: sqlKeyword || undefined,
+    username: username || undefined,
+    tag,
     min_duration_ms: minDurationMs,
     date_start: dateRange?.[0],
     date_end: dateRange?.[1],
-  }), [dateRange, dbName, instanceId, minDurationMs, source, sqlKeyword])
+  }), [dateRange, dbName, instanceId, minDurationMs, source, sqlKeyword, tag, username])
 
   const overviewQuery = useQuery({
     queryKey: ['slowlog-overview', baseParams],
@@ -183,14 +201,65 @@ export default function SlowlogPage() {
     onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '执行计划分析失败'),
   })
 
+  const diagnoseMut = useMutation<OptimizeAnalyzeResponse, any, { log_id?: number; fingerprint?: string; instance_id?: number; db_name?: string; sql?: string }>({
+    mutationFn: (data: { log_id?: number; fingerprint?: string; instance_id?: number; db_name?: string; sql?: string }) => optimizeApi.analyze(data),
+    onSuccess: (data) => {
+      setDiagnosis(data)
+      if (data.msg) msgApi.info(data.msg)
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || e.message || '诊断失败'),
+  })
+
   const resetFilters = () => {
     setInstanceId(undefined)
     setDbName('')
     setSource(undefined)
     setSqlKeyword('')
+    setUsername('')
+    setTag(undefined)
     setMinDurationMs(1000)
     setDateRange([dayjs().subtract(24, 'hour').toISOString(), dayjs().toISOString()])
     setPage(1)
+  }
+
+  const runManualDiagnosis = (values: any) => {
+    diagnoseMut.mutate({
+      instance_id: values.instance_id,
+      db_name: values.db_name || '',
+      sql: values.sql,
+    })
+    setManualOpen(false)
+    setSqlDetail(null)
+    setDetailFingerprint(null)
+    setExplainResult(null)
+  }
+
+  const runActiveDiagnosis = () => {
+    if (!activeInstanceId || !activeSql.trim()) {
+      msgApi.warning('请选择实例和 SQL 后再诊断')
+      return
+    }
+    diagnoseMut.mutate({ instance_id: activeInstanceId, db_name: activeDbName || '', sql: activeSql })
+  }
+
+  const openLogDetail = (row: SlowQueryLogItem, withDiagnosis = false) => {
+    setSqlDetail(row)
+    setDetailFingerprint(null)
+    setExplainResult(null)
+    setDiagnosis(null)
+    if (withDiagnosis) diagnoseMut.mutate({ log_id: row.id })
+  }
+
+  const openFingerprintDetail = (fingerprint: string, withDiagnosis = false, row?: SlowQueryFingerprintItem) => {
+    setDetailFingerprint(fingerprint)
+    setSqlDetail(null)
+    setExplainResult(null)
+    setDiagnosis(null)
+    if (withDiagnosis) diagnoseMut.mutate({ fingerprint, instance_id: instanceId })
+    if (row && !withDiagnosis) {
+      // Keep the drawer responsive while detail data loads.
+      setDetailFingerprint(row.sql_fingerprint)
+    }
   }
 
   const openConfig = (record: SlowQueryConfigItem) => {
@@ -272,8 +341,8 @@ export default function SlowlogPage() {
       width: 120,
       render: (_, row) => (
         <Space size={4}>
-          <Button size="small" icon={<EyeOutlined />} onClick={() => { setSqlDetail(row); setExplainResult(null) }} />
-          <Button size="small" icon={<LineChartOutlined />} loading={explainMut.isPending} onClick={() => { setSqlDetail(row); setExplainResult(null); explainMut.mutate(row.id) }} />
+          <Button size="small" icon={<EyeOutlined />} onClick={() => openLogDetail(row)} />
+          <Button size="small" icon={<BulbOutlined />} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)} />
         </Space>
       ),
     },
@@ -303,14 +372,15 @@ export default function SlowlogPage() {
     },
     { title: '最后出现', dataIndex: 'last_seen_at', width: 150, render: formatTime },
     {
-      title: '样例',
+      title: '操作',
       key: 'sample',
       fixed: 'right',
-      width: 112,
+      width: 140,
       render: (_, row) => (
         <Space size={4}>
           <Button size="small" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)} />
-          <Button size="small" icon={<EyeOutlined />} onClick={() => setDetailFingerprint(row.sql_fingerprint)} />
+          <Button size="small" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)} />
+          <Button size="small" icon={<BulbOutlined />} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)} />
         </Space>
       ),
     },
@@ -379,21 +449,142 @@ export default function SlowlogPage() {
 
   const realtimeItems = realtimeQuery.data?.items ?? []
   const realtimeKeys = realtimeItems.length ? Object.keys(realtimeItems[0]) : []
-  const realtimeColumns = realtimeKeys.map(k => ({
+  const getRealtimeSql = (row: any) => row.query || row.Query || row.Info || row.info || row.sql_text || row.SQL_TEXT || ''
+  const getRealtimeDb = (row: any) => row.db || row.DB || row.datname || row.db_name || row.DB_NAME || dbName
+  const realtimeColumns = [
+    ...realtimeKeys.map(k => ({
     title: k,
     dataIndex: k,
     key: k,
     ellipsis: true,
     width: k.toLowerCase().includes('query') || k.toLowerCase().includes('info') ? 420 : 140,
     render: (v: any) => v === null ? <Text type="secondary">NULL</Text> : String(v),
-  }))
+    })),
+    {
+      title: '操作',
+      key: 'actions',
+      fixed: 'right' as const,
+      width: 110,
+      render: (_: any, row: any) => (
+        <Button
+          size="small"
+          icon={<BulbOutlined />}
+          disabled={!instanceId || !getRealtimeSql(row)}
+          loading={diagnoseMut.isPending}
+          onClick={() => {
+            setSqlDetail(null)
+            setDetailFingerprint(null)
+            diagnoseMut.mutate({ instance_id: instanceId, db_name: getRealtimeDb(row), sql: getRealtimeSql(row) })
+          }}
+        >
+          诊断
+        </Button>
+      ),
+    },
+  ]
 
   const overview = overviewQuery.data
+  const detailData = detailQuery.data
+  const activeSql = sqlDetail?.sql_text || detailData?.fingerprint?.sample_sql || diagnosis?.sql || ''
+  const activeInstanceId = sqlDetail?.instance_id || instanceId
+  const activeDbName = sqlDetail?.db_name || detailData?.samples?.[0]?.db_name || dbName
+
+  const findingColumns: ColumnsType<OptimizeFinding> = [
+    { title: '级别', dataIndex: 'severity', width: 92, render: (v: string) => <Tag color={SEVERITY_COLOR[v]}>{v?.toUpperCase()}</Tag> },
+    { title: '问题', dataIndex: 'title', width: 170 },
+    { title: '说明', dataIndex: 'detail' },
+    { title: '证据', dataIndex: 'evidence', width: 180, ellipsis: true },
+  ]
+
+  const recColumns: ColumnsType<OptimizeRecommendation> = [
+    { title: '优先级', dataIndex: 'priority', width: 80 },
+    { title: '类型', dataIndex: 'type', width: 110, render: (v: string) => <Tag>{v}</Tag> },
+    { title: '建议', dataIndex: 'title', width: 180 },
+    { title: '操作', dataIndex: 'action' },
+    { title: '原因', dataIndex: 'reason' },
+  ]
+
+  const diagnosisPanel = diagnosis ? (
+    <Card size="small" title="诊断结果">
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        {!diagnosis.supported && <Alert type="info" showIcon message={diagnosis.msg || '当前引擎不进入 SQL 优化主链路'} />}
+        <Space align="start" size={16} wrap>
+          <Progress
+            type="dashboard"
+            percent={diagnosis.risk_score}
+            size={104}
+            strokeColor={RISK_COLOR(diagnosis.risk_score)}
+          />
+          <Space direction="vertical" style={{ maxWidth: 620 }}>
+            <Space wrap>
+              <Tag color="blue">{formatDbTypeLabel(diagnosis.engine)}</Tag>
+              <Tag>{diagnosis.support_level}</Tag>
+              <Tag>{diagnosis.source === 'manual' ? '手工 SQL' : diagnosis.source === 'fingerprint' ? 'SQL 指纹' : 'SQL 样本'}</Tag>
+            </Space>
+            <Text strong>{diagnosis.summary}</Text>
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => navigator.clipboard.writeText(diagnosis.sql).then(() => msgApi.success('SQL 已复制'))}
+            >
+              复制 SQL
+            </Button>
+          </Space>
+        </Space>
+        <Table<OptimizeFinding>
+          title={() => '关键问题'}
+          dataSource={(diagnosis.findings || []).map((item, i) => ({ ...item, key: `${item.code}-${i}` }))}
+          columns={findingColumns}
+          size="small"
+          tableLayout="fixed"
+          scroll={{ x: 760 }}
+          pagination={false}
+        />
+        <Table<OptimizeRecommendation>
+          title={() => '优化建议'}
+          dataSource={(diagnosis.recommendations || []).map((item, i) => ({ ...item, key: `${item.priority}-${i}` }))}
+          columns={recColumns}
+          size="small"
+          tableLayout="fixed"
+          scroll={{ x: 980 }}
+          pagination={false}
+        />
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }}>
+          <Descriptions.Item label="全表扫描">{diagnosis.plan?.summary?.full_scan ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="估算行数">{diagnosis.plan?.summary?.rows_estimate ?? 0}</Descriptions.Item>
+          <Descriptions.Item label="最大成本">{diagnosis.plan?.summary?.max_cost ?? 0}</Descriptions.Item>
+          <Descriptions.Item label="临时表">{diagnosis.plan?.summary?.temporary ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="涉及表" span={2}>
+            <Space wrap size={[4, 4]}>
+              {(diagnosis.metadata?.tables || []).map(table => <Tag key={table}>{table}</Tag>)}
+              {!(diagnosis.metadata?.tables || []).length && <Text type="secondary">未识别到表名</Text>}
+            </Space>
+          </Descriptions.Item>
+        </Descriptions>
+        {diagnosis.raw && (
+          <Paragraph code copyable style={{ whiteSpace: 'pre-wrap', maxHeight: 260, overflow: 'auto' }}>
+            {JSON.stringify(diagnosis.raw, null, 2)}
+          </Paragraph>
+        )}
+      </Space>
+    </Card>
+  ) : null
 
   return (
     <div>
       {msgCtx}
-      <PageHeader title="慢日志分析" meta={`共 ${overview?.total ?? 0} 条慢 SQL`} />
+      <PageHeader
+        title="SQL 分析"
+        meta={`共 ${overview?.total ?? 0} 条 SQL 样本，${overview?.fingerprint_count ?? 0} 个指纹`}
+        actions={(
+          <Button icon={<BulbOutlined />} type="primary" onClick={() => {
+            manualForm.setFieldsValue({ instance_id: instanceId, db_name: dbName, sql: activeSql || 'SELECT * FROM sql_users WHERE 1=1' })
+            setManualOpen(true)
+          }}>
+            手工诊断
+          </Button>
+        )}
+      />
 
       <FilterCard marginBottom={16}>
         <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
@@ -433,6 +624,21 @@ export default function SlowlogPage() {
           />
           <Select placeholder="来源" allowClear style={{ width: filterWidth(140) }} value={source} onChange={(v) => { setSource(v); setPage(1) }} options={SOURCE_OPTIONS} />
           <Input placeholder="SQL 关键字" allowClear style={{ width: filterWidth(180) }} value={sqlKeyword} onChange={(e) => { setSqlKeyword(e.target.value); setPage(1) }} />
+          <Input placeholder="用户" allowClear style={{ width: filterWidth(130) }} value={username} onChange={(e) => { setUsername(e.target.value); setPage(1) }} />
+          <Select
+            placeholder="标签"
+            allowClear
+            style={{ width: filterWidth(150) }}
+            value={tag}
+            onChange={(v) => { setTag(v); setPage(1) }}
+            options={[
+              { label: '大结果集', value: '大结果集' },
+              { label: '高耗时', value: '高耗时' },
+              { label: '高扫描', value: '高扫描' },
+              { label: 'SELECT *', value: 'SELECT *' },
+              { label: '前导通配符', value: '前导通配符' },
+            ]}
+          />
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
           <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
           <Button icon={<CloudDownloadOutlined />} type="primary" loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
@@ -442,7 +648,7 @@ export default function SlowlogPage() {
 
       {unsupportedNative && (
         <Card size="small" style={{ marginBottom: 16 }}>
-          <Text type="secondary">{formatDbTypeLabel(selectedInstance.db_type)} 当前仅支持平台查询历史分析，暂不支持原生慢日志采集。</Text>
+          <Text type="secondary">{formatDbTypeLabel(selectedInstance.db_type)} 当前仅支持平台查询历史和手工 SQL 诊断，暂不支持原生 SQL 采集。</Text>
         </Card>
       )}
 
@@ -454,11 +660,12 @@ export default function SlowlogPage() {
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 12 }}>
-                  <Card><Statistic title="慢 SQL" value={overview?.total || 0} /></Card>
+                  <Card><Statistic title="SQL 样本" value={overview?.total || 0} /></Card>
+                  <Card><Statistic title="SQL 指纹" value={overview?.fingerprint_count || 0} /></Card>
                   <Card><Statistic title="影响实例" value={overview?.instance_count || 0} /></Card>
                   <Card><Statistic title="平均耗时" value={overview?.avg_duration_ms || 0} suffix="ms" /></Card>
                   <Card><Statistic title="P95 耗时" value={overview?.p95_duration_ms || 0} suffix="ms" /></Card>
-                  <Card><Statistic title="最大耗时" value={overview?.max_duration_ms || 0} suffix="ms" /></Card>
+                  <Card><Statistic title="异常样本" value={overview?.failed_count || 0} /></Card>
                 </div>
                 <Card title="趋势" loading={overviewQuery.isLoading}>
                   <div style={{ height: 260 }}>
@@ -474,7 +681,17 @@ export default function SlowlogPage() {
                     </ResponsiveContainer>
                   </div>
                 </Card>
-                <Card title="最慢 SQL">
+                <Card title="来源分布">
+                  <Space wrap>
+                    {(overview?.source_distribution || []).map(item => (
+                      <Tag key={item.name} color={SOURCE_COLOR[item.name] || 'default'}>
+                        {sourceLabel(item.name)} {item.count}
+                      </Tag>
+                    ))}
+                    {!(overview?.source_distribution || []).length && <Text type="secondary">暂无来源数据</Text>}
+                  </Space>
+                </Card>
+                <Card title="最高耗时 SQL">
                   {overview?.slowest ? (
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <Space wrap>
@@ -484,14 +701,14 @@ export default function SlowlogPage() {
                       </Space>
                       <Paragraph code copyable ellipsis={{ rows: 3, expandable: true }}>{overview.slowest.sql_text}</Paragraph>
                     </Space>
-                  ) : <TableEmptyState title="暂无慢 SQL 数据" />}
+                  ) : <TableEmptyState title="暂无 SQL 样本" />}
                 </Card>
               </Space>
             ),
           },
           {
             key: 'logs',
-            label: '慢 SQL 明细',
+            label: 'SQL 样本',
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table
@@ -501,7 +718,7 @@ export default function SlowlogPage() {
                   size="small"
                   tableLayout="fixed"
                   scroll={{ x: 1450 }}
-                  locale={{ emptyText: <TableEmptyState title="暂无慢 SQL 数据" /> }}
+                  locale={{ emptyText: <TableEmptyState title="暂无 SQL 样本" /> }}
                   pagination={{
                     current: page,
                     pageSize: 50,
@@ -515,7 +732,7 @@ export default function SlowlogPage() {
           },
           {
             key: 'fingerprints',
-            label: '指纹聚合',
+            label: 'SQL 指纹',
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table
@@ -533,7 +750,7 @@ export default function SlowlogPage() {
           },
           {
             key: 'realtime',
-            label: '实时慢查询',
+            label: '实时 SQL',
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table
@@ -544,7 +761,7 @@ export default function SlowlogPage() {
                   tableLayout="fixed"
                   scroll={{ x: 'max-content' }}
                   pagination={{ pageSize: 50, showSizeChanger: false }}
-                  locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无实时慢查询' : '请先选择实例'} /> }}
+                  locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无实时 SQL' : '请先选择实例'} /> }}
                 />
               </Card>
             ),
@@ -574,7 +791,7 @@ export default function SlowlogPage() {
         title="SQL 详情"
         width={isMobile ? '100%' : 720}
         open={!!sqlDetail}
-        onClose={() => setSqlDetail(null)}
+        onClose={() => { setSqlDetail(null); setDiagnosis(null) }}
       >
         {sqlDetail && (
           <Space direction="vertical" style={{ width: '100%' }} size={12}>
@@ -586,6 +803,14 @@ export default function SlowlogPage() {
             </Space>
             <Space>
               <Button
+                type="primary"
+                icon={<BulbOutlined />}
+                loading={diagnoseMut.isPending}
+                onClick={() => diagnoseMut.mutate({ log_id: sqlDetail.id })}
+              >
+                优化诊断
+              </Button>
+              <Button
                 icon={<LineChartOutlined />}
                 loading={explainMut.isPending}
                 disabled={!['mysql', 'pgsql'].includes(sqlDetail.db_type)}
@@ -594,6 +819,7 @@ export default function SlowlogPage() {
                 执行计划
               </Button>
             </Space>
+            {diagnosisPanel}
             {explainResult && (
               <Card size="small" title="执行计划分析">
                 {!explainResult.supported && <Alert type="info" showIcon message={explainResult.msg || '当前引擎暂不支持执行计划分析'} />}
@@ -632,7 +858,7 @@ export default function SlowlogPage() {
         title="指纹详情"
         width={isMobile ? '100%' : 860}
         open={!!detailFingerprint}
-        onClose={() => setDetailFingerprint(null)}
+        onClose={() => { setDetailFingerprint(null); setDiagnosis(null) }}
       >
         {detailQuery.data && (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -645,8 +871,19 @@ export default function SlowlogPage() {
                   <Statistic title="最大耗时" value={detailQuery.data.fingerprint.max_duration_ms} suffix="ms" />
                 </Space>
                 <Paragraph code copyable ellipsis={{ rows: 3, expandable: true }}>{detailQuery.data.fingerprint.sample_sql}</Paragraph>
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<BulbOutlined />}
+                    loading={diagnoseMut.isPending}
+                    onClick={() => diagnoseMut.mutate({ fingerprint: detailQuery.data.fingerprint.sql_fingerprint, instance_id: instanceId })}
+                  >
+                    优化诊断
+                  </Button>
+                </Space>
               </Space>
             </Card>
+            {diagnosisPanel}
             <Card size="small" title="趋势">
               <div style={{ height: 220 }}>
                 <ResponsiveContainer>
@@ -695,6 +932,66 @@ export default function SlowlogPage() {
         )}
       </Drawer>
 
+      <Drawer
+        title="SQL 诊断"
+        width={isMobile ? '100%' : 860}
+        open={!!diagnosis && !sqlDetail && !detailFingerprint}
+        onClose={() => setDiagnosis(null)}
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Card size="small" title="SQL">
+            <Paragraph code copyable style={{ whiteSpace: 'pre-wrap' }}>{diagnosis?.sql}</Paragraph>
+          </Card>
+          {diagnosisPanel}
+        </Space>
+      </Drawer>
+
+      <Modal
+        title="手工 SQL 诊断"
+        width={820}
+        open={manualOpen}
+        onCancel={() => setManualOpen(false)}
+        onOk={() => manualForm.submit()}
+        confirmLoading={diagnoseMut.isPending}
+        destroyOnClose
+      >
+        <Form form={manualForm} layout="vertical" onFinish={runManualDiagnosis}>
+          <Space style={{ width: '100%' }} align="start" wrap>
+            <Form.Item name="instance_id" label="实例" rules={[{ required: true, message: '请选择实例' }]} style={{ minWidth: 260, flex: 1 }}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="选择实例"
+                onChange={() => manualForm.setFieldValue('db_name', '')}
+                options={(instanceData?.items || []).map(inst => ({ value: inst.id, label: inst.instance_name }))}
+              />
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.instance_id !== curr.instance_id}>
+              {({ getFieldValue }) => {
+                const selected = getFieldValue('instance_id')
+                return (
+                  <Form.Item name="db_name" label="数据库/Schema" style={{ minWidth: 220, flex: 1 }}>
+                    <Select
+                      allowClear
+                      showSearch
+                      disabled={!selected}
+                      optionFilterProp="label"
+                      placeholder="默认库"
+                      options={(selected === instanceId ? (dbData?.databases || []) : [])
+                        .filter(db => db.is_active)
+                        .map(db => ({ value: db.db_name, label: db.db_name }))}
+                    />
+                  </Form.Item>
+                )
+              }}
+            </Form.Item>
+          </Space>
+          <Form.Item name="sql" label="SQL" rules={[{ required: true, message: '请输入 SQL' }]}>
+            <Input.TextArea rows={8} style={{ fontFamily: '"JetBrains Mono", monospace' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       <Modal
         title={editingConfig ? `编辑采集配置：${editingConfig.instance_name || `#${editingConfig.instance_id}`}` : '编辑采集配置'}
         open={configOpen}
@@ -720,7 +1017,7 @@ export default function SlowlogPage() {
           <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item name="threshold_ms" label="慢 SQL 阈值（ms）" rules={[{ required: true }]}>
+          <Form.Item name="threshold_ms" label="SQL 耗时阈值（ms）" rules={[{ required: true }]}>
             <InputNumber min={0} max={3600000} step={500} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="collect_interval" label="采集间隔（秒）" rules={[{ required: true }]}>

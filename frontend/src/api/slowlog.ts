@@ -36,13 +36,16 @@ export interface SlowQueryTrendPoint {
 
 export interface SlowQueryOverviewResponse {
   total: number
+  fingerprint_count: number
   instance_count: number
+  failed_count: number
   avg_duration_ms: number
   p95_duration_ms: number
   max_duration_ms: number
   slowest?: SlowQueryLogItem | null
   unsupported_msg: string
   trends: SlowQueryTrendPoint[]
+  source_distribution: SlowQueryDistributionItem[]
 }
 
 export interface SlowQueryFingerprintItem {
@@ -127,6 +130,8 @@ export interface SlowQueryParams {
   db_name?: string
   source?: string
   sql_keyword?: string
+  username?: string
+  tag?: string
   min_duration_ms?: number
   date_start?: string
   date_end?: string
@@ -137,7 +142,7 @@ export interface SlowQueryParams {
 
 export const slowlogApi = {
   configs: () =>
-    apiClient.get<{ total: number; items: SlowQueryConfigItem[] }>('/slowlog/configs/').then(r => r.data),
+    apiClient.get<{ total: number; items: SlowQueryConfigItem[] }>('/sql-analysis/configs/').then(r => r.data),
 
   saveConfig: (data: {
     instance_id: number
@@ -146,32 +151,32 @@ export const slowlogApi = {
     collect_interval: number
     retention_days: number
     collect_limit: number
-  }) => apiClient.post('/slowlog/configs/', data).then(r => r.data),
+  }) => apiClient.post('/sql-analysis/configs/', data).then(r => r.data),
 
   updateConfig: (id: number, data: Partial<SlowQueryConfigItem>) =>
-    apiClient.put(`/slowlog/configs/${id}/`, data).then(r => r.data),
+    apiClient.put(`/sql-analysis/configs/${id}/`, data).then(r => r.data),
 
   overview: (params: SlowQueryParams) =>
-    apiClient.get<SlowQueryOverviewResponse>('/slowlog/overview/', { params }).then(r => r.data),
+    apiClient.get<SlowQueryOverviewResponse>('/sql-analysis/overview/', { params }).then(r => r.data),
 
   logs: (params: SlowQueryParams) =>
-    apiClient.get<SlowQueryLogListResponse>('/slowlog/logs/', { params }).then(r => r.data),
+    apiClient.get<SlowQueryLogListResponse>('/sql-analysis/logs/', { params }).then(r => r.data),
 
   fingerprints: (params: SlowQueryParams) =>
-    apiClient.get<SlowQueryFingerprintListResponse>('/slowlog/fingerprints/', { params }).then(r => r.data),
+    apiClient.get<SlowQueryFingerprintListResponse>('/sql-analysis/fingerprints/', { params }).then(r => r.data),
 
   samples: (fingerprint: string, limit = 20) =>
-    apiClient.get<{ items: SlowQueryLogItem[] }>(`/slowlog/fingerprints/${fingerprint}/samples/`, { params: { limit } }).then(r => r.data),
+    apiClient.get<{ items: SlowQueryLogItem[] }>(`/sql-analysis/fingerprints/${fingerprint}/samples/`, { params: { limit } }).then(r => r.data),
 
   fingerprintDetail: (fingerprint: string, params?: { date_start?: string; date_end?: string }) =>
-    apiClient.get<SlowQueryFingerprintDetailResponse>(`/slowlog/fingerprints/${fingerprint}/detail/`, { params }).then(r => r.data),
+    apiClient.get<SlowQueryFingerprintDetailResponse>(`/sql-analysis/fingerprints/${fingerprint}/detail/`, { params }).then(r => r.data),
 
   explain: (data: { log_id?: number; instance_id?: number; db_name?: string; sql?: string }) =>
-    apiClient.post<SlowQueryExplainResponse>('/slowlog/explain/', data).then(r => r.data),
+    apiClient.post<SlowQueryExplainResponse>('/sql-analysis/explain/', data).then(r => r.data),
 
   collect: (params: { instance_id?: number; limit?: number }) =>
-    apiClient.post<SlowQueryCollectResponse>('/slowlog/collect/', null, { params }).then(r => r.data),
+    apiClient.post<SlowQueryCollectResponse>('/sql-analysis/collect/', null, { params }).then(r => r.data),
 
   realtime: (params: { instance_id: number; db_name?: string; limit?: number; min_seconds?: number }) =>
-    apiClient.get('/slowlog/', { params }).then(r => r.data),
+    apiClient.get('/sql-analysis/', { params }).then(r => r.data),
 }

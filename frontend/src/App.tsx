@@ -20,8 +20,7 @@ const QueryPrivPage        = lazy(() => import('@/pages/query/QueryPrivPage'))
 const QueryHistoryPage     = lazy(() => import('@/pages/query/QueryHistoryPage'))
 const MonitorPage          = lazy(() => import('@/pages/monitor/MonitorPage'))
 const DiagnosticPage       = lazy(() => import('@/pages/diagnostic/DiagnosticPage'))
-const SlowlogPage          = lazy(() => import('@/pages/slowlog/SlowlogPage'))
-const OptimizePage         = lazy(() => import('@/pages/optimize/OptimizePage'))
+const SqlAnalysisPage      = lazy(() => import('@/pages/slowlog/SlowlogPage'))
 const DataDictPage         = lazy(() => import('@/pages/schema/DataDictPage'))
 const InstanceList         = lazy(() => import('@/pages/instance/InstanceList'))
 const UserManagement       = lazy(() => import('@/pages/system/UserManagement'))
@@ -64,11 +63,12 @@ export default function App() {
           <Route path="query/privileges"     element={<PermissionGuard permission="menu_query"><QueryPrivPage /></PermissionGuard>} />
           <Route path="query/history"        element={<PermissionGuard permission="menu_query"><QueryHistoryPage /></PermissionGuard>} />
           <Route path="monitor"              element={<PermissionGuard permission="menu_monitor"><MonitorPage /></PermissionGuard>} />
-          <Route path="slowlog"              element={<PermissionGuard permission="menu_ops"><SlowlogPage /></PermissionGuard>} />
+          <Route path="sql-analysis"         element={<PermissionGuard permission="menu_ops"><SqlAnalysisPage /></PermissionGuard>} />
+          <Route path="slowlog"              element={<Navigate to="/sql-analysis" replace />} />
           <Route path="diagnostic"           element={<PermissionGuard permission="menu_ops"><DiagnosticPage /></PermissionGuard>} />
           <Route path="archive"              element={<PermissionGuard permission="menu_ops"><ArchivePage /></PermissionGuard>} />
           <Route path="binlog"               element={<PermissionGuard permission="menu_ops"><BinlogPage /></PermissionGuard>} />
-          <Route path="optimize"             element={<PermissionGuard permission="menu_ops"><OptimizePage /></PermissionGuard>} />
+          <Route path="optimize"             element={<Navigate to="/sql-analysis" replace />} />
           <Route path="schema"               element={<PermissionGuard permission="menu_schema"><DataDictPage /></PermissionGuard>} />
           <Route path="instance"             element={<PermissionGuard permission="instance_manage"><InstanceList /></PermissionGuard>} />
           <Route path="system/users"         element={<PermissionGuard permission="menu_system"><UserManagement /></PermissionGuard>} />

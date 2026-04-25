@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, cast, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -289,6 +289,8 @@ class SlowLogService:
         instance_id: int | None = None,
         db_name: str | None = None,
         source: str | None = None,
+        username: str | None = None,
+        tag: str | None = None,
         sql_keyword: str | None = None,
         min_duration_ms: int = DEFAULT_SLOW_THRESHOLD_MS,
         date_start: datetime | None = None,
@@ -306,6 +308,10 @@ class SlowLogService:
             stmt = stmt.where(SlowQueryLog.db_name.ilike(f"%{db_name}%"))
         if source:
             stmt = stmt.where(SlowQueryLog.source == source)
+        if username:
+            stmt = stmt.where(SlowQueryLog.username.ilike(f"%{username}%"))
+        if tag:
+            stmt = stmt.where(cast(SlowQueryLog.analysis_tags, String).ilike(f"%{tag}%"))
         if sql_keyword:
             stmt = stmt.where(SlowQueryLog.sql_text.ilike(f"%{sql_keyword}%"))
         if min_duration_ms:
@@ -390,6 +396,8 @@ class SlowLogService:
         instance_id: int | None = None,
         db_name: str | None = None,
         source: str | None = None,
+        username: str | None = None,
+        tag: str | None = None,
         sql_keyword: str | None = None,
         min_duration_ms: int = DEFAULT_SLOW_THRESHOLD_MS,
         date_start: datetime | None = None,
@@ -404,6 +412,8 @@ class SlowLogService:
             instance_id=instance_id,
             db_name=db_name,
             source=source,
+            username=username,
+            tag=tag,
             sql_keyword=sql_keyword,
             min_duration_ms=min_duration_ms,
             date_start=date_start,
@@ -440,6 +450,8 @@ class SlowLogService:
         durations = sorted([_as_int(r.duration_ms) for r in rows])
         p95_idx = min(len(durations) - 1, int(len(durations) * 0.95))
         instance_count = len({r.instance_id for r in rows if r.instance_id is not None})
+        fingerprint_count = len({r.sql_fingerprint for r in rows})
+        failed_count = sum(1 for r in rows if r.collect_error)
         total_duration = sum(durations)
         by_bucket: dict[str, list[SlowQueryLog]] = defaultdict(list)
         for row in rows:
@@ -456,12 +468,15 @@ class SlowLogService:
         slowest = max(rows, key=lambda r: _as_int(r.duration_ms))
         return SlowQueryOverviewResponse(
             total=len(rows),
+            fingerprint_count=fingerprint_count,
             instance_count=instance_count,
+            failed_count=failed_count,
             avg_duration_ms=int(total_duration / len(rows)),
             p95_duration_ms=durations[p95_idx],
             max_duration_ms=durations[-1],
             slowest=slowest,
             trends=trends,
+            source_distribution=SlowLogService._distribution(list(rows), "source"),
         )
 
     @staticmethod

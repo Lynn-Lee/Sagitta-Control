@@ -1,4 +1,6 @@
-"""Slow query analysis schemas."""
+"""SQL analysis schemas backed by slow query samples."""
+
+from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -44,13 +46,16 @@ class SlowQueryTrendPoint(BaseModel):
 
 class SlowQueryOverviewResponse(BaseModel):
     total: int = 0
+    fingerprint_count: int = 0
     instance_count: int = 0
+    failed_count: int = 0
     avg_duration_ms: int = 0
     p95_duration_ms: int = 0
     max_duration_ms: int = 0
     slowest: SlowQueryLogItem | None = None
     unsupported_msg: str = ""
     trends: list[SlowQueryTrendPoint] = Field(default_factory=list)
+    source_distribution: list["SlowQueryDistributionItem"] = Field(default_factory=list)
 
 
 class SlowQueryFingerprintItem(BaseModel):

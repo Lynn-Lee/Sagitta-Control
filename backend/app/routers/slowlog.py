@@ -42,7 +42,7 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise HTTPException(422, "时间格式错误，请使用 ISO8601") from None
 
 
-@router.get("/configs/", response_model=SlowQueryConfigListResponse, summary="慢日志采集配置列表")
+@router.get("/configs/", response_model=SlowQueryConfigListResponse, summary="SQL 采集配置列表")
 async def list_slowlog_configs(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
@@ -51,17 +51,17 @@ async def list_slowlog_configs(
     return {"total": total, "items": items}
 
 
-@router.post("/configs/", summary="创建或更新慢日志采集配置", dependencies=[Depends(require_perm("menu_ops"))])
+@router.post("/configs/", summary="创建或更新 SQL 采集配置", dependencies=[Depends(require_perm("menu_ops"))])
 async def upsert_slowlog_config(
     data: SlowQueryConfigUpsert,
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     cfg = await SlowLogService.upsert_config(db, data, user)
-    return {"status": 0, "msg": "慢日志采集配置已保存", "data": {"id": cfg.id}}
+    return {"status": 0, "msg": "SQL 采集配置已保存", "data": {"id": cfg.id}}
 
 
-@router.put("/configs/{config_id}/", summary="更新慢日志采集配置", dependencies=[Depends(require_perm("menu_ops"))])
+@router.put("/configs/{config_id}/", summary="更新 SQL 采集配置", dependencies=[Depends(require_perm("menu_ops"))])
 async def update_slowlog_config(
     config_id: int,
     data: SlowQueryConfigUpdate,
@@ -69,14 +69,16 @@ async def update_slowlog_config(
     db: AsyncSession = Depends(get_db),
 ):
     cfg = await SlowLogService.update_config(db, config_id, data, user)
-    return {"status": 0, "msg": "慢日志采集配置已更新", "data": {"id": cfg.id}}
+    return {"status": 0, "msg": "SQL 采集配置已更新", "data": {"id": cfg.id}}
 
 
-@router.get("/logs/", response_model=SlowQueryLogListResponse, summary="慢 SQL 明细列表")
+@router.get("/logs/", response_model=SlowQueryLogListResponse, summary="SQL 样本列表")
 async def list_slow_logs(
     instance_id: int | None = None,
     db_name: str | None = None,
     source: str | None = None,
+    username: str | None = None,
+    tag: str | None = None,
     sql_keyword: str | None = None,
     min_duration_ms: int = QParam(DEFAULT_SLOW_THRESHOLD_MS, ge=0),
     date_start: str | None = None,
@@ -92,6 +94,8 @@ async def list_slow_logs(
         instance_id=instance_id,
         db_name=db_name,
         source=source,
+        username=username,
+        tag=tag,
         sql_keyword=sql_keyword,
         min_duration_ms=min_duration_ms,
         date_start=_parse_dt(date_start),
@@ -102,11 +106,13 @@ async def list_slow_logs(
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
-@router.get("/overview/", response_model=SlowQueryOverviewResponse, summary="慢 SQL 总览")
+@router.get("/overview/", response_model=SlowQueryOverviewResponse, summary="SQL 分析总览")
 async def slowlog_overview(
     instance_id: int | None = None,
     db_name: str | None = None,
     source: str | None = None,
+    username: str | None = None,
+    tag: str | None = None,
     sql_keyword: str | None = None,
     min_duration_ms: int = QParam(DEFAULT_SLOW_THRESHOLD_MS, ge=0),
     date_start: str | None = None,
@@ -120,6 +126,8 @@ async def slowlog_overview(
         instance_id=instance_id,
         db_name=db_name,
         source=source,
+        username=username,
+        tag=tag,
         sql_keyword=sql_keyword,
         min_duration_ms=min_duration_ms,
         date_start=_parse_dt(date_start),
@@ -127,11 +135,13 @@ async def slowlog_overview(
     )
 
 
-@router.get("/fingerprints/", response_model=SlowQueryFingerprintListResponse, summary="慢 SQL 指纹聚合")
+@router.get("/fingerprints/", response_model=SlowQueryFingerprintListResponse, summary="SQL 指纹聚合")
 async def slowlog_fingerprints(
     instance_id: int | None = None,
     db_name: str | None = None,
     source: str | None = None,
+    username: str | None = None,
+    tag: str | None = None,
     sql_keyword: str | None = None,
     min_duration_ms: int = QParam(DEFAULT_SLOW_THRESHOLD_MS, ge=0),
     date_start: str | None = None,
@@ -146,6 +156,8 @@ async def slowlog_fingerprints(
         instance_id=instance_id,
         db_name=db_name,
         source=source,
+        username=username,
+        tag=tag,
         sql_keyword=sql_keyword,
         min_duration_ms=min_duration_ms,
         date_start=_parse_dt(date_start),
@@ -155,7 +167,7 @@ async def slowlog_fingerprints(
     return {"total": len(items), "items": items}
 
 
-@router.get("/fingerprints/{fingerprint}/samples/", summary="慢 SQL 指纹样例")
+@router.get("/fingerprints/{fingerprint}/samples/", summary="SQL 指纹样例")
 async def slowlog_fingerprint_samples(
     fingerprint: str,
     limit: int = QParam(20, ge=1, le=100),
@@ -168,7 +180,7 @@ async def slowlog_fingerprint_samples(
 @router.get(
     "/fingerprints/{fingerprint}/detail/",
     response_model=SlowQueryFingerprintDetailResponse,
-    summary="慢 SQL 指纹详情",
+    summary="SQL 指纹详情",
 )
 async def slowlog_fingerprint_detail(
     fingerprint: str,
@@ -189,7 +201,7 @@ async def slowlog_fingerprint_detail(
 @router.post(
     "/explain/",
     response_model=SlowQueryExplainResponse,
-    summary="慢 SQL 执行计划分析",
+    summary="SQL 执行计划分析",
 )
 async def explain_slow_query(
     data: SlowQueryExplainRequest,
@@ -206,7 +218,7 @@ async def explain_slow_query(
     )
 
 
-@router.post("/collect/", response_model=SlowQueryCollectResponse, summary="手动触发慢日志采集")
+@router.post("/collect/", response_model=SlowQueryCollectResponse, summary="手动触发 SQL 采集")
 async def collect_slow_logs(
     instance_id: int | None = None,
     limit: int = QParam(100, ge=1, le=500),
@@ -262,7 +274,7 @@ async def collect_slow_logs(
     }
 
 
-@router.get("/", summary="实时慢查询列表")
+@router.get("/", summary="实时 SQL 列表")
 async def list_slow_queries(
     instance_id: int = QParam(...),
     db_name: str | None = None,
@@ -308,10 +320,10 @@ async def list_slow_queries(
                 if int((row.get("Time", row.get("TIME", 0)) if isinstance(row, dict) else 0) or 0) > min_seconds
             ][:limit]
     else:
-        return {"items": [], "total": 0, "msg": f"{inst.db_type} 暂不支持实时慢查询分析"}
+        return {"items": [], "total": 0, "msg": f"{inst.db_type} 暂不支持实时 SQL 分析"}
 
     if rs.error:
-        raise HTTPException(400, f"查询慢日志失败：{rs.error}")
+        raise HTTPException(400, f"查询实时 SQL 失败：{rs.error}")
     cols = rs.column_list or []
     return {
         "items": [dict(zip(cols, r, strict=False)) if isinstance(r, tuple) else r for r in rs.rows],
