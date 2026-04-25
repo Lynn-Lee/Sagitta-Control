@@ -445,9 +445,27 @@ export default function SlowlogPage() {
     {
       title: 'SQL 指纹',
       dataIndex: 'fingerprint_text',
-      width: 420,
+      width: 360,
       ellipsis: true,
       render: (v: string) => <Text code>{v}</Text>,
+    },
+    {
+      title: '实例 / 数据库',
+      key: 'target',
+      width: 240,
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Text strong ellipsis style={{ maxWidth: 210 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}
+          </Text>
+          {(row.instance_count > 1 || row.database_count > 1) && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              覆盖 {row.instance_count || 0} 实例 / {row.database_count || 0} 库
+            </Text>
+          )}
+        </Space>
+      ),
     },
     { title: '次数', dataIndex: 'count', width: 80, sorter: (a, b) => a.count - b.count },
     { title: '平均耗时', dataIndex: 'avg_duration_ms', width: 110, render: formatMs, sorter: (a, b) => a.avg_duration_ms - b.avg_duration_ms },
@@ -855,7 +873,7 @@ export default function SlowlogPage() {
                   loading={fingerprintQuery.isLoading || fingerprintQuery.isFetching}
                   size="small"
                   tableLayout="fixed"
-                  scroll={{ x: 1250 }}
+                  scroll={{ x: 1490 }}
                   pagination={false}
                   locale={{ emptyText: <TableEmptyState title="暂无指纹聚合数据" /> }}
                 />

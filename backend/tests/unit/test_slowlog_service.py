@@ -168,6 +168,47 @@ def test_slowlog_group_trends_follow_selected_grouping():
     assert {item.group_name for item in database_trends} == {"orders", "crm"}
 
 
+def test_slowlog_fingerprint_item_includes_target_scope():
+    rows = [
+        SimpleNamespace(
+            instance_id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            db_name="orders",
+            sql_text="select * from orders where id = ?",
+            fingerprint_text="select * from orders where id = ?",
+            sql_fingerprint="fp-1",
+            duration_ms=40,
+            rows_examined=10,
+            rows_sent=1,
+            analysis_tags=[],
+            occurred_at=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            instance_id=2,
+            instance_name="pg-prod",
+            db_type="pgsql",
+            db_name="orders",
+            sql_text="select * from orders where id = ?",
+            fingerprint_text="select * from orders where id = ?",
+            sql_fingerprint="fp-1",
+            duration_ms=80,
+            rows_examined=20,
+            rows_sent=1,
+            analysis_tags=[],
+            occurred_at=datetime(2026, 4, 24, 9, 0, tzinfo=UTC),
+        ),
+    ]
+
+    item = SlowLogService._fingerprint_from_rows("fp-1", rows)
+
+    assert item.instance_id == 2
+    assert item.instance_name == "pg-prod"
+    assert item.db_name == "orders"
+    assert item.instance_count == 2
+    assert item.database_count == 2
+
+
 def test_analyze_plan_detects_mysql_full_scan_and_filesort():
     raw_plan = {
         "query_block": {

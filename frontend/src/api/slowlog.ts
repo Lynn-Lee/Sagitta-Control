@@ -78,6 +78,12 @@ export interface SlowQueryFingerprintItem {
   sql_fingerprint: string
   fingerprint_text: string
   sample_sql: string
+  instance_id?: number | null
+  instance_name: string
+  db_type: string
+  db_name: string
+  instance_count: number
+  database_count: number
   count: number
   avg_duration_ms: number
   max_duration_ms: number

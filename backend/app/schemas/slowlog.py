@@ -88,6 +88,12 @@ class SlowQueryFingerprintItem(BaseModel):
     sql_fingerprint: str
     fingerprint_text: str
     sample_sql: str
+    instance_id: int | None = None
+    instance_name: str = ""
+    db_type: str = ""
+    db_name: str = ""
+    instance_count: int = 0
+    database_count: int = 0
     count: int
     avg_duration_ms: int
     max_duration_ms: int
