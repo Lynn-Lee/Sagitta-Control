@@ -390,6 +390,7 @@ class PgSQLEngine:
     async def processlist(self, command_type: str = "Query", **kwargs: Any) -> ResultSet:
         sql = """SELECT pid, usename, datname, state,
                         extract(epoch from (now()-query_start))::int AS seconds,
+                        round(extract(epoch from (now()-query_start)) * 1000)::bigint AS duration_ms,
                         query
                  FROM pg_stat_activity
                  WHERE state != 'idle' AND pid != pg_backend_pid()

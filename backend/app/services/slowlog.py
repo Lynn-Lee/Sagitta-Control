@@ -148,22 +148,25 @@ def build_recommendations(
 class SlowLogService:
     @staticmethod
     async def list_configs(db: AsyncSession, user: dict) -> tuple[int, list[SlowQueryConfigItem]]:
-        instance_ids = await SlowLogService.scoped_instance_ids(db, user)
-        stmt = select(SlowQueryConfig, Instance.instance_name, Instance.db_type).join(
-            Instance, SlowQueryConfig.instance_id == Instance.id
+        result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.is_active.is_(True))
+            .order_by(Instance.id.desc())
         )
-        if instance_ids is not None:
-            if not instance_ids:
-                stmt = stmt.where(SlowQueryConfig.instance_id == -1)
-            else:
-                stmt = stmt.where(SlowQueryConfig.instance_id.in_(instance_ids))
-        rows = (await db.execute(stmt.order_by(SlowQueryConfig.id.desc()))).all()
-        items = [
-            SlowQueryConfigItem(
+        instances = [
+            instance
+            for instance in result.scalars().all()
+            if SlowLogService.can_access_instance(user, instance)
+        ]
+        items: list[SlowQueryConfigItem] = []
+        for instance in instances:
+            cfg = await SlowLogService.ensure_default_config(db, instance, user)
+            items.append(SlowQueryConfigItem(
                 id=cfg.id,
                 instance_id=cfg.instance_id,
-                instance_name=instance_name,
-                db_type=db_type,
+                instance_name=instance.instance_name,
+                db_type=instance.db_type,
                 is_enabled=cfg.is_enabled,
                 threshold_ms=cfg.threshold_ms,
                 collect_interval=cfg.collect_interval,
@@ -174,9 +177,7 @@ class SlowLogService:
                 last_collect_error=cfg.last_collect_error,
                 last_collect_count=cfg.last_collect_count,
                 created_by=cfg.created_by,
-            )
-            for cfg, instance_name, db_type in rows
-        ]
+            ))
         return len(items), items
 
     @staticmethod
@@ -321,13 +322,14 @@ class SlowLogService:
         *,
         threshold_ms: int = DEFAULT_SLOW_THRESHOLD_MS,
         since: datetime | None = None,
+        instance_id: int | None = None,
     ) -> int:
         since = since or datetime.now(UTC) - timedelta(days=7)
+        stmt = select(QueryLog).where(QueryLog.cost_time_ms >= threshold_ms, QueryLog.created_at >= since)
+        if instance_id is not None:
+            stmt = stmt.where(QueryLog.instance_id == instance_id)
         result = await db.execute(
-            select(QueryLog)
-            .where(QueryLog.cost_time_ms >= threshold_ms, QueryLog.created_at >= since)
-            .order_by(QueryLog.created_at.desc())
-            .limit(1000)
+            stmt.order_by(QueryLog.created_at.desc()).limit(1000)
         )
         logs = result.scalars().all()
         saved = 0

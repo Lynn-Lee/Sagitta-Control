@@ -18,16 +18,45 @@ const { RangePicker } = DatePicker
 type HistorySource = 'platform' | 'ash' | 'awr'
 
 const renderDate = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+const defaultHistoryRange = () => [dayjs().subtract(24, 'hour'), dayjs()] as [Dayjs, Dayjs]
+const numericRawValue = (raw: Record<string, unknown> | undefined, keys: string[]) => {
+  if (!raw) return undefined
+  const entries = Object.entries(raw)
+  for (const key of keys) {
+    const found = entries.find(([rawKey]) => rawKey.toLowerCase() === key)
+    if (!found) continue
+    const value = Number(found[1])
+    if (Number.isFinite(value)) return value
+  }
+  return undefined
+}
+const sessionDurationMs = (row: SessionItem) => {
+  const directMs = numericRawValue(row.raw, ['duration_ms', 'elapsed_ms', 'time_ms'])
+  if (directMs !== undefined) return Math.round(directMs)
+  const durationUs = numericRawValue(row.raw, ['duration_us', 'elapsed_us', 'time_us'])
+  if (durationUs !== undefined) return Math.round(durationUs / 1000)
+  const elapsedSec = numericRawValue(row.raw, ['elapsed_sec', 'seconds', 'time_seconds', 'time', 'last_call_et', 'secs_running', 'elapsed'])
+  if (elapsedSec !== undefined) return Math.round(elapsedSec * 1000)
+  return Number(row.time_seconds || 0) * 1000
+}
+const defaultHistoryFilters = () => {
+  const range = defaultHistoryRange()
+  return {
+    date_start: range[0].toISOString(),
+    date_end: range[1].toISOString(),
+  }
+}
 
 export default function DiagnosticPage() {
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [historySource, setHistorySource] = useState<HistorySource>('platform')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(50)
-  const [historyFilters, setHistoryFilters] = useState<any>({})
+  const [historyFilters, setHistoryFilters] = useState<any>(() => defaultHistoryFilters())
   const [sqlDetail, setSqlDetail] = useState<SessionItem | null>(null)
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<SessionCollectConfigItem | null>(null)
+  const [historyForm] = Form.useForm()
   const [configForm] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
   const qc = useQueryClient()
@@ -37,6 +66,12 @@ export default function DiagnosticPage() {
   const { data: instanceData } = useQuery({
     queryKey: ['instances-for-diag'],
     queryFn: () => instanceApi.list({ page_size: 200 }),
+  })
+
+  const { data: dbData } = useQuery({
+    queryKey: ['diag-instance-databases', instanceId],
+    queryFn: () => instanceApi.getDatabases(instanceId!),
+    enabled: !!instanceId,
   })
 
   const selectedInstance = useMemo(
@@ -118,7 +153,13 @@ export default function DiagnosticPage() {
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
     { title: '命令', dataIndex: 'command', width: 100, render: (v) => v ? <Tag>{v}</Tag> : '-' },
     { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
-    { title: '耗时(s)', dataIndex: 'time_seconds', width: 95, sorter: (a, b) => a.time_seconds - b.time_seconds },
+    {
+      title: '耗时(ms)',
+      dataIndex: 'time_seconds',
+      width: 105,
+      sorter: (a, b) => sessionDurationMs(a) - sessionDurationMs(b),
+      render: (_: number, row) => sessionDurationMs(row).toLocaleString(),
+    },
     { title: 'SQL ID', dataIndex: 'sql_id', width: 130, ellipsis: true },
     {
       title: 'SQL',
@@ -164,14 +205,31 @@ export default function DiagnosticPage() {
 
   const applyHistoryFilters = (values: any) => {
     const range = values.range as [Dayjs, Dayjs] | undefined
+    const minDurationMs = values.min_duration_ms
     setHistoryPage(1)
     setHistoryFilters({
       username: values.username || undefined,
       db_name: values.db_name || undefined,
       sql_keyword: values.sql_keyword || undefined,
-      min_seconds: values.min_seconds,
+      min_seconds: minDurationMs === undefined || minDurationMs === null ? undefined : Math.ceil(Number(minDurationMs) / 1000),
       date_start: range?.[0]?.toISOString(),
       date_end: range?.[1]?.toISOString(),
+    })
+  }
+
+  const resetHistoryFilters = () => {
+    const range = defaultHistoryRange()
+    historyForm.setFieldsValue({
+      range,
+      username: undefined,
+      db_name: undefined,
+      sql_keyword: undefined,
+      min_duration_ms: undefined,
+    })
+    setHistoryPage(1)
+    setHistoryFilters({
+      date_start: range[0].toISOString(),
+      date_end: range[1].toISOString(),
     })
   }
 
@@ -230,6 +288,9 @@ export default function DiagnosticPage() {
             onChange={(value) => {
               setInstanceId(value)
               setHistorySource('platform')
+              historyForm.setFieldValue('db_name', undefined)
+              setHistoryFilters((prev: any) => ({ ...prev, db_name: undefined }))
+              setHistoryPage(1)
             }}
             showSearch
             optionFilterProp="label"
@@ -274,7 +335,12 @@ export default function DiagnosticPage() {
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <FilterCard>
-                  <Form layout="inline" onFinish={applyHistoryFilters}>
+                  <Form
+                    form={historyForm}
+                    layout="inline"
+                    onFinish={applyHistoryFilters}
+                    initialValues={{ range: defaultHistoryRange() }}
+                  >
                     <Form.Item name="range">
                       <RangePicker
                         showTime
@@ -286,13 +352,23 @@ export default function DiagnosticPage() {
                       <Input placeholder="用户" allowClear style={{ width: 120 }} />
                     </Form.Item>
                     <Form.Item name="db_name">
-                      <Input placeholder="库/Schema" allowClear style={{ width: 130 }} />
+                      <Select
+                        placeholder="库/Schema"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        disabled={!instanceId}
+                        style={{ width: 160 }}
+                        options={(dbData?.databases || [])
+                          .filter(db => db.is_active)
+                          .map(db => ({ value: db.db_name, label: db.db_name }))}
+                      />
                     </Form.Item>
                     <Form.Item name="sql_keyword">
                       <Input placeholder="SQL 关键字" allowClear style={{ width: 180 }} />
                     </Form.Item>
-                    <Form.Item name="min_seconds">
-                      <InputNumber placeholder="最小耗时(s)" min={0} style={{ width: 130 }} />
+                    <Form.Item name="min_duration_ms">
+                      <InputNumber placeholder="最小耗时(ms)" min={0} step={100} style={{ width: 140 }} />
                     </Form.Item>
                     {isOracle && instanceId && (
                       <Form.Item>
@@ -305,6 +381,9 @@ export default function DiagnosticPage() {
                     )}
                     <Form.Item>
                       <Button type="primary" htmlType="submit">查询</Button>
+                    </Form.Item>
+                    <Form.Item>
+                      <Button onClick={resetHistoryFilters}>重置条件</Button>
                     </Form.Item>
                   </Form>
                 </FilterCard>

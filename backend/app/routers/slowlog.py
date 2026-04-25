@@ -214,7 +214,7 @@ async def collect_slow_logs(
     db: AsyncSession = Depends(get_db),
 ):
     since = datetime.now(UTC) - timedelta(days=1)
-    saved = await SlowLogService.sync_platform_logs(db, threshold_ms=DEFAULT_SLOW_THRESHOLD_MS, since=since)
+    saved = 0
     failed = 0
     unsupported = 0
     errors: list[str] = []
@@ -232,6 +232,13 @@ async def collect_slow_logs(
     for inst in instances:
         try:
             cfg = await SlowLogService.ensure_default_config(db, inst, user)
+            if cfg.is_enabled:
+                saved += await SlowLogService.sync_platform_logs(
+                    db,
+                    threshold_ms=cfg.threshold_ms,
+                    since=since,
+                    instance_id=inst.id,
+                )
             count, err = await SlowLogService.collect_instance(db, inst, limit=limit, since=since, config=cfg)
             saved += count
             if err:

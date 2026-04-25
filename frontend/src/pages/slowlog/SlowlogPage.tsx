@@ -64,6 +64,7 @@ export default function SlowlogPage() {
   const [sampleFingerprint, setSampleFingerprint] = useState<string | null>(null)
   const [detailFingerprint, setDetailFingerprint] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
+  const [editingConfig, setEditingConfig] = useState<SlowQueryConfigItem | null>(null)
   const [explainResult, setExplainResult] = useState<SlowQueryExplainResponse | null>(null)
   const [configForm] = Form.useForm()
 
@@ -72,6 +73,12 @@ export default function SlowlogPage() {
   const { data: instanceData } = useQuery({
     queryKey: ['slowlog-instances'],
     queryFn: () => instanceApi.list({ page_size: 200 }),
+  })
+
+  const { data: dbData } = useQuery({
+    queryKey: ['slowlog-instance-databases', instanceId],
+    queryFn: () => instanceApi.getDatabases(instanceId!),
+    enabled: !!instanceId,
   })
 
   const selectedInstance = instanceData?.items?.find(i => i.id === instanceId)
@@ -131,10 +138,17 @@ export default function SlowlogPage() {
   const collectMut = useMutation<SlowQueryCollectResponse>({
     mutationFn: () => slowlogApi.collect({ instance_id: instanceId, limit: 100 }),
     onSuccess: (data) => {
-      msgApi.success(`采集完成，新增 ${data.saved} 条`)
+      msgApi.success(`采集完成：新增 ${data.saved} 条，失败 ${data.failed}，不支持 ${data.unsupported}`)
       queryClient.invalidateQueries({ queryKey: ['slowlog-overview'] })
       queryClient.invalidateQueries({ queryKey: ['slowlog-logs'] })
       queryClient.invalidateQueries({ queryKey: ['slowlog-fingerprints'] })
+      queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
+      if (data.saved === 0) {
+        Modal.info({
+          title: '本次没有新增慢 SQL',
+          content: '请检查实例采集配置里的慢 SQL 阈值、最近 1 天时间范围、数据库原生慢日志能力，以及平台查询历史中是否存在符合条件的记录。',
+        })
+      }
       if (data.errors?.length) {
         Modal.info({
           title: '采集提示',
@@ -147,16 +161,6 @@ export default function SlowlogPage() {
       }
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '采集失败'),
-  })
-
-  const configMut = useMutation({
-    mutationFn: (values: any) => slowlogApi.saveConfig(values),
-    onSuccess: () => {
-      msgApi.success('慢日志采集配置已保存')
-      setConfigOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '保存失败'),
   })
 
   const configUpdateMut = useMutation({
@@ -184,20 +188,22 @@ export default function SlowlogPage() {
     setPage(1)
   }
 
-  const openConfig = (record?: SlowQueryConfigItem) => {
-    if (record) {
-      configForm.setFieldsValue(record)
-    } else {
-      configForm.setFieldsValue({
-        instance_id: instanceId,
-        is_enabled: true,
-        threshold_ms: minDurationMs,
-        collect_interval: 300,
-        retention_days: 30,
-        collect_limit: 100,
-      })
-    }
+  const openConfig = (record: SlowQueryConfigItem) => {
+    setEditingConfig(record)
+    configForm.setFieldsValue({
+      is_enabled: record.is_enabled,
+      threshold_ms: record.threshold_ms,
+      collect_interval: record.collect_interval,
+      retention_days: record.retention_days,
+      collect_limit: record.collect_limit,
+    })
     setConfigOpen(true)
+  }
+
+  const closeConfig = () => {
+    setConfigOpen(false)
+    setEditingConfig(null)
+    configForm.resetFields()
   }
 
   const commonColumns: ColumnsType<SlowQueryLogItem> = [
@@ -322,9 +328,9 @@ export default function SlowlogPage() {
     { title: '保留', dataIndex: 'retention_days', width: 90, render: (v: number) => `${v}天` },
     { title: '上限', dataIndex: 'collect_limit', width: 90 },
     {
-      title: '最近采集',
+      title: '最近采集 / 错误',
       key: 'last_collect',
-      width: 210,
+      width: 260,
       render: (_, row) => (
         <Space direction="vertical" size={0}>
           <Space size={4}>
@@ -334,6 +340,11 @@ export default function SlowlogPage() {
             <Text type="secondary">{row.last_collect_count} 条</Text>
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>{formatTime(row.last_collect_at)}</Text>
+          {row.last_collect_error && (
+            <Text type="danger" ellipsis style={{ maxWidth: 230, fontSize: 12 }}>
+              {row.last_collect_error}
+            </Text>
+          )}
         </Space>
       ),
     },
@@ -354,8 +365,8 @@ export default function SlowlogPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right',
-      width: 90,
-      render: (_, row) => <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)} />,
+      width: 100,
+      render: (_, row) => <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>编辑</Button>,
     },
   ]
 
@@ -392,20 +403,32 @@ export default function SlowlogPage() {
             optionFilterProp="label"
             style={{ width: filterWidth(210) }}
             value={instanceId}
-            onChange={(v) => { setInstanceId(v); setPage(1) }}
+            onChange={(v) => { setInstanceId(v); setDbName(''); setPage(1) }}
+            onClear={() => setDbName('')}
             options={(instanceData?.items || []).map(inst => ({
               value: inst.id,
-              label: `${inst.instance_name} ${formatDbTypeLabel(inst.db_type)}`,
-              children: `${formatDbTypeLabel(inst.db_type)} ${inst.instance_name}`,
+              label: inst.instance_name,
+              children: inst.instance_name,
             }))}
           />
-          <Input placeholder="数据库" allowClear style={{ width: filterWidth(130) }} value={dbName} onChange={(e) => { setDbName(e.target.value); setPage(1) }} />
+          <Select
+            placeholder="数据库"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            disabled={!instanceId}
+            style={{ width: filterWidth(150) }}
+            value={dbName || undefined}
+            onChange={(v) => { setDbName(v || ''); setPage(1) }}
+            options={(dbData?.databases || [])
+              .filter(db => db.is_active)
+              .map(db => ({ value: db.db_name, label: db.db_name }))}
+          />
           <Select placeholder="来源" allowClear style={{ width: filterWidth(140) }} value={source} onChange={(v) => { setSource(v); setPage(1) }} options={SOURCE_OPTIONS} />
           <Input placeholder="SQL 关键字" allowClear style={{ width: filterWidth(180) }} value={sqlKeyword} onChange={(e) => { setSqlKeyword(e.target.value); setPage(1) }} />
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
           <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
-          <Button icon={<CloudDownloadOutlined />} type="primary" loading={collectMut.isPending} onClick={() => collectMut.mutate()}>采集</Button>
-          <Button icon={<SettingOutlined />} onClick={() => openConfig()}>配置</Button>
+          <Button icon={<CloudDownloadOutlined />} type="primary" loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
           <Button onClick={resetFilters}>重置</Button>
         </Space>
       </FilterCard>
@@ -530,9 +553,9 @@ export default function SlowlogPage() {
                   loading={configQuery.isLoading || configQuery.isFetching}
                   size="small"
                   tableLayout="fixed"
-                  scroll={{ x: 970 }}
+                  scroll={{ x: 1020 }}
                   pagination={false}
-                  locale={{ emptyText: <TableEmptyState title="暂无慢日志采集配置" /> }}
+                  locale={{ emptyText: <TableEmptyState title="暂无可见实例配置" /> }}
                 />
               </Card>
             ),
@@ -666,26 +689,27 @@ export default function SlowlogPage() {
       </Drawer>
 
       <Modal
-        title="慢日志采集配置"
+        title={editingConfig ? `编辑采集配置：${editingConfig.instance_name || `#${editingConfig.instance_id}`}` : '编辑采集配置'}
         open={configOpen}
-        onCancel={() => setConfigOpen(false)}
+        onCancel={closeConfig}
         onOk={async () => {
           const values = await configForm.validateFields()
-          configMut.mutate(values)
+          if (!editingConfig) return
+          configUpdateMut.mutate({ id: editingConfig.id, data: values }, { onSuccess: closeConfig })
         }}
-        confirmLoading={configMut.isPending}
+        confirmLoading={configUpdateMut.isPending}
         maskClosable={false}
       >
         <Form form={configForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="instance_id" label="实例" rules={[{ required: true }]}>
-            <Select placeholder="选择实例" showSearch optionFilterProp="label">
-              {instanceData?.items?.map((inst) => (
-                <Select.Option key={inst.id} value={inst.id} label={`${inst.instance_name} ${formatDbTypeLabel(inst.db_type)}`}>
-                  {formatDbTypeLabel(inst.db_type)} {inst.instance_name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+          {editingConfig && (
+            <Alert
+              type="info"
+              showIcon
+              message={editingConfig.instance_name || `#${editingConfig.instance_id}`}
+              description={formatDbTypeLabel(editingConfig.db_type)}
+              style={{ marginBottom: 16 }}
+            />
+          )}
           <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
             <Switch />
           </Form.Item>

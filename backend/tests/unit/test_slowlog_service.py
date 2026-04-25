@@ -137,6 +137,71 @@ async def test_update_config_applies_changes_for_accessible_instance():
 
 
 @pytest.mark.asyncio
+async def test_list_configs_backfills_visible_instances_without_overwriting(monkeypatch):
+    instances = [
+        SimpleNamespace(
+            id=1,
+            instance_name="mysql-prod",
+            db_type="mysql",
+            is_active=True,
+            resource_groups=[],
+        ),
+        SimpleNamespace(
+            id=2,
+            instance_name="pg-prod",
+            db_type="pgsql",
+            is_active=True,
+            resource_groups=[],
+        ),
+    ]
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = instances
+    db = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+    configs = {
+        1: SimpleNamespace(
+            id=10,
+            instance_id=1,
+            is_enabled=True,
+            threshold_ms=100,
+            collect_interval=60,
+            retention_days=7,
+            collect_limit=50,
+            last_collect_at=None,
+            last_collect_status="success",
+            last_collect_error="",
+            last_collect_count=3,
+            created_by="alice",
+        ),
+        2: SimpleNamespace(
+            id=11,
+            instance_id=2,
+            is_enabled=False,
+            threshold_ms=2500,
+            collect_interval=300,
+            retention_days=30,
+            collect_limit=100,
+            last_collect_at=None,
+            last_collect_status="idle",
+            last_collect_error="",
+            last_collect_count=0,
+            created_by="bob",
+        ),
+    }
+    ensure_default = AsyncMock(side_effect=lambda _db, instance, _user: configs[instance.id])
+    monkeypatch.setattr(SlowLogService, "ensure_default_config", ensure_default)
+
+    total, items = await SlowLogService.list_configs(db, {"is_superuser": True, "permissions": []})
+
+    assert total == 2
+    assert [item.instance_name for item in items] == ["mysql-prod", "pg-prod"]
+    assert [item.threshold_ms for item in items] == [100, 2500]
+    assert items[0].collect_interval == 60
+    assert items[0].last_collect_count == 3
+    assert ensure_default.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_sync_platform_logs_adds_slow_query_from_query_log():
     qlog = SimpleNamespace(
         id=9,
