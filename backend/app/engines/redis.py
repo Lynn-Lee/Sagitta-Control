@@ -212,7 +212,12 @@ class RedisEngine:
             rs.error = str(e)
         return rs
 
-    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
         rs = await self.get_slow_log(limit=limit)
         if rs.is_success:
             rs.column_list = ["id", "duration_us", "command", "source", "source_ref"]

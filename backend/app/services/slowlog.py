@@ -36,6 +36,19 @@ from app.services.monitor import MonitorService
 
 DEFAULT_SLOW_THRESHOLD_MS = 1000
 SUPPORTED_NATIVE_TYPES = {"mysql", "pgsql", "redis"}
+SQL_TAG_OPTIONS: dict[str, list[str]] = {
+    "mysql": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
+    "tidb": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
+    "starrocks": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "需结合执行计划"],
+    "pgsql": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
+    "postgres": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
+    "postgresql": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
+    "oracle": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "需结合执行计划"],
+    "mssql": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "TOP 缺失", "需结合执行计划"],
+    "sqlserver": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "TOP 缺失", "需结合执行计划"],
+    "clickhouse": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "需结合执行计划"],
+    "doris": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "需结合执行计划"],
+}
 
 
 def _as_int(value: Any) -> int:
@@ -76,23 +89,51 @@ def normalize_sql_fingerprint(sql: str) -> tuple[str, str]:
     return digest, normalized
 
 
-def analyze_sql(sql: str, *, rows_examined: int = 0, rows_sent: int = 0, duration_ms: int = 0, source: str = "") -> list[str]:
+def _normalized_db_type(db_type: str | None) -> str:
+    return (db_type or "mysql").strip().lower()
+
+
+def tag_options_by_engine() -> dict[str, list[str]]:
+    return {db_type: tags[:] for db_type, tags in SQL_TAG_OPTIONS.items()}
+
+
+def _add_tag(tags: list[str], db_type: str, tag: str) -> None:
+    if tag in SQL_TAG_OPTIONS.get(db_type, []) and tag not in tags:
+        tags.append(tag)
+
+
+def analyze_sql(
+    sql: str,
+    *,
+    db_type: str | None = None,
+    rows_examined: int = 0,
+    rows_sent: int = 0,
+    duration_ms: int = 0,
+    source: str = "",
+) -> list[str]:
     text = sql.strip().lower()
+    engine = _normalized_db_type(db_type)
+    if engine not in SQL_TAG_OPTIONS:
+        return []
     tags: list[str] = []
     if "select *" in text:
-        tags.append("SELECT *")
+        _add_tag(tags, engine, "SELECT *")
     if text.startswith("select") and " where " not in f" {text} ":
-        tags.append("缺少 WHERE")
+        _add_tag(tags, engine, "缺少 WHERE")
     if rows_examined >= 100000:
-        tags.append("扫描行数高")
+        _add_tag(tags, engine, "扫描行数高")
     if rows_sent >= 10000:
-        tags.append("返回行数高")
+        _add_tag(tags, engine, "返回行数高")
     if duration_ms >= 10000:
-        tags.append("超长耗时")
+        _add_tag(tags, engine, "超长耗时")
     if source == "platform" and ("export" in text or rows_sent >= 50000):
-        tags.append("慢导出")
+        _add_tag(tags, engine, "慢导出")
+    if engine in {"mysql", "tidb", "pgsql", "postgres", "postgresql"} and re.search(r"\blike\s+['\"]?[%_]", text):
+        _add_tag(tags, engine, "前导通配符")
+    if engine in {"mssql", "sqlserver"} and text.startswith("select") and " top " not in f" {text} ":
+        _add_tag(tags, engine, "TOP 缺失")
     if not tags:
-        tags.append("需结合执行计划")
+        _add_tag(tags, engine, "需结合执行计划")
     return tags
 
 
@@ -376,6 +417,7 @@ class SlowLogService:
                     },
                     analysis_tags=analyze_sql(
                         qlog.sqllog,
+                        db_type=qlog.db_type,
                         rows_sent=rows_sent,
                         duration_ms=_as_int(qlog.cost_time_ms),
                         source="platform",
@@ -438,7 +480,11 @@ class SlowLogService:
     ) -> SlowQueryOverviewResponse:
         await SlowLogService.sync_platform_logs(
             db,
-            threshold_ms=filters.get("min_duration_ms") or DEFAULT_SLOW_THRESHOLD_MS,
+            threshold_ms=(
+                filters["min_duration_ms"]
+                if filters.get("min_duration_ms") is not None
+                else DEFAULT_SLOW_THRESHOLD_MS
+            ),
             since=filters.get("date_start"),
         )
         instance_ids = await SlowLogService.scoped_instance_ids(db, user)
@@ -489,7 +535,11 @@ class SlowLogService:
     ) -> list[SlowQueryFingerprintItem]:
         await SlowLogService.sync_platform_logs(
             db,
-            threshold_ms=filters.get("min_duration_ms") or DEFAULT_SLOW_THRESHOLD_MS,
+            threshold_ms=(
+                filters["min_duration_ms"]
+                if filters.get("min_duration_ms") is not None
+                else DEFAULT_SLOW_THRESHOLD_MS
+            ),
             since=filters.get("date_start"),
         )
         instance_ids = await SlowLogService.scoped_instance_ids(db, user)
@@ -819,6 +869,7 @@ class SlowLogService:
                     raw=item.raw,
                     analysis_tags=analyze_sql(
                         item.sql_text,
+                        db_type=instance.db_type,
                         rows_examined=item.rows_examined,
                         rows_sent=item.rows_sent,
                         duration_ms=item.duration_ms,
@@ -864,7 +915,11 @@ class SlowLogService:
             config.last_collect_count = 0
             await db.commit()
             return 0, f"{instance.db_type} 暂不支持原生慢日志采集"
-        rs = await engine.collect_slow_queries(since=since, limit=limit)
+        rs = await engine.collect_slow_queries(
+            since=since,
+            limit=limit,
+            min_duration_ms=config.threshold_ms,
+        )
         if rs.error:
             config.last_collect_at = datetime.now(UTC)
             config.last_collect_status = "failed"

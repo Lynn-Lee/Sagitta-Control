@@ -189,6 +189,7 @@ class EngineProtocol(Protocol):
         self,
         since: Any | None = None,
         limit: int = 100,
+        min_duration_ms: int = 1000,
     ) -> ResultSet:
         """采集引擎原生慢 SQL/慢命令摘要。"""
         return ResultSet(warning=f"{self.db_type} 暂不支持原生慢日志采集")

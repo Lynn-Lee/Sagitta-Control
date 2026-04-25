@@ -3,12 +3,17 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy import select
 
+from app.engines.models import ResultSet
+from app.models.slowlog import SlowQueryLog
+from app.schemas.slowlog import SlowQueryConfigUpdate, SlowQueryConfigUpsert
 from app.services.slowlog import (
     SlowLogService,
     analyze_sql,
     build_recommendations,
     normalize_sql_fingerprint,
+    tag_options_by_engine,
 )
 
 
@@ -36,6 +41,35 @@ def test_analyze_sql_marks_basic_risks():
     assert "超长耗时" in tags
 
 
+def test_analyze_sql_uses_engine_specific_tags():
+    mysql_tags = analyze_sql("select * from orders where name like '%abc'", db_type="mysql")
+    mssql_tags = analyze_sql("select * from orders", db_type="mssql")
+    redis_tags = analyze_sql("get user:1", db_type="redis")
+
+    assert "前导通配符" in mysql_tags
+    assert "TOP 缺失" not in mysql_tags
+    assert "TOP 缺失" in mssql_tags
+    assert redis_tags == []
+
+
+def test_tag_options_excludes_unsupported_non_sql_engines():
+    options = tag_options_by_engine()
+
+    assert "mysql" in options
+    assert "pgsql" in options
+    assert "oracle" in options
+    assert "redis" not in options
+    assert "mongo" not in options
+
+
+def test_slowlog_filters_still_support_tag_filter():
+    stmt = SlowLogService._filters(select(SlowQueryLog), tag="SELECT *")
+    compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "analysis_tags" in compiled
+    assert "SELECT *" in compiled
+
+
 def test_build_recommendations_returns_structured_items():
     recs = build_recommendations(
         "select * from orders",
@@ -48,6 +82,14 @@ def test_build_recommendations_returns_structured_items():
     assert "减少返回列" in titles
     assert "补充过滤条件" in titles
     assert "检查索引与过滤条件" in titles
+
+
+def test_slow_query_config_allows_30_second_interval():
+    created = SlowQueryConfigUpsert(instance_id=1, collect_interval=30)
+    updated = SlowQueryConfigUpdate(collect_interval=30)
+
+    assert created.collect_interval == 30
+    assert updated.collect_interval == 30
 
 
 def test_analyze_plan_detects_mysql_full_scan_and_filesort():
@@ -110,6 +152,43 @@ async def test_collect_instance_unsupported_engine_returns_message():
 
     assert count == 0
     assert "暂不支持" in err
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_passes_config_threshold_to_engine(monkeypatch):
+    engine = SimpleNamespace(
+        collect_slow_queries=AsyncMock(
+            return_value=ResultSet(
+                column_list=["source", "source_ref", "db_name", "sql_text", "duration_ms"],
+                rows=[("mysql_slowlog", "digest-1", "orders", "select * from orders", 5)],
+            )
+        )
+    )
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+
+    exists_result = MagicMock()
+    exists_result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=exists_result),
+        add=MagicMock(),
+        commit=AsyncMock(),
+    )
+    instance = SimpleNamespace(id=7, db_type="mysql", instance_name="mysql-prod", db_name="orders")
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+    )
+
+    count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
+
+    assert (count, err) == (1, "")
+    engine.collect_slow_queries.assert_awaited_once()
+    assert engine.collect_slow_queries.await_args.kwargs["min_duration_ms"] == 1
 
 
 @pytest.mark.asyncio

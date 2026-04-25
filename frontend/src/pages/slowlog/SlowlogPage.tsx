@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Card, DatePicker, Descriptions, Drawer, Form, Grid, Input, InputNumber, Modal, Progress, Select,
   Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
@@ -68,6 +68,7 @@ export default function SlowlogPage() {
   const [sqlKeyword, setSqlKeyword] = useState('')
   const [username, setUsername] = useState('')
   const [tag, setTag] = useState<string | undefined>()
+  const [activeTab, setActiveTab] = useState('overview')
   const [minDurationMs, setMinDurationMs] = useState(1000)
   const [dateRange, setDateRange] = useState<[string, string] | null>([
     dayjs().subtract(24, 'hour').toISOString(),
@@ -77,7 +78,7 @@ export default function SlowlogPage() {
   const [sampleFingerprint, setSampleFingerprint] = useState<string | null>(null)
   const [detailFingerprint, setDetailFingerprint] = useState<string | null>(null)
   const [diagnosis, setDiagnosis] = useState<OptimizeAnalyzeResponse | null>(null)
-  const [manualOpen, setManualOpen] = useState(false)
+  const [manualDiagnosis, setManualDiagnosis] = useState<OptimizeAnalyzeResponse | null>(null)
   const [manualForm] = Form.useForm()
   const [configOpen, setConfigOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<SlowQueryConfigItem | null>(null)
@@ -91,6 +92,11 @@ export default function SlowlogPage() {
     queryFn: () => instanceApi.list({ page_size: 200 }),
   })
 
+  const tagOptionsQuery = useQuery({
+    queryKey: ['slowlog-tag-options'],
+    queryFn: () => slowlogApi.tagOptions(),
+  })
+
   const { data: dbData } = useQuery({
     queryKey: ['slowlog-instance-databases', instanceId],
     queryFn: () => instanceApi.getDatabases(instanceId!),
@@ -99,6 +105,23 @@ export default function SlowlogPage() {
 
   const selectedInstance = instanceData?.items?.find(i => i.id === instanceId)
   const unsupportedNative = selectedInstance && !['mysql', 'pgsql', 'redis'].includes(selectedInstance.db_type)
+  const selectedDbType = selectedInstance?.db_type?.toLowerCase() || ''
+  const engineTagOptions = useMemo(
+    () => selectedDbType ? (tagOptionsQuery.data?.items?.[selectedDbType] || []) : [],
+    [selectedDbType, tagOptionsQuery.data?.items],
+  )
+  const tagSelectOptions = useMemo(
+    () => engineTagOptions.map(item => ({ label: item, value: item })),
+    [engineTagOptions],
+  )
+
+  useEffect(() => {
+    if (!tag) return
+    if (!instanceId || !engineTagOptions.includes(tag)) {
+      setTag(undefined)
+      setPage(1)
+    }
+  }, [engineTagOptions, instanceId, tag])
 
   const baseParams = useMemo<SlowQueryParams>(() => ({
     instance_id: instanceId,
@@ -153,6 +176,12 @@ export default function SlowlogPage() {
     queryFn: () => slowlogApi.configs(),
   })
 
+  const overview = overviewQuery.data
+  const detailData = detailQuery.data
+  const activeSql = sqlDetail?.sql_text || detailData?.fingerprint?.sample_sql || diagnosis?.sql || ''
+  const activeInstanceId = sqlDetail?.instance_id || instanceId
+  const activeDbName = sqlDetail?.db_name || detailData?.samples?.[0]?.db_name || dbName
+
   const collectMut = useMutation<SlowQueryCollectResponse>({
     mutationFn: () => slowlogApi.collect({ instance_id: instanceId, limit: 100 }),
     onSuccess: (data) => {
@@ -164,6 +193,7 @@ export default function SlowlogPage() {
       if (data.saved === 0) {
         Modal.info({
           title: '本次没有新增慢 SQL',
+          maskClosable: false,
           content: '请检查实例采集配置里的慢 SQL 阈值、最近 1 天时间范围、数据库原生慢日志能力，以及平台查询历史中是否存在符合条件的记录。',
         })
       }
@@ -171,6 +201,7 @@ export default function SlowlogPage() {
         Modal.info({
           title: '采集提示',
           width: 'min(680px, calc(100vw - 32px))',
+          maskClosable: false,
           content: (
             <Space direction="vertical" style={{ maxWidth: '100%', overflowX: 'auto' }}>
               {data.errors.slice(0, 8).map((item) => (
@@ -210,6 +241,15 @@ export default function SlowlogPage() {
     onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || e.message || '诊断失败'),
   })
 
+  const manualDiagnoseMut = useMutation<OptimizeAnalyzeResponse, any, { instance_id: number; db_name?: string; sql: string }>({
+    mutationFn: (data: { instance_id: number; db_name?: string; sql: string }) => optimizeApi.analyze(data),
+    onSuccess: (data) => {
+      setManualDiagnosis(data)
+      if (data.msg) msgApi.info(data.msg)
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || e.message || '诊断失败'),
+  })
+
   const resetFilters = () => {
     setInstanceId(undefined)
     setDbName('')
@@ -222,16 +262,25 @@ export default function SlowlogPage() {
     setPage(1)
   }
 
+  const openManualDiagnosisTab = () => {
+    manualForm.setFieldsValue({
+      instance_id: activeInstanceId,
+      db_name: activeDbName,
+      sql: activeSql || '',
+    })
+    setActiveTab('manual')
+  }
+
   const runManualDiagnosis = (values: any) => {
-    diagnoseMut.mutate({
+    manualDiagnoseMut.mutate({
       instance_id: values.instance_id,
       db_name: values.db_name || '',
       sql: values.sql,
     })
-    setManualOpen(false)
     setSqlDetail(null)
     setDetailFingerprint(null)
     setExplainResult(null)
+    setDiagnosis(null)
   }
 
   const runActiveDiagnosis = () => {
@@ -483,12 +532,6 @@ export default function SlowlogPage() {
     },
   ]
 
-  const overview = overviewQuery.data
-  const detailData = detailQuery.data
-  const activeSql = sqlDetail?.sql_text || detailData?.fingerprint?.sample_sql || diagnosis?.sql || ''
-  const activeInstanceId = sqlDetail?.instance_id || instanceId
-  const activeDbName = sqlDetail?.db_name || detailData?.samples?.[0]?.db_name || dbName
-
   const findingColumns: ColumnsType<OptimizeFinding> = [
     { title: '级别', dataIndex: 'severity', width: 92, render: (v: string) => <Tag color={SEVERITY_COLOR[v]}>{v?.toUpperCase()}</Tag> },
     { title: '问题', dataIndex: 'title', width: 170 },
@@ -504,28 +547,28 @@ export default function SlowlogPage() {
     { title: '原因', dataIndex: 'reason' },
   ]
 
-  const diagnosisPanel = diagnosis ? (
+  const renderDiagnosisPanel = (result?: OptimizeAnalyzeResponse | null) => result ? (
     <Card size="small" title="诊断结果">
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        {!diagnosis.supported && <Alert type="info" showIcon message={diagnosis.msg || '当前引擎不进入 SQL 优化主链路'} />}
+        {!result.supported && <Alert type="info" showIcon message={result.msg || '当前引擎不进入 SQL 优化主链路'} />}
         <Space align="start" size={16} wrap>
           <Progress
             type="dashboard"
-            percent={diagnosis.risk_score}
+            percent={result.risk_score}
             size={104}
-            strokeColor={RISK_COLOR(diagnosis.risk_score)}
+            strokeColor={RISK_COLOR(result.risk_score)}
           />
           <Space direction="vertical" style={{ maxWidth: 620 }}>
             <Space wrap>
-              <Tag color="blue">{formatDbTypeLabel(diagnosis.engine)}</Tag>
-              <Tag>{diagnosis.support_level}</Tag>
-              <Tag>{diagnosis.source === 'manual' ? '手工 SQL' : diagnosis.source === 'fingerprint' ? 'SQL 指纹' : 'SQL 样本'}</Tag>
+              <Tag color="blue">{formatDbTypeLabel(result.engine)}</Tag>
+              <Tag>{result.support_level}</Tag>
+              <Tag>{result.source === 'manual' ? '手工 SQL' : result.source === 'fingerprint' ? 'SQL 指纹' : 'SQL 样本'}</Tag>
             </Space>
-            <Text strong>{diagnosis.summary}</Text>
+            <Text strong>{result.summary}</Text>
             <Button
               size="small"
               icon={<CopyOutlined />}
-              onClick={() => navigator.clipboard.writeText(diagnosis.sql).then(() => msgApi.success('SQL 已复制'))}
+              onClick={() => navigator.clipboard.writeText(result.sql).then(() => msgApi.success('SQL 已复制'))}
             >
               复制 SQL
             </Button>
@@ -533,7 +576,7 @@ export default function SlowlogPage() {
         </Space>
         <Table<OptimizeFinding>
           title={() => '关键问题'}
-          dataSource={(diagnosis.findings || []).map((item, i) => ({ ...item, key: `${item.code}-${i}` }))}
+          dataSource={(result.findings || []).map((item, i) => ({ ...item, key: `${item.code}-${i}` }))}
           columns={findingColumns}
           size="small"
           tableLayout="fixed"
@@ -542,7 +585,7 @@ export default function SlowlogPage() {
         />
         <Table<OptimizeRecommendation>
           title={() => '优化建议'}
-          dataSource={(diagnosis.recommendations || []).map((item, i) => ({ ...item, key: `${item.priority}-${i}` }))}
+          dataSource={(result.recommendations || []).map((item, i) => ({ ...item, key: `${item.priority}-${i}` }))}
           columns={recColumns}
           size="small"
           tableLayout="fixed"
@@ -550,20 +593,20 @@ export default function SlowlogPage() {
           pagination={false}
         />
         <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }}>
-          <Descriptions.Item label="全表扫描">{diagnosis.plan?.summary?.full_scan ? '是' : '否'}</Descriptions.Item>
-          <Descriptions.Item label="估算行数">{diagnosis.plan?.summary?.rows_estimate ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="最大成本">{diagnosis.plan?.summary?.max_cost ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="临时表">{diagnosis.plan?.summary?.temporary ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="全表扫描">{result.plan?.summary?.full_scan ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="估算行数">{result.plan?.summary?.rows_estimate ?? 0}</Descriptions.Item>
+          <Descriptions.Item label="最大成本">{result.plan?.summary?.max_cost ?? 0}</Descriptions.Item>
+          <Descriptions.Item label="临时表">{result.plan?.summary?.temporary ? '是' : '否'}</Descriptions.Item>
           <Descriptions.Item label="涉及表" span={2}>
             <Space wrap size={[4, 4]}>
-              {(diagnosis.metadata?.tables || []).map(table => <Tag key={table}>{table}</Tag>)}
-              {!(diagnosis.metadata?.tables || []).length && <Text type="secondary">未识别到表名</Text>}
+              {(result.metadata?.tables || []).map(table => <Tag key={table}>{table}</Tag>)}
+              {!(result.metadata?.tables || []).length && <Text type="secondary">未识别到表名</Text>}
             </Space>
           </Descriptions.Item>
         </Descriptions>
-        {diagnosis.raw && (
+        {result.raw && (
           <Paragraph code copyable style={{ whiteSpace: 'pre-wrap', maxHeight: 260, overflow: 'auto' }}>
-            {JSON.stringify(diagnosis.raw, null, 2)}
+            {JSON.stringify(result.raw, null, 2)}
           </Paragraph>
         )}
       </Space>
@@ -577,10 +620,7 @@ export default function SlowlogPage() {
         title="SQL 分析"
         meta={`共 ${overview?.total ?? 0} 条 SQL 样本，${overview?.fingerprint_count ?? 0} 个指纹`}
         actions={(
-          <Button icon={<BulbOutlined />} type="primary" onClick={() => {
-            manualForm.setFieldsValue({ instance_id: instanceId, db_name: dbName, sql: activeSql || 'SELECT * FROM sql_users WHERE 1=1' })
-            setManualOpen(true)
-          }}>
+          <Button icon={<BulbOutlined />} type="primary" onClick={openManualDiagnosisTab}>
             手工诊断
           </Button>
         )}
@@ -626,18 +666,14 @@ export default function SlowlogPage() {
           <Input placeholder="SQL 关键字" allowClear style={{ width: filterWidth(180) }} value={sqlKeyword} onChange={(e) => { setSqlKeyword(e.target.value); setPage(1) }} />
           <Input placeholder="用户" allowClear style={{ width: filterWidth(130) }} value={username} onChange={(e) => { setUsername(e.target.value); setPage(1) }} />
           <Select
-            placeholder="标签"
+            placeholder={instanceId ? '标签' : '先选实例'}
             allowClear
+            disabled={!instanceId || !tagSelectOptions.length}
+            loading={tagOptionsQuery.isLoading}
             style={{ width: filterWidth(150) }}
             value={tag}
             onChange={(v) => { setTag(v); setPage(1) }}
-            options={[
-              { label: '大结果集', value: '大结果集' },
-              { label: '高耗时', value: '高耗时' },
-              { label: '高扫描', value: '高扫描' },
-              { label: 'SELECT *', value: 'SELECT *' },
-              { label: '前导通配符', value: '前导通配符' },
-            ]}
+            options={tagSelectOptions}
           />
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
           <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
@@ -653,6 +689,8 @@ export default function SlowlogPage() {
       )}
 
       <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
         items={[
           {
             key: 'overview',
@@ -767,6 +805,65 @@ export default function SlowlogPage() {
             ),
           },
           {
+            key: 'manual',
+            label: '手工诊断',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card>
+                  <Form form={manualForm} layout="vertical" onFinish={runManualDiagnosis}>
+                    <Space style={{ width: '100%' }} align="start" wrap>
+                      <Form.Item name="instance_id" label="实例" rules={[{ required: true, message: '请选择实例' }]} style={{ minWidth: filterWidth(260), flex: 1 }}>
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="选择实例"
+                          onChange={() => manualForm.setFieldValue('db_name', '')}
+                          options={(instanceData?.items || []).map(inst => ({ value: inst.id, label: inst.instance_name }))}
+                        />
+                      </Form.Item>
+                      <Form.Item noStyle shouldUpdate={(prev, curr) => prev.instance_id !== curr.instance_id}>
+                        {({ getFieldValue }) => {
+                          const selected = getFieldValue('instance_id')
+                          return (
+                            <Form.Item name="db_name" label="数据库/Schema" style={{ minWidth: filterWidth(220), flex: 1 }}>
+                              <Select
+                                allowClear
+                                showSearch
+                                disabled={!selected}
+                                optionFilterProp="label"
+                                placeholder="默认库"
+                                options={(selected === instanceId ? (dbData?.databases || []) : [])
+                                  .filter(db => db.is_active)
+                                  .map(db => ({ value: db.db_name, label: db.db_name }))}
+                              />
+                            </Form.Item>
+                          )
+                        }}
+                      </Form.Item>
+                    </Space>
+                    <Form.Item name="sql" label="SQL" rules={[{ required: true, message: '请输入 SQL' }]}>
+                      <Input.TextArea rows={10} style={{ fontFamily: '"JetBrains Mono", monospace' }} />
+                    </Form.Item>
+                    <Space>
+                      <Button type="primary" icon={<BulbOutlined />} htmlType="submit" loading={manualDiagnoseMut.isPending}>
+                        开始诊断
+                      </Button>
+                      <Button onClick={() => { manualForm.resetFields(); setManualDiagnosis(null) }}>
+                        清空
+                      </Button>
+                    </Space>
+                  </Form>
+                </Card>
+                {manualDiagnosis && (
+                  <Card size="small" title="SQL">
+                    <Paragraph code copyable style={{ whiteSpace: 'pre-wrap' }}>{manualDiagnosis.sql}</Paragraph>
+                  </Card>
+                )}
+                {renderDiagnosisPanel(manualDiagnosis)}
+              </Space>
+            ),
+          },
+          {
             key: 'configs',
             label: '采集配置',
             children: (
@@ -819,7 +916,7 @@ export default function SlowlogPage() {
                 执行计划
               </Button>
             </Space>
-            {diagnosisPanel}
+            {renderDiagnosisPanel(diagnosis)}
             {explainResult && (
               <Card size="small" title="执行计划分析">
                 {!explainResult.supported && <Alert type="info" showIcon message={explainResult.msg || '当前引擎暂不支持执行计划分析'} />}
@@ -883,7 +980,7 @@ export default function SlowlogPage() {
                 </Space>
               </Space>
             </Card>
-            {diagnosisPanel}
+            {renderDiagnosisPanel(diagnosis)}
             <Card size="small" title="趋势">
               <div style={{ height: 220 }}>
                 <ResponsiveContainer>
@@ -942,55 +1039,9 @@ export default function SlowlogPage() {
           <Card size="small" title="SQL">
             <Paragraph code copyable style={{ whiteSpace: 'pre-wrap' }}>{diagnosis?.sql}</Paragraph>
           </Card>
-          {diagnosisPanel}
+          {renderDiagnosisPanel(diagnosis)}
         </Space>
       </Drawer>
-
-      <Modal
-        title="手工 SQL 诊断"
-        width={820}
-        open={manualOpen}
-        onCancel={() => setManualOpen(false)}
-        onOk={() => manualForm.submit()}
-        confirmLoading={diagnoseMut.isPending}
-        destroyOnClose
-      >
-        <Form form={manualForm} layout="vertical" onFinish={runManualDiagnosis}>
-          <Space style={{ width: '100%' }} align="start" wrap>
-            <Form.Item name="instance_id" label="实例" rules={[{ required: true, message: '请选择实例' }]} style={{ minWidth: 260, flex: 1 }}>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="选择实例"
-                onChange={() => manualForm.setFieldValue('db_name', '')}
-                options={(instanceData?.items || []).map(inst => ({ value: inst.id, label: inst.instance_name }))}
-              />
-            </Form.Item>
-            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.instance_id !== curr.instance_id}>
-              {({ getFieldValue }) => {
-                const selected = getFieldValue('instance_id')
-                return (
-                  <Form.Item name="db_name" label="数据库/Schema" style={{ minWidth: 220, flex: 1 }}>
-                    <Select
-                      allowClear
-                      showSearch
-                      disabled={!selected}
-                      optionFilterProp="label"
-                      placeholder="默认库"
-                      options={(selected === instanceId ? (dbData?.databases || []) : [])
-                        .filter(db => db.is_active)
-                        .map(db => ({ value: db.db_name, label: db.db_name }))}
-                    />
-                  </Form.Item>
-                )
-              }}
-            </Form.Item>
-          </Space>
-          <Form.Item name="sql" label="SQL" rules={[{ required: true, message: '请输入 SQL' }]}>
-            <Input.TextArea rows={8} style={{ fontFamily: '"JetBrains Mono", monospace' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         title={editingConfig ? `编辑采集配置：${editingConfig.instance_name || `#${editingConfig.instance_id}`}` : '编辑采集配置'}
@@ -1021,7 +1072,7 @@ export default function SlowlogPage() {
             <InputNumber min={0} max={3600000} step={500} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="collect_interval" label="采集间隔（秒）" rules={[{ required: true }]}>
-            <InputNumber min={60} max={86400} step={60} style={{ width: '100%' }} />
+            <InputNumber min={30} max={86400} step={30} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="retention_days" label="保留天数" rules={[{ required: true }]}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} />
@@ -1037,6 +1088,7 @@ export default function SlowlogPage() {
         width={860}
         open={!!sampleFingerprint}
         onCancel={() => setSampleFingerprint(null)}
+        maskClosable={false}
         footer={null}
       >
         <Table

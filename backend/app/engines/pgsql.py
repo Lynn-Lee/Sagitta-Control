@@ -435,7 +435,12 @@ class PgSQLEngine:
         rs = await self.test_connection()
         return {"health": {"up": 1 if rs.is_success else 0}}
 
-    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
         """Collect PostgreSQL slow statement summaries from pg_stat_statements."""
         columns_rs = await self._raw_query(
             db_name=self._db_name,
@@ -476,11 +481,15 @@ class PgSQLEngine:
               rows AS rows_sent,
               calls
             FROM pg_stat_statements
-            WHERE {duration_expr} >= 1000
+            WHERE {duration_expr} >= $2
             ORDER BY {duration_expr} DESC
             LIMIT $1
         """
-        return await self._raw_query(db_name=self._db_name, sql=sql, args=[int(limit)])
+        return await self._raw_query(
+            db_name=self._db_name,
+            sql=sql,
+            args=[int(limit), max(0, int(min_duration_ms))],
+        )
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
         explain_sql = f"EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE) {sql.strip().rstrip(';')}"

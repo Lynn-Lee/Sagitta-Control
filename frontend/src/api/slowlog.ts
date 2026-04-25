@@ -140,9 +140,16 @@ export interface SlowQueryParams {
   limit?: number
 }
 
+export interface SlowQueryTagOptionsResponse {
+  items: Record<string, string[]>
+}
+
 export const slowlogApi = {
   configs: () =>
     apiClient.get<{ total: number; items: SlowQueryConfigItem[] }>('/sql-analysis/configs/').then(r => r.data),
+
+  tagOptions: () =>
+    apiClient.get<SlowQueryTagOptionsResponse>('/sql-analysis/tag-options/').then(r => r.data),
 
   saveConfig: (data: {
     instance_id: number

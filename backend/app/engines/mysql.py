@@ -410,8 +410,14 @@ class MysqlEngine:
     def get_supported_metric_groups(self) -> list[str]:
         return ["health", "performance", "replication", "innodb"]
 
-    async def collect_slow_queries(self, since: Any | None = None, limit: int = 100) -> ResultSet:
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
         """Collect MySQL slow statement digests from performance_schema."""
+        min_timer_wait = max(0, int(min_duration_ms)) * 1_000_000_000
         sql = """
             SELECT
               'mysql_slowlog' AS source,
@@ -424,11 +430,16 @@ class MysqlEngine:
               COUNT_STAR AS count_star
             FROM performance_schema.events_statements_summary_by_digest
             WHERE DIGEST_TEXT IS NOT NULL
-              AND AVG_TIMER_WAIT >= 1000000000000
+              AND AVG_TIMER_WAIT >= %(min_timer_wait)s
             ORDER BY AVG_TIMER_WAIT DESC
             LIMIT %(limit)s
         """
-        return await self.query(db_name="", sql=sql, parameters={"limit": int(limit)}, limit_num=limit)
+        return await self.query(
+            db_name="",
+            sql=sql,
+            parameters={"limit": int(limit), "min_timer_wait": min_timer_wait},
+            limit_num=limit,
+        )
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
         explain_sql = f"EXPLAIN FORMAT=JSON {sql.strip().rstrip(';')}"

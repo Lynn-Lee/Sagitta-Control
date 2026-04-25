@@ -27,7 +27,7 @@ from app.schemas.slowlog import (
     SlowQueryLogListResponse,
     SlowQueryOverviewResponse,
 )
-from app.services.slowlog import DEFAULT_SLOW_THRESHOLD_MS, SlowLogService
+from app.services.slowlog import DEFAULT_SLOW_THRESHOLD_MS, SlowLogService, tag_options_by_engine
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +49,11 @@ async def list_slowlog_configs(
 ):
     total, items = await SlowLogService.list_configs(db, user)
     return {"total": total, "items": items}
+
+
+@router.get("/tag-options/", summary="SQL 分析标签选项")
+async def slowlog_tag_options():
+    return {"items": tag_options_by_engine()}
 
 
 @router.post("/configs/", summary="创建或更新 SQL 采集配置", dependencies=[Depends(require_perm("menu_ops"))])

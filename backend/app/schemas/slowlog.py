@@ -55,7 +55,7 @@ class SlowQueryOverviewResponse(BaseModel):
     slowest: SlowQueryLogItem | None = None
     unsupported_msg: str = ""
     trends: list[SlowQueryTrendPoint] = Field(default_factory=list)
-    source_distribution: list["SlowQueryDistributionItem"] = Field(default_factory=list)
+    source_distribution: list[SlowQueryDistributionItem] = Field(default_factory=list)
 
 
 class SlowQueryFingerprintItem(BaseModel):
@@ -113,7 +113,7 @@ class SlowQueryConfigUpsert(BaseModel):
     instance_id: int
     is_enabled: bool = True
     threshold_ms: int = Field(default=1000, ge=0, le=3600000)
-    collect_interval: int = Field(default=300, ge=60, le=86400)
+    collect_interval: int = Field(default=300, ge=30, le=86400)
     retention_days: int = Field(default=30, ge=1, le=365)
     collect_limit: int = Field(default=100, ge=1, le=1000)
 
@@ -121,7 +121,7 @@ class SlowQueryConfigUpsert(BaseModel):
 class SlowQueryConfigUpdate(BaseModel):
     is_enabled: bool | None = None
     threshold_ms: int | None = Field(default=None, ge=0, le=3600000)
-    collect_interval: int | None = Field(default=None, ge=60, le=86400)
+    collect_interval: int | None = Field(default=None, ge=30, le=86400)
     retention_days: int | None = Field(default=None, ge=1, le=365)
     collect_limit: int | None = Field(default=None, ge=1, le=1000)
 

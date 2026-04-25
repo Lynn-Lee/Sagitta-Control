@@ -136,13 +136,13 @@ class TestPgsqlDataDictSql:
 
         monkeypatch.setattr(engine, "_raw_query", fake_raw_query)
 
-        await engine.collect_slow_queries(limit=25)
+        await engine.collect_slow_queries(limit=25, min_duration_ms=250)
 
         assert "to_regclass('pg_stat_statements')" in calls[0]["sql"]
         assert "round((mean_time)::numeric)::bigint AS duration_ms" in calls[1]["sql"]
-        assert "WHERE mean_time >= 1000" in calls[1]["sql"]
+        assert "WHERE mean_time >= $2" in calls[1]["sql"]
         assert "mean_exec_time" not in calls[1]["sql"]
-        assert calls[1]["args"] == [25]
+        assert calls[1]["args"] == [25, 250]
 
 
 class TestOracleDataDictSql:
