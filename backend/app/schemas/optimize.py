@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-
 SupportLevel = Literal["full", "partial", "static_only", "unsupported"]
 OptimizeSource = Literal["manual", "slowlog", "fingerprint"]
 

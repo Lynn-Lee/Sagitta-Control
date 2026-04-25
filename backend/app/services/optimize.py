@@ -29,7 +29,6 @@ from app.schemas.optimize import (
 )
 from app.services.slowlog import SlowLogService
 
-
 _DIALECTS = {
     "mysql": "mysql",
     "tidb": "mysql",
@@ -400,7 +399,7 @@ class JsonPlanAnalyzer(BaseSqlAnalyzer):
             node_type_lower = node_type.lower()
             if node_type_lower in {"seq scan", "all"} or '"access_type": "all"' in text:
                 summary["full_scan"] = True
-            if "filesort" in text or "sort" == node_type_lower:
+            if "filesort" in text or node_type_lower == "sort":
                 summary["sort"] = True
             if "temporary" in text:
                 summary["temporary"] = True

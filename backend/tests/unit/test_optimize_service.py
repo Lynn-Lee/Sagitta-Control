@@ -35,7 +35,12 @@ async def test_optimize_service_assembles_analyzer_response(monkeypatch):
 
     class FakeAnalyzer:
         async def analyze(self):
-            from app.schemas.optimize import OptimizeFinding, OptimizeMetadata, OptimizePlan, OptimizeRecommendation
+            from app.schemas.optimize import (
+                OptimizeFinding,
+                OptimizeMetadata,
+                OptimizePlan,
+                OptimizeRecommendation,
+            )
             from app.services.optimize import AnalyzerResult
 
             return AnalyzerResult(
