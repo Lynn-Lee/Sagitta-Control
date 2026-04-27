@@ -4,18 +4,25 @@ from __future__ import annotations
 import logging
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import and_, distinct, func, or_, select
+from sqlalchemy import and_, case, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
+from app.models.archive import ArchiveJob, ArchiveJobStatus
 from app.models.instance import Instance, InstanceDatabase
 from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPrivilegeApply
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
 from app.models.user import ResourceGroup, Users
-from app.models.workflow import SqlWorkflow, WorkflowAudit, WorkflowLog, WorkflowStatus
+from app.models.workflow import (
+    SqlWorkflow,
+    WorkflowAudit,
+    WorkflowLog,
+    WorkflowStatus,
+    WorkflowType,
+)
 from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
-from app.services.audit import OP_CANCEL, OP_PASS, OP_REJECT
+from app.services.audit import OP_CANCEL, OP_PASS, OP_REJECT, AuditService
 from app.services.governance_scope import GovernanceScopeService
 
 logger = logging.getLogger(__name__)
@@ -642,6 +649,250 @@ class DashboardService:
         )
 
     @staticmethod
+    async def _visible_archive_workflow_ids_for_user(db: AsyncSession, user: dict) -> set[int]:
+        pending_ids = await AuditService.get_pending_workflow_ids_for_user(db, user)
+        audited_ids = await AuditService.get_audited_workflow_ids_for_user(db, user)
+        return pending_ids | audited_ids
+
+    @staticmethod
+    async def _archive_conditions_for_user(db: AsyncSession, user: dict) -> list:
+        if user.get("is_superuser") or "archive_review" in user.get("permissions", []) or "archive_execute" in user.get("permissions", []):
+            return []
+        visible_workflow_ids = await DashboardService._visible_archive_workflow_ids_for_user(db, user)
+        visibility_conditions = [ArchiveJob.created_by_id == user.get("id")]
+        if visible_workflow_ids:
+            visibility_conditions.append(ArchiveJob.workflow_id.in_(visible_workflow_ids))
+        return [or_(*visibility_conditions)]
+
+    @staticmethod
+    async def get_archive_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:
+        now = datetime.now(UTC)
+        period_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        conditions = await DashboardService._archive_conditions_for_user(db, user)
+
+        async def scalar(stmt) -> int:
+            return int((await db.execute(stmt)).scalar() or 0)
+
+        def archive_stmt(*extra_conditions):
+            stmt = select(ArchiveJob)
+            all_conditions = [*conditions, *extra_conditions]
+            if all_conditions:
+                stmt = stmt.where(and_(*all_conditions))
+            return stmt
+
+        period_submit_subq = archive_stmt(ArchiveJob.created_at >= period_start).subquery()
+        period_success_subq = archive_stmt(
+            ArchiveJob.finished_at >= period_start,
+            ArchiveJob.status == ArchiveJobStatus.SUCCESS,
+        ).subquery()
+        period_failed_subq = archive_stmt(
+            ArchiveJob.finished_at >= period_start,
+            ArchiveJob.status == ArchiveJobStatus.FAILED,
+        ).subquery()
+        period_canceled_subq = archive_stmt(
+            ArchiveJob.finished_at >= period_start,
+            ArchiveJob.status == ArchiveJobStatus.CANCELED,
+        ).subquery()
+
+        period_submit_count = await scalar(select(func.count()).select_from(period_submit_subq))
+        success_count = await scalar(select(func.count()).select_from(period_success_subq))
+        failed_count = await scalar(select(func.count()).select_from(period_failed_subq))
+        canceled_count = await scalar(select(func.count()).select_from(period_canceled_subq))
+
+        pending_count = await scalar(select(func.count()).select_from(archive_stmt(ArchiveJob.status == ArchiveJobStatus.PENDING_REVIEW).subquery()))
+        approved_count = await scalar(select(func.count()).select_from(archive_stmt(ArchiveJob.status == ArchiveJobStatus.APPROVED).subquery()))
+        scheduled_count = await scalar(select(func.count()).select_from(archive_stmt(ArchiveJob.status == ArchiveJobStatus.SCHEDULED).subquery()))
+        running_count = await scalar(select(func.count()).select_from(archive_stmt(ArchiveJob.status.in_((ArchiveJobStatus.QUEUED, ArchiveJobStatus.RUNNING))).subquery()))
+        paused_count = await scalar(select(func.count()).select_from(archive_stmt(ArchiveJob.status.in_((ArchiveJobStatus.PAUSING, ArchiveJobStatus.PAUSED))).subquery()))
+        high_risk_active_count = await scalar(select(func.count()).select_from(archive_stmt(
+            ArchiveJob.risk_level == "high",
+            ArchiveJob.status.in_(
+                (
+                    ArchiveJobStatus.PENDING_REVIEW,
+                    ArchiveJobStatus.APPROVED,
+                    ArchiveJobStatus.SCHEDULED,
+                    ArchiveJobStatus.QUEUED,
+                    ArchiveJobStatus.RUNNING,
+                    ArchiveJobStatus.PAUSING,
+                    ArchiveJobStatus.PAUSED,
+                )
+            ),
+        ).subquery()))
+
+        row_totals = (await db.execute(
+            archive_stmt(ArchiveJob.created_at >= period_start).with_only_columns(
+                func.coalesce(func.sum(ArchiveJob.estimated_rows), 0),
+                func.coalesce(func.sum(ArchiveJob.processed_rows), 0),
+            )
+        )).one()
+
+        submit_trend_rows = (await db.execute(
+            archive_stmt(ArchiveJob.created_at >= period_start).with_only_columns(
+                func.date(ArchiveJob.created_at).label("d"),
+                func.count().label("submit_count"),
+                func.coalesce(func.sum(ArchiveJob.estimated_rows), 0).label("estimated_rows"),
+            ).group_by(func.date(ArchiveJob.created_at)).order_by(func.date(ArchiveJob.created_at))
+        )).all()
+        submit_trend_map = {
+            str(row.d): {
+                "submit_count": int(row.submit_count or 0),
+                "estimated_rows": int(row.estimated_rows or 0),
+            }
+            for row in submit_trend_rows
+        }
+
+        finished_trend_rows = (await db.execute(
+            archive_stmt(
+                ArchiveJob.finished_at >= period_start,
+                ArchiveJob.status.in_((ArchiveJobStatus.SUCCESS, ArchiveJobStatus.FAILED, ArchiveJobStatus.CANCELED)),
+            ).with_only_columns(
+                func.date(ArchiveJob.finished_at).label("d"),
+                func.sum(case((ArchiveJob.status == ArchiveJobStatus.SUCCESS, 1), else_=0)).label("success_count"),
+                func.sum(case((ArchiveJob.status == ArchiveJobStatus.FAILED, 1), else_=0)).label("failed_count"),
+                func.sum(case((ArchiveJob.status == ArchiveJobStatus.CANCELED, 1), else_=0)).label("canceled_count"),
+                func.coalesce(func.sum(ArchiveJob.processed_rows), 0).label("processed_rows"),
+            ).group_by(func.date(ArchiveJob.finished_at)).order_by(func.date(ArchiveJob.finished_at))
+        )).all()
+        finished_trend_map = {
+            str(row.d): {
+                "success_count": int(row.success_count or 0),
+                "failed_count": int(row.failed_count or 0),
+                "canceled_count": int(row.canceled_count or 0),
+                "processed_rows": int(row.processed_rows or 0),
+            }
+            for row in finished_trend_rows
+        }
+
+        dates: list[str] = []
+        submit_count: list[int] = []
+        success_trend_count: list[int] = []
+        failed_trend_count: list[int] = []
+        canceled_trend_count: list[int] = []
+        estimated_rows_trend: list[int] = []
+        processed_rows_trend: list[int] = []
+        active_stock_count: list[int] = []
+        for offset in range(days):
+            day = period_start.date() + timedelta(days=offset)
+            day_key = day.isoformat()
+            day_end = datetime.fromisoformat(day_key).replace(tzinfo=UTC) + timedelta(days=1)
+            dates.append(day_key)
+            submit_day = submit_trend_map.get(day_key, {})
+            finished_day = finished_trend_map.get(day_key, {})
+            submit_count.append(submit_day.get("submit_count", 0))
+            estimated_rows_trend.append(submit_day.get("estimated_rows", 0))
+            success_trend_count.append(finished_day.get("success_count", 0))
+            failed_trend_count.append(finished_day.get("failed_count", 0))
+            canceled_trend_count.append(finished_day.get("canceled_count", 0))
+            processed_rows_trend.append(finished_day.get("processed_rows", 0))
+            active_stock_stmt = archive_stmt(
+                ArchiveJob.created_at < day_end,
+                ArchiveJob.status.in_(
+                    (
+                        ArchiveJobStatus.PENDING_REVIEW,
+                        ArchiveJobStatus.APPROVED,
+                        ArchiveJobStatus.SCHEDULED,
+                        ArchiveJobStatus.QUEUED,
+                        ArchiveJobStatus.RUNNING,
+                        ArchiveJobStatus.PAUSING,
+                        ArchiveJobStatus.PAUSED,
+                    )
+                ),
+            ).subquery()
+            active_stock_count.append(await scalar(select(func.count()).select_from(active_stock_stmt)))
+
+        top_submitter_rows = (await db.execute(
+            archive_stmt(ArchiveJob.created_at >= period_start).with_only_columns(
+                ArchiveJob.created_by_id,
+                func.count().label("count"),
+                func.coalesce(func.sum(ArchiveJob.estimated_rows), 0).label("estimated_rows"),
+            ).group_by(ArchiveJob.created_by_id).order_by(func.count().desc()).limit(10)
+        )).all()
+        submitter_ids = [row.created_by_id for row in top_submitter_rows if row.created_by_id is not None]
+        user_map: dict[int, str] = {}
+        if submitter_ids:
+            user_rows = await db.execute(select(Users.id, Users.display_name, Users.username).where(Users.id.in_(submitter_ids)))
+            user_map = {user_id: (display_name or username) for user_id, display_name, username in user_rows.all()}
+
+        top_instance_rows = (await db.execute(
+            archive_stmt(ArchiveJob.created_at >= period_start)
+            .join(Instance, ArchiveJob.source_instance_id == Instance.id)
+            .with_only_columns(
+                Instance.instance_name,
+                func.count().label("count"),
+                func.coalesce(func.sum(ArchiveJob.estimated_rows), 0).label("estimated_rows"),
+            )
+            .group_by(Instance.instance_name)
+            .order_by(func.count().desc())
+            .limit(10)
+        )).all()
+
+        top_table_rows = (await db.execute(
+            archive_stmt(ArchiveJob.created_at >= period_start).with_only_columns(
+                ArchiveJob.source_db,
+                ArchiveJob.source_table,
+                func.count().label("count"),
+                func.coalesce(func.sum(ArchiveJob.estimated_rows), 0).label("estimated_rows"),
+                func.coalesce(func.sum(ArchiveJob.processed_rows), 0).label("processed_rows"),
+            ).group_by(ArchiveJob.source_db, ArchiveJob.source_table).order_by(func.sum(ArchiveJob.estimated_rows).desc()).limit(10)
+        )).all()
+
+        return {
+            "scope": {
+                "mode": "archive",
+                "label": "归档任务可见范围",
+            },
+            "cards": {
+                "period_submit_count": period_submit_count,
+                "pending_count": pending_count,
+                "approved_count": approved_count,
+                "scheduled_count": scheduled_count,
+                "running_count": running_count,
+                "paused_count": paused_count,
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "canceled_count": canceled_count,
+                "estimated_rows": int(row_totals[0] or 0),
+                "processed_rows": int(row_totals[1] or 0),
+                "high_risk_active_count": high_risk_active_count,
+            },
+            "trend": {
+                "dates": dates,
+                "submit_count": submit_count,
+                "success_count": success_trend_count,
+                "failed_count": failed_trend_count,
+                "canceled_count": canceled_trend_count,
+                "estimated_rows": estimated_rows_trend,
+                "processed_rows": processed_rows_trend,
+                "active_stock_count": active_stock_count,
+            },
+            "top_submitters": [
+                {
+                    "display_name": user_map.get(row.created_by_id, f"用户{row.created_by_id}"),
+                    "count": int(row.count or 0),
+                    "estimated_rows": int(row.estimated_rows or 0),
+                }
+                for row in top_submitter_rows if row.created_by_id is not None
+            ],
+            "top_instances": [
+                {
+                    "instance_name": row.instance_name or "未知实例",
+                    "count": int(row.count or 0),
+                    "estimated_rows": int(row.estimated_rows or 0),
+                }
+                for row in top_instance_rows
+            ],
+            "top_tables": [
+                {
+                    "source_label": f"{row.source_db or '未知库'}.{row.source_table or '未知表'}",
+                    "count": int(row.count or 0),
+                    "estimated_rows": int(row.estimated_rows or 0),
+                    "processed_rows": int(row.processed_rows or 0),
+                }
+                for row in top_table_rows
+            ],
+        }
+
+    @staticmethod
     async def get_workflow_overview(db: AsyncSession, user: dict, days: int = 7) -> dict:
         now = datetime.now(UTC)
         period_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -653,6 +904,11 @@ class DashboardService:
         def workflow_stmt(*conditions):
             stmt = select(SqlWorkflow)
             stmt = DashboardService._apply_workflow_scope(stmt, scope)
+            stmt = stmt.where(
+                SqlWorkflow.id.in_(
+                    select(WorkflowAudit.workflow_id).where(WorkflowAudit.workflow_type == int(WorkflowType.SQL))
+                )
+            )
             if conditions:
                 stmt = stmt.where(and_(*conditions))
             return stmt
@@ -662,6 +918,7 @@ class DashboardService:
                 select(WorkflowLog, SqlWorkflow)
                 .join(WorkflowAudit, WorkflowLog.audit_id == WorkflowAudit.id)
                 .join(SqlWorkflow, WorkflowAudit.workflow_id == SqlWorkflow.id)
+                .where(WorkflowAudit.workflow_type == int(WorkflowType.SQL))
             )
             stmt = DashboardService._apply_workflow_log_scope(stmt, scope)
             if conditions:

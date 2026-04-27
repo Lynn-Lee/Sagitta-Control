@@ -67,6 +67,15 @@ async def workflow_overview(
     return await DashboardService.get_workflow_overview(db, user=user, days=days)
 
 
+@router.get("/dashboard/archive-overview/", summary="数据归档概览")
+async def archive_overview(
+    days: int = QParam(7, ge=1, le=365, description="展示最近 N 天，默认7天"),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await DashboardService.get_archive_overview(db, user=user, days=days)
+
+
 @router.get("/dashboard/instance-overview/", summary="实例与库概览")
 async def instance_overview(
     user: dict = Depends(current_user),
