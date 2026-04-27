@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Alert, Button, Descriptions, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
-import { ApiOutlined, BarChartOutlined, DatabaseOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
+import type { MenuProps } from 'antd'
+import { Alert, Button, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
+import { ApiOutlined, BarChartOutlined, DatabaseOutlined, DownOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import apiClient from '@/api/client'
@@ -173,6 +174,26 @@ export default function MonitorPage() {
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量保存失败'),
   })
+  const disableAllConfig = useMutation({
+    mutationFn: async () => {
+      const results = await Promise.allSettled(
+        instances.map(item => apiClient.put(`/monitor/native/instances/${item.instance_id}/config/`, {
+          is_enabled: false,
+          collect_interval: item.collect_interval || 60,
+          capacity_collect_interval: item.capacity_collect_interval || 3600,
+          retention_days: item.retention_days || 30,
+        })),
+      )
+      const failed = results.filter(result => result.status === 'rejected').length
+      return { total: instances.length, success: instances.length - failed, failed }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
+      msgApi.success(`已关闭 ${result.success}/${result.total} 个实例采集${result.failed ? `，失败 ${result.failed} 个` : ''}`)
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量关闭失败'),
+  })
   const collectNow = useMutation({
     mutationFn: (instanceId: number) => apiClient.post(`/monitor/native/instances/${instanceId}/collect/`).then(r => r.data),
     onSuccess: (_data, instanceId) => {
@@ -249,6 +270,17 @@ export default function MonitorPage() {
     setConfigOpen(true)
   }
 
+  const triggerDisableAllConfig = () => {
+    Modal.confirm({
+      title: '关闭全部实例采集',
+      content: `将关闭当前列表中 ${instances.length} 个实例的原生监控采集，已采集的历史指标不会被删除。`,
+      okText: '关闭采集',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => disableAllConfig.mutateAsync(),
+    })
+  }
+
   const triggerCollect = (instanceId?: number | null) => {
     if (!instanceId) return
     setSelectedId(instanceId)
@@ -264,6 +296,22 @@ export default function MonitorPage() {
       onOk: () => collectAll.mutateAsync(),
     })
   }
+
+  const bulkConfigItems: MenuProps['items'] = [
+    {
+      key: 'configure',
+      icon: <SettingOutlined />,
+      label: '批量配置/开启全部实例',
+      onClick: openAllConfig,
+    },
+    {
+      key: 'disable',
+      icon: <StopOutlined />,
+      danger: true,
+      label: '关闭全部实例采集',
+      onClick: triggerDisableAllConfig,
+    },
+  ]
 
   const columns = [
     {
@@ -333,7 +381,13 @@ export default function MonitorPage() {
         actions={(
           <Space wrap style={isMobile ? { width: '100%' } : undefined}>
             <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })}>刷新</Button>
-            {canManageConfig && <Button icon={<SettingOutlined />} disabled={!instances.length} loading={saveAllConfig.isPending} onClick={openAllConfig}>配置全部实例</Button>}
+            {canManageConfig && (
+              <Dropdown menu={{ items: bulkConfigItems }} disabled={!instances.length || saveAllConfig.isPending || disableAllConfig.isPending}>
+                <Button icon={<SettingOutlined />} loading={saveAllConfig.isPending || disableAllConfig.isPending}>
+                  配置全部实例 <DownOutlined />
+                </Button>
+              </Dropdown>
+            )}
             {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>采集全部实例</Button>}
           </Space>
         )}
@@ -492,10 +546,10 @@ export default function MonitorPage() {
           showIcon
           style={{ marginTop: 8 }}
           message={configScope === 'all' ? '该配置将应用到全部可见实例' : '该配置仅作用于当前实例'}
-          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置；采集时仍使用各实例自己的账号权限。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。'}
+          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置。打开“启用采集”就是一键开启全部实例，关闭它就是一键停用全部实例。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。'}
         />
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
+          <Form.Item name="is_enabled" label={configScope === 'all' ? '启用全部实例采集' : '启用采集'} valuePropName="checked">
             <Switch />
           </Form.Item>
           <Form.Item name="collect_interval" label="实例指标采集间隔（秒）" rules={[{ required: true }]}>
