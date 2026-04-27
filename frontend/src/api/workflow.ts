@@ -1,5 +1,15 @@
 import apiClient from './client'
 
+export interface RiskPlan {
+  scope: 'workflow' | 'query_privilege' | 'archive'
+  level: 'low' | 'medium' | 'high'
+  summary: string
+  risks: string[]
+  suggestions: string[]
+  requires_confirmation: boolean
+  requires_manual_remark: boolean
+}
+
 export interface WorkflowItem {
   id: number
   workflow_name: string
@@ -11,6 +21,8 @@ export interface WorkflowItem {
   engineer_display: string
   status: number
   status_desc: string
+  workflow_type?: number
+  workflow_type_label?: string
   execute_mode?: string | null
   scheduled_execute_at?: string | null
   executed_by_id?: number | null
@@ -22,6 +34,10 @@ export interface WorkflowItem {
   finish_time?: string | null
   current_node_name?: string
   audit_chain_text?: string
+  risk_level?: 'low' | 'medium' | 'high' | ''
+  risk_summary?: string
+  risk_remark?: string
+  can_cancel?: boolean
 }
 
 export interface WorkflowCreateResponse {
@@ -61,7 +77,7 @@ export const workflowApi = {
 
   create: (data: {
     workflow_name: string; group_id?: number; flow_id?: number; instance_id: number
-    db_name: string; sql_content: string; syntax_type?: number; is_backup?: boolean
+    db_name: string; sql_content: string; syntax_type?: number; is_backup?: boolean; risk_remark?: string
   }) => apiClient.post<WorkflowCreateResponse>('/workflow/', data).then(r => r.data),
 
   get: (id: number) =>
@@ -87,6 +103,14 @@ export const workflowApi = {
 
   check: (data: { instance_id: number; db_name: string; sql_content: string }) =>
     apiClient.post<WorkflowCheckResponse>('/workflow/check/', data).then(r => r.data),
+
+  riskPlan: (data: { instance_id: number; db_name: string; sql_content: string }) =>
+    apiClient.post<{
+      status: number
+      risk_plan: RiskPlan
+      requires_high_risk_submit_permission?: boolean
+      can_submit_high_risk_sql?: boolean
+    }>('/workflow/risk-plan/', data).then(r => r.data),
 
   pending: (params?: { page?: number; page_size?: number }) =>
     apiClient.get('/workflow/pending/', { params }).then(r => r.data),

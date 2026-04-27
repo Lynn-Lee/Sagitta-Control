@@ -17,7 +17,6 @@ from app.routers import (
     approval_flow,
     archive,
     auth,
-    binlog,
     diagnostic,
     instance,
     masking,
@@ -76,7 +75,6 @@ app.include_router(slowlog.router,    prefix=f"{API_V1}/slowlog",    tags=["慢�
 app.include_router(slowlog.router,    prefix=f"{API_V1}/sql-analysis", tags=["SQL 分析"])
 app.include_router(diagnostic.router, prefix=f"{API_V1}/diagnostic", tags=["会话诊断"])
 app.include_router(archive.router,    prefix=f"{API_V1}/archive",    tags=["数据归档"])
-app.include_router(binlog.router,     prefix=f"{API_V1}/binlog",     tags=["Binlog"])
 app.include_router(optimize.router,   prefix=f"{API_V1}/optimize",   tags=["SQL 优化"])
 app.include_router(monitor.router,    prefix=f"{API_V1}/monitor",    tags=["可观测中心"])
 app.include_router(system.router,     prefix=f"{API_V1}/system",     tags=["系统管理"])

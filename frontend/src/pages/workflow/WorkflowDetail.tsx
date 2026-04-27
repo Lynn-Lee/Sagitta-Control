@@ -6,6 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { workflowApi } from '@/api/workflow'
 import PageHeader from '@/components/common/PageHeader'
+import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import { useAuthStore } from '@/store/auth'
@@ -97,6 +98,37 @@ export default function WorkflowDetail() {
     { title: '时间', dataIndex: 'created_at', width: 180, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
   ]
 
+  const isHighRisk = wf.risk_plan?.level === 'high'
+
+  const handleAuditPass = () => {
+    if (!isHighRisk || !wf.risk_plan) {
+      auditMut.mutate({ action: 'pass' })
+      return
+    }
+    Modal.confirm({
+      title: '确认放行高风险申请？',
+      width: 640,
+      okText: '确认通过',
+      okButtonProps: { danger: true },
+      cancelText: '返回检查',
+      content: (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <RiskPlanAlert plan={wf.risk_plan} />
+          {wf.risk_remark ? (
+            <div>
+              <Text strong>申请人风险说明：</Text>
+              <div style={{ marginTop: 4 }}>{wf.risk_remark}</div>
+            </div>
+          ) : null}
+          <Text type="secondary">
+            审批前请确认变更范围、影响面、恢复/补偿方案是否可接受；如风险不可控，请驳回申请。
+          </Text>
+        </Space>
+      ),
+      onOk: () => auditMut.mutateAsync({ action: 'pass' }),
+    })
+  }
+
   return (
     <div>
       {msgCtx}
@@ -105,8 +137,13 @@ export default function WorkflowDetail() {
         actions={
           <Space wrap>
           {wf.can_audit && <>
-            <Button type="primary" icon={<CheckOutlined />} loading={auditMut.isPending}
-              onClick={() => auditMut.mutate({ action: 'pass' })}>审批通过</Button>
+            {isHighRisk && (
+              <Text type="danger" style={{ fontSize: 12 }}>
+                高风险申请，请先查看风险预案
+              </Text>
+            )}
+            <Button type="primary" danger={isHighRisk} icon={<CheckOutlined />} loading={auditMut.isPending}
+              onClick={handleAuditPass}>审批通过</Button>
             <Button danger icon={<CloseOutlined />} loading={auditMut.isPending}
               onClick={() => auditMut.mutate({ action: 'reject', remark: '驳回' })}>驳回</Button>
           </>}
@@ -125,9 +162,24 @@ export default function WorkflowDetail() {
         marginBottom={20}
       />
 
+      {wf.can_audit && isHighRisk && (
+        <SectionCard title="审批风险提示">
+          <RiskPlanAlert plan={wf.risk_plan} />
+          {wf.risk_remark ? (
+            <div style={{ marginTop: 12 }}>
+              <Text strong>申请人风险说明：</Text>
+              <div style={{ marginTop: 4 }}>{wf.risk_remark}</div>
+            </div>
+          ) : null}
+        </SectionCard>
+      )}
+
       <SectionCard>
         <Descriptions column={3} size="small">
           <Descriptions.Item label="工单名称">{wf.workflow_name}</Descriptions.Item>
+          <Descriptions.Item label="类型">
+            <Tag color={wf.workflow_type_label === '数据归档' ? 'blue' : 'default'}>{wf.workflow_type_label || 'SQL 工单'}</Tag>
+          </Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={STATUS_COLOR[wf.status]}>{wf.status_desc}</Tag>
           </Descriptions.Item>
@@ -162,6 +214,18 @@ export default function WorkflowDetail() {
           )}
         </Descriptions>
       </SectionCard>
+
+      {wf.risk_plan && (
+        <SectionCard title="风险预案">
+          <RiskPlanAlert plan={wf.risk_plan} />
+          {wf.risk_remark ? (
+            <div style={{ marginTop: 12 }}>
+              <Text strong>申请人说明：</Text>
+              <div style={{ marginTop: 4 }}>{wf.risk_remark}</div>
+            </div>
+          ) : null}
+        </SectionCard>
+      )}
 
       <SectionCard title="SQL 内容" bodyPadding={0}>
         <pre style={{ padding: 16, margin: 0, fontFamily: '"JetBrains Mono", monospace', fontSize: 13,

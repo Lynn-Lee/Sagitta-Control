@@ -114,13 +114,6 @@ const ArchiveMenuSvg = () => (
   </svg>
 )
 
-const BinlogMenuSvg = () => (
-  <svg viewBox="0 0 1024 1024" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M512 56.888889C341.333333 56.888889 193.422222 153.6 113.777778 290.133333V113.777778H56.888889v341.333333h341.333333V398.222222H136.533333C182.044444 238.933333 335.644444 119.466667 512 119.466667c216.177778 0 392.533333 176.355556 392.533333 392.533333s-176.355556 392.533333-392.533333 392.533333c-130.844444 0-244.622222-62.577778-318.577778-159.288889l-45.511111 45.511112C233.244444 898.844444 364.088889 967.111111 512 967.111111c250.311111 0 455.111111-204.8 455.111111-455.111111s-204.8-455.111111-455.111111-455.111111z" />
-    <path d="M512 591.644444V284.444444H455.111111v341.333334l199.111111 113.777778 28.444445-51.2z" />
-  </svg>
-)
-
 const MonitorMenuSvg = () => (
   <svg viewBox="0 0 1024 1024" width="1em" height="1em" fill="currentColor" aria-hidden="true">
     <path d="M651.84 348.8a32.448 32.448 0 0 1 45.184-2.752c12.992 11.968 14.656 31.552 2.688 44.16l-160.64 183.616a32 32 0 0 1-50.624-3.264L391.552 421.76l-139.52 153.088a30.208 30.208 0 0 1-23.36 10.368 32 32 0 0 1-23.36-53.44L372.48 348.8a31.552 31.552 0 0 1 50.112 3.84L518.4 500.8l133.44-152.064z" />
@@ -176,6 +169,7 @@ const MenuIcon = ({ component, label }: { component: React.ComponentType; label:
 
 type NavItem = NonNullable<MenuProps['items']>[number] & {
   permission?: string
+  anyPermissions?: string[]
   children?: NavItem[]
 }
 
@@ -199,12 +193,11 @@ const NAV_ITEMS: NavItem[] = [
   },
   { key: '/monitor', icon: <MenuIcon component={MonitorMenuSvg} label="可观测中心" />, label: '可观测中心', permission: 'menu_monitor' },
   {
-    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', permission: 'menu_ops',
+    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', anyPermissions: ['menu_ops', 'archive_apply', 'archive_review', 'archive_execute'],
     children: [
-      { key: '/diagnostic', icon: <MenuIcon component={DiagnosticMenuSvg} label="会话管理" />, label: '会话管理' },
-      { key: '/sql-analysis', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 分析" />, label: 'SQL 分析' },
-      { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档' },
-      { key: '/binlog', icon: <MenuIcon component={BinlogMenuSvg} label="回滚辅助" />, label: '回滚辅助' },
+      { key: '/diagnostic', icon: <MenuIcon component={DiagnosticMenuSvg} label="会话管理" />, label: '会话管理', permission: 'menu_ops' },
+      { key: '/sql-analysis', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 分析" />, label: 'SQL 分析', permission: 'menu_ops' },
+      { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'] },
     ],
   },
   { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典', permission: 'menu_schema' },
@@ -270,14 +263,24 @@ export default function MainLayout() {
 
   const selectedKeys = [selectedMenuKey]
   const visibleNavItems = NAV_ITEMS
-    .filter((item) => !item.permission || hasPermission(item.permission))
+    .filter((item) => {
+      if (item.permission && !hasPermission(item.permission)) return false
+      if (item.anyPermissions && !item.anyPermissions.some((perm) => hasPermission(perm))) return false
+      return true
+    })
     .map((item) => {
       if (!item.children) return item
+      const children = item.children as NavItem[]
       return {
         ...item,
-        children: item.children.filter(Boolean),
+        children: children.filter((child) => {
+          if (child.permission && !hasPermission(child.permission)) return false
+          if (child.anyPermissions && !child.anyPermissions.some((perm) => hasPermission(perm))) return false
+          return true
+        }),
       }
     })
+    .filter((item) => !item.children || item.children.length > 0)
   const openKeys = useMemo(() => {
     const parent = NAV_ITEMS.find((item) => item.children?.some((child) => child.key === selectedMenuKey))
     return parent ? [parent.key as string] : []

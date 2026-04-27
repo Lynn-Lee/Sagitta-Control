@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
+from app.models.instance import Instance
 from app.schemas.workflow import (
     WorkflowAuditRequest,
     WorkflowCheckRequest,
@@ -19,6 +20,7 @@ from app.schemas.workflow import (
 from app.services.audit import AuditService
 from app.services.audit_log import AuditLogService
 from app.services.notify import NotifyService
+from app.services.risk_plan import RiskPlanService
 from app.services.workflow import WorkflowService
 
 logger = logging.getLogger(__name__)
@@ -95,6 +97,30 @@ async def check_sql(
 ):
     results = await WorkflowService.check_sql(db, data.instance_id, data.db_name, data.sql_content)
     return {"status": 0, "data": results}
+
+
+@router.post("/risk-plan/", summary="SQL 工单风险预案")
+async def workflow_risk_plan(
+    data: WorkflowCheckRequest,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import select
+
+    result = await db.execute(select(Instance).where(Instance.id == data.instance_id))
+    inst = result.scalar_one_or_none()
+    db_type = inst.db_type if inst else ""
+    plan = RiskPlanService.build_workflow_plan(db_type, data.db_name, data.sql_content)
+    requires_high_risk_submit_permission = (
+        plan.level == "high"
+        and RiskPlanService.is_privileged_workflow_sql(db_type, data.sql_content)
+    )
+    return {
+        "status": 0,
+        "risk_plan": plan.model_dump(),
+        "requires_high_risk_submit_permission": requires_high_risk_submit_permission,
+        "can_submit_high_risk_sql": WorkflowService._can_submit_high_risk_sql(user),
+    }
 
 
 @router.get("/{workflow_id}/", summary="工单详情")

@@ -10,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.exceptions import AppException
+from app.engines.models import ReviewSet, SqlItem
 from app.models.workflow import AuditStatus, WorkflowStatus, WorkflowType
 from app.schemas.workflow import WorkflowCreateRequest, WorkflowExecuteRequest
+from app.services.audit import AuditService
 from app.services.workflow import WorkflowService
 
 
@@ -182,6 +184,191 @@ class TestWorkflowHelpers:
         assert "applicant_id" not in decorated[1]
 
 
+class TestWorkflowCreateHighRiskSubmit:
+    def _request(self, sql: str, risk_remark: str = "已确认影响范围和回滚方案") -> WorkflowCreateRequest:
+        return WorkflowCreateRequest(
+            workflow_name="清理日志表",
+            instance_id=8,
+            db_name="app",
+            sql_content=sql,
+            syntax_type=2,
+            flow_id=1,
+            risk_remark=risk_remark,
+        )
+
+    def _db(self):
+        rg = SimpleNamespace(id=3, group_name="技术组", is_active=True)
+        inst = SimpleNamespace(id=8, db_type="mysql", resource_groups=[rg])
+        inst_result = MagicMock()
+        inst_result.scalar_one_or_none.return_value = inst
+        return SimpleNamespace(
+            execute=AsyncMock(return_value=inst_result),
+            add=MagicMock(),
+            flush=AsyncMock(),
+        )
+
+    def _review_error(self, sql: str) -> ReviewSet:
+        review = ReviewSet(full_sql=sql)
+        review.append(SqlItem(id=1, sql=sql, errlevel=2, errormessage="UPDATE/DELETE 语句缺少 WHERE 条件，拒绝执行"))
+        return review
+
+    @pytest.mark.asyncio
+    async def test_developer_cannot_submit_privileged_high_risk_sql(self):
+        db = self._db()
+        sql = "DELETE FROM log_table"
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=self._review_error(sql)))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await WorkflowService.create(
+                    db,
+                    self._request(sql),
+                    {
+                        "id": 7,
+                        "username": "developer",
+                        "resource_groups": [3],
+                        "permissions": ["sql_submit"],
+                        "is_superuser": False,
+                    },
+                )
+
+        assert exc_info.value.code == 403
+        assert "高危 SQL 工单需要高危提交权限" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_dba_can_submit_privileged_high_risk_sql_for_review(self):
+        db = self._db()
+        sql = "DELETE FROM log_table"
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=self._review_error(sql)))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ), patch("app.services.audit.AuditService.create_audit", AsyncMock(return_value=None)):
+            workflow = await WorkflowService.create(
+                db,
+                self._request(sql),
+                {
+                    "id": 2,
+                    "username": "dba",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit", "sql_submit_high_risk"],
+                    "is_superuser": False,
+                },
+            )
+
+        assert workflow.workflow_name == "清理日志表"
+        assert db.add.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_dba_group_role_can_submit_privileged_high_risk_sql_without_cached_permission(self):
+        db = self._db()
+        sql = "DELETE FROM log_table"
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=self._review_error(sql)))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ), patch("app.services.audit.AuditService.create_audit", AsyncMock(return_value=None)):
+            workflow = await WorkflowService.create(
+                db,
+                self._request(sql),
+                {
+                    "id": 3,
+                    "username": "wanglei",
+                    "role": "dba_group",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit"],
+                    "is_superuser": False,
+                },
+            )
+
+        assert workflow.workflow_name == "清理日志表"
+
+    @pytest.mark.asyncio
+    async def test_high_risk_sql_still_requires_risk_remark(self):
+        db = self._db()
+        sql = "DELETE FROM log_table"
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=self._review_error(sql)))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await WorkflowService.create(
+                    db,
+                    self._request(sql, risk_remark=""),
+                    {
+                        "id": 2,
+                        "username": "dba",
+                        "resource_groups": [3],
+                        "permissions": ["sql_submit", "sql_submit_high_risk"],
+                        "is_superuser": False,
+                    },
+                )
+
+        assert exc_info.value.message == "高风险工单必须填写风险/回滚说明"
+
+    @pytest.mark.asyncio
+    async def test_normal_review_error_is_not_overridden_by_high_risk_permission(self):
+        db = self._db()
+        sql = "SELECT FROM"
+        review = ReviewSet(full_sql=sql)
+        review.append(SqlItem(id=1, sql=sql, errlevel=2, errormessage="无法解析的 SQL 语句"))
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=review))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await WorkflowService.create(
+                    db,
+                    self._request(sql),
+                    {
+                        "id": 2,
+                        "username": "dba",
+                        "resource_groups": [3],
+                        "permissions": ["sql_submit", "sql_submit_high_risk"],
+                        "is_superuser": False,
+                    },
+                )
+
+        assert exc_info.value.code == 400
+        assert exc_info.value.message == "SQL 预检查不通过，请修改后重新提交"
+
+    @pytest.mark.asyncio
+    async def test_review_connection_error_is_not_overridden_by_high_risk_permission(self):
+        db = self._db()
+        sql = "DELETE FROM log_table"
+        review = ReviewSet(full_sql=sql, error="连接数据库失败")
+        engine = SimpleNamespace(execute_check=AsyncMock(return_value=review))
+
+        with patch("app.services.workflow.get_engine", return_value=engine), patch(
+            "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
+            AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
+        ):
+            with pytest.raises(AppException) as exc_info:
+                await WorkflowService.create(
+                    db,
+                    self._request(sql),
+                    {
+                        "id": 2,
+                        "username": "dba",
+                        "resource_groups": [3],
+                        "permissions": ["sql_submit", "sql_submit_high_risk"],
+                        "is_superuser": False,
+                    },
+                )
+
+        assert exc_info.value.code == 400
+        assert exc_info.value.message == "SQL 预检查失败：连接数据库失败"
+
+
 class TestWorkflowListingAndDetail:
     def _make_workflow(self, **overrides):
         wf = SimpleNamespace(
@@ -284,7 +471,7 @@ class TestWorkflowListingAndDetail:
         db = AsyncMock()
         wf = self._make_workflow(
             engineer="liuyang",
-            status=WorkflowStatus.TIMING_TASK,
+            status=WorkflowStatus.PENDING_REVIEW,
             content=SimpleNamespace(sql_content="delete from t", review_content="[]", execute_result=""),
         )
         row_result = MagicMock()
@@ -302,6 +489,82 @@ class TestWorkflowListingAndDetail:
 
         assert detail["can_audit"] is False
         assert detail["can_cancel"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_detail_blocks_cancel_after_node_operated(self):
+        db = AsyncMock()
+        wf = self._make_workflow(
+            engineer="liuyang",
+            status=WorkflowStatus.PENDING_REVIEW,
+            content=SimpleNamespace(sql_content="delete from t", review_content="[]", execute_result=""),
+        )
+        row_result = MagicMock()
+        row_result.first.return_value = (wf, "MySQL-技术组")
+        db.execute = AsyncMock(return_value=row_result)
+        audit_info = {"nodes": [{"node_name": "直属领导", "status": AuditStatus.PASSED, "operator": "yanjiabao"}]}
+
+        with patch("app.services.audit.AuditService.get_audit_info", AsyncMock(return_value=audit_info)), patch(
+            "app.services.audit.AuditService.get_audit_logs", AsyncMock(return_value=[])
+        ):
+            detail = await WorkflowService.get_detail(
+                db,
+                5,
+                {"id": 7, "username": "liuyang", "permissions": [], "is_superuser": False},
+            )
+
+        assert detail["can_cancel"] is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_workflow_marks_pending_nodes_canceled(self):
+        db = AsyncMock()
+        workflow = SimpleNamespace(id=5, status=WorkflowStatus.PENDING_REVIEW, engineer="liuyang")
+        nodes = [
+            {"node_name": "直属领导", "status": AuditStatus.PENDING, "operator": None},
+            {"node_name": "DBA", "status": AuditStatus.PENDING, "operator": None},
+        ]
+        audit = SimpleNamespace(
+            id=9,
+            workflow_type=WorkflowType.SQL,
+            current_status=AuditStatus.PENDING,
+            audit_auth_groups_info=json.dumps(nodes, ensure_ascii=False),
+        )
+
+        with patch("app.services.audit.AuditService._write_log", AsyncMock()):
+            await AuditService._do_cancel(
+                db,
+                workflow,
+                audit,
+                {"id": 7, "username": "liuyang", "display_name": "刘洋"},
+                "",
+            )
+
+        canceled_nodes = json.loads(audit.audit_auth_groups_info)
+        assert workflow.status == WorkflowStatus.ABORT
+        assert audit.current_status == AuditStatus.CANCELED
+        assert [node["status"] for node in canceled_nodes] == [AuditStatus.CANCELED, AuditStatus.CANCELED]
+
+    @pytest.mark.asyncio
+    async def test_cancel_workflow_rejects_after_node_operated(self):
+        db = AsyncMock()
+        workflow = SimpleNamespace(id=5, status=WorkflowStatus.PENDING_REVIEW, engineer="liuyang")
+        audit = SimpleNamespace(
+            id=9,
+            workflow_type=WorkflowType.SQL,
+            current_status=AuditStatus.PENDING,
+            audit_auth_groups_info=json.dumps(
+                [{"node_name": "直属领导", "status": AuditStatus.PASSED, "operator": "yanjiabao"}],
+                ensure_ascii=False,
+            ),
+        )
+
+        with pytest.raises(AppException, match="审批节点已操作"):
+            await AuditService._do_cancel(
+                db,
+                workflow,
+                audit,
+                {"id": 7, "username": "liuyang", "display_name": "刘洋"},
+                "",
+            )
 
 
 class TestWorkflowExecuteSync:

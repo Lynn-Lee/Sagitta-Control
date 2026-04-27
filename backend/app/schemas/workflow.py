@@ -18,6 +18,7 @@ class WorkflowCreateRequest(BaseModel):
     run_date_end: datetime | None = None
     # 多级审批流：指定流程模板 ID；不传则使用资源组默认单级审批
     flow_id: int | None = Field(default=None, description="审批流模板 ID（不传则使用默认单级审批）")
+    risk_remark: str = Field(default="", max_length=500, description="高风险变更说明/回滚说明")
 
     @field_validator("sql_content")
     @classmethod
@@ -120,6 +121,8 @@ class WorkflowDetailResponse(BaseModel):
     sql_content: str = ""
     review_content: str = ""
     execute_result: str = ""
+    risk_plan: dict | None = None
+    risk_remark: str = ""
     audit_logs: list[dict] = []
 
 

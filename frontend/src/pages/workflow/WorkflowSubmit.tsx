@@ -6,8 +6,9 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { instanceApi, type InstanceDatabase, type InstanceItem } from '@/api/instance'
 import { approvalFlowApi, type ApprovalFlowListItem } from '@/api/approvalFlow'
-import { workflowApi } from '@/api/workflow'
+import { workflowApi, type RiskPlan } from '@/api/workflow'
 import PageHeader from '@/components/common/PageHeader'
+import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
@@ -51,12 +52,21 @@ export default function WorkflowSubmit() {
   const user = useAuthStore((state) => state.user)
   const canManageGlobal =
     !!user?.is_superuser || !!user?.permissions?.some((perm) => perm === 'sql_review' || perm === 'sql_execute')
+  const canSubmitHighRiskSql =
+    !!user?.is_superuser
+    || user?.role === 'dba'
+    || user?.role === 'dba_group'
+    || !!user?.permissions?.includes('sql_submit_high_risk')
   const [sql, setSql] = useState('')
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [dbName, setDbName] = useState<string>('')
   const [syntaxType, setSyntaxType] = useState(0)
   const [checkResults, setCheckResults] = useState<Array<{ id: number; sql: string; errlevel: number; msg: string }>>([])
   const [checking, setChecking] = useState(false)
+  const [riskPlan, setRiskPlan] = useState<RiskPlan | null>(null)
+  const [riskPlanCanSubmitHighRiskSql, setRiskPlanCanSubmitHighRiskSql] = useState<boolean | null>(null)
+  const [riskPlanRequiresHighRiskPermission, setRiskPlanRequiresHighRiskPermission] = useState(false)
+  const [riskChecking, setRiskChecking] = useState(false)
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
@@ -267,21 +277,68 @@ export default function WorkflowSubmit() {
         return
       }
       if (!sql.trim()) { msgApi.warning('SQL 内容不能为空'); return }
-      submitMut.mutate({
+      setRiskChecking(true)
+      const planRes = await workflowApi.riskPlan({ instance_id: instanceId, db_name: dbName, sql_content: sql })
+      const plan = planRes.risk_plan
+      setRiskPlan(plan)
+      const serverCanSubmitHighRiskSql = planRes.can_submit_high_risk_sql ?? canSubmitHighRiskSql
+      const requiresHighRiskPermission = planRes.requires_high_risk_submit_permission ?? plan.level === 'high'
+      setRiskPlanCanSubmitHighRiskSql(serverCanSubmitHighRiskSql)
+      setRiskPlanRequiresHighRiskPermission(requiresHighRiskPermission)
+      setRiskChecking(false)
+      if (requiresHighRiskPermission && !serverCanSubmitHighRiskSql) {
+        msgApi.error('高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限')
+        return
+      }
+      if (plan.requires_manual_remark && !values.risk_remark?.trim()) {
+        msgApi.warning('高风险工单请填写风险/回滚说明后再提交')
+        return
+      }
+      const payload = {
         ...values,
         sql_content: sql,
         instance_id: instanceId,
         db_name: dbName,
         syntax_type: syntaxType,
-      })
-    } catch { /* validation */ }
+      }
+      if (plan.requires_confirmation) {
+        Modal.confirm({
+          title: '确认提交高风险 SQL 工单？',
+          width: 640,
+          okText: '确认提交',
+          okButtonProps: { danger: true },
+          cancelText: '返回修改',
+          content: (
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <RiskPlanAlert plan={plan} />
+              {values.risk_remark?.trim() && (
+                <div>
+                  <Text strong>风险/回滚说明：</Text>
+                  <div style={{ marginTop: 4 }}>{values.risk_remark}</div>
+                </div>
+              )}
+            </Space>
+          ),
+          onOk: () => submitMut.mutateAsync(payload),
+        })
+        return
+      }
+      submitMut.mutate(payload)
+    } catch {
+      setRiskChecking(false)
+    }
   }
 
   const checkColumns = [
     { title: '#', dataIndex: 'id', width: 50 },
     { title: 'SQL', dataIndex: 'sql', ellipsis: true },
     { title: '级别', dataIndex: 'errlevel', width: 80,
-      render: (v: number) => v === 0 ? <Tag color="success">OK</Tag> : v === 1 ? <Tag color="warning">警告</Tag> : <Tag color="error">错误</Tag> },
+      render: (v: number) => {
+        if (v === 0) return <Tag color="success">OK</Tag>
+        if (v === 1) return <Tag color="warning">警告</Tag>
+        if (riskPlan?.level === 'high' && (riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql)) return <Tag color="error">高危</Tag>
+        return <Tag color="error">错误</Tag>
+      } },
     { title: '信息', dataIndex: 'msg', ellipsis: true },
   ]
 
@@ -309,7 +366,7 @@ export default function WorkflowSubmit() {
           </Form.Item>
           <Space style={{ width: '100%', display: 'flex' }} align="start">
             <Form.Item label="实例" style={{ flex: 1 }} required>
-              <Select placeholder="选择实例" onChange={(v) => { setInstanceId(v); setDbName('') }}
+              <Select placeholder="选择实例" onChange={(v) => { setInstanceId(v); setDbName(''); setRiskPlan(null); setRiskPlanCanSubmitHighRiskSql(null); setRiskPlanRequiresHighRiskPermission(false) }}
                 showSearch optionFilterProp="label" popupMatchSelectWidth={false}>
                 {instanceItems.map((i) => (
                   <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}>
@@ -322,7 +379,7 @@ export default function WorkflowSubmit() {
               <Select
                   placeholder={!instanceId ? "请先选择实例" : dbData?.items?.length === 0 ? "该实例暂无注册数据库，请在实例管理中添加" : "选择数据库"}
                   value={dbName || undefined}
-                  onChange={setDbName}
+                  onChange={(value) => { setDbName(value); setRiskPlan(null); setRiskPlanCanSubmitHighRiskSql(null); setRiskPlanRequiresHighRiskPermission(false) }}
                   disabled={!instanceId}
                   showSearch
                   popupMatchSelectWidth={false}
@@ -351,6 +408,30 @@ export default function WorkflowSubmit() {
             description="提交工单时只需选择自己可访问的实例和数据库。系统会根据“用户组 → 资源组 → 实例”的权限链路自动绑定资源组。"
             style={{ marginTop: 4 }}
           />
+          {riskPlan && (
+            <div style={{ marginTop: 16 }}>
+              <RiskPlanAlert plan={riskPlan} />
+            </div>
+          )}
+          {riskPlanRequiresHighRiskPermission && !(riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql) && (
+            <Alert
+              type="error"
+              showIcon
+              message="当前账号不能提交高危 SQL 工单"
+              description="清空表、全表删除、无 where 更新或 DDL 等高危 SQL 需要 sql_submit_high_risk 权限，请联系 DBA 提交或申请该权限。"
+              style={{ marginTop: 16 }}
+            />
+          )}
+          {riskPlan?.requires_manual_remark && (
+            <Form.Item
+              name="risk_remark"
+              label="风险/回滚说明"
+              rules={[{ required: true, message: '请填写高风险工单的风险/回滚说明' }]}
+              style={{ marginTop: 16 }}
+            >
+              <Input.TextArea rows={3} placeholder="说明影响范围、备份方式、验证方式和异常恢复路径" />
+            </Form.Item>
+          )}
         </Form>
       </SectionCard>
 
@@ -364,7 +445,7 @@ export default function WorkflowSubmit() {
           </Space>
         }>
         <Editor height="300px" defaultLanguage="sql" value={sql}
-          onChange={(v) => setSql(v || '')}
+          onChange={(v) => { setSql(v || ''); setRiskPlan(null); setRiskPlanCanSubmitHighRiskSql(null); setRiskPlanRequiresHighRiskPermission(false) }}
           options={{ fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, minimap: { enabled: false }, padding: { top: 12 } }} />
       </SectionCard>
 
@@ -376,7 +457,14 @@ export default function WorkflowSubmit() {
       )}
 
       <Space>
-        <Button type="primary" loading={submitMut.isPending} onClick={handleSubmit}>提交工单</Button>
+        <Button
+          type="primary"
+          disabled={riskPlanRequiresHighRiskPermission && !(riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql)}
+          loading={submitMut.isPending || riskChecking}
+          onClick={handleSubmit}
+        >
+          提交工单
+        </Button>
         <Button onClick={() => navigate('/workflow')}>取消</Button>
       </Space>
 

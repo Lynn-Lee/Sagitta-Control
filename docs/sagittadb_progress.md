@@ -2,7 +2,7 @@
 
 > **项目路径：** `/Users/lynn/SynologyDrive/SynologyDrive/Code/SagittaDB`
 > **重构基准：** Archery v1.14.0
-> **文档版本：** v1.12 · 2026-04-24
+> **文档版本：** v1.13 · 2026-04-27
 > **状态说明：** ✅ 已完成并验证 · 🔧 已开发待测试 · 📋 待开发
 
 ---
@@ -34,7 +34,7 @@
 | Pack C1 | 系统配置、审计日志、资源组、个人设置 | ✅ | 100% |
 | Pack C2 | 实例数据库注册管理 | ✅ | 100% |
 | Pack D | 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL | ✅ | 100% |
-| Pack E | 多引擎补全、数据归档、SQL 回滚辅助、通知服务 | 🔧 | 85% |
+| Pack E | 多引擎补全、数据归档、通知服务 | ✅ | 100% |
 | Pack F | 第三方登录（LDAP/钉钉/飞书/企微/CAS） | ✅ | 100% |
 | Pack G | 全链路测试、性能测试、安全扫描 | ✅ | 100% |
 | Pack H | Helm Chart、CI/CD 流水线、生产环境配置 | ✅ | 100% |
@@ -202,7 +202,7 @@
 | 工单模板（个人/全局、从模板创建、保存为模板、默认模板） | ✅ |
 | AI Text2SQL（Claude API，多方言适配） | ✅ |
 
-### Pack E — 引擎补全与高级工具 🔧
+### Pack E — 引擎补全与高级工具 ✅
 
 **多引擎实现**
 | 引擎 | 状态 | 说明 |
@@ -230,19 +230,16 @@
 
 **数据归档**
 - 全数据库支持矩阵（不支持的返回明确提示）
-- 归档提交后创建 `WorkflowType.ARCHIVE` 审批工单，`archive_review` 用于审批
+- 归档提交后创建 `WorkflowType.ARCHIVE` 审批工单，支持直属上级、指定人员和任意审批员节点
+- 权限拆分为 `archive_apply` / `archive_review` / `archive_execute`：研发默认可申请，DBA/资源组 DBA/超管默认可审批和执行
 - 后台作业化执行：`archive_job / archive_batch_log` 记录状态、估算行数、真实处理行数、批次日志、错误信息和 Celery task
 - purge 模式：分批删除，各数据库语法适配，优先使用真实 affected rows 统计
 - dest 模式：跨实例迁移（INSERT + DELETE），按批记录插入/删除结果和失败补偿提示
-- 支持作业启动、暂停、继续、取消；暂停/取消在当前批次完成后生效
+- 审批后执行处理与 SQL 工单保持一致，支持立即执行、定时执行和外部已执行登记
+- 支持作业启动、暂停、继续、取消执行/停止作业；暂停/停止在当前批次完成后生效
+- 归档任务记录按“自己提交 / 待我审批 / 我已审批 / 我可执行”统一展示，直属领导审批人可直接在数据归档中处理申请
 - SQL 条件安全校验：禁止空条件、多语句、注释绕过和明显全表条件；MongoDB 条件必须为非空 JSON
-- 前端作业工作台：提交审批、作业列表、进度、批次日志、状态控制和恢复提示
-
-**SQL 回滚辅助**
-- sqlglot 静态逆向 SQL 生成（INSERT↔DELETE↔UPDATE）
-- MySQL/TiDB：my2sql 命令生成器
-- PostgreSQL：WAL 查询语句生成
-- 各数据库回滚方案说明文档
+- 前端作业工作台：风险预案、提交审批、作业列表、执行处理、进度、批次日志、状态控制和恢复提示
 
 **通知服务**
 - 钉钉/企微/飞书三渠道并发通知
@@ -373,7 +370,7 @@
 - `tests/unit/test_mongo_engine.py`：MongoDB 引擎（已有）
 - `tests/unit/test_ldap_auth.py`：LDAP 认证服务（5 个测试）
 - `tests/unit/test_oauth_auth.py`：OAuth2 服务（8 个测试）
-- `tests/unit/test_rollback.py`：SQL 回滚辅助（24 个测试）— generate_reverse_sql/my2sql/pg_wal
+- `tests/unit/test_archive_cancel.py`：归档撤回/执行权限/审批人可见性
 - `tests/unit/test_notify.py`：通知服务（14 个测试）— 钉钉/飞书/企微 mock HTTP
 - `tests/unit/test_system_config.py`：配置服务（15 个测试）— get_value/update_batch/敏感字段加密
 - `tests/unit/test_workflow_service.py`：工单服务（11 个测试）— 状态枚举/格式化/check_sql
@@ -482,7 +479,7 @@
 | 数据库注册 | instance_database 表解耦实例连接与数据库名，Oracle=Schema，Redis=数字索引；is_active 字段控制启停和权限 |
 | 数据库权限管控 | is_active=False 的库：普通用户 API 不可见 + 前端下拉框不显示；管理员可见并标灰提示"已禁用"；查询接口 403 拦截 |
 | 归档实现 | 纯 Python 通过引擎层执行，不依赖 pt-archiver，各数据库分批语法独立适配 |
-| Binlog 回滚 | 重定位为"SQL 回滚辅助"，my2sql 做命令生成器而非直接执行 |
+| 回滚辅助 | 回滚辅助/Binlog 页面暂从首发范围移除，恢复方案以 SQL 工单风险预案和归档恢复说明承载 |
 | 品牌主色 | #165DFF（Space Tech Blue，ARCO Design 标准色） |
 | OAuth2 回调架构 | 后端处理 code 交换 → JWT → 重定向前端，前端无需保存 client_secret，安全且符合 SPA 最佳实践 |
 | LDAP 密码验证 | 使用 user re-bind 方式（而非 compare），兼容更多 LDAP Server |

@@ -20,12 +20,18 @@ from app.models.workflow import (
     SqlWorkflowContent,
     WorkflowAudit,
     WorkflowStatus,
+    WorkflowType,
 )
 from app.schemas.workflow import WorkflowCreateRequest, WorkflowExecuteRequest
 from app.services.audit import OP_EXECUTE, OP_TIMING, AuditService
+from app.services.cancel_policy import ApplicationCancelPolicy
 from app.services.governance_scope import GovernanceScopeService
+from app.services.risk_plan import RiskPlanService
 
 logger = logging.getLogger(__name__)
+
+HIGH_RISK_SQL_SUBMIT_PERMISSION = "sql_submit_high_risk"
+HIGH_RISK_SQL_SUBMIT_ROLES = {"dba", "dba_group"}
 
 STATUS_DESC = {
     0: "待审核",
@@ -40,6 +46,13 @@ STATUS_DESC = {
     9: "自动审核不通过",  # 系统自动拒绝（预留，与人工驳回区分）
 }
 
+WORKFLOW_TYPE_LABEL = {
+    int(WorkflowType.QUERY): "查询权限",
+    int(WorkflowType.SQL): "SQL 工单",
+    int(WorkflowType.ARCHIVE): "数据归档",
+    int(WorkflowType.MONITOR): "监控权限",
+}
+
 EXECUTION_RECORD_STATUSES = (
     WorkflowStatus.REVIEW_PASS,
     WorkflowStatus.TIMING_TASK,
@@ -51,6 +64,24 @@ EXECUTION_RECORD_STATUSES = (
 
 
 class WorkflowService:
+    @staticmethod
+    def _can_cancel_workflow(wf: SqlWorkflow, user: dict, nodes: list[dict] | None = None) -> bool:
+        return ApplicationCancelPolicy.can_cancel_before_approval(
+            applicant_username=wf.engineer,
+            operator=user,
+            status=wf.status,
+            pending_status=WorkflowStatus.PENDING_REVIEW,
+            nodes=nodes or [],
+        )
+
+    @staticmethod
+    def _can_submit_high_risk_sql(operator: dict) -> bool:
+        return bool(
+            operator.get("is_superuser")
+            or operator.get("role") in HIGH_RISK_SQL_SUBMIT_ROLES
+            or HIGH_RISK_SQL_SUBMIT_PERMISSION in operator.get("permissions", [])
+        )
+
     @staticmethod
     def _build_audit_chain_text(
         nodes: list[dict],
@@ -94,6 +125,17 @@ class WorkflowService:
     @staticmethod
     def _fmt_workflow(wf: SqlWorkflow, instance_name: str = "") -> dict:
         """序列化工单为 dict（不含 SQL 内容）。"""
+        risk_level = ""
+        risk_summary = ""
+        content = getattr(wf, "content", None)
+        if content and getattr(content, "risk_plan", ""):
+            try:
+                risk_plan = json.loads(content.risk_plan)
+                risk_level = risk_plan.get("level", "") or ""
+                risk_summary = risk_plan.get("summary", "") or ""
+            except (TypeError, ValueError):
+                risk_level = ""
+                risk_summary = ""
         return {
             "id": wf.id,
             "workflow_name": wf.workflow_name,
@@ -108,6 +150,8 @@ class WorkflowService:
             "engineer_display": wf.engineer_display,
             "status": wf.status,
             "status_desc": STATUS_DESC.get(wf.status, "未知"),
+            "workflow_type": int(WorkflowType.SQL),
+            "workflow_type_label": WORKFLOW_TYPE_LABEL[int(WorkflowType.SQL)],
             "audit_auth_groups": wf.audit_auth_groups,
             "run_date_start": wf.run_date_start.isoformat() if wf.run_date_start else None,
             "run_date_end": wf.run_date_end.isoformat() if wf.run_date_end else None,
@@ -126,6 +170,9 @@ class WorkflowService:
             "created_at": wf.created_at.isoformat() if wf.created_at else "",
             "current_node_name": "—",
             "audit_chain_text": "—",
+            "risk_level": risk_level,
+            "risk_summary": risk_summary,
+            "risk_remark": getattr(content, "risk_remark", "") if content else "",
         }
 
     # ── 创建工单 ──────────────────────────────────────────────
@@ -171,6 +218,14 @@ class WorkflowService:
             nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, data.flow_id)
             nodes_snapshot = WorkflowService._decorate_snapshot_for_applicant(nodes_snapshot, operator)
 
+        db_type = getattr(inst, "db_type", "") or ""
+        risk_plan = RiskPlanService.build_workflow_plan(db_type, data.db_name, data.sql_content)
+        is_privileged_high_risk_sql = (
+            risk_plan.level == "high"
+            and RiskPlanService.is_privileged_workflow_sql(db_type, data.sql_content)
+        )
+        can_submit_high_risk_sql = WorkflowService._can_submit_high_risk_sql(operator)
+
         # 自动 SQL 预检查
         engine = get_engine(inst)
         review_set = await engine.execute_check(data.db_name, data.sql_content)
@@ -181,9 +236,22 @@ class WorkflowService:
         )
 
         # 如果有严重错误，拒绝提交
+        review_error = getattr(review_set, "error", "") or ""
+        if review_error:
+            raise AppException(f"SQL 预检查失败：{review_error}", code=400)
+
         error_count = getattr(review_set, 'error_count', 0)
-        if error_count > 0 and not review_set.error:
-            raise AppException("SQL 预检查不通过，请修改后重新提交", code=400)
+        if error_count > 0:
+            if not (is_privileged_high_risk_sql and can_submit_high_risk_sql):
+                if is_privileged_high_risk_sql:
+                    raise AppException("高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限", code=403)
+                raise AppException("SQL 预检查不通过，请修改后重新提交", code=400)
+
+        if is_privileged_high_risk_sql and not can_submit_high_risk_sql:
+            raise AppException("高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限", code=403)
+
+        if risk_plan.requires_manual_remark and not (data.risk_remark or "").strip():
+            raise AppException("高风险工单必须填写风险/回滚说明", code=400)
 
         # 创建工单主记录
         workflow = SqlWorkflow(
@@ -212,6 +280,8 @@ class WorkflowService:
             sql_content=data.sql_content,
             review_content=review_json,
             execute_result="",
+            risk_plan=json.dumps(risk_plan.model_dump(), ensure_ascii=False),
+            risk_remark=data.risk_remark or "",
         )
         db.add(content)
         await db.flush()
@@ -321,6 +391,7 @@ class WorkflowService:
         data_stmt = (
             select(SqlWorkflow, Instance.instance_name)
             .outerjoin(Instance, SqlWorkflow.instance_id == Instance.id)
+            .options(selectinload(SqlWorkflow.content))
         )
         if scope:
             data_stmt = GovernanceScopeService.apply_scope(
@@ -369,6 +440,10 @@ class WorkflowService:
         for wf, inst_name in rows:
             item = WorkflowService._fmt_workflow(wf, inst_name or "")
             audit = audit_map.get(wf.id)
+            if audit:
+                workflow_type = int(getattr(audit, "workflow_type", None) or WorkflowType.SQL)
+                item["workflow_type"] = workflow_type
+                item["workflow_type_label"] = WORKFLOW_TYPE_LABEL.get(workflow_type, "SQL 工单")
             if audit and audit.audit_auth_groups_info:
                 nodes = json.loads(audit.audit_auth_groups_info or "[]")
                 item["current_node_name"] = WorkflowService._get_current_node_name(nodes, wf.status)
@@ -377,6 +452,9 @@ class WorkflowService:
                     wf.status,
                     operator_display_map,
                 )
+            else:
+                nodes = []
+            item["can_cancel"] = WorkflowService._can_cancel_workflow(wf, user, nodes)
             items.append(item)
         scope_payload = {"mode": scope["mode"], "label": scope["label"]} if scope else None
         return total, items, scope_payload
@@ -401,12 +479,23 @@ class WorkflowService:
             detail["sql_content"] = wf.content.sql_content
             detail["review_content"] = wf.content.review_content
             detail["execute_result"] = wf.content.execute_result
+            try:
+                detail["risk_plan"] = json.loads(getattr(wf.content, "risk_plan", "") or "null")
+            except Exception:
+                detail["risk_plan"] = None
+            detail["risk_remark"] = getattr(wf.content, "risk_remark", "") or ""
         else:
             detail["sql_content"] = ""
             detail["review_content"] = ""
             detail["execute_result"] = ""
+            detail["risk_plan"] = None
+            detail["risk_remark"] = ""
 
         audit_info = await AuditService.get_audit_info(db, workflow_id)
+        if audit_info:
+            workflow_type = int(audit_info.get("workflow_type") or WorkflowType.SQL)
+            detail["workflow_type"] = workflow_type
+            detail["workflow_type_label"] = WORKFLOW_TYPE_LABEL.get(workflow_type, "SQL 工单")
         detail["audit_logs"] = await AuditService.get_audit_logs(db, workflow_id)
         detail["audit_info"] = audit_info
 
@@ -429,14 +518,10 @@ class WorkflowService:
             wf.status == WorkflowStatus.REVIEW_PASS
             and (user.get("is_superuser") or "sql_execute" in user.get("permissions", []))
         )
-        can_cancel = (
-            wf.status in (
-                WorkflowStatus.PENDING_REVIEW,
-                WorkflowStatus.AUTO_REVIEW_FAIL,
-                WorkflowStatus.REVIEW_PASS,
-                WorkflowStatus.TIMING_TASK,
-            )
-            and (user.get("is_superuser") or user.get("username") == wf.engineer)
+        can_cancel = WorkflowService._can_cancel_workflow(
+            wf,
+            user,
+            audit_info.get("nodes", []) if audit_info else [],
         )
         detail["can_audit"] = can_audit
         detail["can_execute"] = can_execute

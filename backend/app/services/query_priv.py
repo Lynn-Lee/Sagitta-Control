@@ -20,8 +20,10 @@ from app.models.instance import Instance
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
 from app.models.user import Users
 from app.models.workflow import AuditStatus
+from app.services.cancel_policy import ApplicationCancelPolicy
 from app.services.governance_scope import GovernanceScopeService
 from app.services.masking import extract_table_refs
+from app.services.risk_plan import RiskPlanService
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,17 @@ class QueryPrivService:
     def _get_current_pending_node(apply: QueryPrivilegeApply) -> dict | None:
         nodes = json.loads(apply.audit_auth_groups_info or "[]")
         return next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
+
+    @staticmethod
+    def can_cancel_apply(apply: QueryPrivilegeApply, user: dict) -> bool:
+        nodes = QueryPrivService._safe_load_nodes(apply.audit_auth_groups_info)
+        return ApplicationCancelPolicy.can_cancel_before_approval(
+            applicant_id=apply.user_id,
+            operator=user,
+            status=apply.status,
+            pending_status=0,
+            nodes=nodes,
+        )
 
     @staticmethod
     async def _check_apply_approver_permission(
@@ -102,6 +115,27 @@ class QueryPrivService:
         user_rg_ids = set(user.get("resource_groups", []))
         instance_rg_ids = {rg.id for rg in instance.resource_groups}
         return bool(user_rg_ids & instance_rg_ids)
+
+    @staticmethod
+    def user_has_query_bypass(user: dict, instance: Instance) -> bool:
+        """Return whether the user may query this instance without data-scope grants."""
+        permissions = set(user.get("permissions", []))
+        if user.get("is_superuser") or "query_all_instances" in permissions:
+            return True
+        if "query_resource_group_instance" not in permissions:
+            return False
+        user_rg_ids = set(user.get("resource_groups", []))
+        instance_rg_ids = {rg.id for rg in instance.resource_groups}
+        return bool(user_rg_ids & instance_rg_ids)
+
+    @staticmethod
+    def query_bypass_reason(user: dict, instance: Instance) -> str:
+        permissions = set(user.get("permissions", []))
+        if user.get("is_superuser") or "query_all_instances" in permissions:
+            return "admin"
+        if QueryPrivService.user_has_query_bypass(user, instance):
+            return "resource_group_query"
+        return ""
 
     @staticmethod
     async def _can_revoke_privilege(
@@ -323,7 +357,7 @@ class QueryPrivService:
         instance: Instance,
         database_names: list[str],
     ) -> list[str]:
-        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+        if QueryPrivService.user_has_query_bypass(user, instance):
             return database_names
         if not QueryPrivService.user_has_instance_access(user, instance):
             return []
@@ -357,7 +391,7 @@ class QueryPrivService:
         db_name: str,
         table_names: list[str],
     ) -> list[str]:
-        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+        if QueryPrivService.user_has_query_bypass(user, instance):
             return table_names
         if not QueryPrivService.user_has_instance_access(user, instance):
             return []
@@ -398,8 +432,9 @@ class QueryPrivService:
         db_name: str = "",
         table_name: str = "",
     ) -> tuple[bool, str]:
-        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
-            return True, "admin"
+        bypass_reason = QueryPrivService.query_bypass_reason(user, instance)
+        if bypass_reason:
+            return True, bypass_reason
         if not QueryPrivService.user_has_instance_access(user, instance):
             return False, "实例不在你的资源组内"
         if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
@@ -466,12 +501,13 @@ class QueryPrivService:
     ) -> tuple[bool, str]:
         """
         查询权限三层校验：
-          L1: 超管 / query_all_instances
+          L1: 超管 / query_all_instances / query_resource_group_instance（资源组内）
           L2: 资源组范围
           L3: 数据级授权（database/table）
         """
-        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
-            return True, "admin"
+        bypass_reason = QueryPrivService.query_bypass_reason(user, instance)
+        if bypass_reason:
+            return True, bypass_reason
 
         if not QueryPrivService.user_has_instance_access(user, instance):
             return False, "实例不在你的资源组内"
@@ -548,7 +584,7 @@ class QueryPrivService:
             "identity"
             if reason == "admin"
             else "resource_scope"
-            if reason == "实例不在你的资源组内"
+            if reason in {"resource_group_query", "实例不在你的资源组内"}
             else "data_scope"
         )
         return {"allowed": allowed, "reason": reason, "layer": layer}
@@ -562,7 +598,7 @@ class QueryPrivService:
         sql: str,
         requested_limit: int,
     ) -> int:
-        if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
+        if QueryPrivService.user_has_query_bypass(user, instance):
             return requested_limit
 
         async def _latest_limit(
@@ -792,6 +828,7 @@ class QueryPrivService:
         title: str,
         scope_type: str = "database",
         user: dict | None = None,
+        risk_remark: str = "",
     ) -> QueryPrivilegeApply:
         if user is None:
             raise AppException("缺少申请用户上下文", code=400)
@@ -803,6 +840,19 @@ class QueryPrivService:
         resolved_group_id = await QueryPrivService._resolve_apply_group_id(
             db, user=user, instance_id=instance_id, group_id=group_id
         )
+        inst_result = await db.execute(select(Instance).where(Instance.id == instance_id))
+        inst = inst_result.scalar_one_or_none()
+        db_type = inst.db_type if inst else ""
+        risk_plan = RiskPlanService.build_query_privilege_plan(
+            db_type=db_type,
+            scope_type=normalized_scope_type,
+            db_name=db_name,
+            table_name=table_name or "",
+            valid_date=valid_date,
+            limit_num=limit_num,
+        )
+        if risk_plan.requires_manual_remark and not (risk_remark or "").strip():
+            raise AppException("高风险查询权限申请必须填写风险说明", code=400)
         audit_groups_value = audit_auth_groups
         audit_groups_info = ""
         if flow_id:
@@ -827,6 +877,9 @@ class QueryPrivService:
             limit_num=limit_num,
             priv_type=normalized_priv_type,
             apply_reason=apply_reason,
+            risk_level=risk_plan.level,
+            risk_summary=risk_plan.summary,
+            risk_remark=risk_remark or "",
             status=0,
             audit_auth_groups=audit_groups_value,
             flow_id=flow_id,
@@ -916,7 +969,7 @@ class QueryPrivService:
 
             nodes = json.loads(apply.audit_auth_groups_info or "[]")
             acted_by_me = any(node.get("operator") == username for node in nodes)
-            current_node = QueryPrivService._get_current_pending_node(apply)
+            current_node = QueryPrivService._get_current_pending_node(apply) if apply.status == 0 else None
 
             if current_node:
                 try:
@@ -953,7 +1006,7 @@ class QueryPrivService:
             raise AppException("该申请已审批，不能重复操作", code=400)
 
         if apply.flow_id and apply.audit_auth_groups_info:
-            current_node = QueryPrivService._get_current_pending_node(apply)
+            current_node = QueryPrivService._get_current_pending_node(apply) if apply.status == 0 else None
             if not current_node:
                 raise AppException("该申请审批链已完成，不能重复审批", code=400)
             await QueryPrivService._check_apply_approver_permission(db, auditor, current_node)
@@ -1018,6 +1071,33 @@ class QueryPrivService:
         else:
             raise AppException("action 必须是 pass 或 reject", code=400)
 
+        await db.commit()
+        await db.refresh(apply)
+        return apply
+
+    @staticmethod
+    async def cancel_apply(db: AsyncSession, apply_id: int, user: dict) -> QueryPrivilegeApply:
+        result = await db.execute(
+            select(QueryPrivilegeApply).where(QueryPrivilegeApply.id == apply_id)
+        )
+        apply = result.scalar_one_or_none()
+        if not apply:
+            raise NotFoundException(f"申请 ID={apply_id} 不存在")
+        if apply.user_id != user.get("id") and not user.get("is_superuser"):
+            raise AppException("只能取消自己提交的查询权限申请", code=403)
+        if apply.status != 0:
+            raise AppException("只有待审核的申请可以取消", code=400)
+        if not QueryPrivService.can_cancel_apply(apply, user):
+            raise AppException("审批节点已操作，不能取消申请", code=400)
+
+        if apply.flow_id and apply.audit_auth_groups_info:
+            nodes = json.loads(apply.audit_auth_groups_info or "[]")
+            operated_at = datetime.now(UTC).isoformat()
+            user_with_time = dict(user)
+            user_with_time["operated_at"] = operated_at
+            ApplicationCancelPolicy.cancel_pending_nodes(nodes, user_with_time)
+            apply.audit_auth_groups_info = json.dumps(nodes, ensure_ascii=False)
+        apply.status = 3
         await db.commit()
         await db.refresh(apply)
         return apply

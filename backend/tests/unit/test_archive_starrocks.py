@@ -52,6 +52,15 @@ def test_archive_condition_rejects_obvious_full_table_condition():
         raise AssertionError("expected AppException")
 
 
+def test_archive_condition_rejects_full_sql_statement():
+    try:
+        validate_archive_condition("mysql", "orders", "delete from orders where dt < '2024-01-01'")
+    except AppException as exc:
+        assert "WHERE 后面的条件" in exc.message
+    else:
+        raise AssertionError("expected AppException")
+
+
 def test_archive_condition_requires_valid_mongo_json():
     try:
         validate_archive_condition("mongo", "orders", "{bad json")

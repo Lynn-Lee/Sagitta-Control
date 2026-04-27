@@ -1,4 +1,5 @@
 import apiClient from './client'
+import type { RiskPlan } from './workflow'
 
 export interface QueryResult {
   column_list: string[]
@@ -123,7 +124,23 @@ export const queryApi = {
     limit_num?: number
     priv_type?: number
     apply_reason?: string
+    risk_remark?: string
   }) => apiClient.post('/query/privileges/apply/', data).then(r => r.data),
+
+  privilegeRiskPlan: (data: {
+    title: string
+    instance_id: number
+    group_id?: number
+    flow_id?: number
+    db_name: string
+    table_name?: string
+    scope_type?: 'instance' | 'database' | 'table'
+    valid_date: string
+    limit_num?: number
+    priv_type?: number
+    apply_reason?: string
+    risk_remark?: string
+  }) => apiClient.post<{ status: number; risk_plan: RiskPlan }>('/query/privileges/risk-plan/', data).then(r => r.data),
 
   listApplies: (params?: { status?: number; page?: number; page_size?: number }) =>
     apiClient.get('/query/privileges/applies/', { params }).then(r => r.data),
@@ -133,6 +150,9 @@ export const queryApi = {
 
   auditApply: (apply_id: number, data: { action: 'pass' | 'reject'; remark?: string; valid_date?: string }) =>
     apiClient.post('/query/privileges/audit/', data, { params: { apply_id } }).then(r => r.data),
+
+  cancelApply: (apply_id: number) =>
+    apiClient.post(`/query/privileges/applies/${apply_id}/cancel/`).then(r => r.data),
 
   revokePrivilege: (priv_id: number, data?: { reason?: string }) =>
     apiClient.delete(`/query/privileges/${priv_id}/`, { data: data || {} }).then(r => r.data),

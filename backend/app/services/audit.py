@@ -28,6 +28,7 @@ from app.models.workflow import (
     WorkflowStatus,
     WorkflowType,
 )
+from app.services.cancel_policy import ApplicationCancelPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -254,9 +255,6 @@ class AuditService:
     ) -> dict:
         cancelable = (
             WorkflowStatus.PENDING_REVIEW,
-            WorkflowStatus.AUTO_REVIEW_FAIL,
-            WorkflowStatus.REVIEW_PASS,
-            WorkflowStatus.TIMING_TASK,
         )
         if workflow.status not in cancelable:
             raise AppException("当前状态不允许取消", code=400)
@@ -264,8 +262,17 @@ class AuditService:
         # 取消只允许：工单提交人 或 超管
         if not operator.get("is_superuser") and operator.get("username") != workflow.engineer:
             raise AppException("只有工单提交人或超管可以取消工单", code=403)
+        groups_info = ApplicationCancelPolicy.load_nodes(audit.audit_auth_groups_info)
+        if ApplicationCancelPolicy.has_operated_node(groups_info):
+            raise AppException("审批节点已操作，不能取消申请", code=400)
 
         audit.current_status = AuditStatus.CANCELED
+        operator_with_time = dict(operator)
+        operator_with_time["operated_at"] = datetime.now(UTC).isoformat()
+        audit.audit_auth_groups_info = json.dumps(
+            ApplicationCancelPolicy.cancel_pending_nodes(groups_info, operator_with_time),
+            ensure_ascii=False,
+        )
         workflow.status = WorkflowStatus.ABORT
         if audit.workflow_type == int(WorkflowType.ARCHIVE):
             from app.services.archive import ArchiveService
@@ -551,6 +558,7 @@ class AuditService:
             return None
         groups_info = json.loads(audit.audit_auth_groups_info or "[]")
         return {
+            "workflow_type": audit.workflow_type,
             "current_audit_auth_group": audit.current_audit_auth_group,
             "current_status": audit.current_status,
             "nodes": [

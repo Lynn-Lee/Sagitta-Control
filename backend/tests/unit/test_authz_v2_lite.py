@@ -2,6 +2,7 @@
 v2-lite 权限体系单元测试。
 """
 
+import json
 from datetime import date
 from types import MethodType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -42,6 +43,12 @@ class TestBuiltinRolePermissions:
         assert "menu_monitor" in dba_group
         assert "monitor_config_manage" in dba_group
         assert "monitor_all_instances" not in dba_group
+
+    def test_high_risk_sql_submit_permission_is_dba_only_by_default(self):
+        assert "sql_submit_high_risk" in _role_permissions("superadmin")
+        assert "sql_submit_high_risk" in _role_permissions("dba")
+        assert "sql_submit_high_risk" in _role_permissions("dba_group")
+        assert "sql_submit_high_risk" not in _role_permissions("developer")
 
 
 class TestApprovalFlowNodeSchema:
@@ -116,6 +123,34 @@ class TestResourceScopedAccess:
         instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=2), SimpleNamespace(id=3)])
         user = {"resource_groups": [1, 3], "permissions": [], "is_superuser": False}
         assert QueryPrivService.user_has_instance_access(user, instance) is True
+
+    def test_resource_group_query_bypass_requires_permission_and_scope(self):
+        instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=2)])
+
+        assert QueryPrivService.user_has_query_bypass(
+            {
+                "resource_groups": [2],
+                "permissions": ["query_resource_group_instance"],
+                "is_superuser": False,
+            },
+            instance,
+        ) is True
+        assert QueryPrivService.user_has_query_bypass(
+            {
+                "resource_groups": [2],
+                "permissions": [],
+                "is_superuser": False,
+            },
+            instance,
+        ) is False
+        assert QueryPrivService.user_has_query_bypass(
+            {
+                "resource_groups": [9],
+                "permissions": ["query_resource_group_instance"],
+                "is_superuser": False,
+            },
+            instance,
+        ) is False
 
     def test_monitor_access_respects_resource_group_intersection(self):
         instance = SimpleNamespace(resource_groups=[SimpleNamespace(id=5)])
@@ -196,6 +231,104 @@ class TestGovernanceScope:
 
 
 class TestQueryPrivilegeHelpers:
+    @pytest.mark.asyncio
+    async def test_resource_group_query_permission_allows_query_in_scope(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        db = AsyncMock()
+
+        allowed, reason = await QueryPrivService.check_query_priv(
+            db=db,
+            user={
+                "id": 7,
+                "permissions": ["query_resource_group_instance"],
+                "resource_groups": [2],
+                "is_superuser": False,
+            },
+            instance=instance,
+            db_name="analytics",
+            sql="SELECT * FROM orders",
+        )
+
+        assert allowed is True
+        assert reason == "resource_group_query"
+        db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_resource_group_query_permission_denies_out_of_scope_instance(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+
+        allowed, reason = await QueryPrivService.check_query_priv(
+            db=AsyncMock(),
+            user={
+                "id": 7,
+                "permissions": ["query_resource_group_instance"],
+                "resource_groups": [9],
+                "is_superuser": False,
+            },
+            instance=instance,
+            db_name="analytics",
+            sql="SELECT * FROM orders",
+        )
+
+        assert allowed is False
+        assert reason == "实例不在你的资源组内"
+
+    @pytest.mark.asyncio
+    async def test_developer_in_resource_group_still_needs_query_privilege(self, monkeypatch):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        monkeypatch.setattr("app.services.query_priv.extract_table_refs", lambda *_args: [])
+        monkeypatch.setattr(QueryPrivService, "_has_instance_priv", AsyncMock(return_value=False))
+        monkeypatch.setattr(QueryPrivService, "_has_db_priv", AsyncMock(return_value=False))
+
+        allowed, reason = await QueryPrivService.check_query_priv(
+            db=AsyncMock(),
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+            db_name="analytics",
+            sql="SELECT 1",
+        )
+
+        assert allowed is False
+        assert "没有数据库 analytics 的查询权限" in reason
+
+    @pytest.mark.asyncio
+    async def test_resource_group_query_permission_sees_all_data_dict_databases(self):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        db = AsyncMock()
+
+        databases = await QueryPrivService.list_data_dict_databases(
+            db=db,
+            user={
+                "id": 7,
+                "permissions": ["query_resource_group_instance"],
+                "resource_groups": [2],
+                "is_superuser": False,
+            },
+            instance=instance,
+            database_names=["analytics", "ops"],
+        )
+
+        assert databases == ["analytics", "ops"]
+        db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_developer_data_dict_databases_still_follow_privileges(self, monkeypatch):
+        instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
+        monkeypatch.setattr(QueryPrivService, "_has_instance_priv", AsyncMock(return_value=False))
+        empty_result = MagicMock()
+        empty_result.scalars.return_value.all.return_value = []
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=empty_result)
+
+        databases = await QueryPrivService.list_data_dict_databases(
+            db=db,
+            user={"id": 7, "permissions": [], "resource_groups": [2], "is_superuser": False},
+            instance=instance,
+            database_names=["analytics", "ops"],
+        )
+
+        assert databases == []
+
     @pytest.mark.asyncio
     async def test_write_log_records_query_history_metadata(self):
         db = SimpleNamespace(add=MagicMock(), commit=AsyncMock())
@@ -343,6 +476,126 @@ class TestQueryPrivilegeHelpers:
 
         assert apply.valid_date == date(2099, 1, 15)
         assert db.add.call_args.args[0].valid_date == date(2099, 1, 15)
+
+    @pytest.mark.asyncio
+    async def test_canceled_apply_does_not_remain_auditable_for_later_reviewer(self):
+        nodes = [
+            {
+                "node_name": "直属领导",
+                "approver_type": "manager",
+                "status": 3,
+                "operator": "liuyang",
+            },
+            {
+                "node_name": "DBA 执行审批",
+                "approver_type": "any_reviewer",
+                "status": 0,
+                "operator": None,
+            },
+        ]
+        apply = SimpleNamespace(
+            id=99,
+            status=3,
+            audit_auth_groups_info=json.dumps(nodes, ensure_ascii=False),
+            created_at=None,
+        )
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [apply]
+        db = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        total, items, can_audit_ids = await QueryPrivService.list_audit_records(
+            db=db,
+            auditor={
+                "id": 2,
+                "username": "dba",
+                "is_superuser": False,
+                "permissions": ["query_review"],
+            },
+        )
+
+        assert total == 0
+        assert items == []
+        assert can_audit_ids == set()
+
+    @pytest.mark.asyncio
+    async def test_cancel_apply_cancels_all_pending_nodes(self):
+        nodes = [
+            {
+                "node_name": "直属领导",
+                "approver_type": "manager",
+                "status": 0,
+                "operator": None,
+            },
+            {
+                "node_name": "DBA 执行审批",
+                "approver_type": "any_reviewer",
+                "status": 0,
+                "operator": None,
+            },
+        ]
+        apply = SimpleNamespace(
+            id=99,
+            user_id=7,
+            status=0,
+            flow_id=1,
+            audit_auth_groups_info=json.dumps(nodes, ensure_ascii=False),
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = apply
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        await QueryPrivService.cancel_apply(
+            db=db,
+            apply_id=99,
+            user={"id": 7, "username": "liuyang", "display_name": "刘洋"},
+        )
+
+        canceled_nodes = json.loads(apply.audit_auth_groups_info)
+        assert apply.status == 3
+        assert [node["status"] for node in canceled_nodes] == [3, 3]
+        assert {node["operator"] for node in canceled_nodes} == {"liuyang"}
+
+    @pytest.mark.asyncio
+    async def test_cancel_apply_rejects_after_node_operated(self):
+        nodes = [
+            {
+                "node_name": "直属领导",
+                "approver_type": "manager",
+                "status": 1,
+                "operator": "yanjiabao",
+            },
+            {
+                "node_name": "DBA 执行审批",
+                "approver_type": "any_reviewer",
+                "status": 0,
+                "operator": None,
+            },
+        ]
+        apply = SimpleNamespace(
+            id=99,
+            user_id=7,
+            status=0,
+            flow_id=1,
+            audit_auth_groups_info=json.dumps(nodes, ensure_ascii=False),
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = apply
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+        with pytest.raises(AppException, match="审批节点已操作"):
+            await QueryPrivService.cancel_apply(
+                db=db,
+                apply_id=99,
+                user={"id": 7, "username": "liuyang", "display_name": "刘洋"},
+            )
 
     @pytest.mark.asyncio
     async def test_check_data_dict_access_accepts_instance_scope_privilege(self):

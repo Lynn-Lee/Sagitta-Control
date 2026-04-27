@@ -1,4 +1,5 @@
 import apiClient from './client'
+import type { RiskPlan } from './workflow'
 
 export interface ArchiveJob {
   id: number
@@ -20,12 +21,21 @@ export interface ArchiveJob {
   current_batch: number
   row_count_is_estimated: boolean
   apply_reason?: string
+  risk_level?: string
+  risk_summary?: string
+  risk_remark?: string
+  risk_plan?: RiskPlan | null
   error_message?: string
   created_by: string
+  created_by_display?: string
   created_by_id: number
   started_at?: string | null
   finished_at?: string | null
   created_at?: string | null
+  can_cancel?: boolean
+  can_audit?: boolean
+  can_execute?: boolean
+  can_control?: boolean
   batches?: ArchiveBatchLog[]
 }
 
@@ -53,6 +63,7 @@ export interface ArchivePayload {
   batch_size: number
   sleep_ms: number
   apply_reason?: string
+  risk_remark?: string
   flow_id?: number
 }
 
@@ -61,6 +72,7 @@ export interface ArchiveEstimateResponse {
   msg: string
   count: number
   db_type?: string
+  risk_plan?: RiskPlan
 }
 
 export interface ArchiveActionResponse {
@@ -70,6 +82,15 @@ export interface ArchiveActionResponse {
   workflow_id?: number | null
   status: string
   estimated_rows?: number
+  scheduled_execute_at?: string
+}
+
+export interface ArchiveExecutePayload {
+  mode?: 'immediate' | 'scheduled' | 'external'
+  scheduled_at?: string
+  external_executed_at?: string
+  external_status?: 'success' | 'failed'
+  external_remark?: string
 }
 
 export const archiveApi = {
@@ -81,7 +102,8 @@ export const archiveApi = {
   listJobs: (params?: { page?: number; page_size?: number }) =>
     apiClient.get<{ total: number; page: number; page_size: number; items: ArchiveJob[] }>('/archive/jobs/', { params }).then(r => r.data),
   getJob: (id: number) => apiClient.get<ArchiveJob>(`/archive/jobs/${id}/`).then(r => r.data),
-  start: (id: number) => apiClient.post<ArchiveActionResponse>(`/archive/jobs/${id}/start/`).then(r => r.data),
+  start: (id: number, data?: ArchiveExecutePayload) =>
+    apiClient.post<ArchiveActionResponse>(`/archive/jobs/${id}/start/`, data || {}).then(r => r.data),
   pause: (id: number) => apiClient.post<ArchiveActionResponse>(`/archive/jobs/${id}/pause/`).then(r => r.data),
   resume: (id: number) => apiClient.post<ArchiveActionResponse>(`/archive/jobs/${id}/resume/`).then(r => r.data),
   cancel: (id: number) => apiClient.post<ArchiveActionResponse>(`/archive/jobs/${id}/cancel/`).then(r => r.data),

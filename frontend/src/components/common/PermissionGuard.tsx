@@ -4,13 +4,15 @@ import { Result } from 'antd'
 import { useAuthStore } from '@/store/auth'
 
 interface PermissionGuardProps {
-  permission: string
+  permission?: string
+  anyPermissions?: string[]
   children: ReactNode
   fallbackTo?: string
 }
 
 export default function PermissionGuard({
   permission,
+  anyPermissions,
   children,
   fallbackTo = '/dashboard',
 }: PermissionGuardProps) {
@@ -20,12 +22,14 @@ export default function PermissionGuard({
     return <Navigate to="/login" replace />
   }
 
-  if (!hasPermission(permission)) {
+  const allowed = permission ? hasPermission(permission) : !!anyPermissions?.some((perm) => hasPermission(perm))
+
+  if (!allowed) {
     return (
       <Result
         status="403"
         title="无权访问"
-        subTitle={`缺少页面权限：${permission}`}
+        subTitle={`缺少页面权限：${permission || anyPermissions?.join(' / ') || '-'}`}
       />
     )
   }

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
+import { Alert, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
 import { PlusOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { queryApi } from '@/api/query'
+import type { RiskPlan } from '@/api/workflow'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
 import PageHeader from '@/components/common/PageHeader'
+import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import dayjs from 'dayjs'
@@ -28,6 +30,19 @@ const SCOPE_META: Record<string, { label: string; color: string }> = {
   table: { label: '表级', color: 'purple' },
 }
 
+const RISK_META: Record<string, { label: string; color: string; alertType: 'success' | 'warning' | 'error' | 'info' }> = {
+  low: { label: '低风险', color: 'success', alertType: 'success' },
+  medium: { label: '中风险', color: 'warning', alertType: 'warning' },
+  high: { label: '高风险', color: 'error', alertType: 'error' },
+}
+
+const renderRiskTag = (level?: string, summary?: string) => {
+  if (!level) return <Text type="secondary">—</Text>
+  const meta = RISK_META[level] || { label: level, color: 'default', alertType: 'info' as const }
+  const tag = <Tag color={meta.color}>{meta.label}</Tag>
+  return summary ? <Tooltip title={summary}>{tag}</Tooltip> : tag
+}
+
 export default function QueryPrivPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
@@ -41,6 +56,8 @@ export default function QueryPrivPage() {
   const [scopeType, setScopeType] = useState<'instance' | 'database' | 'table'>('database')
   const [auditModalOpen, setAuditModalOpen] = useState(false)
   const [auditTarget, setAuditTarget] = useState<any>(null)
+  const [riskPlan, setRiskPlan] = useState<RiskPlan | null>(null)
+  const [riskChecking, setRiskChecking] = useState(false)
   const [msgApi, msgCtx] = message.useMessage()
 
   useEffect(() => {
@@ -124,6 +141,7 @@ export default function QueryPrivPage() {
       qc.invalidateQueries({ queryKey: ['query-priv-applies'] })
       qc.invalidateQueries({ queryKey: ['query-priv-audit-records'] })
       setApplyModalOpen(false)
+      setRiskPlan(null)
       msgApi.success('申请已提交')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '提交失败'),
@@ -145,6 +163,16 @@ export default function QueryPrivPage() {
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '审批失败'),
   })
 
+  const cancelApplyMut = useMutation({
+    mutationFn: (apply_id: number) => queryApi.cancelApply(apply_id),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ['query-priv-applies'] })
+      qc.invalidateQueries({ queryKey: ['query-priv-audit-records'] })
+      msgApi.success(res?.msg || '申请已取消')
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || '取消失败'),
+  })
+
   const revokeMut = useMutation({
     mutationFn: ({ priv_id, reason }: { priv_id: number; reason?: string }) =>
       queryApi.revokePrivilege(priv_id, { reason }),
@@ -164,7 +192,7 @@ export default function QueryPrivPage() {
         msgApi.warning('请选择目标实例')
         return
       }
-      applyMut.mutate({
+      const payload = {
         ...values,
         scope_type: values.scope_type,
         valid_date: values.valid_date.format('YYYY-MM-DD'),
@@ -173,8 +201,42 @@ export default function QueryPrivPage() {
         db_name: values.scope_type === 'instance' ? '' : values.db_name,
         table_name: values.scope_type === 'table' ? values.table_name : '',
         priv_type: values.scope_type === 'table' ? 2 : values.scope_type === 'database' ? 1 : 0,
-      })
-    } catch { /* validation */ }
+      }
+      setRiskChecking(true)
+      const planRes = await queryApi.privilegeRiskPlan(payload)
+      const plan = planRes.risk_plan
+      setRiskPlan(plan)
+      setRiskChecking(false)
+      if (plan.requires_manual_remark && !values.risk_remark?.trim()) {
+        msgApi.warning('高风险查询权限申请请填写风险说明后再提交')
+        return
+      }
+      if (plan.requires_confirmation) {
+        Modal.confirm({
+          title: '确认提交高风险查询权限申请？',
+          width: 640,
+          okText: '确认提交',
+          okButtonProps: { danger: true },
+          cancelText: '返回修改',
+          content: (
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <RiskPlanAlert plan={plan} />
+              {values.risk_remark?.trim() && (
+                <div>
+                  <Text strong>风险说明：</Text>
+                  <div style={{ marginTop: 4 }}>{values.risk_remark}</div>
+                </div>
+              )}
+            </Space>
+          ),
+          onOk: () => applyMut.mutateAsync(payload),
+        })
+        return
+      }
+      applyMut.mutate(payload)
+    } catch {
+      setRiskChecking(false)
+    }
   }
 
   const openAuditPassModal = (record: any) => {
@@ -322,6 +384,12 @@ export default function QueryPrivPage() {
     { title: '行数限制', dataIndex: 'limit_num', width: 100 },
     { title: '有效期', dataIndex: 'valid_date', width: 120 },
     { title: '申请理由', dataIndex: 'apply_reason', width: 220, ellipsis: true },
+    {
+      title: '风险',
+      dataIndex: 'risk_level',
+      width: 100,
+      render: (v: string, r: any) => renderRiskTag(v, r.risk_summary),
+    },
     { title: '当前节点', dataIndex: 'current_node_name', width: 150, ellipsis: true, render: (v: string) => v || '—' },
     {
       title: '审批链路',
@@ -354,26 +422,51 @@ export default function QueryPrivPage() {
     },
     {
       title: '审批操作',
-      width: 180,
-      render: (_: any, r: any) => r.can_audit ? (
-        <Space size={8} wrap>
-          <Button
-            size="small"
-            type="primary"
-            icon={<CheckOutlined />}
-            onClick={() => openAuditPassModal(r)}
-          >
-            通过
-          </Button>
-          <Button
-            size="small"
-            danger
-            icon={<CloseOutlined />}
-            onClick={() => auditMut.mutate({ apply_id: r.id, action: 'reject' })}
-          >
-            驳回
-          </Button>
+      width: 240,
+      render: (_: any, r: any) => r.status === 0 && r.can_audit ? (
+        <Space direction="vertical" size={6}>
+          {r.risk_level === 'high' && (
+            <Text type="danger" style={{ fontSize: 12 }}>
+              高风险申请，请先查看风险说明
+            </Text>
+          )}
+          <Space size={8} wrap>
+            <Button
+              size="small"
+              type="primary"
+              danger={r.risk_level === 'high'}
+              icon={<CheckOutlined />}
+              onClick={() => openAuditPassModal(r)}
+            >
+              通过
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<CloseOutlined />}
+              onClick={() => auditMut.mutate({ apply_id: r.id, action: 'reject' })}
+            >
+              驳回
+            </Button>
+          </Space>
         </Space>
+      ) : r.can_cancel ? (
+        <Button
+          size="small"
+          icon={<CloseOutlined />}
+          loading={cancelApplyMut.isPending}
+          onClick={() => {
+            Modal.confirm({
+              title: '取消查询权限申请？',
+              content: '取消后该申请不会继续流转审批。',
+              okText: '确认取消',
+              cancelText: '返回',
+              onOk: () => cancelApplyMut.mutateAsync(r.id),
+            })
+          }}
+        >
+          取消申请
+        </Button>
       ) : <Text type="secondary">—</Text>,
     },
   ]
@@ -488,14 +581,19 @@ export default function QueryPrivPage() {
 
       <Modal title="申请查询权限" open={applyModalOpen}
         maskClosable={false}
-        onOk={handleApply} onCancel={() => setApplyModalOpen(false)}
-        confirmLoading={applyMut.isPending} width={520}>
-        <Form form={applyForm} layout="vertical" style={{ marginTop: 16 }}>
+        onOk={handleApply} onCancel={() => { setApplyModalOpen(false); setRiskPlan(null) }}
+        confirmLoading={applyMut.isPending || riskChecking} width={640}>
+        <Form
+          form={applyForm}
+          layout="vertical"
+          style={{ marginTop: 16 }}
+          onValuesChange={(changed) => { if (!('risk_remark' in changed)) setRiskPlan(null) }}
+        >
           <Form.Item name="title" label="申请标题" rules={[{ required: true }]}>
             <Input placeholder="简明描述申请用途" />
           </Form.Item>
           <Form.Item label="目标实例" required>
-            <Select placeholder="选择实例" value={instanceId} onChange={v => { setInstanceId(v); applyForm.setFieldValue('db_name', undefined); applyForm.setFieldValue('table_name', '') }} showSearch optionFilterProp="label"
+            <Select placeholder="选择实例" value={instanceId} onChange={v => { setInstanceId(v); setRiskPlan(null); applyForm.setFieldValue('db_name', undefined); applyForm.setFieldValue('table_name', '') }} showSearch optionFilterProp="label"
               popupMatchSelectWidth={false} style={{ minWidth: 220 }}>
               {instanceData?.items?.map((i: any) => (
                 <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}>
@@ -563,6 +661,17 @@ export default function QueryPrivPage() {
           <Form.Item name="apply_reason" label="申请理由">
             <Input.TextArea rows={3} placeholder="说明申请原因" />
           </Form.Item>
+          {riskPlan && <RiskPlanAlert plan={riskPlan} />}
+          {riskPlan?.requires_manual_remark && (
+            <Form.Item
+              name="risk_remark"
+              label="风险说明"
+              rules={[{ required: true, message: '请填写高风险权限申请的风险说明' }]}
+              style={{ marginTop: 16 }}
+            >
+              <Input.TextArea rows={3} placeholder="说明数据访问用途、范围控制和到期处理方式" />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 
@@ -576,6 +685,28 @@ export default function QueryPrivPage() {
         okText="通过"
         width={520}
       >
+        {auditTarget?.risk_level && (
+          <Alert
+            showIcon
+            type={RISK_META[auditTarget.risk_level]?.alertType || 'info'}
+            message={auditTarget.risk_level === 'high' ? '高风险查询权限申请' : `${RISK_META[auditTarget.risk_level]?.label || auditTarget.risk_level}提示`}
+            description={
+              <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                {auditTarget.risk_summary && <Text>{auditTarget.risk_summary}</Text>}
+                {auditTarget.risk_remark && (
+                  <div>
+                    <Text strong>申请人风险说明：</Text>
+                    <Text>{auditTarget.risk_remark}</Text>
+                  </div>
+                )}
+                <Text type="secondary">
+                  审批前请确认授权范围、有效期和行数限制是否可接受；如风险不可控，请驳回或缩短有效期后再放行。
+                </Text>
+              </Space>
+            }
+            style={{ marginTop: 16 }}
+          />
+        )}
         <Form form={auditForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item label="申请有效期">
             <Input value={auditTarget?.valid_date || '—'} disabled />

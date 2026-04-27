@@ -138,6 +138,9 @@ class QueryPrivilegeApply(BaseModel):
     limit_num: Mapped[int] = mapped_column(Integer, default=100, comment="行数限制")
     priv_type: Mapped[int] = mapped_column(Integer, default=1)
     apply_reason: Mapped[str] = mapped_column(String(500), default="", comment="申请理由")
+    risk_level: Mapped[str] = mapped_column(String(20), default="", comment="风险等级")
+    risk_summary: Mapped[str] = mapped_column(String(500), default="", comment="风险摘要")
+    risk_remark: Mapped[str] = mapped_column(String(500), default="", comment="申请人风险说明")
     # 复用 AuditStatus: 0待审 1通过 2驳回 3取消
     status: Mapped[int] = mapped_column(Integer, default=0, comment="审批状态")
     audit_auth_groups: Mapped[str] = mapped_column(String(255), default="", comment="审批链")

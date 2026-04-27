@@ -30,6 +30,7 @@ class QueryResultResponse(BaseModel):
     cost_time_ms: int
     is_masked: bool = False
     error: str = ""
+    risk_plan: dict | None = None
 
 
 class QueryLogItem(BaseModel):
@@ -75,6 +76,7 @@ class PrivApplyRequest(BaseModel):
     limit_num: int = Field(default=100, ge=1, le=100000)
     priv_type: int = Field(default=1, description="1=库级 2=表级")
     apply_reason: str = Field(default="", max_length=500)
+    risk_remark: str = Field(default="", max_length=500)
     audit_auth_groups: str = ""
 
     @field_validator("valid_date")
@@ -121,6 +123,9 @@ class PrivApplyItem(BaseModel):
     limit_num: int
     priv_type: int
     apply_reason: str
+    risk_level: str = ""
+    risk_summary: str = ""
+    risk_remark: str = ""
     status: int
     current_node_name: str | None = None
     approval_progress: str | None = None

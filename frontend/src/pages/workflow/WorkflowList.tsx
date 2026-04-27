@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import {
   Button, Card, DatePicker, Input, InputNumber, Select,
-  Space, Table, Tabs, Tag, Typography, Tooltip, Grid,
+  Popconfirm, Space, Table, Tabs, Tag, Typography, Tooltip, Grid, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { useQuery } from '@tanstack/react-query'
+import { PlusOutlined, ReloadOutlined, SearchOutlined, StopOutlined } from '@ant-design/icons'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
 import { instanceApi } from '@/api/instance'
@@ -110,6 +110,22 @@ const renderStatus = (s: number, r: any) => (
   </Tag>
 )
 
+const renderRisk = (level?: string, summary?: string) => {
+  if (!level) return <Text type="secondary">—</Text>
+  const meta = level === 'high'
+    ? { color: 'error', label: '高风险' }
+    : level === 'medium'
+      ? { color: 'warning', label: '中风险' }
+      : { color: 'success', label: '低风险' }
+  const tag = <Tag color={meta.color}>{meta.label}</Tag>
+  return summary ? <Tooltip title={summary}>{tag}</Tooltip> : tag
+}
+
+const renderWorkflowType = (label?: string) => {
+  const text = label || 'SQL 工单'
+  return <Tag color={text === '数据归档' ? 'blue' : 'default'}>{text}</Tag>
+}
+
 const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
 
 const EXECUTION_MODE_LABEL: Record<string, string> = {
@@ -134,6 +150,8 @@ const renderExecutionInfo = (_: unknown, r: any) => {
 
 export default function WorkflowList() {
   const navigate = useNavigate()
+  const [msgApi, contextHolder] = message.useMessage()
+  const qc = useQueryClient()
   const { user } = useAuthStore()
   const screens = useBreakpoint()
   const isMobile = !screens.md
@@ -168,6 +186,14 @@ export default function WorkflowList() {
     queryKey: ['workflows', queryParams],
     queryFn: () => workflowApi.list(queryParams),
   })
+  const cancelMut = useMutation({
+    mutationFn: (id: number) => workflowApi.cancel(id),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ['workflows'] })
+      msgApi.success(res?.msg || '工单已取消')
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '取消失败'),
+  })
   const { data: scopePreview } = useQuery({
     queryKey: ['workflow-scope-preview', user?.id],
     queryFn: () => workflowApi.list({ view: 'scope', page: 1, page_size: 1 }),
@@ -188,17 +214,34 @@ export default function WorkflowList() {
   }
 
   const detailColumn: ColumnsType<any>[number] = {
-    title: '操作', width: 88, fixed: 'right',
+    title: '操作', width: 132, fixed: 'right',
     render: (_, r) => (
-      <Button size="small" type="link" onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
+      <Space size={4}>
+        <Button size="small" type="link" onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
+        {activeTab === 'mine' && r.can_cancel && (
+          <Popconfirm
+            title="确认取消此工单？"
+            description="取消后该工单不会继续流转审批。"
+            okText="确认取消"
+            cancelText="返回"
+            onConfirm={() => cancelMut.mutate(r.id)}
+          >
+            <Button size="small" type="link" danger icon={<StopOutlined />} loading={cancelMut.isPending}>
+              取消
+            </Button>
+          </Popconfirm>
+        )}
+      </Space>
     ),
   }
 
   const mineColumns: ColumnsType<any> = [
     idColumn,
+    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 290, render: renderWorkflowName(navigate, 260) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '风险', dataIndex: 'risk_level', width: 100, align: 'center', render: (v, r) => renderRisk(v, r.risk_summary) },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
     { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: true, render: renderCurrentNode },
@@ -208,10 +251,12 @@ export default function WorkflowList() {
 
   const auditColumns: ColumnsType<any> = [
     idColumn,
+    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
     { title: '申请人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
     { title: '工单名称', dataIndex: 'workflow_name', width: 255, render: renderWorkflowName(navigate, 225) },
     { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '风险', dataIndex: 'risk_level', width: 100, align: 'center', render: (v, r) => renderRisk(v, r.risk_summary) },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: true, render: renderCurrentNode },
     { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
@@ -221,6 +266,7 @@ export default function WorkflowList() {
 
   const executeColumns: ColumnsType<any> = [
     idColumn,
+    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 340, render: renderWorkflowName(navigate, 310) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
@@ -258,6 +304,7 @@ export default function WorkflowList() {
 
   return (
     <div>
+      {contextHolder}
       <PageHeader
         title="SQL 工单"
         meta={`共 ${data?.total ?? 0} 个`}
@@ -365,7 +412,7 @@ export default function WorkflowList() {
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
-          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1680 : activeTab === 'execute' ? 1710 : 1540 }}
+          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1885 : activeTab === 'execute' ? 1815 : 1745 }}
           pagination={{
             total: data?.total,
             current: page,

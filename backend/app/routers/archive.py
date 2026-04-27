@@ -1,8 +1,10 @@
 """Data archive routes."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,7 +27,33 @@ class ArchiveRequest(BaseModel):
     sleep_ms: int = Field(default=100, ge=0, le=10000)
     dry_run: bool = Field(default=True, description="兼容旧字段；run 接口不再同步执行")
     apply_reason: str = Field(default="", max_length=500)
+    risk_remark: str = Field(default="", max_length=500)
     flow_id: int | None = Field(default=None, description="审批流模板 ID")
+
+
+class ArchiveExecuteRequest(BaseModel):
+    mode: str = Field(default="immediate", description="immediate=立即执行 scheduled=定时执行 external=外部已执行")
+    scheduled_at: datetime | None = Field(default=None, description="预约平台执行时间")
+    timing_time: datetime | None = Field(default=None, description="兼容旧字段：预约平台执行时间")
+    external_executed_at: datetime | None = Field(default=None, description="外部实际执行时间")
+    external_status: str | None = Field(default=None, description="success 或 failed")
+    external_remark: str | None = Field(default=None, max_length=500, description="外部执行结果备注")
+
+    @field_validator("mode")
+    @classmethod
+    def mode_valid(cls, v: str) -> str:
+        aliases = {"auto": "immediate", "manual": "external", "timing": "scheduled"}
+        normalized = aliases.get(v, v)
+        if normalized not in ("immediate", "scheduled", "external"):
+            raise ValueError("mode 必须是 immediate、scheduled 或 external")
+        return normalized
+
+    @field_validator("external_status")
+    @classmethod
+    def external_status_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("success", "failed"):
+            raise ValueError("external_status 必须是 success 或 failed")
+        return v
 
 
 @router.get("/support/", summary="查询数据库归档支持情况")
@@ -50,7 +78,8 @@ async def estimate_archive(
     db: AsyncSession = Depends(get_db),
 ):
     return await ArchiveService.estimate_rows(
-        db, data.source_instance_id, data.source_db, data.source_table, data.condition
+        db, data.source_instance_id, data.source_db, data.source_table, data.condition,
+        data.archive_mode, data.batch_size, data.dest_db, data.dest_table
     )
 
 
@@ -112,17 +141,18 @@ async def get_archive_job_status(
 @router.post("/jobs/{job_id}/start/", summary="启动已审批归档作业")
 async def start_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_apply")),
+    data: ArchiveExecuteRequest = ArchiveExecuteRequest(),
+    user=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
 ):
-    job = await ArchiveService.start_job(db, job_id, user)
-    return {"success": True, "msg": "归档作业已加入后台队列", "job_id": job.id, "status": job.status}
+    result = await ArchiveService.start_job(db, job_id, user, data)
+    return {"success": True, **result}
 
 
 @router.post("/jobs/{job_id}/pause/", summary="暂停归档作业")
 async def pause_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_apply")),
+    user=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
 ):
     job = await ArchiveService.set_job_control_state(db, job_id, "pause", user)
@@ -132,18 +162,18 @@ async def pause_archive_job(
 @router.post("/jobs/{job_id}/resume/", summary="继续归档作业")
 async def resume_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_apply")),
+    user=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
 ):
     job = await ArchiveService.set_job_control_state(db, job_id, "resume", user)
-    job = await ArchiveService.start_job(db, job.id, user)
-    return {"success": True, "msg": "归档作业已继续执行", "job_id": job.id, "status": job.status}
+    result = await ArchiveService.start_job(db, job.id, user)
+    return {"success": True, **result}
 
 
 @router.post("/jobs/{job_id}/cancel/", summary="取消归档作业")
 async def cancel_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_apply")),
+    user=Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     job = await ArchiveService.set_job_control_state(db, job_id, "cancel", user)

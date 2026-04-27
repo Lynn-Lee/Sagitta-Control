@@ -49,6 +49,11 @@ celery_app.conf.update(
             "schedule": crontab(minute="*"),
             "options": {"queue": "execute"},
         },
+        "dispatch-scheduled-archive-jobs-every-minute": {
+            "task": "dispatch_scheduled_archive_jobs",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "archive"},
+        },
         "collect-session-snapshots-every-minute": {
             "task": "collect_session_snapshots",
             "schedule": 10.0,

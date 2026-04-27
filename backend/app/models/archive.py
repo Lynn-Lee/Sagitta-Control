@@ -13,6 +13,7 @@ from app.models.base import BaseModel
 class ArchiveJobStatus(StrEnum):
     PENDING_REVIEW = "pending_review"
     APPROVED = "approved"
+    SCHEDULED = "scheduled"
     QUEUED = "queued"
     RUNNING = "running"
     PAUSING = "pausing"
@@ -59,6 +60,10 @@ class ArchiveJob(BaseModel):
     row_count_is_estimated: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     apply_reason: Mapped[str] = mapped_column(String(500), default="")
+    risk_plan: Mapped[str] = mapped_column(Text, default="", comment="风险预案JSON")
+    risk_level: Mapped[str] = mapped_column(String(20), default="", comment="风险等级")
+    risk_summary: Mapped[str] = mapped_column(String(500), default="", comment="风险摘要")
+    risk_remark: Mapped[str] = mapped_column(String(500), default="", comment="申请人风险说明")
     error_message: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(100), nullable=False)
     created_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("sql_users.id"), nullable=False)

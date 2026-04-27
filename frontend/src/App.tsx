@@ -33,7 +33,6 @@ const UserGroupManagement  = lazy(() => import('@/pages/system/UserGroupManageme
 const AuditLog             = lazy(() => import('@/pages/audit/AuditLog'))
 const Placeholder          = lazy(() => import('@/pages/Placeholder'))
 const ArchivePage          = lazy(() => import('@/pages/archive/ArchivePage'))
-const BinlogPage           = lazy(() => import('@/pages/binlog/BinlogPage'))
 
 const Loading = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -66,8 +65,7 @@ export default function App() {
           <Route path="sql-analysis"         element={<PermissionGuard permission="menu_ops"><SqlAnalysisPage /></PermissionGuard>} />
           <Route path="slowlog"              element={<Navigate to="/sql-analysis" replace />} />
           <Route path="diagnostic"           element={<PermissionGuard permission="menu_ops"><DiagnosticPage /></PermissionGuard>} />
-          <Route path="archive"              element={<PermissionGuard permission="menu_ops"><ArchivePage /></PermissionGuard>} />
-          <Route path="binlog"               element={<PermissionGuard permission="menu_ops"><BinlogPage /></PermissionGuard>} />
+          <Route path="archive"              element={<PermissionGuard anyPermissions={['archive_apply', 'archive_review', 'archive_execute']}><ArchivePage /></PermissionGuard>} />
           <Route path="optimize"             element={<Navigate to="/sql-analysis" replace />} />
           <Route path="schema"               element={<PermissionGuard permission="menu_schema"><DataDictPage /></PermissionGuard>} />
           <Route path="instance"             element={<PermissionGuard permission="instance_manage"><InstanceList /></PermissionGuard>} />

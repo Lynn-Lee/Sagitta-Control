@@ -161,6 +161,9 @@ class SqlWorkflowContent(BaseModel):
     review_content: Mapped[str] = mapped_column(Text, default="", comment="审核结果JSON")
     # 执行结果（JSON 字符串）
     execute_result: Mapped[str] = mapped_column(Text, default="", comment="执行结果JSON")
+    # 提交时风险预案快照（JSON 字符串）
+    risk_plan: Mapped[str] = mapped_column(Text, default="", comment="风险预案JSON")
+    risk_remark: Mapped[str] = mapped_column(String(500), default="", comment="申请人风险说明")
 
     workflow: Mapped[SqlWorkflow] = relationship("SqlWorkflow", back_populates="content")
 

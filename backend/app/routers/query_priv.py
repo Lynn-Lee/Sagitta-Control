@@ -15,6 +15,7 @@ from app.models.user import Users
 from app.schemas.query import AuditPrivRequest, PrivApplyRequest, RevokePrivilegeRequest
 from app.services.audit_log import AuditLogService
 from app.services.query_priv import QueryPrivService
+from app.services.risk_plan import RiskPlanService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -85,9 +86,10 @@ def _serialize_apply_items(
     can_audit_ids: set[int],
     instance_name_map: dict[int, str],
     user_map: dict[int, dict],
-    operator_username: str,
+    operator: dict,
 ) -> list[dict]:
     items: list[dict] = []
+    operator_username = operator.get("username", "")
     for apply in applies:
         applicant = user_map.get(apply.user_id or 0, {})
         acted_node_name, acted_action, acted_at = _extract_latest_action(apply, operator_username)
@@ -107,6 +109,9 @@ def _serialize_apply_items(
                 "limit_num": apply.limit_num,
                 "priv_type": apply.priv_type,
                 "apply_reason": apply.apply_reason,
+                "risk_level": getattr(apply, "risk_level", "") or "",
+                "risk_summary": getattr(apply, "risk_summary", "") or "",
+                "risk_remark": getattr(apply, "risk_remark", "") or "",
                 "status": apply.status,
                 "current_node_name": (
                     QueryPrivService._get_current_pending_node(apply) or {}
@@ -116,6 +121,7 @@ def _serialize_apply_items(
                 "acted_action": acted_action,
                 "acted_at": acted_at,
                 "can_audit": apply.id in can_audit_ids,
+                "can_cancel": QueryPrivService.can_cancel_apply(apply, operator),
                 "created_at": apply.created_at.isoformat() if apply.created_at else "",
             }
         )
@@ -172,8 +178,29 @@ async def apply_privilege(
         title=data.title,
         scope_type=data.scope_type,
         user=user,
+        risk_remark=data.risk_remark,
     )
     return {"status": 0, "msg": "申请已提交", "data": {"apply_id": apply.id}}
+
+
+@router.post("/privileges/risk-plan/", summary="查询权限申请风险预案")
+async def query_privilege_risk_plan(
+    data: PrivApplyRequest,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Instance).where(Instance.id == data.instance_id))
+    inst = result.scalar_one_or_none()
+    db_type = inst.db_type if inst else ""
+    plan = RiskPlanService.build_query_privilege_plan(
+        db_type=db_type,
+        scope_type=data.scope_type,
+        db_name=data.db_name,
+        table_name=data.table_name,
+        valid_date=data.valid_date,
+        limit_num=data.limit_num,
+    )
+    return {"status": 0, "risk_plan": plan.model_dump()}
 
 
 @router.get("/privileges/applies/", summary="权限申请列表")
@@ -198,7 +225,7 @@ async def list_applies(
             can_audit_ids=set(),
             instance_name_map=instance_name_map,
             user_map=user_map,
-            operator_username=user.get("username", ""),
+            operator=user,
         ),
     }
 
@@ -228,7 +255,7 @@ async def list_audit_records(
             can_audit_ids=can_audit_ids,
             instance_name_map=instance_name_map,
             user_map=user_map,
-            operator_username=user.get("username", ""),
+            operator=user,
         ),
     }
 
@@ -260,6 +287,16 @@ async def audit_apply(
     else:
         msg = "已驳回"
     return {"status": 0, "msg": msg, "data": {"apply_id": apply.id, "status": apply.status}}
+
+
+@router.post("/privileges/applies/{apply_id}/cancel/", summary="取消查询权限申请")
+async def cancel_apply(
+    apply_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    apply = await QueryPrivService.cancel_apply(db=db, apply_id=apply_id, user=user)
+    return {"status": 0, "msg": "申请已取消", "data": {"apply_id": apply.id, "status": apply.status}}
 
 
 @router.get("/privileges/manage/", summary="查询权限统一视角")
