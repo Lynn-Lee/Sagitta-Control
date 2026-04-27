@@ -16,7 +16,7 @@
 | 技术栈（后端） | FastAPI + SQLAlchemy 2.0 async + Celery 5 + PostgreSQL 16 |
 | 技术栈（前端） | React 18 + TypeScript + Vite + Ant Design 5 |
 | 引擎层 | EngineBase Protocol + sqlglot（替代 goInception 解析） |
-| 可观测中心 | Prometheus + Alertmanager + Grafana |
+| 可观测中心 | 数据库原生指标采集 + 容量快照（Prometheus/Grafana 可选） |
 | SaaS 预留 | 全部模型含 tenant_id，初期固定为 1 |
 | 部署方式 | Docker Compose（开发/测试）/ K8s + Helm（生产预留）|
 
@@ -161,11 +161,13 @@
 - 在线查询结果区支持自适应高度、分页、`row_num` 行号列、当前页/全部结果导出
 - 在线查询新增 `查询历史` 页面：支持时间范围、操作人、实例、数据库、操作类型、脱敏、SQL 关键字筛选，支持 SQL 明细查看、复制和收藏
 - 查询历史复用 v2-lite 查询治理范围；查询/导出成功与失败统一写入 `query_log`，迁移新增 `0017_query_log_history_audit` 和 `0018_qlog_snapshot_backfill`
-- 监控配置管理（Prometheus Exporter 配置）
-- Prometheus + Grafana 集成
-- Alertmanager 告警管理
-- Prometheus SD（服务发现）端点
-- 监控队列新增 `collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入 `session_snapshot` 和 `slow_query_log`
+- 可观测中心边界收敛为“数据库实例监控”，平台治理统计继续归属首页 Dashboard
+- 原生监控配置管理：启停、实例指标采集间隔、容量采集间隔、指标保留天数、采集状态与错误
+- 新增原生采样快照：`monitor_metric_snapshot`、`monitor_database_capacity_snapshot`、`monitor_table_capacity_snapshot`
+- 实例详情支持概览、24小时趋势、库/Schema 容量、表/索引容量、采集诊断
+- MySQL / PostgreSQL 补充原生连接、吞吐、慢查询、锁等待等指标；MongoDB 补充集合容量和索引大小映射
+- Prometheus + Grafana + Alertmanager 调整为可选外围集成；Prometheus SD 端点保留兼容旧部署
+- 监控队列新增 `collect_native_monitoring`、`collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入原生监控快照、`session_snapshot` 和 `slow_query_log`
 
 **会话诊断与慢日志补充**
 - Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0024_session_duration_ms`、`0025_session_duration_fields`

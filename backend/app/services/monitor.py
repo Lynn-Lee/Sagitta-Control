@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import and_, case, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,14 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AppException, ConflictException, NotFoundException
 from app.models.archive import ArchiveJob, ArchiveJobStatus
 from app.models.instance import Instance, InstanceDatabase
-from app.models.monitor import MonitorCollectConfig, MonitorPrivilege, MonitorPrivilegeApply
+from app.models.monitor import (
+    MonitorCollectConfig,
+    MonitorDatabaseCapacitySnapshot,
+    MonitorMetricSnapshot,
+    MonitorPrivilege,
+    MonitorPrivilegeApply,
+    MonitorTableCapacitySnapshot,
+)
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
 from app.models.user import ResourceGroup, Users
 from app.models.workflow import (
@@ -29,6 +37,18 @@ logger = logging.getLogger(__name__)
 
 
 class MonitorService:
+    SYSTEM_DATABASES = {
+        "information_schema",
+        "performance_schema",
+        "mysql",
+        "sys",
+        "pg_catalog",
+        "template0",
+        "template1",
+        "admin",
+        "local",
+        "config",
+    }
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
@@ -70,6 +90,12 @@ class MonitorService:
                 "is_enabled": cfg.is_enabled, "collect_interval": cfg.collect_interval,
                 "exporter_url": cfg.exporter_url, "exporter_type": cfg.exporter_type,
                 "alert_rules_override": cfg.alert_rules_override or {}, "created_by": cfg.created_by,
+                "capacity_collect_interval": cfg.capacity_collect_interval,
+                "retention_days": cfg.retention_days,
+                "last_metric_collect_at": cfg.last_metric_collect_at.isoformat() if cfg.last_metric_collect_at else None,
+                "last_capacity_collect_at": cfg.last_capacity_collect_at.isoformat() if cfg.last_capacity_collect_at else None,
+                "last_collect_status": cfg.last_collect_status,
+                "last_collect_error": cfg.last_collect_error,
             })
         return total, items
 
@@ -91,6 +117,8 @@ class MonitorService:
         cfg = MonitorCollectConfig(
             instance_id=data.instance_id, exporter_url=data.exporter_url,
             exporter_type=data.exporter_type, collect_interval=data.collect_interval,
+            capacity_collect_interval=data.capacity_collect_interval,
+            retention_days=data.retention_days,
             alert_rules_override=data.alert_rules_override, created_by=operator.get("username", ""),
         )
         db.add(cfg)
@@ -232,6 +260,566 @@ class MonitorService:
         total = total_q.scalar_one()
         result = await db.execute(query.order_by(MonitorPrivilegeApply.created_at.desc()).offset((page-1)*page_size).limit(page_size))
         return total, list(result.scalars().all())
+
+    @staticmethod
+    async def upsert_native_config(
+        db: AsyncSession,
+        instance_id: int,
+        data: Any,
+        user: dict,
+    ) -> MonitorCollectConfig:
+        inst_result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == instance_id)
+        )
+        instance = inst_result.scalar_one_or_none()
+        if not instance:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        if not MonitorService._can_access_instance(user, instance):
+            raise AppException("不能配置资源组外实例的监控采集", code=403)
+
+        cfg_result = await db.execute(select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id))
+        cfg = cfg_result.scalar_one_or_none()
+        if not cfg:
+            cfg = MonitorCollectConfig(
+                instance_id=instance_id,
+                exporter_url="",
+                exporter_type="",
+                created_by=user.get("username", ""),
+            )
+            db.add(cfg)
+        for field, value in data.model_dump(exclude_none=True).items():
+            setattr(cfg, field, value)
+        await db.commit()
+        await db.refresh(cfg)
+        return cfg
+
+    @staticmethod
+    async def list_native_instances(db: AsyncSession, user: dict) -> list[dict]:
+        stmt = select(Instance).options(selectinload(Instance.resource_groups)).where(Instance.is_active.is_(True))
+        if not (user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", [])):
+            user_rg_ids = user.get("resource_groups", [])
+            privileged_instance_ids = (
+                await db.execute(
+                    select(MonitorPrivilege.instance_id).where(
+                        MonitorPrivilege.user_id == user.get("id"),
+                        MonitorPrivilege.valid_date >= date.today(),
+                        MonitorPrivilege.is_deleted == 0,
+                    )
+                )
+            ).scalars().all()
+            if user_rg_ids:
+                stmt = stmt.join(Instance.resource_groups.of_type(ResourceGroup)).where(
+                    or_(ResourceGroup.id.in_(user_rg_ids), Instance.id.in_(privileged_instance_ids or [-1]))
+                ).distinct()
+            elif privileged_instance_ids:
+                stmt = stmt.where(Instance.id.in_(privileged_instance_ids))
+            else:
+                return []
+        instances = list((await db.execute(stmt.order_by(Instance.instance_name))).scalars().all())
+
+        items: list[dict] = []
+        for inst in instances:
+            cfg = (await db.execute(select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == inst.id))).scalar_one_or_none()
+            latest = await MonitorService.get_latest_snapshot(db, inst.id)
+            items.append(
+                {
+                    "instance_id": inst.id,
+                    "instance_name": inst.instance_name,
+                    "db_type": inst.db_type,
+                    "is_active": inst.is_active,
+                    "config_id": cfg.id if cfg else None,
+                    "config_enabled": bool(cfg and cfg.is_enabled),
+                    "collect_interval": cfg.collect_interval if cfg else None,
+                    "capacity_collect_interval": cfg.capacity_collect_interval if cfg else None,
+                    "retention_days": cfg.retention_days if cfg else None,
+                    "last_metric_collect_at": cfg.last_metric_collect_at.isoformat() if cfg and cfg.last_metric_collect_at else None,
+                    "last_capacity_collect_at": cfg.last_capacity_collect_at.isoformat() if cfg and cfg.last_capacity_collect_at else None,
+                    "last_collect_status": cfg.last_collect_status if cfg else "not_configured",
+                    "last_collect_error": cfg.last_collect_error if cfg else "",
+                    "latest": latest,
+                }
+            )
+        return items
+
+    @staticmethod
+    async def get_latest_snapshot(db: AsyncSession, instance_id: int) -> dict | None:
+        snap = (
+            await db.execute(
+                select(MonitorMetricSnapshot)
+                .where(MonitorMetricSnapshot.instance_id == instance_id)
+                .order_by(MonitorMetricSnapshot.collected_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if not snap:
+            return None
+        return MonitorService._snapshot_to_dict(snap)
+
+    @staticmethod
+    def _snapshot_to_dict(snap: MonitorMetricSnapshot) -> dict:
+        return {
+            "instance_id": snap.instance_id,
+            "collected_at": snap.collected_at.isoformat() if snap.collected_at else None,
+            "status": snap.status,
+            "error": snap.error,
+            "missing_groups": snap.missing_groups or {},
+            "is_up": snap.is_up,
+            "version": snap.version,
+            "uptime_seconds": snap.uptime_seconds,
+            "current_connections": snap.current_connections,
+            "active_sessions": snap.active_sessions,
+            "max_connections": snap.max_connections,
+            "connection_usage": snap.connection_usage,
+            "qps": snap.qps,
+            "tps": snap.tps,
+            "slow_queries": snap.slow_queries,
+            "error_count": snap.error_count,
+            "lock_waits": snap.lock_waits,
+            "long_transactions": snap.long_transactions,
+            "replication_lag_seconds": snap.replication_lag_seconds,
+            "total_size_bytes": snap.total_size_bytes,
+            "extra_metrics": snap.extra_metrics or {},
+        }
+
+    @staticmethod
+    async def get_native_detail(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        instance = (
+            await db.execute(
+                select(Instance)
+                .options(selectinload(Instance.resource_groups))
+                .where(Instance.id == instance_id)
+            )
+        ).scalar_one_or_none()
+        if not instance:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+
+        cfg = (await db.execute(select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id))).scalar_one_or_none()
+        latest = await MonitorService.get_latest_snapshot(db, instance_id)
+        return {
+            "instance": {
+                "id": instance.id,
+                "instance_name": instance.instance_name,
+                "db_type": instance.db_type,
+                "host": instance.host,
+                "port": instance.port,
+                "is_active": instance.is_active,
+            },
+            "config": {
+                "id": cfg.id,
+                "is_enabled": cfg.is_enabled,
+                "collect_interval": cfg.collect_interval,
+                "capacity_collect_interval": cfg.capacity_collect_interval,
+                "retention_days": cfg.retention_days,
+                "last_metric_collect_at": cfg.last_metric_collect_at.isoformat() if cfg.last_metric_collect_at else None,
+                "last_capacity_collect_at": cfg.last_capacity_collect_at.isoformat() if cfg.last_capacity_collect_at else None,
+                "last_collect_status": cfg.last_collect_status,
+                "last_collect_error": cfg.last_collect_error,
+            } if cfg else None,
+            "latest": latest,
+        }
+
+    @staticmethod
+    async def get_native_trend(db: AsyncSession, instance_id: int, user: dict, hours: int = 24) -> list[dict]:
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+        since = datetime.now(UTC) - timedelta(hours=hours)
+        rows = (
+            await db.execute(
+                select(MonitorMetricSnapshot)
+                .where(
+                    MonitorMetricSnapshot.instance_id == instance_id,
+                    MonitorMetricSnapshot.collected_at >= since,
+                )
+                .order_by(MonitorMetricSnapshot.collected_at)
+            )
+        ).scalars().all()
+        return [
+            {
+                "collected_at": row.collected_at.isoformat(),
+                "current_connections": row.current_connections,
+                "qps": row.qps,
+                "tps": row.tps,
+                "slow_queries": row.slow_queries,
+                "total_size_bytes": row.total_size_bytes,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def get_database_capacity(db: AsyncSession, instance_id: int, user: dict) -> list[dict]:
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+        latest_at = (
+            await db.execute(
+                select(func.max(MonitorDatabaseCapacitySnapshot.collected_at))
+                .where(MonitorDatabaseCapacitySnapshot.instance_id == instance_id)
+            )
+        ).scalar_one_or_none()
+        if not latest_at:
+            return []
+        rows = (
+            await db.execute(
+                select(MonitorDatabaseCapacitySnapshot)
+                .where(
+                    MonitorDatabaseCapacitySnapshot.instance_id == instance_id,
+                    MonitorDatabaseCapacitySnapshot.collected_at == latest_at,
+                )
+                .order_by(MonitorDatabaseCapacitySnapshot.total_size_bytes.desc())
+            )
+        ).scalars().all()
+        return [
+            {
+                "db_name": row.db_name,
+                "collected_at": row.collected_at.isoformat(),
+                "table_count": row.table_count,
+                "data_size_bytes": row.data_size_bytes,
+                "index_size_bytes": row.index_size_bytes,
+                "total_size_bytes": row.total_size_bytes,
+                "row_count": row.row_count,
+                "status": row.status,
+                "error": row.error,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def get_table_capacity(
+        db: AsyncSession,
+        instance_id: int,
+        user: dict,
+        db_name: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[int, list[dict]]:
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+        latest_at = (
+            await db.execute(
+                select(func.max(MonitorTableCapacitySnapshot.collected_at))
+                .where(MonitorTableCapacitySnapshot.instance_id == instance_id)
+            )
+        ).scalar_one_or_none()
+        if not latest_at:
+            return 0, []
+        stmt = select(MonitorTableCapacitySnapshot).where(
+            MonitorTableCapacitySnapshot.instance_id == instance_id,
+            MonitorTableCapacitySnapshot.collected_at == latest_at,
+        )
+        if db_name:
+            stmt = stmt.where(MonitorTableCapacitySnapshot.db_name == db_name)
+        if search:
+            stmt = stmt.where(MonitorTableCapacitySnapshot.table_name.ilike(f"%{search}%"))
+        total = int((await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0)
+        rows = (
+            await db.execute(
+                stmt.order_by(MonitorTableCapacitySnapshot.total_size_bytes.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).scalars().all()
+        return total, [
+            {
+                "db_name": row.db_name,
+                "table_name": row.table_name,
+                "collected_at": row.collected_at.isoformat(),
+                "data_size_bytes": row.data_size_bytes,
+                "index_size_bytes": row.index_size_bytes,
+                "total_size_bytes": row.total_size_bytes,
+                "row_count": row.row_count,
+                "extra": row.extra or {},
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
+        now = datetime.now(UTC)
+        cfg_rows = (
+            await db.execute(
+                select(MonitorCollectConfig, Instance)
+                .join(Instance, MonitorCollectConfig.instance_id == Instance.id)
+                .where(MonitorCollectConfig.is_enabled.is_(True), Instance.is_active.is_(True))
+                .order_by(MonitorCollectConfig.id)
+                .limit(limit or 1000)
+            )
+        ).all()
+        collected = 0
+        failed = 0
+        skipped = 0
+        capacity_collected = 0
+        for cfg, inst in cfg_rows:
+            metric_due = (
+                not cfg.last_metric_collect_at
+                or now - cfg.last_metric_collect_at >= timedelta(seconds=cfg.collect_interval)
+            )
+            capacity_due = (
+                not cfg.last_capacity_collect_at
+                or now - cfg.last_capacity_collect_at >= timedelta(seconds=cfg.capacity_collect_interval)
+            )
+            if not metric_due and not capacity_due:
+                skipped += 1
+                continue
+            try:
+                if metric_due:
+                    await MonitorService.collect_instance_metrics(db, inst, cfg, collected_at=now)
+                    collected += 1
+                if capacity_due:
+                    await MonitorService.collect_instance_capacity(db, inst, cfg, collected_at=now)
+                    capacity_collected += 1
+                cfg.last_collect_status = "success"
+                cfg.last_collect_error = ""
+            except Exception as exc:
+                failed += 1
+                cfg.last_collect_status = "failed"
+                cfg.last_collect_error = str(exc)[:4000]
+                db.add(
+                    MonitorMetricSnapshot(
+                        instance_id=inst.id,
+                        collected_at=now,
+                        status="failed",
+                        error=str(exc)[:4000],
+                        is_up=False,
+                    )
+                )
+            await MonitorService.cleanup_old_snapshots(db, inst.id, cfg.retention_days, now)
+        await db.commit()
+        return {
+            "instances": len(cfg_rows),
+            "metric_collected": collected,
+            "capacity_collected": capacity_collected,
+            "failed": failed,
+            "skipped": skipped,
+        }
+
+    @staticmethod
+    async def collect_instance_metrics(
+        db: AsyncSession,
+        inst: Instance,
+        cfg: MonitorCollectConfig,
+        collected_at: datetime | None = None,
+    ) -> MonitorMetricSnapshot:
+        from app.engines.registry import get_engine
+
+        now = collected_at or datetime.now(UTC)
+        engine = get_engine(inst)
+        raw = await engine.collect_metrics()
+        normalized = MonitorService._normalize_metric_payload(raw)
+        snapshot = MonitorMetricSnapshot(instance_id=inst.id, collected_at=now, **normalized)
+        db.add(snapshot)
+        cfg.last_metric_collect_at = now
+        return snapshot
+
+    @staticmethod
+    def _normalize_metric_payload(raw: dict[str, Any]) -> dict[str, Any]:
+        health = raw.get("health") or {}
+        connections = raw.get("connections") or raw.get("stats") or {}
+        stats = raw.get("stats") or raw.get("opcounters") or raw.get("metrics") or {}
+        version = raw.get("version")
+        if isinstance(version, dict):
+            version = version.get("value") or version.get("version") or ""
+        missing: dict[str, str] = {}
+        if raw.get("error"):
+            missing["health"] = "collect_failed"
+        current_connections = MonitorService._first_number(
+            connections,
+            "current",
+            "connected_clients",
+            "Threads_connected",
+            "threads_connected",
+            "current_connections",
+        )
+        max_connections = MonitorService._first_number(
+            raw.get("variables") or raw,
+            "max_connections",
+            "Max_used_connections",
+        ) or MonitorService._first_number(connections, "max_connections")
+        usage = None
+        if current_connections is not None and max_connections:
+            usage = round(float(current_connections) / float(max_connections), 4)
+        qps = MonitorService._first_number(stats, "qps", "instantaneous_ops_per_sec", "queries_per_second")
+        tps = MonitorService._first_number(stats, "tps", "transactions_per_second")
+        return {
+            "status": "failed" if raw.get("error") else "success",
+            "error": str(raw.get("error") or ""),
+            "missing_groups": missing,
+            "is_up": bool(health.get("up")),
+            "version": str(version or raw.get("server_version") or ""),
+            "uptime_seconds": MonitorService._first_number(raw, "uptime_seconds", "uptime") or MonitorService._first_number(stats, "uptime_in_seconds"),
+            "current_connections": current_connections,
+            "active_sessions": MonitorService._first_number(raw.get("queries") or connections, "active_sessions", "active", "current"),
+            "max_connections": max_connections,
+            "connection_usage": usage,
+            "qps": float(qps) if qps is not None else None,
+            "tps": float(tps) if tps is not None else None,
+            "slow_queries": MonitorService._first_number(stats, "slow_queries", "Slow_queries"),
+            "error_count": MonitorService._first_number(stats, "errors", "error_count"),
+            "lock_waits": MonitorService._first_number(stats, "lock_waits", "Innodb_row_lock_waits"),
+            "long_transactions": MonitorService._first_number(stats, "long_transactions"),
+            "replication_lag_seconds": MonitorService._first_number(raw.get("replication") or {}, "lag_seconds", "seconds_behind_master"),
+            "extra_metrics": raw,
+        }
+
+    @staticmethod
+    def _first_number(mapping: Any, *keys: str) -> int | float | None:
+        if not isinstance(mapping, dict):
+            return None
+        lowered = {str(k).lower(): v for k, v in mapping.items()}
+        for key in keys:
+            value = lowered.get(key.lower())
+            if value is None:
+                continue
+            try:
+                return float(value) if "." in str(value) else int(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    async def collect_instance_capacity(
+        db: AsyncSession,
+        inst: Instance,
+        cfg: MonitorCollectConfig,
+        collected_at: datetime | None = None,
+    ) -> None:
+        from app.engines.registry import get_engine
+
+        now = collected_at or datetime.now(UTC)
+        engine = get_engine(inst)
+        db_names = await MonitorService._capacity_database_names(db, engine, inst)
+        instance_total = 0
+        for db_name in db_names:
+            try:
+                metas = await engine.get_tables_metas_data(db_name)
+                table_rows = [
+                    MonitorService._normalize_table_capacity(inst.id, db_name, meta, now)
+                    for meta in metas
+                ]
+                db_total = sum(row.total_size_bytes for row in table_rows)
+                db_data = sum(row.data_size_bytes for row in table_rows)
+                db_index = sum(row.index_size_bytes for row in table_rows)
+                db_row_count = sum(row.row_count for row in table_rows)
+                instance_total += db_total
+                for row in table_rows:
+                    db.add(row)
+                db.add(
+                    MonitorDatabaseCapacitySnapshot(
+                        instance_id=inst.id,
+                        db_name=db_name,
+                        collected_at=now,
+                        table_count=len(table_rows),
+                        data_size_bytes=db_data,
+                        index_size_bytes=db_index,
+                        total_size_bytes=db_total,
+                        row_count=db_row_count,
+                    )
+                )
+            except Exception as exc:
+                db.add(
+                    MonitorDatabaseCapacitySnapshot(
+                        instance_id=inst.id,
+                        db_name=db_name,
+                        collected_at=now,
+                        status="failed",
+                        error=str(exc)[:4000],
+                    )
+                )
+        latest = (
+            await db.execute(
+                select(MonitorMetricSnapshot)
+                .where(MonitorMetricSnapshot.instance_id == inst.id)
+                .order_by(MonitorMetricSnapshot.collected_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if latest:
+            latest.total_size_bytes = instance_total
+        cfg.last_capacity_collect_at = now
+
+    @staticmethod
+    async def _capacity_database_names(db: AsyncSession, engine: Any, inst: Instance) -> list[str]:
+        registered = (
+            await db.execute(
+                select(InstanceDatabase.db_name)
+                .where(InstanceDatabase.instance_id == inst.id, InstanceDatabase.is_active.is_(True))
+                .order_by(InstanceDatabase.db_name)
+            )
+        ).scalars().all()
+        if registered:
+            return list(registered)
+        rs = await engine.get_all_databases()
+        if rs.error:
+            raise AppException(rs.error, code=400)
+        names = [str(row[0] if isinstance(row, (list, tuple)) else row) for row in rs.rows]
+        return [name for name in names if name.lower() not in MonitorService.SYSTEM_DATABASES]
+
+    @staticmethod
+    def _normalize_table_capacity(
+        instance_id: int,
+        db_name: str,
+        meta: dict[str, Any],
+        collected_at: datetime,
+    ) -> MonitorTableCapacitySnapshot:
+        lowered = {str(k).lower(): v for k, v in meta.items()}
+        table_name = str(
+            lowered.get("table_name")
+            or lowered.get("name")
+            or lowered.get("collection")
+            or lowered.get("tablename")
+            or ""
+        )
+        data_size = MonitorService._int_value(
+            lowered.get("data_length")
+            or lowered.get("data_size")
+            or lowered.get("data_bytes")
+            or lowered.get("size")
+            or 0
+        )
+        index_size = MonitorService._int_value(lowered.get("index_length") or lowered.get("index_size") or 0)
+        total_size = MonitorService._int_value(
+            lowered.get("total_size")
+            or lowered.get("total_bytes")
+            or lowered.get("bytes")
+            or lowered.get("storage_size")
+            or data_size + index_size
+        )
+        if not data_size and total_size and index_size:
+            data_size = max(total_size - index_size, 0)
+        row_count = MonitorService._int_value(
+            lowered.get("table_rows") or lowered.get("rows") or lowered.get("count") or lowered.get("row_count") or 0
+        )
+        return MonitorTableCapacitySnapshot(
+            instance_id=instance_id,
+            db_name=db_name,
+            table_name=table_name,
+            collected_at=collected_at,
+            data_size_bytes=data_size,
+            index_size_bytes=index_size,
+            total_size_bytes=total_size or data_size + index_size,
+            row_count=row_count,
+            extra=meta,
+        )
+
+    @staticmethod
+    def _int_value(value: Any) -> int:
+        try:
+            return int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    async def cleanup_old_snapshots(db: AsyncSession, instance_id: int, retention_days: int, now: datetime | None = None) -> None:
+        cutoff = (now or datetime.now(UTC)) - timedelta(days=max(1, retention_days))
+        for model in (MonitorMetricSnapshot, MonitorDatabaseCapacitySnapshot, MonitorTableCapacitySnapshot):
+            rows = await db.execute(
+                select(model).where(model.instance_id == instance_id, model.collected_at < cutoff)
+            )
+            for row in rows.scalars().all():
+                await db.delete(row)
 
 
 class DashboardService:

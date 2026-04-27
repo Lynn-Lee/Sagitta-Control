@@ -64,5 +64,10 @@ celery_app.conf.update(
             "schedule": crontab(minute="*/5"),
             "options": {"queue": "monitor"},
         },
+        "collect-native-monitoring-every-minute": {
+            "task": "collect_native_monitoring",
+            "schedule": 60.0,
+            "options": {"queue": "monitor"},
+        },
     },
 )

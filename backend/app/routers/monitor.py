@@ -4,15 +4,19 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query as QParam
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
+from app.models.instance import Instance
+from app.models.monitor import MonitorCollectConfig
 from app.schemas.monitor import (
     AuditMonitorPrivRequest,
     MonitorConfigCreate,
     MonitorConfigUpdate,
     MonitorPrivApplyRequest,
+    NativeMonitorConfigUpsert,
 )
 from app.services.monitor import DashboardService, MonitorService
 
@@ -82,6 +86,100 @@ async def instance_overview(
     db: AsyncSession = Depends(get_db),
 ):
     return await DashboardService.get_instance_overview(db, user=user)
+
+
+# ── 原生数据库监控 ────────────────────────────────────────────
+
+@router.get("/native/instances/", summary="原生数据库监控实例列表")
+async def native_instances(
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items = await MonitorService.list_native_instances(db, user)
+    return {"items": items}
+
+
+@router.put(
+    "/native/instances/{instance_id}/config/",
+    summary="配置原生监控采集",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
+async def upsert_native_config(
+    instance_id: int,
+    data: NativeMonitorConfigUpsert,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    cfg = await MonitorService.upsert_native_config(db, instance_id, data, user)
+    return {"status": 0, "msg": "监控采集配置已保存", "data": {"id": cfg.id}}
+
+
+@router.post(
+    "/native/instances/{instance_id}/collect/",
+    summary="手动触发原生监控采集",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
+async def collect_native_instance(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    detail = await MonitorService.get_native_detail(db, instance_id, user)
+    cfg_data = detail.get("config")
+    if not cfg_data:
+        await MonitorService.upsert_native_config(db, instance_id, NativeMonitorConfigUpsert(), user)
+    cfg = (
+        await db.execute(select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id))
+    ).scalar_one()
+    inst = (await db.execute(select(Instance).where(Instance.id == instance_id))).scalar_one()
+    now_result = await MonitorService.collect_instance_metrics(db, inst, cfg)
+    await MonitorService.collect_instance_capacity(db, inst, cfg)
+    cfg.last_collect_status = "success"
+    cfg.last_collect_error = ""
+    await db.commit()
+    return {"status": 0, "msg": "采集完成", "data": MonitorService._snapshot_to_dict(now_result)}
+
+
+@router.get("/native/instances/{instance_id}/", summary="原生数据库监控详情")
+async def native_detail(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_native_detail(db, instance_id, user)
+
+
+@router.get("/native/instances/{instance_id}/trend/", summary="原生数据库监控趋势")
+async def native_trend(
+    instance_id: int,
+    hours: int = QParam(24, ge=1, le=720),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return {"items": await MonitorService.get_native_trend(db, instance_id, user, hours)}
+
+
+@router.get("/native/instances/{instance_id}/databases/", summary="库/Schema 容量")
+async def native_database_capacity(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return {"items": await MonitorService.get_database_capacity(db, instance_id, user)}
+
+
+@router.get("/native/instances/{instance_id}/tables/", summary="表容量")
+async def native_table_capacity(
+    instance_id: int,
+    db_name: str | None = None,
+    search: str | None = None,
+    page: int = QParam(1, ge=1),
+    page_size: int = QParam(50, ge=1, le=200),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await MonitorService.get_table_capacity(db, instance_id, user, db_name, search, page, page_size)
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
 # ── 采集配置 ──────────────────────────────────────────────────

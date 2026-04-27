@@ -26,6 +26,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _to_int(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 class MysqlEngine:
     """MySQL 数据库引擎。"""
 
@@ -405,7 +412,46 @@ class MysqlEngine:
     async def collect_metrics(self) -> dict[str, Any]:
         """采集 MySQL 核心健康指标。"""
         rs = await self.test_connection()
-        return {"health": {"up": 1 if rs.is_success else 0}}
+        if not rs.is_success:
+            return {"health": {"up": 0}, "error": rs.error}
+        status_rs = await self.query(db_name="", sql="SHOW GLOBAL STATUS", limit_num=0)
+        variables_rs = await self.query(db_name="", sql="SHOW GLOBAL VARIABLES", limit_num=0)
+        version_rs = await self.query(db_name="", sql="SELECT VERSION() AS version", limit_num=1)
+        process_rs = await self.processlist(command_type="ALL")
+
+        status = {str(row[0]): row[1] for row in status_rs.rows} if status_rs.is_success else {}
+        variables = {str(row[0]): row[1] for row in variables_rs.rows} if variables_rs.is_success else {}
+        current_connections = _to_int(status.get("Threads_connected"))
+        max_connections = _to_int(variables.get("max_connections"))
+        questions = _to_int(status.get("Questions"))
+        uptime = _to_int(status.get("Uptime"))
+        qps = round(questions / uptime, 2) if questions is not None and uptime else None
+        commits = _to_int(status.get("Com_commit")) or 0
+        rollbacks = _to_int(status.get("Com_rollback")) or 0
+        tps = round((commits + rollbacks) / uptime, 2) if uptime else None
+        return {
+            "health": {"up": 1},
+            "version": {"value": version_rs.rows[0][0] if version_rs.rows else ""},
+            "uptime_seconds": uptime,
+            "connections": {
+                "current": current_connections,
+                "max_connections": max_connections,
+            },
+            "queries": {
+                "current": len(process_rs.rows) if process_rs.is_success else None,
+                "warning": process_rs.error if process_rs.error else "",
+            },
+            "stats": {
+                "qps": qps,
+                "tps": tps,
+                "slow_queries": _to_int(status.get("Slow_queries")),
+                "Innodb_row_lock_waits": _to_int(status.get("Innodb_row_lock_waits")),
+                "errors": (_to_int(status.get("Connection_errors_internal")) or 0)
+                + (_to_int(status.get("Connection_errors_max_connections")) or 0),
+            },
+            "variables": {"max_connections": max_connections},
+            "replication": {},
+        }
 
     def get_supported_metric_groups(self) -> list[str]:
         return ["health", "performance", "replication", "innodb"]

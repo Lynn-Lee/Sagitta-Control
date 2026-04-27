@@ -12,7 +12,7 @@ SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效
 - **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，敏感字段加密存储，并内置本地密码复杂度、默认密码强制改密和 30 天轮换策略
 - **全面**：支持 11 种数据库引擎（MySQL / PostgreSQL / Oracle / MongoDB / Redis / ClickHouse 等）
 - **高效**：AI Text2SQL + SQL 工单模板 + 自定义审批流，全异步 Celery 执行不阻塞
-- **可观测**：内建 Prometheus + Grafana 监控，全流程操作审计
+- **可观测**：内建数据库原生指标采集、容量/表索引体积监控与全流程操作审计
 - **可解释权限**：v2-lite 权限体系已落地，权限拒绝可定位到身份 / 资源范围 / 数据授权层
 
 ## 技术栈
@@ -23,7 +23,7 @@ SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效
 | 前端 | React 18 + TypeScript + Vite + Ant Design 5 |
 | SQL 解析 | sqlglot（替代 goInception，支持 20+ 方言） |
 | AI | Anthropic Claude API（Text2SQL） |
-| 可观测 | Prometheus + Alertmanager + Grafana |
+| 可观测 | 数据库原生采集 + Celery monitor 队列 + PostgreSQL 指标快照（Prometheus/Grafana 可选部署） |
 | 部署 | Docker Compose（开发/测试）/ K8s + Helm（生产预留）|
 
 ## 快速启动
@@ -41,7 +41,7 @@ docker compose exec backend alembic upgrade head
 # 4. 访问
 # 前端：       http://localhost
 # 后端 API：   http://localhost:8000/docs
-# Grafana：    http://localhost:3000
+# Grafana：    http://localhost:3000（可选外围监控服务）
 # Flower：     http://localhost:5555
 ```
 
@@ -74,7 +74,7 @@ docker compose up -d
 SagittaDB/
 ├── backend/        # FastAPI 后端（engines / routers / services / models）
 ├── frontend/       # React 前端（pages / components / store / api）
-├── deploy/         # 部署配置（Nginx / Prometheus / Grafana）
+├── deploy/         # 部署配置（Nginx / 可选 Prometheus / Grafana）
 ├── docs/           # 项目文档
 │   ├── sagittadb_prd.md       # 产品需求文档（PRD v2.0）
 │   └── sagittadb_progress.md  # 开发进度文档
@@ -103,6 +103,7 @@ SagittaDB/
 | 授权体系 v2-lite | 角色权限、用户组资源范围、库/表级查询授权、权限排查接口 | ✅ 100% |
 | 密码安全策略 | 复杂度校验、默认/过期密码强制改密、到期前 7 天提醒、导入默认密码合规化 | ✅ 100% |
 | 会话诊断与慢日志分析 | 在线/历史会话、慢日志采集配置、SQL 指纹聚合、MySQL/PG 执行计划分析 | ✅ 100% |
+| 原生可观测中心 | 数据库实例指标、库容量、表/索引容量、采集诊断，不依赖 Prometheus/Grafana | ✅ 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ 100% |
 
 **总体完成度：100%（v1.0-GA）**

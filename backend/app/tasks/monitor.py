@@ -16,6 +16,7 @@ from app.engines.models import ResultSet
 from app.engines.registry import get_engine
 from app.models.instance import Instance
 from app.models.slowlog import SlowQueryConfig
+from app.services.monitor import MonitorService
 from app.services.session_diagnostic import (
     DEFAULT_SESSION_RETENTION_DAYS,
     SessionDiagnosticService,
@@ -212,3 +213,16 @@ async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100
 @celery_app.task(name="collect_slow_queries", queue="monitor")
 def collect_slow_queries(retention_days: int = 30, limit: int = 100) -> dict:
     return asyncio.run(_collect_slow_queries_async(retention_days=retention_days, limit=limit))
+
+
+async def _collect_native_monitoring_with_db(db: AsyncSession, limit: int | None = None) -> dict:
+    return await MonitorService.collect_due_native(db, limit=limit)
+
+
+async def _collect_native_monitoring_async(limit: int | None = None) -> dict:
+    return await _run_with_task_session(_collect_native_monitoring_with_db, limit=limit)
+
+
+@celery_app.task(name="collect_native_monitoring", queue="monitor")
+def collect_native_monitoring(limit: int | None = None) -> dict:
+    return asyncio.run(_collect_native_monitoring_async(limit=limit))

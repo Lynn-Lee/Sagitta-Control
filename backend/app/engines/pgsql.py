@@ -22,6 +22,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _to_int(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 class PgSQLEngine:
     name = "PgSQLEngine"
     db_type = "pgsql"
@@ -130,6 +137,8 @@ class PgSQLEngine:
     async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
         sql = """SELECT relname AS table_name,
                         pg_stat_get_live_tuples(c.oid) AS table_rows,
+                        pg_relation_size(c.oid) AS data_size,
+                        pg_indexes_size(c.oid) AS index_size,
                         pg_total_relation_size(c.oid) AS total_size,
                         obj_description(c.oid) AS comment
                  FROM pg_class c
@@ -433,7 +442,62 @@ class PgSQLEngine:
 
     async def collect_metrics(self) -> dict[str, Any]:
         rs = await self.test_connection()
-        return {"health": {"up": 1 if rs.is_success else 0}}
+        if not rs.is_success:
+            return {"health": {"up": 0}, "error": rs.error}
+        version_rs = await self._raw_query(db_name=self._db_name, sql="SHOW server_version", args=[])
+        activity_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="""
+                SELECT
+                  count(*) AS current_connections,
+                  count(*) FILTER (WHERE state = 'active') AS active_sessions,
+                  count(*) FILTER (WHERE wait_event_type = 'Lock') AS lock_waits,
+                  count(*) FILTER (WHERE xact_start IS NOT NULL AND now() - xact_start > interval '5 minutes') AS long_transactions
+                FROM pg_stat_activity
+            """,
+            args=[],
+        )
+        max_conn_rs = await self._raw_query(db_name=self._db_name, sql="SHOW max_connections", args=[])
+        stats_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="""
+                SELECT xact_commit, xact_rollback, tup_returned + tup_fetched AS query_work, deadlocks
+                FROM pg_stat_database
+                WHERE datname = current_database()
+            """,
+            args=[],
+        )
+        current_connections = active_sessions = lock_waits = long_transactions = None
+        if activity_rs.rows:
+            current_connections = _to_int(activity_rs.rows[0][0])
+            active_sessions = _to_int(activity_rs.rows[0][1])
+            lock_waits = _to_int(activity_rs.rows[0][2])
+            long_transactions = _to_int(activity_rs.rows[0][3])
+        uptime_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="SELECT extract(epoch from now() - pg_postmaster_start_time())::bigint",
+            args=[],
+        )
+        uptime = _to_int(uptime_rs.rows[0][0]) if uptime_rs.rows else None
+        query_work = _to_int(stats_rs.rows[0][2]) if stats_rs.rows else None
+        tx = ((_to_int(stats_rs.rows[0][0]) or 0) + (_to_int(stats_rs.rows[0][1]) or 0)) if stats_rs.rows else None
+        return {
+            "health": {"up": 1},
+            "version": {"value": version_rs.rows[0][0] if version_rs.rows else ""},
+            "uptime_seconds": uptime,
+            "connections": {
+                "current": current_connections,
+                "max_connections": _to_int(max_conn_rs.rows[0][0]) if max_conn_rs.rows else None,
+                "active_sessions": active_sessions,
+            },
+            "stats": {
+                "qps": round(query_work / uptime, 2) if query_work is not None and uptime else None,
+                "tps": round(tx / uptime, 2) if tx is not None and uptime else None,
+                "errors": _to_int(stats_rs.rows[0][3]) if stats_rs.rows else None,
+                "lock_waits": lock_waits,
+                "long_transactions": long_transactions,
+            },
+        }
 
     async def collect_slow_queries(
         self,

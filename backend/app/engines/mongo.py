@@ -120,9 +120,12 @@ class MongoEngine:
             for name in colls:
                 stats = await db.command("collStats", name)
                 result.append({
-                    "name": name,
+                    "table_name": name,
                     "count": stats.get("count", 0),
-                    "size": stats.get("size", 0),
+                    "data_size": stats.get("size", 0),
+                    "index_size": stats.get("totalIndexSize", 0),
+                    "total_size": stats.get("storageSize", 0) + stats.get("totalIndexSize", 0),
+                    "storage_size": stats.get("storageSize", 0),
                 })
         except Exception as e:
             logger.warning("mongo_meta_error: %s", str(e))

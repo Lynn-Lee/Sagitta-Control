@@ -1,9 +1,22 @@
 """
 可观测中心模型（3 张新增表）。
 """
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, Enum, ForeignKey, Index, Integer, String
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -29,18 +42,30 @@ class MonitorCollectConfig(BaseModel):
     collect_interval: Mapped[int] = mapped_column(Integer, default=60, comment="采集间隔(秒)")
     # 官方 Exporter 地址，如 http://db-host:9104/metrics
     exporter_url: Mapped[str] = mapped_column(
-        String(500), nullable=False, comment="Exporter 地址"
+        String(500), default="", comment="Exporter 地址(历史字段，可选)"
     )
     # Exporter 类型（用于前端展示和 Dashboard 路由）
     # mysqld_exporter / postgres_exporter / redis_exporter / ...
     exporter_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="Exporter 类型"
+        String(50), default="", comment="Exporter 类型(历史字段，可选)"
     )
     # 实例级告警阈值覆盖（JSON），不填则使用全局默认规则
     alert_rules_override: Mapped[dict] = mapped_column(
         JSON, default=dict, comment="告警阈值覆盖(JSON)"
     )
     created_by: Mapped[str] = mapped_column(String(30), default="", comment="创建人")
+    capacity_collect_interval: Mapped[int] = mapped_column(
+        Integer, default=3600, comment="容量采集间隔(秒)"
+    )
+    retention_days: Mapped[int] = mapped_column(Integer, default=30, comment="指标保留天数")
+    last_metric_collect_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="最近实例指标采集时间"
+    )
+    last_capacity_collect_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="最近容量采集时间"
+    )
+    last_collect_status: Mapped[str] = mapped_column(String(30), default="pending", comment="最近采集状态")
+    last_collect_error: Mapped[str] = mapped_column(Text, default="", comment="最近采集错误")
 
     __table_args__ = (Index("ix_mcc_tenant", "tenant_id"),)
 
@@ -114,4 +139,93 @@ class MonitorPrivilege(BaseModel):
             "user_id", "instance_id", "valid_date", "is_deleted",
         ),
         Index("ix_mon_priv_tenant", "tenant_id"),
+    )
+
+
+class MonitorMetricSnapshot(BaseModel):
+    """实例级监控指标采样快照。"""
+
+    __tablename__ = "monitor_metric_snapshot"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    instance_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sql_instance.id", ondelete="CASCADE"), nullable=False
+    )
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="success", comment="success/partial/failed")
+    error: Mapped[str] = mapped_column(Text, default="", comment="采集错误")
+    missing_groups: Mapped[dict] = mapped_column(JSON, default=dict, comment="缺失指标组原因")
+
+    is_up: Mapped[bool] = mapped_column(Boolean, default=False)
+    version: Mapped[str] = mapped_column(String(100), default="")
+    uptime_seconds: Mapped[int | None] = mapped_column(BigInteger)
+    current_connections: Mapped[int | None] = mapped_column(Integer)
+    active_sessions: Mapped[int | None] = mapped_column(Integer)
+    max_connections: Mapped[int | None] = mapped_column(Integer)
+    connection_usage: Mapped[float | None] = mapped_column(Float)
+    qps: Mapped[float | None] = mapped_column(Float)
+    tps: Mapped[float | None] = mapped_column(Float)
+    slow_queries: Mapped[int | None] = mapped_column(BigInteger)
+    error_count: Mapped[int | None] = mapped_column(BigInteger)
+    lock_waits: Mapped[int | None] = mapped_column(Integer)
+    long_transactions: Mapped[int | None] = mapped_column(Integer)
+    replication_lag_seconds: Mapped[int | None] = mapped_column(Integer)
+    total_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    extra_metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_mms_instance_time", "instance_id", "collected_at"),
+        Index("ix_mms_tenant", "tenant_id"),
+    )
+
+
+class MonitorDatabaseCapacitySnapshot(BaseModel):
+    """库/Schema 容量采样快照。"""
+
+    __tablename__ = "monitor_database_capacity_snapshot"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    instance_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sql_instance.id", ondelete="CASCADE"), nullable=False
+    )
+    db_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    table_count: Mapped[int] = mapped_column(Integer, default=0)
+    data_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    index_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    row_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    status: Mapped[str] = mapped_column(String(30), default="success")
+    error: Mapped[str] = mapped_column(Text, default="")
+
+    __table_args__ = (
+        Index("ix_mdcs_instance_time", "instance_id", "collected_at"),
+        Index("ix_mdcs_db", "instance_id", "db_name"),
+        Index("ix_mdcs_tenant", "tenant_id"),
+    )
+
+
+class MonitorTableCapacitySnapshot(BaseModel):
+    """表/集合容量采样快照。"""
+
+    __tablename__ = "monitor_table_capacity_snapshot"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    instance_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sql_instance.id", ondelete="CASCADE"), nullable=False
+    )
+    db_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    table_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    index_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    row_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_mtcs_instance_time", "instance_id", "collected_at"),
+        Index("ix_mtcs_table", "instance_id", "db_name", "table_name"),
+        Index("ix_mtcs_total_size", "instance_id", "total_size_bytes"),
+        Index("ix_mtcs_tenant", "tenant_id"),
     )

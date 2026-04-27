@@ -10,8 +10,11 @@ from app.models.instance import Instance, InstanceDatabase, InstanceTag, SshTunn
 from app.models.masking import MaskingRule, WorkflowTemplate  # noqa: F401
 from app.models.monitor import (  # noqa: F401
     MonitorCollectConfig,
+    MonitorDatabaseCapacitySnapshot,
+    MonitorMetricSnapshot,
     MonitorPrivilege,
     MonitorPrivilegeApply,
+    MonitorTableCapacitySnapshot,
 )
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply  # noqa: F401
 from app.models.role import Role, UserGroup  # noqa: F401
@@ -60,6 +63,9 @@ __all__ = [
     "SlowQueryLog",
     "SlowQueryConfig",
     "MonitorCollectConfig",
+    "MonitorMetricSnapshot",
+    "MonitorDatabaseCapacitySnapshot",
+    "MonitorTableCapacitySnapshot",
     "MonitorPrivilegeApply",
     "MonitorPrivilege",
     "SystemConfig",
