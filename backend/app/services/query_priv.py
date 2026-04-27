@@ -498,6 +498,7 @@ class QueryPrivService:
         instance: Instance,
         db_name: str,
         sql: str,
+        table_refs: list[dict[str, Any]] | None = None,
     ) -> tuple[bool, str]:
         """
         查询权限三层校验：
@@ -512,7 +513,7 @@ class QueryPrivService:
         if not QueryPrivService.user_has_instance_access(user, instance):
             return False, "实例不在你的资源组内"
 
-        table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        table_refs = table_refs if table_refs is not None else extract_table_refs(sql, db_name, instance.db_type)
         pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
         if not table_refs:
             if await QueryPrivService._has_instance_priv(db, user["id"], instance.id):
@@ -578,8 +579,11 @@ class QueryPrivService:
         instance: Instance,
         db_name: str,
         sql: str,
+        table_refs: list[dict[str, Any]] | None = None,
     ) -> dict:
-        allowed, reason = await QueryPrivService.check_query_priv(db, user, instance, db_name, sql)
+        allowed, reason = await QueryPrivService.check_query_priv(
+            db, user, instance, db_name, sql, table_refs=table_refs
+        )
         layer = (
             "identity"
             if reason == "admin"
@@ -597,6 +601,7 @@ class QueryPrivService:
         db_name: str,
         sql: str,
         requested_limit: int,
+        table_refs: list[dict[str, Any]] | None = None,
     ) -> int:
         if QueryPrivService.user_has_query_bypass(user, instance):
             return requested_limit
@@ -633,7 +638,7 @@ class QueryPrivService:
             privilege = result.scalars().first()
             return privilege.limit_num if privilege else None
 
-        table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        table_refs = table_refs if table_refs is not None else extract_table_refs(sql, db_name, instance.db_type)
         pg_table_schema_map = await QueryPrivService._get_pg_table_schema_map(instance, db_name, table_refs)
         instance_limit = await _latest_limit("instance", "")
         if not table_refs:
@@ -685,11 +690,12 @@ class QueryPrivService:
         instance: Instance,
         db_name: str,
         sql: str,
+        table_refs: list[dict[str, Any]] | None = None,
     ) -> str | None:
         if instance.db_type != "pgsql":
             return None
 
-        table_refs = extract_table_refs(sql, db_name, instance.db_type)
+        table_refs = table_refs if table_refs is not None else extract_table_refs(sql, db_name, instance.db_type)
         if not table_refs:
             return None
 

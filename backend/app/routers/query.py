@@ -23,6 +23,7 @@ from app.models.instance import Instance, InstanceDatabase
 from app.schemas.query import QueryExecuteRequest
 from app.services.masking import DataMaskingService
 from app.services.masking_rule import MaskingRuleService
+from app.services.query_guard import get_query_guard
 from app.services.query_priv import QueryPrivService
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,10 @@ async def _run_query_with_permissions(
     inst = await _load_instance(db, data.instance_id)
     engine = get_engine(inst)
 
-    check = engine.query_check(data.db_name, data.sql)
-    if check.get("msg") and check.get("syntax_error") is not False and check.get("syntax_error"):
-        raise HTTPException(400, f"SQL 语法错误：{check['msg']}")
+    guard = get_query_guard(inst.db_type)
+    guard_result = guard.validate(data.sql, data.db_name)
+    if not guard_result.allowed:
+        raise HTTPException(400, guard_result.reason or "在线查询只允许只读语句")
 
     passed, reason = await QueryPrivService.check_query_priv(
         db=db,
@@ -62,6 +64,7 @@ async def _run_query_with_permissions(
         instance=inst,
         db_name=data.db_name,
         sql=data.sql,
+        table_refs=guard_result.table_refs,
     )
     if not passed:
         raise HTTPException(403, reason)
@@ -84,17 +87,27 @@ async def _run_query_with_permissions(
         db_name=data.db_name,
         sql=data.sql,
         requested_limit=data.limit_num,
+        table_refs=guard_result.table_refs,
     )
-    safe_sql = engine.filter_sql(data.sql, effective_limit)
+    safe_sql = guard.apply_limit(
+        guard_result.normalized_sql or data.sql,
+        effective_limit,
+        guard_result.statement_kind,
+    )
     query_kwargs: dict[str, str] = {}
-    pg_search_path = await QueryPrivService.resolve_pg_search_path(inst, data.db_name, data.sql)
+    pg_search_path = await QueryPrivService.resolve_pg_search_path(
+        inst,
+        data.db_name,
+        data.sql,
+        table_refs=guard_result.table_refs,
+    )
     if pg_search_path:
         query_kwargs["search_path"] = pg_search_path
 
     resultset = await engine.query(
         db_name=data.db_name,
         sql=safe_sql,
-        limit_num=effective_limit,
+        limit_num=effective_limit if guard_result.use_driver_limit else 0,
         **query_kwargs,
     )
     if resultset.error:
@@ -319,12 +332,23 @@ async def explain_query_access(
     db: AsyncSession = Depends(get_db),
 ):
     inst = await _load_instance(db, data.instance_id)
+    guard = get_query_guard(inst.db_type)
+    guard_result = guard.validate(data.sql, data.db_name)
+    if not guard_result.allowed:
+        return {
+            "instance_id": data.instance_id,
+            "db_name": data.db_name,
+            "allowed": False,
+            "reason": guard_result.reason or "在线查询只允许只读语句",
+            "layer": "query_guard",
+        }
     explanation = await QueryPrivService.explain_query_access(
         db=db,
         user=user,
         instance=inst,
         db_name=data.db_name,
         sql=data.sql,
+        table_refs=guard_result.table_refs,
     )
     return {
         "instance_id": data.instance_id,

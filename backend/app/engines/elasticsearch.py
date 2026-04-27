@@ -21,7 +21,7 @@ class ElasticsearchEngine:
     async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
     async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
     async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list: return []
-    def query_check(self, db_name: str, sql: str) -> dict: return {"msg": "", "syntax_error": False}
+    def query_check(self, db_name: str, sql: str) -> dict: return {"msg": "Elasticsearch 暂不支持在线查询执行", "syntax_error": True}
     def filter_sql(self, sql: str, limit_num: int) -> str: return sql
     async def query(self, db_name: str, sql: str, limit_num: int = 0, parameters: dict | None = None, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
     def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet: return resultset

@@ -21,8 +21,7 @@ ALLOWED_COMMANDS = {
     "get", "mget", "hget", "hgetall", "hkeys", "hvals", "lrange", "smembers",
     "scard", "zrange", "zrangebyscore", "zcard", "ttl", "pttl", "type",
     "exists", "strlen", "llen", "sismember", "zscore", "keys", "scan",
-    "hscan", "sscan", "zscan", "info", "dbsize", "time", "ping",
-    "object", "debug", "slowlog", "client",
+    "hscan", "sscan", "zscan", "info", "dbsize", "time", "ping", "object",
 }
 
 # 工单执行允许的额外命令
@@ -109,10 +108,12 @@ class RedisEngine:
         return []
 
     def query_check(self, db_name: str, sql: str) -> dict:
-        cmd = sql.strip().split()[0].lower() if sql.strip() else ""
-        if cmd not in ALLOWED_COMMANDS:
+        from app.services.query_guard import RedisCommandGuard
+
+        guard_result = RedisCommandGuard().validate(sql, db_name)
+        if not guard_result.allowed:
             return {
-                "msg": f"在线查询不允许命令 {cmd.upper()}，允许的命令：{', '.join(sorted(ALLOWED_COMMANDS))}",
+                "msg": guard_result.reason,
                 "syntax_error": True,
             }
         return {"msg": "", "syntax_error": False}
