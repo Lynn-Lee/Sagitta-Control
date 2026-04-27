@@ -10,7 +10,10 @@ const LoginPage            = lazy(() => import('@/pages/auth/LoginPage'))
 const OAuthCallbackPage    = lazy(() => import('@/pages/auth/OAuthCallbackPage'))
 const ProfilePage          = lazy(() => import('@/pages/auth/ProfilePage'))
 const MainLayout           = lazy(() => import('@/components/layout/MainLayout'))
-const Dashboard            = lazy(() => import('@/pages/dashboard/DashboardPage'))
+const DashboardQuery       = lazy(() => import('@/pages/dashboard/DashboardPage').then(m => ({ default: m.QueryDashboardPage })))
+const DashboardWorkflow    = lazy(() => import('@/pages/dashboard/DashboardPage').then(m => ({ default: m.WorkflowDashboardPage })))
+const DashboardArchive     = lazy(() => import('@/pages/dashboard/DashboardPage').then(m => ({ default: m.ArchiveDashboardPage })))
+const DashboardInstance    = lazy(() => import('@/pages/dashboard/DashboardPage').then(m => ({ default: m.InstanceDashboardPage })))
 const WorkflowList         = lazy(() => import('@/pages/workflow/WorkflowList'))
 const WorkflowSubmit       = lazy(() => import('@/pages/workflow/WorkflowSubmit'))
 const WorkflowDetail       = lazy(() => import('@/pages/workflow/WorkflowDetail'))
@@ -53,7 +56,11 @@ export default function App() {
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/" element={<AuthGuard><MainLayout /></AuthGuard>}>
           <Route index element={<DefaultAuthedRoute />} />
-          <Route path="dashboard"            element={<PermissionGuard permission="menu_dashboard"><Dashboard /></PermissionGuard>} />
+          <Route path="dashboard"            element={<PermissionGuard permission="menu_dashboard"><Navigate to="/dashboard/query" replace /></PermissionGuard>} />
+          <Route path="dashboard/query"      element={<PermissionGuard permission="menu_dashboard"><DashboardQuery /></PermissionGuard>} />
+          <Route path="dashboard/workflow"   element={<PermissionGuard permission="menu_dashboard"><DashboardWorkflow /></PermissionGuard>} />
+          <Route path="dashboard/archive"    element={<PermissionGuard permission="menu_dashboard"><DashboardArchive /></PermissionGuard>} />
+          <Route path="dashboard/instance"   element={<PermissionGuard permission="menu_dashboard"><DashboardInstance /></PermissionGuard>} />
           <Route path="workflow"             element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowList /></PermissionGuard>} />
           <Route path="workflow/submit"      element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowSubmit /></PermissionGuard>} />
           <Route path="workflow/templates"   element={<PermissionGuard permission="menu_sqlworkflow"><WorkflowTemplatePage /></PermissionGuard>} />

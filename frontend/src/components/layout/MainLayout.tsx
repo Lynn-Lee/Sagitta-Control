@@ -174,7 +174,15 @@ type NavItem = NonNullable<MenuProps['items']>[number] & {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard', permission: 'menu_dashboard' },
+  {
+    key: 'dashboard-group', icon: <DashboardOutlined />, label: 'Dashboard', permission: 'menu_dashboard',
+    children: [
+      { key: '/dashboard/query', icon: <MenuIcon component={QueryMenuSvg} label="在线查询概览" />, label: '在线查询概览' },
+      { key: '/dashboard/workflow', icon: <MenuIcon component={SqlWorkflowMenuSvg} label="SQL 工单概览" />, label: 'SQL 工单概览' },
+      { key: '/dashboard/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档概览" />, label: '数据归档概览' },
+      { key: '/dashboard/instance', icon: <MenuIcon component={InstanceMenuSvg} label="实例与库概览" />, label: '实例与库概览' },
+    ],
+  },
   {
     key: 'workflow-group', icon: <MenuIcon component={SqlWorkflowMenuSvg} label="SQL 工单" />, label: 'SQL 工单', permission: 'menu_sqlworkflow',
     children: [

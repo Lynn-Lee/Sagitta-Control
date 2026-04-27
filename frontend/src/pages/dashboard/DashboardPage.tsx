@@ -228,38 +228,15 @@ function EmptyChart({ text }: { text: string }) {
   )
 }
 
-export default function DashboardPage() {
+
+export function QueryDashboardPage() {
   const [queryDays, setQueryDays] = useState<number>(7)
   const [queryDaysInput, setQueryDaysInput] = useState<number>(7)
-  const [workflowDays, setWorkflowDays] = useState<number>(7)
-  const [workflowDaysInput, setWorkflowDaysInput] = useState<number>(7)
-  const [archiveDays, setArchiveDays] = useState<number>(7)
-  const [archiveDaysInput, setArchiveDaysInput] = useState<number>(7)
   const queryRangeLabel = `近${queryDays}天`
-  const workflowRangeLabel = `近${workflowDays}天`
-  const archiveRangeLabel = `近${archiveDays}天`
 
   const { data: queryOverview } = useQuery<OverviewResponse>({
     queryKey: ['dashboard-query-overview', queryDays],
     queryFn: () => apiClient.get(`/monitor/dashboard/query-overview/?days=${queryDays}`).then(r => r.data),
-    refetchInterval: 60000,
-  })
-
-  const { data: workflowOverview } = useQuery<WorkflowOverviewResponse>({
-    queryKey: ['dashboard-workflow-overview', workflowDays],
-    queryFn: () => apiClient.get(`/monitor/dashboard/workflow-overview/?days=${workflowDays}`).then(r => r.data),
-    refetchInterval: 60000,
-  })
-
-  const { data: archiveOverview } = useQuery<ArchiveOverviewResponse>({
-    queryKey: ['dashboard-archive-overview', archiveDays],
-    queryFn: () => apiClient.get(`/monitor/dashboard/archive-overview/?days=${archiveDays}`).then(r => r.data),
-    refetchInterval: 60000,
-  })
-
-  const { data: instanceOverview } = useQuery<InstanceOverviewResponse>({
-    queryKey: ['dashboard-instance-overview'],
-    queryFn: () => apiClient.get('/monitor/dashboard/instance-overview/').then(r => r.data),
     refetchInterval: 60000,
   })
 
@@ -278,57 +255,6 @@ export default function DashboardPage() {
     }))
   }, [queryOverview])
 
-  const workflowSubmitTrendData = useMemo(() => {
-    if (!workflowOverview?.submit_trend?.dates) return []
-    return workflowOverview.submit_trend.dates.map((date, index) => ({
-      date: date.slice(5),
-      submit_count: workflowOverview.submit_trend?.submit_count[index] ?? 0,
-      approved_count: workflowOverview.submit_trend?.approved_count[index] ?? 0,
-    }))
-  }, [workflowOverview])
-
-  const workflowGovernanceTrendData = useMemo(() => {
-    if (!workflowOverview?.governance_trend?.dates) return []
-    return workflowOverview.governance_trend.dates.map((date, index) => ({
-      date: date.slice(5),
-      rejected_count: workflowOverview.governance_trend?.rejected_count[index] ?? 0,
-      cancel_count: workflowOverview.governance_trend?.cancel_count[index] ?? 0,
-      execute_failed_count: workflowOverview.governance_trend?.execute_failed_count[index] ?? 0,
-    }))
-  }, [workflowOverview])
-
-  const workflowExecuteTrendData = useMemo(() => {
-    if (!workflowOverview?.execute_trend?.dates) return []
-    return workflowOverview.execute_trend.dates.map((date, index) => ({
-      date: date.slice(5),
-      queued_count: workflowOverview.execute_trend?.queued_count[index] ?? 0,
-      running_count: workflowOverview.execute_trend?.running_count[index] ?? 0,
-      success_count: workflowOverview.execute_trend?.success_count[index] ?? 0,
-    }))
-  }, [workflowOverview])
-
-  const workflowPendingStockData = useMemo(() => {
-    if (!workflowOverview?.pending_stock_trend?.dates) return []
-    return workflowOverview.pending_stock_trend.dates.map((date, index) => ({
-      date: date.slice(5),
-      pending_count: workflowOverview.pending_stock_trend?.pending_count[index] ?? 0,
-    }))
-  }, [workflowOverview])
-
-  const archiveTrendData = useMemo(() => {
-    if (!archiveOverview?.trend?.dates) return []
-    return archiveOverview.trend.dates.map((date, index) => ({
-      date: date.slice(5),
-      submit_count: archiveOverview.trend?.submit_count[index] ?? 0,
-      success_count: archiveOverview.trend?.success_count[index] ?? 0,
-      failed_count: archiveOverview.trend?.failed_count[index] ?? 0,
-      canceled_count: archiveOverview.trend?.canceled_count[index] ?? 0,
-      estimated_rows: archiveOverview.trend?.estimated_rows[index] ?? 0,
-      processed_rows: archiveOverview.trend?.processed_rows[index] ?? 0,
-      active_stock_count: archiveOverview.trend?.active_stock_count[index] ?? 0,
-    }))
-  }, [archiveOverview])
-
   const queryCards = [
     { title: `${queryRangeLabel}查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: '#1558A8' },
     { title: `${queryRangeLabel}查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: '#722ed1' },
@@ -340,46 +266,11 @@ export default function DashboardPage() {
     { title: `${queryRangeLabel}撤销查询权限数`, value: queryOverview?.cards?.revoked_query_privilege_count ?? 0, icon: <DeleteOutlined />, color: '#8c8c8c' },
   ]
 
-  const workflowCards = [
-    { title: `${workflowRangeLabel}提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: '#1558A8' },
-    { title: `${workflowRangeLabel}审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
-    { title: `${workflowRangeLabel}审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: '#fa8c16' },
-    { title: '待审批工单数', value: workflowOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: '#722ed1' },
-    { title: '队列中工单数', value: workflowOverview?.cards?.queued_count ?? 0, icon: <ClockCircleOutlined />, color: '#722ed1' },
-    { title: '执行中工单数', value: workflowOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: '#1677FF' },
-    { title: `${workflowRangeLabel}执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: '#13C2C2' },
-    { title: `${workflowRangeLabel}执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: '#E53935' },
-    { title: `${workflowRangeLabel}取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: '#A0A0A0' },
-    { title: `${workflowRangeLabel}完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: '#2F54EB' },
-  ]
-
-  const archiveCards = [
-    { title: `${archiveRangeLabel}提交归档数`, value: archiveOverview?.cards?.period_submit_count ?? 0, icon: <FileTextOutlined />, color: ARCHIVE_COLORS.submit },
-    { title: '待审批归档数', value: archiveOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: ARCHIVE_COLORS.activeStock },
-    { title: '已审批待执行数', value: archiveOverview?.cards?.approved_count ?? 0, icon: <CheckCircleOutlined />, color: ARCHIVE_COLORS.success },
-    { title: '定时待执行数', value: archiveOverview?.cards?.scheduled_count ?? 0, icon: <ClockCircleOutlined />, color: ARCHIVE_COLORS.scheduled },
-    { title: '执行中归档数', value: archiveOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: ARCHIVE_COLORS.running },
-    { title: '暂停中归档数', value: archiveOverview?.cards?.paused_count ?? 0, icon: <StopOutlined />, color: ARCHIVE_COLORS.canceled },
-    { title: `${archiveRangeLabel}成功归档数`, value: archiveOverview?.cards?.success_count ?? 0, icon: <CheckCircleOutlined />, color: ARCHIVE_COLORS.success },
-    { title: `${archiveRangeLabel}失败归档数`, value: archiveOverview?.cards?.failed_count ?? 0, icon: <CloseCircleOutlined />, color: ARCHIVE_COLORS.failed },
-    { title: `${archiveRangeLabel}取消归档数`, value: archiveOverview?.cards?.canceled_count ?? 0, icon: <CloseCircleOutlined />, color: ARCHIVE_COLORS.canceled },
-    { title: `${archiveRangeLabel}预估影响行数`, value: archiveOverview?.cards?.estimated_rows ?? 0, icon: <DatabaseOutlined />, color: ARCHIVE_COLORS.rows },
-    { title: `${archiveRangeLabel}已处理行数`, value: archiveOverview?.cards?.processed_rows ?? 0, icon: <FileDoneOutlined />, color: ARCHIVE_COLORS.running },
-    { title: '高风险活跃归档数', value: archiveOverview?.cards?.high_risk_active_count ?? 0, icon: <SafetyCertificateOutlined />, color: ARCHIVE_COLORS.risk },
-  ]
-
-  const instanceCards = [
-    { title: '可见实例数', value: instanceOverview?.cards?.visible_instance_count ?? 0, icon: <DatabaseOutlined />, color: '#1558A8' },
-    { title: '已同步库/Schema数', value: instanceOverview?.cards?.synced_database_count ?? 0, icon: <AppstoreOutlined />, color: '#1677FF' },
-    { title: '已启用库/Schema数', value: instanceOverview?.cards?.enabled_database_count ?? 0, icon: <CheckCircleOutlined />, color: '#52C41A' },
-    { title: '已禁用库/Schema数', value: instanceOverview?.cards?.disabled_database_count ?? 0, icon: <StopOutlined />, color: '#FA8C16' },
-  ]
-
   const pendingStockTooltipFormatter = (value: number | string) => [`${value}`, '截至当日结束待审批存量']
 
   return (
     <div>
-      <PageHeader title="Dashboard" marginBottom={20} />
+      <PageHeader title="在线查询概览" marginBottom={20} />
 
       <Card
         title="在线查询概览"
@@ -510,6 +401,74 @@ export default function DashboardPage() {
           </Col>
         </Row>
       </Card>
+    </div>
+  )
+}
+
+export function WorkflowDashboardPage() {
+  const [workflowDays, setWorkflowDays] = useState<number>(7)
+  const [workflowDaysInput, setWorkflowDaysInput] = useState<number>(7)
+  const workflowRangeLabel = `近${workflowDays}天`
+
+  const { data: workflowOverview } = useQuery<WorkflowOverviewResponse>({
+    queryKey: ['dashboard-workflow-overview', workflowDays],
+    queryFn: () => apiClient.get(`/monitor/dashboard/workflow-overview/?days=${workflowDays}`).then(r => r.data),
+    refetchInterval: 60000,
+  })
+
+  const workflowSubmitTrendData = useMemo(() => {
+    if (!workflowOverview?.submit_trend?.dates) return []
+    return workflowOverview.submit_trend.dates.map((date, index) => ({
+      date: date.slice(5),
+      submit_count: workflowOverview.submit_trend?.submit_count[index] ?? 0,
+      approved_count: workflowOverview.submit_trend?.approved_count[index] ?? 0,
+    }))
+  }, [workflowOverview])
+
+  const workflowGovernanceTrendData = useMemo(() => {
+    if (!workflowOverview?.governance_trend?.dates) return []
+    return workflowOverview.governance_trend.dates.map((date, index) => ({
+      date: date.slice(5),
+      rejected_count: workflowOverview.governance_trend?.rejected_count[index] ?? 0,
+      cancel_count: workflowOverview.governance_trend?.cancel_count[index] ?? 0,
+      execute_failed_count: workflowOverview.governance_trend?.execute_failed_count[index] ?? 0,
+    }))
+  }, [workflowOverview])
+
+  const workflowExecuteTrendData = useMemo(() => {
+    if (!workflowOverview?.execute_trend?.dates) return []
+    return workflowOverview.execute_trend.dates.map((date, index) => ({
+      date: date.slice(5),
+      queued_count: workflowOverview.execute_trend?.queued_count[index] ?? 0,
+      running_count: workflowOverview.execute_trend?.running_count[index] ?? 0,
+      success_count: workflowOverview.execute_trend?.success_count[index] ?? 0,
+    }))
+  }, [workflowOverview])
+
+  const workflowPendingStockData = useMemo(() => {
+    if (!workflowOverview?.pending_stock_trend?.dates) return []
+    return workflowOverview.pending_stock_trend.dates.map((date, index) => ({
+      date: date.slice(5),
+      pending_count: workflowOverview.pending_stock_trend?.pending_count[index] ?? 0,
+    }))
+  }, [workflowOverview])
+
+  const workflowCards = [
+    { title: `${workflowRangeLabel}提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: '#1558A8' },
+    { title: `${workflowRangeLabel}审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
+    { title: `${workflowRangeLabel}审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: '#fa8c16' },
+    { title: '待审批工单数', value: workflowOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: '#722ed1' },
+    { title: '队列中工单数', value: workflowOverview?.cards?.queued_count ?? 0, icon: <ClockCircleOutlined />, color: '#722ed1' },
+    { title: '执行中工单数', value: workflowOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: '#1677FF' },
+    { title: `${workflowRangeLabel}执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: '#13C2C2' },
+    { title: `${workflowRangeLabel}执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: '#E53935' },
+    { title: `${workflowRangeLabel}取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: '#A0A0A0' },
+    { title: `${workflowRangeLabel}完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: '#2F54EB' },
+  ]
+
+  return (
+    <div>
+      <PageHeader title="SQL 工单概览" marginBottom={20} />
 
       <Card
         title="SQL 工单概览"
@@ -728,7 +687,7 @@ export default function DashboardPage() {
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col xs={24} lg={8} lg-offset={16}>
+          <Col xs={24} lg={{ span: 8, offset: 16 }}>
             <Card title="执行实例 Top 10" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
               {workflowOverview?.top_execute_instances?.length ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
@@ -751,6 +710,53 @@ export default function DashboardPage() {
           </Col>
         </Row>
       </Card>
+    </div>
+  )
+}
+
+export function ArchiveDashboardPage() {
+  const [archiveDays, setArchiveDays] = useState<number>(7)
+  const [archiveDaysInput, setArchiveDaysInput] = useState<number>(7)
+  const archiveRangeLabel = `近${archiveDays}天`
+
+  const { data: archiveOverview } = useQuery<ArchiveOverviewResponse>({
+    queryKey: ['dashboard-archive-overview', archiveDays],
+    queryFn: () => apiClient.get(`/monitor/dashboard/archive-overview/?days=${archiveDays}`).then(r => r.data),
+    refetchInterval: 60000,
+  })
+
+  const archiveTrendData = useMemo(() => {
+    if (!archiveOverview?.trend?.dates) return []
+    return archiveOverview.trend.dates.map((date, index) => ({
+      date: date.slice(5),
+      submit_count: archiveOverview.trend?.submit_count[index] ?? 0,
+      success_count: archiveOverview.trend?.success_count[index] ?? 0,
+      failed_count: archiveOverview.trend?.failed_count[index] ?? 0,
+      canceled_count: archiveOverview.trend?.canceled_count[index] ?? 0,
+      estimated_rows: archiveOverview.trend?.estimated_rows[index] ?? 0,
+      processed_rows: archiveOverview.trend?.processed_rows[index] ?? 0,
+      active_stock_count: archiveOverview.trend?.active_stock_count[index] ?? 0,
+    }))
+  }, [archiveOverview])
+
+  const archiveCards = [
+    { title: `${archiveRangeLabel}提交归档数`, value: archiveOverview?.cards?.period_submit_count ?? 0, icon: <FileTextOutlined />, color: ARCHIVE_COLORS.submit },
+    { title: '待审批归档数', value: archiveOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: ARCHIVE_COLORS.activeStock },
+    { title: '已审批待执行数', value: archiveOverview?.cards?.approved_count ?? 0, icon: <CheckCircleOutlined />, color: ARCHIVE_COLORS.success },
+    { title: '定时待执行数', value: archiveOverview?.cards?.scheduled_count ?? 0, icon: <ClockCircleOutlined />, color: ARCHIVE_COLORS.scheduled },
+    { title: '执行中归档数', value: archiveOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: ARCHIVE_COLORS.running },
+    { title: '暂停中归档数', value: archiveOverview?.cards?.paused_count ?? 0, icon: <StopOutlined />, color: ARCHIVE_COLORS.canceled },
+    { title: `${archiveRangeLabel}成功归档数`, value: archiveOverview?.cards?.success_count ?? 0, icon: <CheckCircleOutlined />, color: ARCHIVE_COLORS.success },
+    { title: `${archiveRangeLabel}失败归档数`, value: archiveOverview?.cards?.failed_count ?? 0, icon: <CloseCircleOutlined />, color: ARCHIVE_COLORS.failed },
+    { title: `${archiveRangeLabel}取消归档数`, value: archiveOverview?.cards?.canceled_count ?? 0, icon: <CloseCircleOutlined />, color: ARCHIVE_COLORS.canceled },
+    { title: `${archiveRangeLabel}预估影响行数`, value: archiveOverview?.cards?.estimated_rows ?? 0, icon: <DatabaseOutlined />, color: ARCHIVE_COLORS.rows },
+    { title: `${archiveRangeLabel}已处理行数`, value: archiveOverview?.cards?.processed_rows ?? 0, icon: <FileDoneOutlined />, color: ARCHIVE_COLORS.running },
+    { title: '高风险活跃归档数', value: archiveOverview?.cards?.high_risk_active_count ?? 0, icon: <SafetyCertificateOutlined />, color: ARCHIVE_COLORS.risk },
+  ]
+
+  return (
+    <div>
+      <PageHeader title="数据归档概览" marginBottom={20} />
 
       <Card
         title="数据归档概览"
@@ -925,6 +931,27 @@ export default function DashboardPage() {
           </Col>
         </Row>
       </Card>
+    </div>
+  )
+}
+
+export function InstanceDashboardPage() {
+  const { data: instanceOverview } = useQuery<InstanceOverviewResponse>({
+    queryKey: ['dashboard-instance-overview'],
+    queryFn: () => apiClient.get('/monitor/dashboard/instance-overview/').then(r => r.data),
+    refetchInterval: 60000,
+  })
+
+  const instanceCards = [
+    { title: '可见实例数', value: instanceOverview?.cards?.visible_instance_count ?? 0, icon: <DatabaseOutlined />, color: '#1558A8' },
+    { title: '已同步库/Schema数', value: instanceOverview?.cards?.synced_database_count ?? 0, icon: <AppstoreOutlined />, color: '#1677FF' },
+    { title: '已启用库/Schema数', value: instanceOverview?.cards?.enabled_database_count ?? 0, icon: <CheckCircleOutlined />, color: '#52C41A' },
+    { title: '已禁用库/Schema数', value: instanceOverview?.cards?.disabled_database_count ?? 0, icon: <StopOutlined />, color: '#FA8C16' },
+  ]
+
+  return (
+    <div>
+      <PageHeader title="实例与库概览" marginBottom={20} />
 
       <Card
         title="实例与库概览"
@@ -1053,3 +1080,5 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+export default QueryDashboardPage
