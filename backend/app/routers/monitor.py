@@ -1,5 +1,7 @@
 """可观测中心路由（Sprint 5）。"""
+
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query as QParam
@@ -9,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
+from app.core.exceptions import AppException
 from app.models.instance import Instance
-from app.models.monitor import MonitorCollectConfig
+from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
 from app.schemas.monitor import (
     AuditMonitorPrivRequest,
     MonitorConfigCreate,
@@ -26,6 +29,7 @@ sd_router = APIRouter()
 
 
 # ── Dashboard 统计 ────────────────────────────────────────────
+
 
 @router.get("/dashboard/stats/", summary="Dashboard 首页统计")
 async def dashboard_stats(
@@ -90,6 +94,7 @@ async def instance_overview(
 
 # ── 原生数据库监控 ────────────────────────────────────────────
 
+
 @router.get("/native/instances/", summary="原生数据库监控实例列表")
 async def native_instances(
     user: dict = Depends(current_user),
@@ -127,16 +132,39 @@ async def collect_native_instance(
     detail = await MonitorService.get_native_detail(db, instance_id, user)
     cfg_data = detail.get("config")
     if not cfg_data:
-        await MonitorService.upsert_native_config(db, instance_id, NativeMonitorConfigUpsert(), user)
+        await MonitorService.upsert_native_config(
+            db, instance_id, NativeMonitorConfigUpsert(), user
+        )
     cfg = (
-        await db.execute(select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id))
+        await db.execute(
+            select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id)
+        )
     ).scalar_one()
     inst = (await db.execute(select(Instance).where(Instance.id == instance_id))).scalar_one()
-    now_result = await MonitorService.collect_instance_metrics(db, inst, cfg)
-    await MonitorService.collect_instance_capacity(db, inst, cfg)
-    cfg.last_collect_status = "success"
-    cfg.last_collect_error = ""
-    await db.commit()
+    try:
+        now_result = await MonitorService.collect_instance_metrics(db, inst, cfg)
+        await MonitorService.collect_instance_capacity(db, inst, cfg)
+        cfg.last_collect_status = "success"
+        cfg.last_collect_error = ""
+        await db.commit()
+    except Exception as exc:
+        error = str(exc) or exc.__class__.__name__
+        cfg.last_collect_status = "failed"
+        cfg.last_collect_error = error[:4000]
+        db.add(
+            MonitorMetricSnapshot(
+                instance_id=inst.id,
+                collected_at=datetime.now(UTC),
+                status="failed",
+                error=error[:4000],
+                is_up=False,
+            )
+        )
+        await db.commit()
+        logger.warning(
+            "native_monitor_manual_collect_failed: instance_id=%s error=%s", instance_id, error
+        )
+        raise AppException(f"采集失败：{error}", code=400) from exc
     return {"status": 0, "msg": "采集完成", "data": MonitorService._snapshot_to_dict(now_result)}
 
 
@@ -178,13 +206,20 @@ async def native_table_capacity(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total, items = await MonitorService.get_table_capacity(db, instance_id, user, db_name, search, page, page_size)
+    total, items = await MonitorService.get_table_capacity(
+        db, instance_id, user, db_name, search, page, page_size
+    )
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
 # ── 采集配置 ──────────────────────────────────────────────────
 
-@router.get("/configs/", summary="采集配置列表", dependencies=[Depends(require_perm("monitor_config_manage"))])
+
+@router.get(
+    "/configs/",
+    summary="采集配置列表",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
 async def list_configs(
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
@@ -195,7 +230,11 @@ async def list_configs(
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
-@router.post("/configs/", summary="新建采集配置", dependencies=[Depends(require_perm("monitor_config_manage"))])
+@router.post(
+    "/configs/",
+    summary="新建采集配置",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
 async def create_config(
     data: MonitorConfigCreate,
     user: dict = Depends(current_user),
@@ -205,7 +244,11 @@ async def create_config(
     return {"status": 0, "msg": "采集配置创建成功", "data": {"id": cfg.id}}
 
 
-@router.put("/configs/{config_id}/", summary="更新采集配置", dependencies=[Depends(require_perm("monitor_config_manage"))])
+@router.put(
+    "/configs/{config_id}/",
+    summary="更新采集配置",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
 async def update_config(
     config_id: int,
     data: MonitorConfigUpdate,
@@ -216,7 +259,11 @@ async def update_config(
     return {"status": 0, "msg": "采集配置已更新", "data": {"id": cfg.id}}
 
 
-@router.delete("/configs/{config_id}/", summary="删除采集配置", dependencies=[Depends(require_perm("monitor_config_manage"))])
+@router.delete(
+    "/configs/{config_id}/",
+    summary="删除采集配置",
+    dependencies=[Depends(require_perm("monitor_config_manage"))],
+)
 async def delete_config(
     config_id: int,
     user: dict = Depends(current_user),
@@ -227,6 +274,7 @@ async def delete_config(
 
 
 # ── 监控权限申请 ──────────────────────────────────────────────
+
 
 @router.post("/privileges/apply/", summary="申请监控权限")
 async def apply_privilege(
@@ -248,11 +296,16 @@ async def list_applies(
 ):
     total, applies = await MonitorService.list_applies(db, user, status, page, page_size)
     return {
-        "total": total, "page": page, "page_size": page_size,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
         "items": [
             {
-                "id": a.id, "title": a.title, "instance_id": a.instance_id,
-                "valid_date": a.valid_date.isoformat(), "status": a.status,
+                "id": a.id,
+                "title": a.title,
+                "instance_id": a.instance_id,
+                "valid_date": a.valid_date.isoformat(),
+                "status": a.status,
                 "apply_reason": a.apply_reason,
                 "created_at": a.created_at.isoformat() if a.created_at else "",
             }
@@ -261,7 +314,11 @@ async def list_applies(
     }
 
 
-@router.post("/privileges/audit/", summary="审批监控权限", dependencies=[Depends(require_perm("monitor_review"))])
+@router.post(
+    "/privileges/audit/",
+    summary="审批监控权限",
+    dependencies=[Depends(require_perm("monitor_review"))],
+)
 async def audit_privilege(
     apply_id: int,
     data: AuditMonitorPrivRequest,
@@ -273,6 +330,7 @@ async def audit_privilege(
 
 
 # ── 实例指标（代理到 Prometheus）─────────────────────────────
+
 
 @router.get("/instances/{instance_id}/metrics/", summary="实例指标概览")
 async def instance_metrics(
@@ -289,6 +347,7 @@ async def instance_metrics(
 
     from app.engines.registry import get_engine
     from app.models.instance import Instance
+
     inst_result = await db.execute(select(Instance).where(Instance.id == instance_id))
     inst = inst_result.scalar_one_or_none()
     if not inst:
@@ -301,7 +360,10 @@ async def instance_metrics(
 
 # ── Prometheus HTTP SD 端点（内部，不鉴权）────────────────────
 
-@sd_router.get("/prometheus/sd-targets", summary="Prometheus HTTP SD 发现目标", include_in_schema=False)
+
+@sd_router.get(
+    "/prometheus/sd-targets", summary="Prometheus HTTP SD 发现目标", include_in_schema=False
+)
 async def prometheus_sd_targets(db: AsyncSession = Depends(get_db)):
     """
     Prometheus HTTP SD 端点。

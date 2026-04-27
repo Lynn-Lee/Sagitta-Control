@@ -6,6 +6,7 @@ MySQL 引擎实现。
 - P0-2：基础审核用 sqlglot，goInception 降级为可选增强（不再在 SQL 中传密码）
 - P0-4：所有查询强制参数化
 """
+
 from __future__ import annotations
 
 import logging
@@ -94,9 +95,14 @@ class MysqlEngine:
     async def get_all_databases(self) -> ResultSet:
         sql = "SHOW DATABASES"
         rs = await self.query(db_name="", sql=sql, limit_num=0)
+        if rs.is_success:
+            rs.rows = [
+                (next(iter(row.values())),) if isinstance(row, dict) else row for row in rs.rows
+            ]
         # 过滤系统库，应用 show_db_name_regex
         if self.instance.show_db_name_regex:
             import re
+
             pattern = re.compile(self.instance.show_db_name_regex)
             rs.rows = [r for r in rs.rows if pattern.search(str(r[0]))]
         return rs
@@ -106,9 +112,7 @@ class MysqlEngine:
         sql = f"SHOW TABLES FROM `{db_safe}`"
         return await self.query(db_name=db_name, sql=sql, limit_num=0)
 
-    async def get_all_columns_by_tb(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, "
             "COLUMN_COMMENT, COLUMN_KEY, EXTRA "
@@ -117,22 +121,19 @@ class MysqlEngine:
             "ORDER BY ORDINAL_POSITION"
         )
         return await self.query(
-            db_name=db_name, sql=sql,
+            db_name=db_name,
+            sql=sql,
             parameters={"db": db_name, "tb": tb_name},
             limit_num=0,
         )
 
-    async def describe_table(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def describe_table(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         tb_safe = self.escape_string(tb_name)
         db_safe = self.escape_string(db_name)
         sql = f"SHOW CREATE TABLE `{db_safe}`.`{tb_safe}`"
         return await self.query(db_name=db_name, sql=sql, limit_num=0)
 
-    async def get_table_constraints(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT "
             "tc.CONSTRAINT_NAME AS constraint_name, "
@@ -168,9 +169,7 @@ class MysqlEngine:
             limit_num=0,
         )
 
-    async def get_table_indexes(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT "
             "s.INDEX_NAME AS index_name, "
@@ -200,9 +199,7 @@ class MysqlEngine:
             limit_num=0,
         )
 
-    async def get_tables_metas_data(
-        self, db_name: str, **kwargs: Any
-    ) -> list[dict[str, Any]]:
+    async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
         sql = (
             "SELECT TABLE_NAME, TABLE_COMMENT, TABLE_ROWS, "
             "DATA_LENGTH, INDEX_LENGTH, CREATE_TIME, UPDATE_TIME "
@@ -210,24 +207,27 @@ class MysqlEngine:
             "WHERE TABLE_SCHEMA = %(db)s AND TABLE_TYPE = 'BASE TABLE'"
         )
         rs = await self.query(
-            db_name=db_name, sql=sql,
-            parameters={"db": db_name}, limit_num=0,
+            db_name=db_name,
+            sql=sql,
+            parameters={"db": db_name},
+            limit_num=0,
         )
         cols = rs.column_list
-        return [dict(zip(cols, row, strict=False)) for row in rs.rows]
+        return [
+            row if isinstance(row, dict) else dict(zip(cols, row, strict=False)) for row in rs.rows
+        ]
 
     # ── 查询 ──────────────────────────────────────────────────
 
     def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         """基于 sqlglot 的查询前置检查。"""
-        result: dict[str, Any] = {
-            "msg": "", "has_star": False, "syntax_error": False
-        }
+        result: dict[str, Any] = {"msg": "", "has_star": False, "syntax_error": False}
         sql_strip = sql.strip().rstrip(";")
         try:
             tree = sqlglot.parse_one(sql_strip, dialect="mysql")
             # 检查是否有 SELECT *
             import sqlglot.expressions as exp
+
             for _col in tree.find_all(exp.Star):
                 result["has_star"] = True
                 break
@@ -318,9 +318,7 @@ class MysqlEngine:
 
         return review
 
-    async def _sqlglot_check(
-        self, db_name: str, sql: str, review: ReviewSet
-    ) -> ReviewSet:
+    async def _sqlglot_check(self, db_name: str, sql: str, review: ReviewSet) -> ReviewSet:
         """基于 sqlglot 的本地规则引擎审核。"""
         import sqlglot.expressions as exp
 
@@ -355,9 +353,7 @@ class MysqlEngine:
 
         return review
 
-    async def _goinception_check(
-        self, db_name: str, sql: str, review: ReviewSet
-    ) -> ReviewSet:
+    async def _goinception_check(self, db_name: str, sql: str, review: ReviewSet) -> ReviewSet:
         """
         goInception 可选增强审核。
         注意：连接参数通过独立配置传递，不在 SQL 字符串中携带密码（修复 P0-2）。
@@ -370,9 +366,7 @@ class MysqlEngine:
 
     # ── 执行 ──────────────────────────────────────────────────
 
-    async def execute(
-        self, db_name: str, sql: str, **kwargs: Any
-    ) -> ReviewSet:
+    async def execute(self, db_name: str, sql: str, **kwargs: Any) -> ReviewSet:
         review = ReviewSet(full_sql=sql)
         conn = None
         pool = await self._get_pool()
@@ -419,8 +413,28 @@ class MysqlEngine:
         version_rs = await self.query(db_name="", sql="SELECT VERSION() AS version", limit_num=1)
         process_rs = await self.processlist(command_type="ALL")
 
-        status = {str(row[0]): row[1] for row in status_rs.rows} if status_rs.is_success else {}
-        variables = {str(row[0]): row[1] for row in variables_rs.rows} if variables_rs.is_success else {}
+        status = (
+            {
+                str(row.get("Variable_name", row.get("VARIABLE_NAME", ""))): row.get(
+                    "Value", row.get("VALUE")
+                )
+                for row in status_rs.rows
+                if isinstance(row, dict)
+            }
+            if status_rs.is_success
+            else {}
+        )
+        variables = (
+            {
+                str(row.get("Variable_name", row.get("VARIABLE_NAME", ""))): row.get(
+                    "Value", row.get("VALUE")
+                )
+                for row in variables_rs.rows
+                if isinstance(row, dict)
+            }
+            if variables_rs.is_success
+            else {}
+        )
         current_connections = _to_int(status.get("Threads_connected"))
         max_connections = _to_int(variables.get("max_connections"))
         questions = _to_int(status.get("Questions"))
@@ -431,7 +445,11 @@ class MysqlEngine:
         tps = round((commits + rollbacks) / uptime, 2) if uptime else None
         return {
             "health": {"up": 1},
-            "version": {"value": version_rs.rows[0][0] if version_rs.rows else ""},
+            "version": {
+                "value": version_rs.rows[0].get("version", "")
+                if version_rs.rows and isinstance(version_rs.rows[0], dict)
+                else ""
+            },
             "uptime_seconds": uptime,
             "connections": {
                 "current": current_connections,
@@ -495,9 +513,7 @@ class MysqlEngine:
     def auto_backup(self) -> bool:
         return True  # MySQL 支持 Binlog 备份
 
-    async def processlist(
-        self, command_type: str = "Query", **kwargs: Any
-    ) -> ResultSet:
+    async def processlist(self, command_type: str = "Query", **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT "
             "ID AS session_id, "
@@ -521,9 +537,7 @@ class MysqlEngine:
     async def kill_connection(self, thread_id: int) -> ResultSet:
         return await self.query(db_name="", sql=f"KILL {int(thread_id)}", limit_num=0)
 
-    async def get_variables(
-        self, variables: list[str] | None = None
-    ) -> ResultSet:
+    async def get_variables(self, variables: list[str] | None = None) -> ResultSet:
         if variables:
             placeholders = ", ".join(f"%(v{i})s" for i in range(len(variables)))
             params = {f"v{i}": v for i, v in enumerate(variables)}

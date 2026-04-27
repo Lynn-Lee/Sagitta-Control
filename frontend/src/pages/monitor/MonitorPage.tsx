@@ -108,6 +108,7 @@ export default function MonitorPage() {
   const canManageConfig = useAuthStore((s) => s.hasPermission('monitor_config_manage'))
   const [msgApi, msgCtx] = message.useMessage()
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [tableDb, setTableDb] = useState<string | undefined>()
   const [tableSearch, setTableSearch] = useState('')
@@ -144,22 +145,23 @@ export default function MonitorPage() {
   })
 
   const saveConfig = useMutation({
-    mutationFn: (values: any) => apiClient.put(`/monitor/native/instances/${activeId}/config/`, values).then(r => r.data),
-    onSuccess: () => {
+    mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/config/`, values).then(r => r.data),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', variables.instanceId] })
       setConfigOpen(false)
+      setConfigTarget(null)
       msgApi.success('监控采集配置已保存')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '保存失败'),
   })
   const collectNow = useMutation({
-    mutationFn: () => apiClient.post(`/monitor/native/instances/${activeId}/collect/`).then(r => r.data),
-    onSuccess: () => {
+    mutationFn: (instanceId: number) => apiClient.post(`/monitor/native/instances/${instanceId}/collect/`).then(r => r.data),
+    onSuccess: (_data, instanceId) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', activeId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', activeId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
       msgApi.success('采集完成')
     },
@@ -175,14 +177,24 @@ export default function MonitorPage() {
     size_gb: row.total_size_bytes ? Number((row.total_size_bytes / 1024 / 1024 / 1024).toFixed(2)) : null,
   })), [trendData])
 
-  const openConfig = () => {
+  const openConfig = (target?: MonitorInstance | null) => {
+    const item = target || active
+    if (!item) return
+    setSelectedId(item.instance_id)
+    setConfigTarget(item)
     form.setFieldsValue({
-      is_enabled: active?.config_enabled ?? true,
-      collect_interval: active?.collect_interval || 60,
-      capacity_collect_interval: active?.capacity_collect_interval || 3600,
-      retention_days: active?.retention_days || 30,
+      is_enabled: item.config_enabled ?? true,
+      collect_interval: item.collect_interval || 60,
+      capacity_collect_interval: item.capacity_collect_interval || 3600,
+      retention_days: item.retention_days || 30,
     })
     setConfigOpen(true)
+  }
+
+  const triggerCollect = (instanceId?: number | null) => {
+    if (!instanceId) return
+    setSelectedId(instanceId)
+    collectNow.mutate(instanceId)
   }
 
   const columns = [
@@ -210,6 +222,18 @@ export default function MonitorPage() {
     { title: '慢查询', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.slow_queries) },
     { title: '容量', width: 130, render: (_: any, row: MonitorInstance) => formatBytes(row.latest?.total_size_bytes) },
     { title: '最后采集', width: 180, render: (_: any, row: MonitorInstance) => formatTime(row.last_metric_collect_at) },
+    {
+      title: '操作',
+      key: 'actions',
+      fixed: 'right' as const,
+      width: 170,
+      render: (_: any, row: MonitorInstance) => canManageConfig ? (
+        <Space onClick={(event) => event.stopPropagation()}>
+          <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>
+          <Button size="small" type="primary" icon={<PlayCircleOutlined />} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>采集</Button>
+        </Space>
+      ) : null,
+    },
   ]
 
   const dbColumns = [
@@ -241,8 +265,8 @@ export default function MonitorPage() {
         actions={(
           <Space wrap style={isMobile ? { width: '100%' } : undefined}>
             <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })}>刷新</Button>
-            {canManageConfig && <Button icon={<SettingOutlined />} disabled={!activeId} onClick={openConfig}>采集配置</Button>}
-            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!activeId} loading={collectNow.isPending} onClick={() => collectNow.mutate()}>立即采集</Button>}
+            {canManageConfig && <Button icon={<SettingOutlined />} disabled={!activeId} onClick={() => openConfig(active)}>配置当前实例</Button>}
+            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!activeId} loading={collectNow.isPending} onClick={() => triggerCollect(activeId)}>采集当前实例</Button>}
           </Space>
         )}
       />
@@ -253,9 +277,13 @@ export default function MonitorPage() {
         rowKey="instance_id"
         loading={isLoading}
         tableLayout="fixed"
-        scroll={{ x: 1080 }}
+        scroll={{ x: 1250 }}
         pagination={false}
         rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
+        onRow={(row) => ({
+          onClick: () => setSelectedId(row.instance_id),
+          style: { cursor: 'pointer' },
+        })}
         locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
       />
 
@@ -374,13 +402,26 @@ export default function MonitorPage() {
       )}
 
       <Modal
-        title="原生监控采集配置"
+        title={`原生监控采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
         open={configOpen}
-        onCancel={() => setConfigOpen(false)}
-        onOk={() => form.validateFields().then(values => saveConfig.mutate(values))}
+        onCancel={() => {
+          setConfigOpen(false)
+          setConfigTarget(null)
+        }}
+        onOk={() => form.validateFields().then(values => {
+          const instanceId = configTarget?.instance_id || activeId
+          if (instanceId) saveConfig.mutate({ instanceId, values })
+        })}
         confirmLoading={saveConfig.isPending}
         maskClosable={false}
       >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 8 }}
+          message="该配置仅作用于当前实例"
+          description="不同实例需要分别启用采集。保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。"
+        />
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
             <Switch />
