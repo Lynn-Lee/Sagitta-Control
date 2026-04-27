@@ -109,6 +109,7 @@ export default function MonitorPage() {
   const [msgApi, msgCtx] = message.useMessage()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
+  const [configScope, setConfigScope] = useState<'single' | 'all'>('single')
   const [configOpen, setConfigOpen] = useState(false)
   const [tableDb, setTableDb] = useState<string | undefined>()
   const [tableSearch, setTableSearch] = useState('')
@@ -155,6 +156,23 @@ export default function MonitorPage() {
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '保存失败'),
   })
+  const saveAllConfig = useMutation({
+    mutationFn: async (values: any) => {
+      const results = await Promise.allSettled(
+        instances.map(item => apiClient.put(`/monitor/native/instances/${item.instance_id}/config/`, values)),
+      )
+      const failed = results.filter(result => result.status === 'rejected').length
+      return { total: instances.length, success: instances.length - failed, failed }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
+      setConfigOpen(false)
+      setConfigTarget(null)
+      msgApi.success(`已配置 ${result.success}/${result.total} 个实例${result.failed ? `，失败 ${result.failed} 个` : ''}`)
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量保存失败'),
+  })
   const collectNow = useMutation({
     mutationFn: (instanceId: number) => apiClient.post(`/monitor/native/instances/${instanceId}/collect/`).then(r => r.data),
     onSuccess: (_data, instanceId) => {
@@ -166,6 +184,33 @@ export default function MonitorPage() {
       msgApi.success('采集完成')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '采集失败'),
+  })
+  const collectAll = useMutation({
+    mutationFn: async () => {
+      let success = 0
+      const failed: string[] = []
+      for (const item of instances) {
+        try {
+          await apiClient.post(`/monitor/native/instances/${item.instance_id}/collect/`)
+          success += 1
+        } catch (error: any) {
+          failed.push(`${item.instance_name}：${error.response?.data?.msg || '采集失败'}`)
+        }
+      }
+      return { total: instances.length, success, failed }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-trend'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
+      if (result.failed.length) {
+        msgApi.warning(`已采集 ${result.success}/${result.total} 个实例，${result.failed.length} 个失败`)
+      } else {
+        msgApi.success(`已采集全部 ${result.total} 个实例`)
+      }
+    },
   })
 
   const latest: MonitorSnapshot | null = detail?.latest || active?.latest || null
@@ -182,6 +227,7 @@ export default function MonitorPage() {
     if (!item) return
     setSelectedId(item.instance_id)
     setConfigTarget(item)
+    setConfigScope('single')
     form.setFieldsValue({
       is_enabled: item.config_enabled ?? true,
       collect_interval: item.collect_interval || 60,
@@ -191,10 +237,32 @@ export default function MonitorPage() {
     setConfigOpen(true)
   }
 
+  const openAllConfig = () => {
+    setConfigScope('all')
+    setConfigTarget(null)
+    form.setFieldsValue({
+      is_enabled: true,
+      collect_interval: 60,
+      capacity_collect_interval: 3600,
+      retention_days: 30,
+    })
+    setConfigOpen(true)
+  }
+
   const triggerCollect = (instanceId?: number | null) => {
     if (!instanceId) return
     setSelectedId(instanceId)
     collectNow.mutate(instanceId)
+  }
+
+  const triggerCollectAll = () => {
+    Modal.confirm({
+      title: '采集全部实例',
+      content: `将按当前可见实例逐个触发采集，共 ${instances.length} 个实例。采集失败的实例会保留失败原因，不影响其他实例。`,
+      okText: '开始采集',
+      cancelText: '取消',
+      onOk: () => collectAll.mutateAsync(),
+    })
   }
 
   const columns = [
@@ -230,7 +298,7 @@ export default function MonitorPage() {
       render: (_: any, row: MonitorInstance) => canManageConfig ? (
         <Space onClick={(event) => event.stopPropagation()}>
           <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>
-          <Button size="small" type="primary" icon={<PlayCircleOutlined />} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>采集</Button>
+          <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>采集</Button>
         </Space>
       ) : null,
     },
@@ -265,8 +333,8 @@ export default function MonitorPage() {
         actions={(
           <Space wrap style={isMobile ? { width: '100%' } : undefined}>
             <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })}>刷新</Button>
-            {canManageConfig && <Button icon={<SettingOutlined />} disabled={!activeId} onClick={() => openConfig(active)}>配置当前实例</Button>}
-            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!activeId} loading={collectNow.isPending} onClick={() => triggerCollect(activeId)}>采集当前实例</Button>}
+            {canManageConfig && <Button icon={<SettingOutlined />} disabled={!instances.length} loading={saveAllConfig.isPending} onClick={openAllConfig}>配置全部实例</Button>}
+            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>采集全部实例</Button>}
           </Space>
         )}
       />
@@ -402,25 +470,29 @@ export default function MonitorPage() {
       )}
 
       <Modal
-        title={`原生监控采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
+        title={configScope === 'all' ? '原生监控采集配置 - 全部实例' : `原生监控采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
         open={configOpen}
         onCancel={() => {
           setConfigOpen(false)
           setConfigTarget(null)
         }}
         onOk={() => form.validateFields().then(values => {
+          if (configScope === 'all') {
+            saveAllConfig.mutate(values)
+            return
+          }
           const instanceId = configTarget?.instance_id || activeId
           if (instanceId) saveConfig.mutate({ instanceId, values })
         })}
-        confirmLoading={saveConfig.isPending}
+        confirmLoading={saveConfig.isPending || saveAllConfig.isPending}
         maskClosable={false}
       >
         <Alert
           type="info"
           showIcon
           style={{ marginTop: 8 }}
-          message="该配置仅作用于当前实例"
-          description="不同实例需要分别启用采集。保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。"
+          message={configScope === 'all' ? '该配置将应用到全部可见实例' : '该配置仅作用于当前实例'}
+          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置；采集时仍使用各实例自己的账号权限。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。'}
         />
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
