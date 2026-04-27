@@ -94,6 +94,11 @@ function StatusTag({ status }: { status?: string }) {
   return <Tag color={statusColor[value] || 'default'}>{label[value] || value}</Tag>
 }
 
+function ConfigStatusTag({ row }: { row: Pick<MonitorInstance, 'config_id' | 'config_enabled'> }) {
+  if (!row.config_id) return <Tag>未配置</Tag>
+  return row.config_enabled ? <Tag color="success">已启用</Tag> : <Tag color="default">已停用</Tag>
+}
+
 function MetricCard({ title, value, suffix, danger }: { title: string; value?: number | string | null; suffix?: string; danger?: boolean }) {
   return (
     <div style={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: 16, minHeight: 92 }}>
@@ -272,9 +277,9 @@ export default function MonitorPage() {
 
   const triggerDisableAllConfig = () => {
     Modal.confirm({
-      title: '关闭全部实例采集',
-      content: `将关闭当前列表中 ${instances.length} 个实例的原生监控采集，已采集的历史指标不会被删除。`,
-      okText: '关闭采集',
+      title: '关闭全部实例配置/采集',
+      content: `将关闭当前列表中 ${instances.length} 个实例的原生监控定时采集配置，已采集的历史指标不会被删除。`,
+      okText: '关闭配置/采集',
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => disableAllConfig.mutateAsync(),
@@ -289,8 +294,8 @@ export default function MonitorPage() {
 
   const triggerCollectAll = () => {
     Modal.confirm({
-      title: '采集全部实例',
-      content: `将按当前可见实例逐个触发采集，共 ${instances.length} 个实例。采集失败的实例会保留失败原因，不影响其他实例。`,
+      title: '立即采集全部',
+      content: `将按当前可见实例逐个手动触发一次采集，共 ${instances.length} 个实例。该操作不会改变实例的定时采集开关。`,
       okText: '开始采集',
       cancelText: '取消',
       onOk: () => collectAll.mutateAsync(),
@@ -308,7 +313,7 @@ export default function MonitorPage() {
       key: 'disable',
       icon: <StopOutlined />,
       danger: true,
-      label: '关闭全部实例采集',
+      label: '关闭全部实例配置/采集',
       onClick: triggerDisableAllConfig,
     },
   ]
@@ -332,6 +337,7 @@ export default function MonitorPage() {
       ),
     },
     { title: '健康', width: 110, render: (_: any, row: MonitorInstance) => row.latest?.is_up ? <Tag color="success">在线</Tag> : <Tag color="error">未知</Tag> },
+    { title: '采集开关', width: 120, render: (_: any, row: MonitorInstance) => <ConfigStatusTag row={row} /> },
     { title: '采集状态', width: 120, render: (_: any, row: MonitorInstance) => <StatusTag status={row.last_collect_status} /> },
     { title: '连接使用率', width: 130, render: (_: any, row: MonitorInstance) => row.latest?.connection_usage !== null && row.latest?.connection_usage !== undefined ? <Progress percent={Math.round(row.latest.connection_usage * 100)} size="small" /> : <Text type="secondary">暂无数据</Text> },
     { title: 'QPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.qps) },
@@ -342,11 +348,11 @@ export default function MonitorPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 170,
+      width: 210,
       render: (_: any, row: MonitorInstance) => canManageConfig ? (
         <Space onClick={(event) => event.stopPropagation()}>
           <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>
-          <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>采集</Button>
+          <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集</Button>
         </Space>
       ) : null,
     },
@@ -388,7 +394,7 @@ export default function MonitorPage() {
                 </Button>
               </Dropdown>
             )}
-            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>采集全部实例</Button>}
+            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>立即采集全部</Button>}
           </Space>
         )}
       />
@@ -399,7 +405,7 @@ export default function MonitorPage() {
         rowKey="instance_id"
         loading={isLoading}
         tableLayout="fixed"
-        scroll={{ x: 1250 }}
+        scroll={{ x: 1380 }}
         pagination={false}
         rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
         onRow={(row) => ({
@@ -414,6 +420,7 @@ export default function MonitorPage() {
           <Space align="center" style={{ marginBottom: 12 }}>
             <DatabaseOutlined />
             <Text strong>{active?.instance_name || detail?.instance?.instance_name}</Text>
+            <ConfigStatusTag row={{ config_id: detail?.config?.id || active?.config_id, config_enabled: detail?.config?.is_enabled ?? active?.config_enabled }} />
             <StatusTag status={detail?.config?.last_collect_status || active?.last_collect_status} />
             <Text type="secondary">最后指标采集：{formatTime(detail?.config?.last_metric_collect_at || active?.last_metric_collect_at)}</Text>
           </Space>
@@ -546,7 +553,7 @@ export default function MonitorPage() {
           showIcon
           style={{ marginTop: 8 }}
           message={configScope === 'all' ? '该配置将应用到全部可见实例' : '该配置仅作用于当前实例'}
-          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置。打开“启用采集”就是一键开启全部实例，关闭它就是一键停用全部实例。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。'}
+          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置。打开“启用采集”就是一键开启全部实例，关闭它就是一键停用全部实例；手动立即采集不会改变这个开关。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。手动立即采集不会改变这个开关。'}
         />
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="is_enabled" label={configScope === 'all' ? '启用全部实例采集' : '启用采集'} valuePropName="checked">
