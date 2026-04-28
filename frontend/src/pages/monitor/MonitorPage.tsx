@@ -113,6 +113,7 @@ export default function MonitorPage() {
   const queryClient = useQueryClient()
   const canManageConfig = useAuthStore((s) => s.hasPermission('monitor_config_manage'))
   const [msgApi, msgCtx] = message.useMessage()
+  const [mainTab, setMainTab] = useState('instance-overview')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
   const [configScope, setConfigScope] = useState<'single' | 'all'>('single')
@@ -150,6 +151,7 @@ export default function MonitorPage() {
     queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/tables/`, { params: { db_name: tableDb, search: tableSearch, page: tablePage, page_size: 100 } }).then(r => r.data),
     enabled: !!activeId,
   })
+  const showOverviewActions = mainTab === 'instance-overview'
 
   const saveConfig = useMutation({
     mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/config/`, values).then(r => r.data),
@@ -248,10 +250,35 @@ export default function MonitorPage() {
     size_gb: row.total_size_bytes ? Number((row.total_size_bytes / 1024 / 1024 / 1024).toFixed(2)) : null,
   })), [trendData])
 
+  const resetTableFilters = () => {
+    setTableDb(undefined)
+    setTableSearch('')
+    setTablePage(1)
+  }
+
+  const selectInstance = (instanceId: number) => {
+    setSelectedId(instanceId)
+    resetTableFilters()
+  }
+
+  const showInstanceMonitor = (instanceId: number) => {
+    selectInstance(instanceId)
+    setMainTab('monitor')
+  }
+
+  const refreshMonitorData = () => {
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+    if (!activeId) return
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
+  }
+
   const openConfig = (target?: MonitorInstance | null) => {
     const item = target || active
     if (!item) return
-    setSelectedId(item.instance_id)
+    selectInstance(item.instance_id)
     setConfigTarget(item)
     setConfigScope('single')
     form.setFieldsValue({
@@ -288,7 +315,7 @@ export default function MonitorPage() {
 
   const triggerCollect = (instanceId?: number | null) => {
     if (!instanceId) return
-    setSelectedId(instanceId)
+    selectInstance(instanceId)
     collectNow.mutate(instanceId)
   }
 
@@ -326,7 +353,7 @@ export default function MonitorPage() {
       width: 220,
       render: (_: any, row: MonitorInstance) => (
         <Space direction="vertical" size={0}>
-          <Button type="link" style={{ padding: 0, height: 22, fontWeight: 600 }} onClick={() => setSelectedId(row.instance_id)}>
+          <Button type="link" style={{ padding: 0, height: 22, fontWeight: 600 }} onClick={() => showInstanceMonitor(row.instance_id)}>
             {row.instance_name}
           </Button>
           <Space size={4}>
@@ -348,13 +375,14 @@ export default function MonitorPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 210,
-      render: (_: any, row: MonitorInstance) => canManageConfig ? (
+      width: 300,
+      render: (_: any, row: MonitorInstance) => (
         <Space onClick={(event) => event.stopPropagation()}>
-          <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>
-          <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集</Button>
+          <Button size="small" icon={<BarChartOutlined />} onClick={() => showInstanceMonitor(row.instance_id)}>查看监控</Button>
+          {canManageConfig && <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>}
+          {canManageConfig && <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集</Button>}
         </Space>
-      ) : null,
+      ),
     },
   ]
 
@@ -386,149 +414,177 @@ export default function MonitorPage() {
         marginBottom={20}
         actions={(
           <Space wrap style={isMobile ? { width: '100%' } : undefined}>
-            <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })}>刷新</Button>
-            {canManageConfig && (
+            <Button icon={<ReloadOutlined />} onClick={refreshMonitorData}>刷新</Button>
+            {showOverviewActions && canManageConfig && (
               <Dropdown menu={{ items: bulkConfigItems }} disabled={!instances.length || saveAllConfig.isPending || disableAllConfig.isPending}>
                 <Button icon={<SettingOutlined />} loading={saveAllConfig.isPending || disableAllConfig.isPending}>
                   配置全部实例 <DownOutlined />
                 </Button>
               </Dropdown>
             )}
-            {canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>立即采集全部</Button>}
+            {showOverviewActions && canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>立即采集全部</Button>}
           </Space>
         )}
       />
 
-      <Table
-        dataSource={instances}
-        columns={columns}
-        rowKey="instance_id"
-        loading={isLoading}
-        tableLayout="fixed"
-        scroll={{ x: 1380 }}
-        pagination={false}
-        rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
-        onRow={(row) => ({
-          onClick: () => setSelectedId(row.instance_id),
-          style: { cursor: 'pointer' },
-        })}
-        locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
-      />
-
-      {activeId && (
-        <div style={{ marginTop: 20 }}>
-          <Space align="center" style={{ marginBottom: 12 }}>
-            <DatabaseOutlined />
-            <Text strong>{active?.instance_name || detail?.instance?.instance_name}</Text>
-            <ConfigStatusTag row={{ config_id: detail?.config?.id || active?.config_id, config_enabled: detail?.config?.is_enabled ?? active?.config_enabled }} />
-            <StatusTag status={detail?.config?.last_collect_status || active?.last_collect_status} />
-            <Text type="secondary">最后指标采集：{formatTime(detail?.config?.last_metric_collect_at || active?.last_metric_collect_at)}</Text>
-          </Space>
-
-          {!detail?.config && (
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message="该实例尚未启用原生监控采集"
-              description="保存采集配置或点击立即采集后，SagittaDB 会使用实例账号读取数据库原生监控指标。账号权限不足的指标会显示为空。"
-            />
-          )}
-          {latest?.error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message="最近采集失败" description={latest.error} />}
-
-          <Tabs
-            items={[
-              {
-                key: 'overview',
-                label: <span><ApiOutlined />概览</span>,
-                children: (
-                  <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                      <MetricCard title="健康状态" value={latest?.is_up ? '在线' : '暂无数据'} />
-                      <MetricCard title="当前连接" value={latest?.current_connections} />
-                      <MetricCard title="QPS" value={latest?.qps} />
-                      <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
-                      <MetricCard title="活跃会话" value={latest?.active_sessions} />
-                      <MetricCard title="TPS" value={latest?.tps} />
-                      <MetricCard title="慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
-                      <MetricCard title="锁等待" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
-                    </div>
-                    <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
-                      <Descriptions.Item label="数据库版本">{formatMetric(latest?.version)}</Descriptions.Item>
-                      <Descriptions.Item label="运行时长">{formatMetric(latest?.uptime_seconds, 's')}</Descriptions.Item>
-                      <Descriptions.Item label="最大连接">{formatMetric(latest?.max_connections)}</Descriptions.Item>
-                      <Descriptions.Item label="长事务">{formatMetric(latest?.long_transactions)}</Descriptions.Item>
-                      <Descriptions.Item label="复制延迟">{formatMetric(latest?.replication_lag_seconds, 's')}</Descriptions.Item>
-                      <Descriptions.Item label="采集时间">{formatTime(latest?.collected_at)}</Descriptions.Item>
-                    </Descriptions>
-                  </Space>
-                ),
-              },
-              {
-                key: 'trend',
-                label: <span><BarChartOutlined />趋势</span>,
-                children: trendRows.length ? (
-                  <div style={{ height: 320 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendRows}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="time" />
-                        <YAxis />
-                        <Tooltip formatter={(value: any, name: string) => name === 'size_gb' ? [`${value} GB`, '容量'] : [value, name]} />
-                        <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
-                        <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
-                        <Line type="monotone" dataKey="slow_queries" name="慢查询" stroke="#fa8c16" dot={false} />
-                        <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : <TableEmptyState title="暂无趋势数据" />,
-              },
-              {
-                key: 'databases',
-                label: <span><DatabaseOutlined />库容量</span>,
-                children: <Table dataSource={dbItems} columns={dbColumns} rowKey="db_name" scroll={{ x: 980 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无库容量数据" /> }} />,
-              },
-              {
-                key: 'tables',
-                label: <span><TableOutlined />表容量</span>,
-                children: (
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Space wrap>
-                      <Select allowClear placeholder="库/Schema" style={{ width: 220 }} value={tableDb} onChange={(value) => { setTableDb(value); setTablePage(1) }}>
-                        {dbItems.map((item: any) => <Option key={item.db_name} value={item.db_name}>{item.db_name}</Option>)}
-                      </Select>
-                      <Input.Search allowClear placeholder="搜索表名" style={{ width: 260 }} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
-                    </Space>
-                    <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={{ total: tableCapacity?.total, pageSize: 100, current: tablePage, showSizeChanger: false, onChange: setTablePage }} locale={{ emptyText: <TableEmptyState title="暂无表容量数据" /> }} />
-                  </Space>
-                ),
-              },
-              {
-                key: 'diagnosis',
-                label: '采集诊断',
-                children: (
-                  <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="指标缺失说明"
-                      description="SagittaDB 使用实例配置账号采集监控数据。若账号缺少系统视图、性能视图或管理命令权限，对应指标会显示为空。请为监控账号授予数据库原生监控权限后重新采集。"
+      <Tabs
+        activeKey={mainTab}
+        onChange={setMainTab}
+        items={[
+          {
+            key: 'instance-overview',
+            label: <span><DatabaseOutlined />实例概览</span>,
+            children: (
+              <Table
+                dataSource={instances}
+                columns={columns}
+                rowKey="instance_id"
+                loading={isLoading}
+                tableLayout="fixed"
+                scroll={{ x: 1480 }}
+                pagination={false}
+                rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
+                onRow={(row) => ({
+                  onClick: () => showInstanceMonitor(row.instance_id),
+                  style: { cursor: 'pointer' },
+                })}
+                locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
+              />
+            ),
+          },
+          {
+            key: 'monitor',
+            label: <span><BarChartOutlined />监控</span>,
+            children: activeId ? (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Space wrap align="center">
+                    <Select
+                      showSearch
+                      placeholder="选择实例"
+                      style={{ width: isMobile ? '100%' : 320 }}
+                      value={activeId}
+                      optionFilterProp="label"
+                      onChange={selectInstance}
+                      options={instances.map(item => ({
+                        value: item.instance_id,
+                        label: item.instance_name,
+                        children: `${item.instance_name} ${item.db_type}`,
+                      }))}
                     />
-                    <Descriptions bordered size="small" column={1}>
-                      <Descriptions.Item label="实例指标采集">{formatTime(detail?.config?.last_metric_collect_at)}</Descriptions.Item>
-                      <Descriptions.Item label="容量采集">{formatTime(detail?.config?.last_capacity_collect_at)}</Descriptions.Item>
-                      <Descriptions.Item label="采集状态"><StatusTag status={detail?.config?.last_collect_status} /></Descriptions.Item>
-                      <Descriptions.Item label="采集错误">{detail?.config?.last_collect_error || latest?.error || '暂无'}</Descriptions.Item>
-                      <Descriptions.Item label="缺失指标组">{Object.keys(latest?.missing_groups || {}).length ? JSON.stringify(latest?.missing_groups) : '暂无'}</Descriptions.Item>
-                    </Descriptions>
+                    <Tag>{active?.db_type || detail?.instance?.db_type}</Tag>
+                    <ConfigStatusTag row={{ config_id: detail?.config?.id || active?.config_id, config_enabled: detail?.config?.is_enabled ?? active?.config_enabled }} />
+                    <StatusTag status={detail?.config?.last_collect_status || active?.last_collect_status} />
+                    <Text type="secondary">最后指标采集：{formatTime(detail?.config?.last_metric_collect_at || active?.last_metric_collect_at)}</Text>
                   </Space>
-                ),
-              },
-            ]}
-          />
-        </div>
-      )}
+                </Space>
+
+                {!detail?.config && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="该实例尚未启用原生监控采集"
+                    description="保存采集配置或点击立即采集后，SagittaDB 会使用实例账号读取数据库原生监控指标。账号权限不足的指标会显示为空。"
+                  />
+                )}
+                {latest?.error && <Alert type="error" showIcon message="最近采集失败" description={latest.error} />}
+
+                <Tabs
+                  items={[
+                    {
+                      key: 'overview',
+                      label: <span><ApiOutlined />概览</span>,
+                      children: (
+                        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                            <MetricCard title="健康状态" value={latest?.is_up ? '在线' : '暂无数据'} />
+                            <MetricCard title="当前连接" value={latest?.current_connections} />
+                            <MetricCard title="QPS" value={latest?.qps} />
+                            <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
+                            <MetricCard title="活跃会话" value={latest?.active_sessions} />
+                            <MetricCard title="TPS" value={latest?.tps} />
+                            <MetricCard title="慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
+                            <MetricCard title="锁等待" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
+                          </div>
+                          <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+                            <Descriptions.Item label="数据库版本">{formatMetric(latest?.version)}</Descriptions.Item>
+                            <Descriptions.Item label="运行时长">{formatMetric(latest?.uptime_seconds, 's')}</Descriptions.Item>
+                            <Descriptions.Item label="最大连接">{formatMetric(latest?.max_connections)}</Descriptions.Item>
+                            <Descriptions.Item label="长事务">{formatMetric(latest?.long_transactions)}</Descriptions.Item>
+                            <Descriptions.Item label="复制延迟">{formatMetric(latest?.replication_lag_seconds, 's')}</Descriptions.Item>
+                            <Descriptions.Item label="采集时间">{formatTime(latest?.collected_at)}</Descriptions.Item>
+                          </Descriptions>
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: 'trend',
+                      label: <span><BarChartOutlined />趋势</span>,
+                      children: trendRows.length ? (
+                        <div style={{ height: 320 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trendRows}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="time" />
+                              <YAxis />
+                              <Tooltip formatter={(value: any, name: string) => name === 'size_gb' ? [`${value} GB`, '容量'] : [value, name]} />
+                              <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
+                              <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
+                              <Line type="monotone" dataKey="slow_queries" name="慢查询" stroke="#fa8c16" dot={false} />
+                              <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : <TableEmptyState title="暂无趋势数据" />,
+                    },
+                    {
+                      key: 'databases',
+                      label: <span><DatabaseOutlined />库容量</span>,
+                      children: <Table dataSource={dbItems} columns={dbColumns} rowKey="db_name" scroll={{ x: 980 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无库容量数据" /> }} />,
+                    },
+                    {
+                      key: 'tables',
+                      label: <span><TableOutlined />表容量</span>,
+                      children: (
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          <Space wrap>
+                            <Select allowClear placeholder="库/Schema" style={{ width: 220 }} value={tableDb} onChange={(value) => { setTableDb(value); setTablePage(1) }}>
+                              {dbItems.map((item: any) => <Option key={item.db_name} value={item.db_name}>{item.db_name}</Option>)}
+                            </Select>
+                            <Input.Search allowClear placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
+                          </Space>
+                          <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={{ total: tableCapacity?.total, pageSize: 100, current: tablePage, showSizeChanger: false, onChange: setTablePage }} locale={{ emptyText: <TableEmptyState title="暂无表容量数据" /> }} />
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: 'diagnosis',
+                      label: '采集诊断',
+                      children: (
+                        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                          <Alert
+                            type="info"
+                            showIcon
+                            message="指标缺失说明"
+                            description="SagittaDB 使用实例配置账号采集监控数据。若账号缺少系统视图、性能视图或管理命令权限，对应指标会显示为空。请为监控账号授予数据库原生监控权限后重新采集。"
+                          />
+                          <Descriptions bordered size="small" column={1}>
+                            <Descriptions.Item label="实例指标采集">{formatTime(detail?.config?.last_metric_collect_at)}</Descriptions.Item>
+                            <Descriptions.Item label="容量采集">{formatTime(detail?.config?.last_capacity_collect_at)}</Descriptions.Item>
+                            <Descriptions.Item label="采集状态"><StatusTag status={detail?.config?.last_collect_status} /></Descriptions.Item>
+                            <Descriptions.Item label="采集错误">{detail?.config?.last_collect_error || latest?.error || '暂无'}</Descriptions.Item>
+                            <Descriptions.Item label="缺失指标组">{Object.keys(latest?.missing_groups || {}).length ? JSON.stringify(latest?.missing_groups) : '暂无'}</Descriptions.Item>
+                          </Descriptions>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                />
+              </Space>
+            ) : <TableEmptyState title="暂无可监控实例" />,
+          },
+        ]}
+      />
 
       <Modal
         title={configScope === 'all' ? '原生监控采集配置 - 全部实例' : `原生监控采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}

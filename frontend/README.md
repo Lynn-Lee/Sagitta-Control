@@ -95,7 +95,7 @@ src/
     ├── dashboard/   Dashboard
     ├── workflow/    SQL 工单
     ├── query/       在线查询
-    ├── monitor/     可观测中心
+    ├── monitor/     可观测中心（默认实例概览；监控 Tab 按实例查看指标）
     ├── diagnostic/  在线/历史会话诊断
     ├── slowlog/     慢日志分析与指纹诊断
     ├── instance/    实例管理

@@ -162,6 +162,7 @@
 - 在线查询新增 `查询历史` 页面：支持时间范围、操作人、实例、数据库、操作类型、脱敏、SQL 关键字筛选，支持 SQL 明细查看、复制和收藏
 - 查询历史复用 v2-lite 查询治理范围；查询/导出成功与失败统一写入 `query_log`，迁移新增 `0017_query_log_history_audit` 和 `0018_qlog_snapshot_backfill`
 - 可观测中心边界收敛为“数据库实例监控”，平台治理统计继续归属首页 Dashboard
+- 可观测中心前端入口拆分为默认“实例概览”和“监控”两个 Tab：实例概览负责全实例配置/采集状态与单实例/批量配置采集操作，监控 Tab 仅通过实例筛选查看单实例指标详情
 - 原生监控配置管理：启停、实例指标采集间隔、容量采集间隔、指标保留天数、采集状态与错误
 - 新增原生采样快照：`monitor_metric_snapshot`、`monitor_database_capacity_snapshot`、`monitor_table_capacity_snapshot`
 - 实例详情支持概览、24小时趋势、库/Schema 容量、表/索引容量、采集诊断
