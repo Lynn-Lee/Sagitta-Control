@@ -3,7 +3,7 @@
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Query as QParam
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
@@ -104,6 +104,14 @@ async def native_instances(
     return {"items": items}
 
 
+@router.get("/native/overview/", summary="原生数据库监控舰队总览")
+async def native_overview(
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_native_overview(db, user)
+
+
 @router.put(
     "/native/instances/{instance_id}/config/",
     summary="配置原生监控采集",
@@ -185,6 +193,76 @@ async def native_trend(
     db: AsyncSession = Depends(get_db),
 ):
     return {"items": await MonitorService.get_native_trend(db, instance_id, user, hours)}
+
+
+@router.get("/native/instances/{instance_id}/health/", summary="实例健康评分")
+async def native_health(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_native_health(db, instance_id, user)
+
+
+@router.get("/native/instances/{instance_id}/top-sql/", summary="实例 Top SQL")
+async def native_top_sql(
+    instance_id: int,
+    limit: int = QParam(20, ge=1, le=100),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_top_sql(db, instance_id, user, limit)
+
+
+@router.get("/native/instances/{instance_id}/waits/", summary="等待事件与阻塞摘要")
+async def native_waits(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_waits(db, instance_id, user)
+
+
+@router.get("/native/instances/{instance_id}/capacity-growth/", summary="容量增长分析")
+async def native_capacity_growth(
+    instance_id: int,
+    days: int = QParam(7, ge=1, le=90),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_capacity_growth(db, instance_id, user, days)
+
+
+@router.get("/native/instances/{instance_id}/engine-detail/", summary="引擎专属指标包")
+async def native_engine_detail(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_engine_detail(db, instance_id, user)
+
+
+@router.get("/native/instances/{instance_id}/alerts/", summary="实例阈值告警规则")
+async def native_alert_rules(
+    instance_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_alert_rules(db, instance_id, user)
+
+
+@router.put(
+    "/native/instances/{instance_id}/alerts/",
+    summary="更新实例阈值告警规则",
+    dependencies=[Depends(require_perm("monitor_alert_manage"))],
+)
+async def update_native_alert_rules(
+    instance_id: int,
+    rules: dict = Body(default_factory=dict),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.update_alert_rules(db, instance_id, rules, user)
 
 
 @router.get("/native/instances/{instance_id}/databases/", summary="库/Schema 容量")

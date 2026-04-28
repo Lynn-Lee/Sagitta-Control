@@ -133,6 +133,10 @@ class MonitorSnapshotResponse(BaseModel):
     replication_lag_seconds: int | None = None
     total_size_bytes: int | None = None
     extra_metrics: dict = {}
+    health_score: int = 0
+    risk_level: str = "attention"
+    risk_label: str = "关注"
+    risk_reasons: list[str] = []
 
 
 class MonitorListItem(BaseModel):
@@ -150,6 +154,10 @@ class MonitorListItem(BaseModel):
     last_collect_status: str = "not_configured"
     last_collect_error: str = ""
     latest: MonitorSnapshotResponse | None = None
+    health_score: int = 0
+    risk_level: str = "attention"
+    risk_label: str = "关注"
+    risk_reasons: list[str] = []
 
 
 class MonitorTrendPoint(BaseModel):

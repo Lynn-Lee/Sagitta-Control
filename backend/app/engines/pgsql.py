@@ -461,9 +461,48 @@ class PgSQLEngine:
         stats_rs = await self._raw_query(
             db_name=self._db_name,
             sql="""
-                SELECT xact_commit, xact_rollback, tup_returned + tup_fetched AS query_work, deadlocks
+                SELECT
+                  xact_commit,
+                  xact_rollback,
+                  tup_returned + tup_fetched AS query_work,
+                  deadlocks,
+                  blks_hit,
+                  blks_read,
+                  temp_files,
+                  temp_bytes
                 FROM pg_stat_database
                 WHERE datname = current_database()
+            """,
+            args=[],
+        )
+        wal_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')::bigint",
+            args=[],
+        )
+        repl_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="""
+                SELECT
+                  count(*) AS replica_count,
+                  max(EXTRACT(EPOCH FROM replay_lag))::bigint AS max_replay_lag_seconds,
+                  max(pg_wal_lsn_diff(sent_lsn, replay_lsn))::bigint AS max_lag_bytes
+                FROM pg_stat_replication
+            """,
+            args=[],
+        )
+        vacuum_rs = await self._raw_query(
+            db_name=self._db_name,
+            sql="""
+                SELECT
+                  schemaname,
+                  relname,
+                  n_dead_tup,
+                  n_live_tup,
+                  last_autovacuum
+                FROM pg_stat_user_tables
+                ORDER BY n_dead_tup DESC
+                LIMIT 10
             """,
             args=[],
         )
@@ -481,6 +520,10 @@ class PgSQLEngine:
         uptime = _to_int(uptime_rs.rows[0][0]) if uptime_rs.rows else None
         query_work = _to_int(stats_rs.rows[0][2]) if stats_rs.rows else None
         tx = ((_to_int(stats_rs.rows[0][0]) or 0) + (_to_int(stats_rs.rows[0][1]) or 0)) if stats_rs.rows else None
+        blks_hit = _to_int(stats_rs.rows[0][4]) if stats_rs.rows else 0
+        blks_read = _to_int(stats_rs.rows[0][5]) if stats_rs.rows else 0
+        cache_total = (blks_hit or 0) + (blks_read or 0)
+        replay_lag = _to_int(repl_rs.rows[0][1]) if repl_rs.rows else None
         return {
             "health": {"up": 1},
             "version": {"value": version_rs.rows[0][0] if version_rs.rows else ""},
@@ -496,7 +539,32 @@ class PgSQLEngine:
                 "errors": _to_int(stats_rs.rows[0][3]) if stats_rs.rows else None,
                 "lock_waits": lock_waits,
                 "long_transactions": long_transactions,
+                "cache_hit_rate": round((blks_hit or 0) / cache_total * 100, 2)
+                if cache_total
+                else None,
+                "temp_files": _to_int(stats_rs.rows[0][6]) if stats_rs.rows else None,
+                "temp_bytes": _to_int(stats_rs.rows[0][7]) if stats_rs.rows else None,
             },
+            "counters": {
+                "query_work": query_work,
+                "xact_total": tx,
+                "wal_bytes": _to_int(wal_rs.rows[0][0]) if wal_rs.rows else None,
+            },
+            "replication": {
+                "replica_count": _to_int(repl_rs.rows[0][0]) if repl_rs.rows else 0,
+                "lag_seconds": replay_lag,
+                "max_lag_bytes": _to_int(repl_rs.rows[0][2]) if repl_rs.rows else None,
+            },
+            "vacuum": [
+                {
+                    "schema": row[0],
+                    "table": row[1],
+                    "dead_tuples": _to_int(row[2]),
+                    "live_tuples": _to_int(row[3]),
+                    "last_autovacuum": row[4],
+                }
+                for row in (vacuum_rs.rows or [])
+            ],
         }
 
     async def collect_slow_queries(

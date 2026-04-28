@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { MenuProps } from 'antd'
-import { Alert, Button, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
-import { ApiOutlined, BarChartOutlined, DatabaseOutlined, DownOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
+import { AlertOutlined, ApiOutlined, BarChartOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import apiClient from '@/api/client'
@@ -33,6 +33,11 @@ interface MonitorSnapshot {
   long_transactions?: number | null
   replication_lag_seconds?: number | null
   total_size_bytes?: number | null
+  extra_metrics?: Record<string, any>
+  health_score?: number
+  risk_level?: string
+  risk_label?: string
+  risk_reasons?: string[]
 }
 
 interface MonitorInstance {
@@ -50,6 +55,16 @@ interface MonitorInstance {
   last_collect_status: string
   last_collect_error?: string
   latest?: MonitorSnapshot | null
+  health_score?: number
+  risk_level?: string
+  risk_label?: string
+  risk_reasons?: string[]
+}
+
+interface MonitorOverview {
+  cards: Record<string, number>
+  distributions: Record<string, Record<string, number>>
+  items: MonitorInstance[]
 }
 
 const statusColor: Record<string, string> = {
@@ -58,6 +73,13 @@ const statusColor: Record<string, string> = {
   failed: 'error',
   pending: 'processing',
   not_configured: 'default',
+}
+
+const riskColor: Record<string, string> = {
+  healthy: 'success',
+  attention: 'processing',
+  warning: 'warning',
+  critical: 'error',
 }
 
 function formatBytes(value?: number | null) {
@@ -114,6 +136,16 @@ function ConfigStatusTag({ row }: { row: Pick<MonitorInstance, 'config_id' | 'co
   return row.config_enabled ? <Tag color="success">已启用</Tag> : <Tag color="default">已停用</Tag>
 }
 
+function RiskTag({ level, label }: { level?: string; label?: string }) {
+  const value = level || 'attention'
+  return <Tag color={riskColor[value] || 'default'}>{label || value}</Tag>
+}
+
+function riskReasonText(row?: Pick<MonitorInstance, 'risk_reasons' | 'latest'> | null) {
+  const reasons = row?.risk_reasons || row?.latest?.risk_reasons || []
+  return reasons.length ? reasons.join('；') : '暂无明显风险'
+}
+
 function MetricCard({ title, value, suffix, danger }: { title: string; value?: number | string | null; suffix?: string; danger?: boolean }) {
   return (
     <div style={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: 16, minHeight: 92 }}>
@@ -127,9 +159,15 @@ export default function MonitorPage() {
   const isMobile = !screens.md
   const queryClient = useQueryClient()
   const canManageConfig = useAuthStore((s) => s.hasPermission('monitor_config_manage'))
+  const canManageAlerts = useAuthStore((s) => s.hasPermission('monitor_alert_manage'))
   const [msgApi, msgCtx] = message.useMessage()
   const [mainTab, setMainTab] = useState('instance-overview')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [dbTypeFilter, setDbTypeFilter] = useState<string | undefined>()
+  const [riskFilter, setRiskFilter] = useState<string | undefined>()
+  const [collectStatusFilter, setCollectStatusFilter] = useState<string | undefined>()
+  const [trendHours, setTrendHours] = useState(24)
+  const [alertRulesText, setAlertRulesText] = useState('{}')
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
   const [configScope, setConfigScope] = useState<'single' | 'all'>('single')
   const [configOpen, setConfigOpen] = useState(false)
@@ -142,7 +180,20 @@ export default function MonitorPage() {
     queryKey: ['native-monitor-instances'],
     queryFn: () => apiClient.get('/monitor/native/instances/').then(r => r.data),
   })
-  const instances: MonitorInstance[] = data?.items || []
+  const { data: overview } = useQuery<MonitorOverview>({
+    queryKey: ['native-monitor-overview'],
+    queryFn: () => apiClient.get('/monitor/native/overview/').then(r => r.data),
+  })
+  const allInstances: MonitorInstance[] = useMemo(
+    () => overview?.items || data?.items || [],
+    [overview?.items, data?.items],
+  )
+  const instances = useMemo(() => allInstances.filter(item => {
+    if (dbTypeFilter && item.db_type !== dbTypeFilter) return false
+    if (riskFilter && item.risk_level !== riskFilter) return false
+    if (collectStatusFilter && item.last_collect_status !== collectStatusFilter) return false
+    return true
+  }), [allInstances, dbTypeFilter, riskFilter, collectStatusFilter])
   const activeId = selectedId || instances[0]?.instance_id || null
   const active = instances.find(i => i.instance_id === activeId) || null
 
@@ -152,8 +203,38 @@ export default function MonitorPage() {
     enabled: !!activeId,
   })
   const { data: trendData } = useQuery({
-    queryKey: ['native-monitor-trend', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/trend/?hours=24`).then(r => r.data),
+    queryKey: ['native-monitor-trend', activeId, trendHours],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/trend/`, { params: { hours: trendHours } }).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: healthData } = useQuery({
+    queryKey: ['native-monitor-health', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/health/`).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: topSqlData } = useQuery({
+    queryKey: ['native-monitor-top-sql', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: waitsData } = useQuery({
+    queryKey: ['native-monitor-waits', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/waits/`).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: growthData } = useQuery({
+    queryKey: ['native-monitor-capacity-growth', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/capacity-growth/`).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: engineDetail } = useQuery({
+    queryKey: ['native-monitor-engine-detail', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/engine-detail/`).then(r => r.data),
+    enabled: !!activeId,
+  })
+  const { data: alertRules } = useQuery({
+    queryKey: ['native-monitor-alerts', activeId],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/alerts/`).then(r => r.data),
     enabled: !!activeId,
   })
   const { data: dbCapacity } = useQuery({
@@ -168,10 +249,15 @@ export default function MonitorPage() {
   })
   const showOverviewActions = mainTab === 'instance-overview'
 
+  useEffect(() => {
+    setAlertRulesText(JSON.stringify(alertRules?.rules || {}, null, 2))
+  }, [alertRules?.rules])
+
   const saveConfig = useMutation({
     mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/config/`, values).then(r => r.data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', variables.instanceId] })
       setConfigOpen(false)
       setConfigTarget(null)
@@ -189,6 +275,7 @@ export default function MonitorPage() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
       setConfigOpen(false)
       setConfigTarget(null)
@@ -211,6 +298,7 @@ export default function MonitorPage() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
       msgApi.success(`已关闭 ${result.success}/${result.total} 个实例采集${result.failed ? `，失败 ${result.failed} 个` : ''}`)
     },
@@ -220,10 +308,16 @@ export default function MonitorPage() {
     mutationFn: (instanceId: number) => apiClient.post(`/monitor/native/instances/${instanceId}/collect/`).then(r => r.data),
     onSuccess: (_data, instanceId) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-health', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-top-sql', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', instanceId] })
       msgApi.success('采集完成')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '采集失败'),
@@ -244,6 +338,7 @@ export default function MonitorPage() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-trend'] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity'] })
@@ -255,9 +350,27 @@ export default function MonitorPage() {
       }
     },
   })
+  const saveAlertRules = useMutation({
+    mutationFn: async () => {
+      const payload = JSON.parse(alertRulesText || '{}')
+      return apiClient.put(`/monitor/native/instances/${activeId}/alerts/`, payload).then(r => r.data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-alerts', activeId] })
+      msgApi.success('告警规则已保存')
+    },
+    onError: (e: any) => msgApi.error(e instanceof SyntaxError ? '告警规则 JSON 格式不正确' : e.response?.data?.msg || '保存告警规则失败'),
+  })
 
   const latest: MonitorSnapshot | null = detail?.latest || active?.latest || null
   const dbItems = dbCapacity?.items || []
+  const health = healthData || {
+    health_score: active?.health_score ?? latest?.health_score ?? 0,
+    risk_level: active?.risk_level || latest?.risk_level,
+    risk_label: active?.risk_label || latest?.risk_label,
+    risk_reasons: active?.risk_reasons || latest?.risk_reasons || [],
+  }
+  const dbTypeOptions = useMemo(() => Array.from(new Set(allInstances.map(item => item.db_type))).sort(), [allInstances])
 
   const trendRows = useMemo(() => (trendData?.items || []).map((row: any) => ({
     ...row,
@@ -283,11 +396,17 @@ export default function MonitorPage() {
 
   const refreshMonitorData = () => {
     queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
     if (!activeId) return
     queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] })
     queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', activeId] })
     queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', activeId] })
     queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-health', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-top-sql', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', activeId] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', activeId] })
   }
 
   const openConfig = (target?: MonitorInstance | null) => {
@@ -378,13 +497,25 @@ export default function MonitorPage() {
         </Space>
       ),
     },
-    { title: '健康', width: 110, render: (_: any, row: MonitorInstance) => row.latest?.is_up ? <Tag color="success">在线</Tag> : <Tag color="error">未知</Tag> },
+    {
+      title: '健康分',
+      width: 150,
+      render: (_: any, row: MonitorInstance) => (
+        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+          <Progress percent={row.health_score ?? row.latest?.health_score ?? 0} size="small" status={(row.risk_level || row.latest?.risk_level) === 'critical' ? 'exception' : undefined} />
+          <RiskTag level={row.risk_level || row.latest?.risk_level} label={row.risk_label || row.latest?.risk_label} />
+        </Space>
+      ),
+    },
+    { title: '风险原因', width: 260, ellipsis: true, render: (_: any, row: MonitorInstance) => <Text ellipsis={{ tooltip: riskReasonText(row) }}>{riskReasonText(row)}</Text> },
     { title: '采集开关', width: 120, render: (_: any, row: MonitorInstance) => <ConfigStatusTag row={row} /> },
     { title: '采集状态', width: 120, render: (_: any, row: MonitorInstance) => <StatusTag status={row.last_collect_status} /> },
     { title: '连接使用率', width: 130, render: (_: any, row: MonitorInstance) => row.latest?.connection_usage !== null && row.latest?.connection_usage !== undefined ? <Progress percent={Math.round(row.latest.connection_usage * 100)} size="small" /> : <Text type="secondary">暂无数据</Text> },
     { title: 'QPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.qps) },
     { title: '慢查询', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.slow_queries) },
+    { title: 'TPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.tps) },
     { title: '容量', width: 130, render: (_: any, row: MonitorInstance) => formatBytes(row.latest?.total_size_bytes) },
+    { title: '复制延迟', width: 110, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.replication_lag_seconds, 's') },
     { title: '最后采集', width: 180, render: (_: any, row: MonitorInstance) => formatTime(row.last_metric_collect_at) },
     {
       title: '操作',
@@ -442,6 +573,31 @@ export default function MonitorPage() {
     { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
   ]
 
+  const topSqlColumns = [
+    { title: 'SQL/SQL_ID', width: 180, render: (_: any, row: any) => row.sql_id || row.source_ref || row.digest || '-' },
+    { title: 'Schema', width: 140, render: (_: any, row: any) => row.schema_name || row.db_name || '-' },
+    { title: '执行次数', width: 110, render: (_: any, row: any) => formatMetric(row.executions ?? row.count_star) },
+    { title: '总耗时(ms)', width: 120, render: (_: any, row: any) => formatMetric(row.elapsed_time_ms ?? row.duration_ms) },
+    { title: '平均耗时(ms)', width: 130, render: (_: any, row: any) => formatMetric(row.avg_elapsed_ms ?? row.avg_duration_ms) },
+    { title: 'SQL 文本', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text || row.DIGEST_TEXT }}>{row.sql_text || row.DIGEST_TEXT || '-'}</Text> },
+  ]
+
+  const waitColumns = [
+    { title: '事件/会话', width: 220, render: (_: any, row: any) => row.event || row.sid || row.session_id || '-' },
+    { title: '等待类别', width: 140, render: (_: any, row: any) => row.wait_class || '-' },
+    { title: '等待次数', width: 120, render: (_: any, row: any) => formatMetric(row.total_waits) },
+    { title: '等待时间', width: 120, render: (_: any, row: any) => formatMetric(row.time_waited ?? row.seconds_in_wait) },
+    { title: '阻塞源', width: 120, render: (_: any, row: any) => formatMetric(row.blocking_session) },
+    { title: '用户', width: 140, render: (_: any, row: any) => row.username || '-' },
+  ]
+
+  const growthColumns = [
+    { title: '库/Schema', dataIndex: 'db_name', width: 180 },
+    { title: '增长量', dataIndex: 'growth_bytes', render: formatBytes },
+    { title: '当前大小', dataIndex: 'latest_size_bytes', render: formatBytes },
+    { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
+  ]
+
   return (
     <div>
       {msgCtx}
@@ -469,23 +625,54 @@ export default function MonitorPage() {
         items={[
           {
             key: 'instance-overview',
-            label: <span><DatabaseOutlined />实例概览</span>,
+            label: <span><DatabaseOutlined />舰队总览</span>,
             children: (
-              <Table
-                dataSource={instances}
-                columns={columns}
-                rowKey="instance_id"
-                loading={isLoading}
-                tableLayout="fixed"
-                scroll={{ x: 1480 }}
-                pagination={false}
-                rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
-                onRow={(row) => ({
-                  onClick: () => showInstanceMonitor(row.instance_id),
-                  style: { cursor: 'pointer' },
-                })}
-                locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
-              />
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(8, minmax(0, 1fr))', gap: 12 }}>
+                  <MetricCard title="实例总数" value={overview?.cards?.instance_total ?? allInstances.length} />
+                  <MetricCard title="在线率" value={Math.round((overview?.cards?.online_rate || 0) * 100)} suffix="%" />
+                  <MetricCard title="异常实例" value={overview?.cards?.abnormal_count ?? 0} danger={(overview?.cards?.abnormal_count || 0) > 0} />
+                  <MetricCard title="采集失败" value={overview?.cards?.collect_failed_count ?? 0} danger={(overview?.cards?.collect_failed_count || 0) > 0} />
+                  <MetricCard title="连接压力" value={overview?.cards?.high_connection_count ?? 0} danger={(overview?.cards?.high_connection_count || 0) > 0} />
+                  <MetricCard title="容量风险" value={overview?.cards?.capacity_risk_count ?? 0} danger={(overview?.cards?.capacity_risk_count || 0) > 0} />
+                  <MetricCard title="复制延迟" value={overview?.cards?.replication_lag_count ?? 0} danger={(overview?.cards?.replication_lag_count || 0) > 0} />
+                  <MetricCard title="锁/长事务" value={overview?.cards?.lock_or_long_tx_count ?? 0} danger={(overview?.cards?.lock_or_long_tx_count || 0) > 0} />
+                </div>
+                <Card size="small" styles={{ body: { padding: 12 } }}>
+                  <Space wrap>
+                    <Select allowClear placeholder="数据库类型" style={{ width: 180 }} value={dbTypeFilter} onChange={setDbTypeFilter}>
+                      {dbTypeOptions.map(type => <Option key={type} value={type}>{type}</Option>)}
+                    </Select>
+                    <Select allowClear placeholder="风险等级" style={{ width: 160 }} value={riskFilter} onChange={setRiskFilter}>
+                      <Option value="critical">严重</Option>
+                      <Option value="warning">警告</Option>
+                      <Option value="attention">关注</Option>
+                      <Option value="healthy">健康</Option>
+                    </Select>
+                    <Select allowClear placeholder="采集状态" style={{ width: 160 }} value={collectStatusFilter} onChange={setCollectStatusFilter}>
+                      <Option value="success">正常</Option>
+                      <Option value="partial">部分缺失</Option>
+                      <Option value="failed">采集失败</Option>
+                      <Option value="not_configured">未配置</Option>
+                    </Select>
+                  </Space>
+                </Card>
+                <Table
+                  dataSource={instances}
+                  columns={columns}
+                  rowKey="instance_id"
+                  loading={isLoading}
+                  tableLayout="fixed"
+                  scroll={{ x: 1760 }}
+                  pagination={false}
+                  rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
+                  onRow={(row) => ({
+                    onClick: () => showInstanceMonitor(row.instance_id),
+                    style: { cursor: 'pointer' },
+                  })}
+                  locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
+                />
+              </Space>
             ),
           },
           {
@@ -511,6 +698,7 @@ export default function MonitorPage() {
                     <Tag>{active?.db_type || detail?.instance?.db_type}</Tag>
                     <ConfigStatusTag row={{ config_id: detail?.config?.id || active?.config_id, config_enabled: detail?.config?.is_enabled ?? active?.config_enabled }} />
                     <StatusTag status={detail?.config?.last_collect_status || active?.last_collect_status} />
+                    <RiskTag level={health.risk_level} label={health.risk_label} />
                     <Text type="secondary">最后指标采集：{formatTime(detail?.config?.last_metric_collect_at || active?.last_metric_collect_at)}</Text>
                   </Space>
                 </Space>
@@ -533,15 +721,20 @@ export default function MonitorPage() {
                       children: (
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                            <div style={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: 16, minHeight: 92 }}>
+                              <Statistic title="健康评分" value={health.health_score ?? 0} suffix="/100" valueStyle={{ fontSize: 20 }} />
+                              <Progress percent={health.health_score ?? 0} size="small" status={health.risk_level === 'critical' ? 'exception' : undefined} />
+                            </div>
                             <MetricCard title="健康状态" value={latest?.is_up ? '在线' : '暂无数据'} />
                             <MetricCard title="当前连接" value={latest?.current_connections} />
                             <MetricCard title="QPS" value={latest?.qps} />
-                            <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
                             <MetricCard title="活跃会话" value={latest?.active_sessions} />
                             <MetricCard title="TPS" value={latest?.tps} />
+                            <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
                             <MetricCard title="慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
                             <MetricCard title="锁等待" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
                           </div>
+                          <Alert type={health.risk_level === 'critical' ? 'error' : health.risk_level === 'warning' ? 'warning' : 'info'} showIcon message="风险摘要" description={(health.risk_reasons || []).join('；') || '暂无明显风险'} />
                           <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
                             <Descriptions.Item label="数据库版本">{formatMetric(latest?.version)}</Descriptions.Item>
                             <Descriptions.Item label="运行时长">{formatDurationSeconds(latest?.uptime_seconds)}</Descriptions.Item>
@@ -555,23 +748,39 @@ export default function MonitorPage() {
                     },
                     {
                       key: 'trend',
-                      label: <span><BarChartOutlined />趋势</span>,
-                      children: trendRows.length ? (
-                        <div style={{ height: 320 }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={trendRows}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="time" />
-                              <YAxis />
-                              <Tooltip formatter={(value: any, name: string) => name === 'size_gb' ? [`${value} GB`, '容量'] : [value, name]} />
-                              <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
-                              <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
-                              <Line type="monotone" dataKey="slow_queries" name="慢查询" stroke="#fa8c16" dot={false} />
-                              <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      ) : <TableEmptyState title="暂无趋势数据" />,
+                      label: <span><BarChartOutlined />性能</span>,
+                      children: (
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          <Select value={trendHours} style={{ width: 160 }} onChange={setTrendHours}>
+                            <Option value={1}>近 1 小时</Option>
+                            <Option value={6}>近 6 小时</Option>
+                            <Option value={24}>近 24 小时</Option>
+                            <Option value={168}>近 7 天</Option>
+                          </Select>
+                          {trendRows.length ? (
+                            <div style={{ height: 320 }}>
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={trendRows}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="time" />
+                                  <YAxis />
+                                  <Tooltip formatter={(value: any, name: string) => name === 'size_gb' ? [`${value} GB`, '容量'] : [value, name]} />
+                                  <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
+                                  <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
+                                  <Line type="monotone" dataKey="tps" name="TPS" stroke="#13c2c2" dot={false} />
+                                  <Line type="monotone" dataKey="slow_queries" name="慢查询" stroke="#fa8c16" dot={false} />
+                                  <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : <TableEmptyState title="暂无趋势数据" />}
+                          <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+                            {Object.entries(engineDetail?.metric_groups?.stats || {}).map(([key, value]) => (
+                              <Descriptions.Item key={key} label={key}>{formatMetric(value as any)}</Descriptions.Item>
+                            ))}
+                          </Descriptions>
+                        </Space>
+                      ),
                     },
                     {
                       key: 'databases',
@@ -590,6 +799,105 @@ export default function MonitorPage() {
                             <Input.Search allowClear placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
                           </Space>
                           <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={{ total: tableCapacity?.total, pageSize: 100, current: tablePage, showSizeChanger: false, onChange: setTablePage }} locale={{ emptyText: <TableEmptyState title="暂无表容量数据" /> }} />
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: 'sessions',
+                      label: <span><FieldTimeOutlined />会话</span>,
+                      children: (
+                        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                          <Alert type="info" showIcon message="会话诊断入口" description="当前页展示阻塞与等待摘要；完整 processlist、kill 会话和历史 ASH 请进入会话管理页面继续处理。" />
+                          <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 920 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: 'top-sql',
+                      label: <span><AlertOutlined />慢 SQL</span>,
+                      children: (
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
+                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 1100 }} pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: 'replication',
+                      label: '复制',
+                      children: (
+                        <Descriptions bordered size="small" column={isMobile ? 1 : 2}>
+                          {Object.entries(engineDetail?.metric_groups?.replication || {}).map(([key, value]) => (
+                            <Descriptions.Item key={key} label={key}>{formatMetric(value as any)}</Descriptions.Item>
+                          ))}
+                          {!Object.keys(engineDetail?.metric_groups?.replication || {}).length && (
+                            <Descriptions.Item label="复制状态">暂无复制指标</Descriptions.Item>
+                          )}
+                        </Descriptions>
+                      ),
+                    },
+                    {
+                      key: 'waits',
+                      label: '等待事件',
+                      children: <Table dataSource={waitsData?.top_waits || []} columns={waitColumns} rowKey={(row: any, index) => `${row.event || 'wait'}-${index}`} scroll={{ x: 920 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无等待事件数据" /> }} />,
+                    },
+                    {
+                      key: 'capacity-growth',
+                      label: '容量增长',
+                      children: <Table dataSource={growthData?.top_databases || []} columns={growthColumns} rowKey="db_name" pagination={false} locale={{ emptyText: <TableEmptyState title="暂无容量增长数据" /> }} />,
+                    },
+                    ...((active?.db_type || detail?.instance?.db_type) === 'oracle' ? [
+                      {
+                        key: 'oracle',
+                        label: 'Oracle 专属',
+                        children: (
+                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                            <Descriptions bordered size="small" column={isMobile ? 1 : 2}>
+                              {Object.entries(engineDetail?.metric_groups?.fra || {}).map(([key, value]) => (
+                                <Descriptions.Item key={key} label={`FRA ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
+                              ))}
+                              {Object.entries(engineDetail?.metric_groups?.archive || {}).map(([key, value]) => (
+                                <Descriptions.Item key={key} label={`Archive ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
+                              ))}
+                            </Descriptions>
+                            <Table dataSource={engineDetail?.metric_groups?.tablespaces || []} rowKey={(row: any) => row.tablespace_name} size="small" pagination={false} columns={[
+                              { title: '表空间', dataIndex: 'tablespace_name' },
+                              { title: '使用率', dataIndex: 'used_pct', render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
+                              { title: '已用', dataIndex: 'used_bytes', render: formatBytes },
+                              { title: '总量', dataIndex: 'total_bytes', render: formatBytes },
+                              { title: 'Autoextend', dataIndex: 'autoextensible' },
+                            ]} />
+                            <Table dataSource={engineDetail?.metric_groups?.data_guard || []} rowKey={(row: any, index) => `${row.name}-${index}`} size="small" pagination={false} columns={[
+                              { title: 'Data Guard 指标', dataIndex: 'name' },
+                              { title: '值', dataIndex: 'value' },
+                              { title: '单位', dataIndex: 'unit' },
+                              { title: '计算时间', dataIndex: 'time_computed', render: formatTime },
+                            ]} locale={{ emptyText: <TableEmptyState title="暂无 Data Guard 数据" /> }} />
+                          </Space>
+                        ),
+                      },
+                    ] : []),
+                    {
+                      key: 'alerts',
+                      label: '告警',
+                      children: (
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          <Alert
+                            type="info"
+                            showIcon
+                            message="阈值告警一期"
+                            description="规则以 JSON 保存到当前实例采集配置，支持 operator、threshold、duration_count、recover_notify、silence_minutes 等字段；后台采集与通知服务可按这些规则继续接入执行。"
+                          />
+                          <Descriptions bordered size="small" column={1}>
+                            <Descriptions.Item label="默认规则">{JSON.stringify(alertRules?.defaults || {})}</Descriptions.Item>
+                          </Descriptions>
+                          <Input.TextArea
+                            rows={10}
+                            value={alertRulesText}
+                            onChange={(event) => setAlertRulesText(event.target.value)}
+                            disabled={!canManageAlerts}
+                          />
+                          {canManageAlerts && <Button type="primary" loading={saveAlertRules.isPending} onClick={() => saveAlertRules.mutate()}>保存告警规则</Button>}
                         </Space>
                       ),
                     },

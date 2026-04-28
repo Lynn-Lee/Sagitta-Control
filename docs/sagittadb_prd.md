@@ -1,7 +1,7 @@
 # SagittaDB 矢准数据 — 产品需求文档（PRD）
 
-> **版本：** v2.5
-> **日期：** 2026-04-12
+> **版本：** v2.6
+> **日期：** 2026-04-28
 > **状态：** 内测中
 > **产品定位：** 企业级多引擎数据库管控平台，为 SaaS 3.0 预留接口
 
@@ -18,7 +18,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - **安全**：彻底修复原 Archery 5 个 P0 安全漏洞，所有敏感字段加密存储
 - **高效**：AI Text2SQL + SQL 工单模板提升 SQL 编写效率，全异步执行不阻塞
 - **全面**：支持 11 种数据库引擎，覆盖 MySQL/PostgreSQL/Oracle/MongoDB/Redis/ClickHouse 等
-- **可观测**：内建 Prometheus + Grafana 监控体系，全流程操作审计
+- **可观测**：内建数据库原生指标采集、舰队健康评分、TopN 诊断、容量趋势与全流程操作审计，Prometheus/Grafana 作为可选外围集成
 
 ### 1.2 目标用户
 
@@ -343,10 +343,10 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 #### 2.6.1 产品边界
 
-- 可观测中心聚焦“数据库实例监控”，包括实例健康、连接/会话、吞吐、慢查询/锁等待、库容量、表数据大小与索引大小。
+- 可观测中心聚焦“数据库实例健康与问题定位”，包括舰队健康、连接/会话、吞吐、慢查询/锁等待、复制状态、库/表容量、容量增长、Top SQL、等待事件和采集诊断。
 - 平台治理类统计（在线查询概览、SQL 工单概览、实例与库治理概览、归档概览）归属首页 Dashboard，不并入可观测中心。
 - 首版不要求用户部署 Prometheus/Grafana；后端按实例引擎原生采集指标并入库。
-- 实例账号能读取到多少指标就展示多少；读取不到的指标保持为空，并在采集诊断中提示权限不足、引擎不支持或采集失败原因。
+- 实例账号能读取到多少指标就展示多少；读取不到的指标保持为空，并在采集诊断中提示权限不足、引擎不支持或采集失败原因。Oracle 等高权限视图采集失败时必须保留基础健康指标，不能因单个指标组失败导致整实例采集失败。
 
 #### 2.6.2 Dashboard（首页治理看板）
 
@@ -414,20 +414,35 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 #### 2.6.3 原生数据库监控
 
-- 实例监控列表展示健康状态、数据库类型、连接使用率、QPS/TPS、慢查询、实例容量与最近采集状态。
-- 实例详情包含概览、趋势、库容量、表容量和采集诊断五个视图。
-- 指标采样入库，支持 24 小时趋势查看；容量采集按较低频率全量扫描库/表元数据。
+- 可观测中心首屏为“舰队总览”，展示实例总数、在线率、异常实例、采集失败、连接压力、容量风险、复制延迟、锁等待/长事务等卡片。
+- 实例列表按健康风险排序，展示健康分、风险等级、风险原因、数据库类型、采集开关、采集状态、连接使用率、QPS/TPS、慢查询、容量、复制延迟和最后采集时间。
+- 舰队总览支持按数据库类型、风险等级和采集状态筛选。
+- 每个实例派生 `health_score / risk_level / risk_reasons`，健康评分扣分维度包括不可用、采集失败、连接使用率高、锁等待、长事务、慢查询、复制延迟、Oracle 表空间/FRA 风险和缺失指标组。
+- 实例详情包含概览、性能、库容量、表容量、会话、慢 SQL、复制、等待事件、容量增长、告警、采集诊断；Oracle 实例额外展示 Oracle 专属页。
+- 指标采样入库，趋势支持 1 小时、6 小时、24 小时、7 天；QPS/TPS 优先按采集间隔 counters 计算真实区间速率，缺少 counters 时回退到引擎提供值。
 - 库容量展示库/Schema 总大小、数据大小、索引大小、表数量和行数估算。
 - 表容量展示表名、库名、数据大小、索引大小、总大小和行数估算，支持排序、库过滤和表名搜索。
+- TopN 诊断接口展示 Top SQL、等待事件/阻塞会话、Top 增长库、Top 大表，并复用现有会话诊断和慢日志能力作为下钻入口。
 - 原生采集配置支持启停、实例指标采集间隔、容量采集间隔和保留天数。
 - Celery `monitor` 队列定时执行 `collect_native_monitoring`，采集任务失败不会阻断其他实例。
+
+#### 2.6.3.1 引擎指标包
+
+- MySQL / TiDB：连接数、Threads running、真实区间 QPS/TPS、InnoDB buffer pool 命中率、临时表落盘率、行锁等待、死锁、复制线程状态与 seconds behind master。
+- PostgreSQL：连接数、active sessions、真实区间 QPS/TPS、cache hit、deadlocks、temp files/temp bytes、WAL counters、replication lag、vacuum/dead tuples TopN。
+- Oracle：版本、uptime、sessions/processes 使用率、Executions Per Sec、User Transaction Per Sec、Average Active Sessions、DB Time/DB CPU、Parse/Hard Parse、Redo、Logical/Physical Reads、Top wait events、blocking sessions、表空间/TEMP/FRA/归档、Data Guard、Top SQL、Top segment。
+- Redis：内存、fragmentation、ops/sec、keyspace hit/miss、connected/blocked clients、replication role 与 slaves。
+- MongoDB：connections、opcounters、memory、replication、currentOp 与集合容量。
+- ClickHouse / StarRocks：健康、查询/集群节点指标、容量和慢查询能力按引擎可用视图逐步增强。
 
 #### 2.6.4 监控权限与采集诊断
 
 - 监控查看范围遵循 v2-lite 资源组范围和 `monitor_all_instances` 权限。
 - `monitor_config_manage` 用户可配置采集并手动触发采集。
+- `monitor_alert_manage` 用户可维护实例级阈值告警覆盖规则。
 - 采集诊断展示最近指标采集时间、容量采集时间、采集状态、错误信息和缺失指标组原因。
 - 指标为空时不显示为 0，统一展示“暂无数据”或权限/配置提示。
+- 缺失指标组必须可读，方便 DBA 为监控账号补充 `v$`、`dba_`、`performance_schema`、`pg_stat_*` 等原生监控权限。
 
 #### 2.6.5 可选外部监控集成
 
@@ -438,7 +453,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 
 - 原 `monitor_collect_config` 表保留历史 Exporter 字段用于兼容。
 - 新增原生采集配置：实例指标采集间隔、容量采集间隔、保留天数、最近采集状态和错误。
-- 告警规则配置字段保留为后续告警能力扩展。
+- 告警规则配置字段用于实例级阈值规则覆盖，一期以 JSON 存储指标、比较符、阈值、持续次数、恢复通知和静默时间；复杂告警编排后续扩展。
 - 监控权限申请/审批流程
 
 #### 2.6.7 Grafana 集成（可选）

@@ -1277,7 +1277,14 @@ class OracleEngine:
                 'Executions Per Sec',
                 'User Transaction Per Sec',
                 'Average Active Sessions',
-                'Current Logons Count'
+                'Current Logons Count',
+                'Database Time Per Sec',
+                'Database CPU Time Ratio',
+                'Redo Generated Per Sec',
+                'Logical Reads Per Sec',
+                'Physical Reads Per Sec',
+                'Hard Parse Count Per Sec',
+                'Parse Failure Count Per Sec'
               )
             """,
         )
@@ -1291,6 +1298,20 @@ class OracleEngine:
                 metrics["queries"]["active_sessions"] = value
             elif name == "current logons count":
                 metrics["connections"].setdefault("current", value)
+            elif name == "database time per sec":
+                metrics["stats"]["db_time_per_sec"] = value
+            elif name == "database cpu time ratio":
+                metrics["stats"]["db_cpu_time_ratio"] = value
+            elif name == "redo generated per sec":
+                metrics["stats"]["redo_bytes_per_sec"] = value
+            elif name == "logical reads per sec":
+                metrics["stats"]["logical_reads_per_sec"] = value
+            elif name == "physical reads per sec":
+                metrics["stats"]["physical_reads_per_sec"] = value
+            elif name == "hard parse count per sec":
+                metrics["stats"]["hard_parse_per_sec"] = value
+            elif name == "parse failure count per sec":
+                metrics["stats"]["parse_failure_per_sec"] = value
 
         row = fetch_one(
             "stats",
@@ -1315,6 +1336,191 @@ class OracleEngine:
         if row and row[0] is not None:
             metrics["stats"]["long_transactions"] = row[0]
 
+        process_row = fetch_one(
+            "connections",
+            """
+            SELECT
+                MAX(CASE WHEN resource_name = 'processes' THEN current_utilization END),
+                MAX(CASE WHEN resource_name = 'processes' THEN limit_value END)
+            FROM v$resource_limit
+            WHERE resource_name = 'processes'
+            """,
+        )
+        if process_row:
+            metrics["connections"]["processes_current"] = process_row[0]
+            metrics["connections"]["processes_limit"] = process_row[1]
+
+        metrics["wait_events"] = [
+            {"event": row[0], "wait_class": row[1], "total_waits": row[2], "time_waited": row[3]}
+            for row in fetch_all(
+                "wait_events",
+                """
+                SELECT event, wait_class, total_waits, time_waited
+                FROM v$system_event
+                WHERE wait_class <> 'Idle'
+                ORDER BY time_waited DESC
+                FETCH FIRST 10 ROWS ONLY
+                """,
+            )
+        ]
+        metrics["blocking_sessions"] = [
+            {
+                "sid": row[0],
+                "serial": row[1],
+                "username": row[2],
+                "event": row[3],
+                "blocking_session": row[4],
+                "seconds_in_wait": row[5],
+            }
+            for row in fetch_all(
+                "blocking_sessions",
+                """
+                SELECT sid, serial#, username, event, blocking_session, seconds_in_wait
+                FROM v$session
+                WHERE blocking_session IS NOT NULL
+                   OR event LIKE 'enq:%'
+                ORDER BY seconds_in_wait DESC
+                FETCH FIRST 20 ROWS ONLY
+                """,
+            )
+        ]
+        metrics["tablespaces"] = [
+            {
+                "tablespace_name": row[0],
+                "total_bytes": row[1],
+                "used_bytes": row[2],
+                "free_bytes": row[3],
+                "used_pct": row[4],
+                "autoextensible": row[5],
+            }
+            for row in fetch_all(
+                "tablespaces",
+                """
+                SELECT
+                    df.tablespace_name,
+                    df.total_bytes,
+                    df.total_bytes - NVL(fs.free_bytes, 0) AS used_bytes,
+                    NVL(fs.free_bytes, 0) AS free_bytes,
+                    ROUND((df.total_bytes - NVL(fs.free_bytes, 0)) / NULLIF(df.total_bytes, 0) * 100, 2) AS used_pct,
+                    df.autoextensible
+                FROM (
+                    SELECT tablespace_name, SUM(bytes) AS total_bytes, MAX(autoextensible) AS autoextensible
+                    FROM dba_data_files
+                    GROUP BY tablespace_name
+                ) df
+                LEFT JOIN (
+                    SELECT tablespace_name, SUM(bytes) AS free_bytes
+                    FROM dba_free_space
+                    GROUP BY tablespace_name
+                ) fs ON fs.tablespace_name = df.tablespace_name
+                ORDER BY used_pct DESC
+                """,
+            )
+        ]
+        metrics["temp_tablespaces"] = [
+            {"tablespace_name": row[0], "used_bytes": row[1], "total_bytes": row[2], "used_pct": row[3]}
+            for row in fetch_all(
+                "temp_tablespaces",
+                """
+                SELECT
+                    tablespace_name,
+                    used_blocks * block_size AS used_bytes,
+                    tablespace_size * block_size AS total_bytes,
+                    ROUND(used_blocks / NULLIF(tablespace_size, 0) * 100, 2) AS used_pct
+                FROM v$temp_space_header
+                ORDER BY used_pct DESC
+                """,
+            )
+        ]
+        metrics["top_segments"] = [
+            {"owner": row[0], "segment_name": row[1], "segment_type": row[2], "bytes": row[3]}
+            for row in fetch_all(
+                "top_segments",
+                """
+                SELECT owner, segment_name, segment_type, bytes
+                FROM dba_segments
+                ORDER BY bytes DESC
+                FETCH FIRST 20 ROWS ONLY
+                """,
+            )
+        ]
+        metrics["fra"] = {}
+        fra_row = fetch_one(
+            "fra",
+            """
+            SELECT
+                space_limit,
+                space_used,
+                ROUND(space_used / NULLIF(space_limit, 0) * 100, 2) AS used_pct
+            FROM v$recovery_file_dest
+            WHERE space_limit > 0
+            """,
+        )
+        if fra_row:
+            metrics["fra"] = {
+                "space_limit": fra_row[0],
+                "space_used": fra_row[1],
+                "used_pct": fra_row[2],
+            }
+        archive_row = fetch_one(
+            "archive",
+            """
+            SELECT
+                MAX(completion_time),
+                COUNT(*)
+            FROM v$archived_log
+            WHERE completion_time >= SYSDATE - 1
+            """,
+        )
+        if archive_row:
+            metrics["archive"] = {
+                "last_completion_time": archive_row[0],
+                "logs_last_24h": archive_row[1],
+            }
+        metrics["data_guard"] = [
+            {"name": row[0], "value": row[1], "unit": row[2], "time_computed": row[3]}
+            for row in fetch_all(
+                "data_guard",
+                """
+                SELECT name, value, unit, time_computed
+                FROM v$dataguard_stats
+                WHERE name IN ('transport lag', 'apply lag', 'apply finish time')
+                """,
+            )
+        ]
+        metrics["top_sql"] = [
+            {
+                "sql_id": row[0],
+                "schema_name": row[1],
+                "module": row[2],
+                "executions": row[3],
+                "elapsed_time_ms": row[4],
+                "avg_elapsed_ms": row[5],
+                "buffer_gets": row[6],
+                "disk_reads": row[7],
+                "sql_text": row[8],
+            }
+            for row in fetch_all(
+                "top_sql",
+                """
+                SELECT
+                    sql_id,
+                    parsing_schema_name,
+                    module,
+                    executions,
+                    ROUND(elapsed_time / 1000) AS elapsed_time_ms,
+                    ROUND(elapsed_time / NULLIF(executions, 0) / 1000) AS avg_elapsed_ms,
+                    buffer_gets,
+                    disk_reads,
+                    SUBSTR(sql_text, 1, 1000) AS sql_text
+                FROM v$sql
+                WHERE sql_text IS NOT NULL
+                ORDER BY elapsed_time DESC
+                FETCH FIRST 20 ROWS ONLY
+                """,
+            )
+        ]
+
         if conn is not None:
             conn.close()
         return metrics
@@ -1323,4 +1529,18 @@ class OracleEngine:
         return await asyncio.to_thread(self._collect_metrics_sync)
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "version", "instance", "connections", "stats"]
+        return [
+            "health",
+            "version",
+            "instance",
+            "connections",
+            "stats",
+            "wait_events",
+            "blocking_sessions",
+            "tablespaces",
+            "temp_tablespaces",
+            "fra",
+            "archive",
+            "data_guard",
+            "top_sql",
+        ]

@@ -51,6 +51,12 @@ class MonitorService:
         "local",
         "config",
     }
+    RISK_LABELS = {
+        "healthy": "健康",
+        "attention": "关注",
+        "warning": "警告",
+        "critical": "严重",
+    }
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
@@ -394,6 +400,7 @@ class MonitorService:
                 )
             ).scalar_one_or_none()
             latest = await MonitorService.get_latest_snapshot(db, inst.id)
+            health = MonitorService.evaluate_health(latest, cfg.last_collect_status if cfg else "not_configured")
             items.append(
                 {
                     "instance_id": inst.id,
@@ -414,9 +421,10 @@ class MonitorService:
                     "last_collect_status": cfg.last_collect_status if cfg else "not_configured",
                     "last_collect_error": cfg.last_collect_error if cfg else "",
                     "latest": latest,
+                    **health,
                 }
             )
-        return items
+        return sorted(items, key=lambda item: (item["health_score"], item["instance_name"]))
 
     @staticmethod
     async def get_latest_snapshot(db: AsyncSession, instance_id: int) -> dict | None:
@@ -434,7 +442,7 @@ class MonitorService:
 
     @staticmethod
     def _snapshot_to_dict(snap: MonitorMetricSnapshot) -> dict:
-        return {
+        data = {
             "instance_id": snap.instance_id,
             "collected_at": snap.collected_at.isoformat() if snap.collected_at else None,
             "status": snap.status,
@@ -456,6 +464,105 @@ class MonitorService:
             "replication_lag_seconds": snap.replication_lag_seconds,
             "total_size_bytes": snap.total_size_bytes,
             "extra_metrics": snap.extra_metrics or {},
+        }
+        data.update(MonitorService.evaluate_health(data, snap.status))
+        return data
+
+    @staticmethod
+    def evaluate_health(snapshot: dict | None, collect_status: str = "not_configured") -> dict:
+        """Derive an operator-facing health score from the latest native snapshot."""
+        score = 100
+        reasons: list[str] = []
+        if not snapshot:
+            return {
+                "health_score": 0,
+                "risk_level": "critical" if collect_status == "failed" else "attention",
+                "risk_label": "严重" if collect_status == "failed" else "关注",
+                "risk_reasons": ["暂无监控快照" if collect_status != "failed" else "最近采集失败"],
+            }
+
+        extra = snapshot.get("extra_metrics") or {}
+        missing_groups = snapshot.get("missing_groups") or {}
+        if not snapshot.get("is_up"):
+            score -= 50
+            reasons.append("实例不可用或连通性未知")
+        if collect_status == "failed" or snapshot.get("status") == "failed":
+            score -= 35
+            reasons.append("最近采集失败")
+        elif missing_groups:
+            score -= min(20, 5 * len(missing_groups))
+            reasons.append(f"缺失 {len(missing_groups)} 个指标组")
+
+        usage = snapshot.get("connection_usage")
+        if usage is not None:
+            pct = round(float(usage) * 100)
+            if usage >= 0.9:
+                score -= 25
+                reasons.append(f"连接使用率 {pct}%")
+            elif usage >= 0.75:
+                score -= 12
+                reasons.append(f"连接使用率 {pct}%")
+
+        lock_waits = int(snapshot.get("lock_waits") or 0)
+        if lock_waits > 0:
+            score -= min(20, 8 + lock_waits * 2)
+            reasons.append(f"存在 {lock_waits} 个锁等待/阻塞")
+
+        long_transactions = int(snapshot.get("long_transactions") or 0)
+        if long_transactions > 0:
+            score -= min(16, 6 + long_transactions * 2)
+            reasons.append(f"存在 {long_transactions} 个长事务")
+
+        slow_queries = int(snapshot.get("slow_queries") or 0)
+        if slow_queries > 0:
+            score -= min(12, 4 + slow_queries // 10)
+            reasons.append(f"慢查询累计 {slow_queries}")
+
+        lag = snapshot.get("replication_lag_seconds")
+        if lag is not None and float(lag) > 0:
+            if float(lag) >= 300:
+                score -= 25
+            elif float(lag) >= 60:
+                score -= 12
+            else:
+                score -= 5
+            reasons.append(f"复制延迟 {int(float(lag))}s")
+
+        for item in extra.get("tablespaces") or []:
+            usage_pct = MonitorService._coerce_float(item.get("used_pct"))
+            name = item.get("tablespace_name") or item.get("name") or "表空间"
+            if usage_pct is not None and usage_pct >= 90:
+                score -= 20
+                reasons.append(f"{name} 表空间 {round(usage_pct)}%")
+                break
+            if usage_pct is not None and usage_pct >= 80:
+                score -= 10
+                reasons.append(f"{name} 表空间 {round(usage_pct)}%")
+                break
+
+        fra = extra.get("fra") or {}
+        fra_pct = MonitorService._coerce_float(fra.get("used_pct"))
+        if fra_pct is not None and fra_pct >= 90:
+            score -= 20
+            reasons.append(f"FRA 使用率 {round(fra_pct)}%")
+        elif fra_pct is not None and fra_pct >= 80:
+            score -= 10
+            reasons.append(f"FRA 使用率 {round(fra_pct)}%")
+
+        score = max(0, min(100, score))
+        if score < 40:
+            level = "critical"
+        elif score < 65:
+            level = "warning"
+        elif score < 85:
+            level = "attention"
+        else:
+            level = "healthy"
+        return {
+            "health_score": score,
+            "risk_level": level,
+            "risk_label": MonitorService.RISK_LABELS[level],
+            "risk_reasons": reasons or ["暂无明显风险"],
         }
 
     @staticmethod
@@ -640,6 +747,235 @@ class MonitorService:
         ]
 
     @staticmethod
+    async def get_native_overview(db: AsyncSession, user: dict) -> dict:
+        items = await MonitorService.list_native_instances(db, user)
+        total = len(items)
+        online = sum(1 for item in items if (item.get("latest") or {}).get("is_up"))
+        failed = sum(1 for item in items if item.get("last_collect_status") == "failed")
+        high_connection = sum(
+            1 for item in items if ((item.get("latest") or {}).get("connection_usage") or 0) >= 0.8
+        )
+        capacity_risk = sum(
+            1 for item in items if MonitorService._has_capacity_risk(item.get("latest") or {})
+        )
+        replication_risk = sum(
+            1 for item in items if ((item.get("latest") or {}).get("replication_lag_seconds") or 0) >= 60
+        )
+        lock_risk = sum(
+            1
+            for item in items
+            if ((item.get("latest") or {}).get("lock_waits") or 0) > 0
+            or ((item.get("latest") or {}).get("long_transactions") or 0) > 0
+        )
+        by_db_type: dict[str, int] = {}
+        by_risk_level: dict[str, int] = {}
+        for item in items:
+            by_db_type[item["db_type"]] = by_db_type.get(item["db_type"], 0) + 1
+            level = item.get("risk_level", "attention")
+            by_risk_level[level] = by_risk_level.get(level, 0) + 1
+        return {
+            "cards": {
+                "instance_total": total,
+                "online_count": online,
+                "online_rate": round(online / total, 4) if total else 0,
+                "abnormal_count": sum(1 for item in items if item.get("risk_level") in {"warning", "critical"}),
+                "collect_failed_count": failed,
+                "high_connection_count": high_connection,
+                "capacity_risk_count": capacity_risk,
+                "replication_lag_count": replication_risk,
+                "lock_or_long_tx_count": lock_risk,
+            },
+            "distributions": {"db_type": by_db_type, "risk_level": by_risk_level},
+            "items": items,
+        }
+
+    @staticmethod
+    def _has_capacity_risk(snapshot: dict) -> bool:
+        extra = snapshot.get("extra_metrics") or {}
+        tablespaces = extra.get("tablespaces") or []
+        if any((MonitorService._coerce_float(item.get("used_pct")) or 0) >= 80 for item in tablespaces):
+            return True
+        fra = extra.get("fra") or {}
+        return (MonitorService._coerce_float(fra.get("used_pct")) or 0) >= 80
+
+    @staticmethod
+    async def get_native_health(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        detail = await MonitorService.get_native_detail(db, instance_id, user)
+        latest = detail.get("latest")
+        return {
+            "instance": detail["instance"],
+            **MonitorService.evaluate_health(
+                latest, (detail.get("config") or {}).get("last_collect_status", "not_configured")
+            ),
+            "latest": latest,
+        }
+
+    @staticmethod
+    async def get_engine_detail(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        detail = await MonitorService.get_native_detail(db, instance_id, user)
+        latest = detail.get("latest") or {}
+        extra = latest.get("extra_metrics") or {}
+        return {
+            "instance": detail["instance"],
+            "metric_groups": {
+                key: value
+                for key, value in extra.items()
+                if key not in {"health", "version", "missing_groups"}
+            },
+            "missing_groups": latest.get("missing_groups") or {},
+            "health": MonitorService.evaluate_health(
+                latest, (detail.get("config") or {}).get("last_collect_status", "not_configured")
+            ),
+        }
+
+    @staticmethod
+    async def get_alert_rules(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        detail = await MonitorService.get_native_detail(db, instance_id, user)
+        cfg = (
+            await db.execute(
+                select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id)
+            )
+        ).scalar_one_or_none()
+        return {
+            "instance": detail["instance"],
+            "rules": (cfg.alert_rules_override if cfg else {}) or {},
+            "defaults": {
+                "connection_usage": {"operator": ">=", "threshold": 0.8, "duration_count": 3},
+                "replication_lag_seconds": {"operator": ">=", "threshold": 60, "duration_count": 2},
+                "tablespace_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
+                "fra_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
+                "lock_waits": {"operator": ">", "threshold": 0, "duration_count": 1},
+            },
+        }
+
+    @staticmethod
+    async def update_alert_rules(
+        db: AsyncSession, instance_id: int, rules: dict[str, Any], user: dict
+    ) -> dict:
+        inst_result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == instance_id)
+        )
+        instance = inst_result.scalar_one_or_none()
+        if not instance:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        if not MonitorService._can_access_instance(user, instance):
+            raise AppException("不能修改资源组外实例的监控告警规则", code=403)
+        cfg = (
+            await db.execute(
+                select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id)
+            )
+        ).scalar_one_or_none()
+        if not cfg:
+            cfg = MonitorCollectConfig(
+                instance_id=instance_id,
+                exporter_url="",
+                exporter_type="",
+                created_by=user.get("username", ""),
+            )
+            db.add(cfg)
+        cfg.alert_rules_override = MonitorService._json_safe(rules)
+        await db.commit()
+        await db.refresh(cfg)
+        return {"rules": cfg.alert_rules_override or {}}
+
+    @staticmethod
+    async def get_waits(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        detail = await MonitorService.get_native_detail(db, instance_id, user)
+        extra = (detail.get("latest") or {}).get("extra_metrics") or {}
+        return {
+            "top_waits": extra.get("wait_events") or extra.get("waits") or [],
+            "blocking_sessions": extra.get("blocking_sessions") or [],
+            "long_transactions": extra.get("long_transactions") or [],
+            "missing_groups": (detail.get("latest") or {}).get("missing_groups") or {},
+        }
+
+    @staticmethod
+    async def get_top_sql(
+        db: AsyncSession, instance_id: int, user: dict, limit: int = 20
+    ) -> dict:
+        from app.engines.registry import get_engine
+
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+        inst = (await db.execute(select(Instance).where(Instance.id == instance_id))).scalar_one_or_none()
+        if not inst:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        latest = await MonitorService.get_latest_snapshot(db, instance_id)
+        extra = (latest or {}).get("extra_metrics") or {}
+        items = extra.get("top_sql") or []
+        error = ""
+        if not items:
+            engine = get_engine(inst)
+            if hasattr(engine, "collect_slow_queries"):
+                rs = await engine.collect_slow_queries(limit=limit)
+                error = rs.error
+                if rs.is_success:
+                    items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
+        return {"items": items[:limit], "error": error, "missing_groups": (latest or {}).get("missing_groups") or {}}
+
+    @staticmethod
+    def _result_rows_to_dicts(columns: list[str], rows: list[Any]) -> list[dict]:
+        result: list[dict] = []
+        for row in rows:
+            if isinstance(row, dict):
+                result.append(MonitorService._json_safe(row))
+            elif columns:
+                result.append(MonitorService._json_safe(dict(zip(columns, row, strict=False))))
+            else:
+                result.append({"value": MonitorService._json_safe(row)})
+        return result
+
+    @staticmethod
+    async def get_capacity_growth(
+        db: AsyncSession, instance_id: int, user: dict, days: int = 7
+    ) -> dict:
+        if not await MonitorService.check_privilege(db, user, instance_id):
+            raise AppException("没有该实例的监控查看权限", code=403)
+        since = datetime.now(UTC) - timedelta(days=days)
+        db_rows = (
+            (
+                await db.execute(
+                    select(MonitorDatabaseCapacitySnapshot)
+                    .where(
+                        MonitorDatabaseCapacitySnapshot.instance_id == instance_id,
+                        MonitorDatabaseCapacitySnapshot.collected_at >= since,
+                    )
+                    .order_by(
+                        MonitorDatabaseCapacitySnapshot.db_name,
+                        MonitorDatabaseCapacitySnapshot.collected_at,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        first_by_db: dict[str, MonitorDatabaseCapacitySnapshot] = {}
+        last_by_db: dict[str, MonitorDatabaseCapacitySnapshot] = {}
+        for row in db_rows:
+            first_by_db.setdefault(row.db_name, row)
+            last_by_db[row.db_name] = row
+        db_growth = [
+            {
+                "db_name": name,
+                "first_size_bytes": first_by_db[name].total_size_bytes,
+                "latest_size_bytes": last.total_size_bytes,
+                "growth_bytes": last.total_size_bytes - first_by_db[name].total_size_bytes,
+                "collected_at": last.collected_at.isoformat(),
+            }
+            for name, last in last_by_db.items()
+        ]
+        db_growth.sort(key=lambda item: item["growth_bytes"], reverse=True)
+        table_total, tables = await MonitorService.get_table_capacity(db, instance_id, user, page_size=20)
+        return {
+            "top_databases": db_growth[:20],
+            "top_tables": tables,
+            "table_total": table_total,
+            "days": days,
+        }
+
+    @staticmethod
     async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
         now = datetime.now(UTC)
         cfg_rows = (
@@ -711,8 +1047,17 @@ class MonitorService:
 
         now = collected_at or datetime.now(UTC)
         engine = get_engine(inst)
+        previous = (
+            await db.execute(
+                select(MonitorMetricSnapshot)
+                .where(MonitorMetricSnapshot.instance_id == inst.id)
+                .order_by(MonitorMetricSnapshot.collected_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         raw = await engine.collect_metrics()
         normalized = MonitorService._normalize_metric_payload(raw)
+        MonitorService._apply_delta_rates(normalized, raw, previous, now)
         snapshot = MonitorMetricSnapshot(instance_id=inst.id, collected_at=now, **normalized)
         db.add(snapshot)
         await db.flush()
@@ -781,6 +1126,46 @@ class MonitorService:
         }
 
     @staticmethod
+    def _apply_delta_rates(
+        normalized: dict[str, Any],
+        raw: dict[str, Any],
+        previous: MonitorMetricSnapshot | None,
+        now: datetime,
+    ) -> None:
+        """Prefer interval rates when engines provide monotonically increasing counters."""
+        if not previous or not previous.collected_at:
+            return
+        previous_at = previous.collected_at
+        if previous_at.tzinfo is None and now.tzinfo is not None:
+            previous_at = previous_at.replace(tzinfo=UTC)
+        seconds = max((now - previous_at).total_seconds(), 1)
+        previous_extra = previous.extra_metrics or {}
+        counters = raw.get("counters") or {}
+        previous_counters = previous_extra.get("counters") or {}
+        qps = MonitorService._counter_rate(counters, previous_counters, seconds, "queries", "query_work")
+        tps = MonitorService._counter_rate(
+            counters, previous_counters, seconds, "transactions", "xact_total"
+        )
+        if qps is not None:
+            normalized["qps"] = qps
+        if tps is not None:
+            normalized["tps"] = tps
+
+    @staticmethod
+    def _counter_rate(
+        counters: dict[str, Any], previous_counters: dict[str, Any], seconds: float, *keys: str
+    ) -> float | None:
+        if not isinstance(counters, dict) or not isinstance(previous_counters, dict):
+            return None
+        for key in keys:
+            current = MonitorService._coerce_float(counters.get(key))
+            previous = MonitorService._coerce_float(previous_counters.get(key))
+            if current is None or previous is None or current < previous:
+                continue
+            return round((current - previous) / seconds, 2)
+        return None
+
+    @staticmethod
     def _first_number(mapping: Any, *keys: str) -> int | float | None:
         if not isinstance(mapping, dict):
             return None
@@ -794,6 +1179,15 @@ class MonitorService:
             except (TypeError, ValueError):
                 continue
         return None
+
+    @staticmethod
+    def _coerce_float(value: Any) -> float | None:
+        try:
+            if value is None or value == "":
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     async def collect_instance_capacity(

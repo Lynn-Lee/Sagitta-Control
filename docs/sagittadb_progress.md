@@ -2,7 +2,7 @@
 
 > **项目路径：** `/Users/lynn/SynologyDrive/SynologyDrive/Code/SagittaDB`
 > **重构基准：** Archery v1.14.0
-> **文档版本：** v1.13 · 2026-04-27
+> **文档版本：** v1.14 · 2026-04-28
 > **状态说明：** ✅ 已完成并验证 · 🔧 已开发待测试 · 📋 待开发
 
 ---
@@ -16,7 +16,7 @@
 | 技术栈（后端） | FastAPI + SQLAlchemy 2.0 async + Celery 5 + PostgreSQL 16 |
 | 技术栈（前端） | React 18 + TypeScript + Vite + Ant Design 5 |
 | 引擎层 | EngineBase Protocol + sqlglot（替代 goInception 解析） |
-| 可观测中心 | 数据库原生指标采集 + 容量快照（Prometheus/Grafana 可选） |
+| 可观测中心 | 数据库原生指标采集 + 舰队健康评分 + TopN 诊断 + 容量快照（Prometheus/Grafana 可选） |
 | SaaS 预留 | 全部模型含 tenant_id，初期固定为 1 |
 | 部署方式 | Docker Compose（开发/测试）/ K8s + Helm（生产预留）|
 
@@ -48,6 +48,7 @@
 | 统一治理视角 | Dashboard、查询权限、SQL 工单统一 self/group/instance_scope/global 视角 | ✅ | 100% |
 | 查询权限撤销审计 | 已生效查询权限撤销、撤销记录、历史软删除回填、Dashboard 撤销统计 | ✅ | 100% |
 | 会话诊断与慢日志分析 | 连接/会话视角在线与历史快照、Oracle ASH/AWR 活跃采样、慢日志采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
+| 可观测中心 2 期 | 舰队总览、健康评分、真实区间 QPS/TPS、Top SQL/等待事件/容量增长、Oracle 指标包、阈值告警规则 | ✅ | 100% |
 
 **总体完成度：100%（v1.0-GA），v2-lite 首发范围已完成并进入体验收口与持续验收阶段**
 
@@ -162,11 +163,15 @@
 - 在线查询新增 `查询历史` 页面：支持时间范围、操作人、实例、数据库、操作类型、脱敏、SQL 关键字筛选，支持 SQL 明细查看、复制和收藏
 - 查询历史复用 v2-lite 查询治理范围；查询/导出成功与失败统一写入 `query_log`，迁移新增 `0017_query_log_history_audit` 和 `0018_qlog_snapshot_backfill`
 - 可观测中心边界收敛为“数据库实例监控”，平台治理统计继续归属首页 Dashboard
-- 可观测中心前端入口拆分为默认“实例概览”和“监控”两个 Tab：实例概览负责全实例配置/采集状态与单实例/批量配置采集操作，监控 Tab 仅通过实例筛选查看单实例指标详情
+- 可观测中心前端入口升级为默认“舰队总览”和“监控”两个 Tab：舰队总览负责全局健康卡片、风险排序、DB 类型/风险等级/采集状态筛选与单实例/批量配置采集操作，监控 Tab 按实例查看诊断详情
 - 原生监控配置管理：启停、实例指标采集间隔、容量采集间隔、指标保留天数、采集状态与错误
 - 新增原生采样快照：`monitor_metric_snapshot`、`monitor_database_capacity_snapshot`、`monitor_table_capacity_snapshot`
-- 实例详情支持概览、24小时趋势、库/Schema 容量、表/索引容量、采集诊断
-- MySQL / PostgreSQL 补充原生连接、吞吐、慢查询、锁等待等指标；MongoDB 补充集合容量和索引大小映射
+- 实例详情支持概览、性能趋势（1h/6h/24h/7d）、库/Schema 容量、表/索引容量、会话阻塞、Top SQL、复制状态、等待事件、容量增长、告警规则与采集诊断
+- 健康评分按实例派生 `health_score / risk_level / risk_reasons`，扣分维度覆盖不可用、采集失败、连接压力、锁等待、长事务、慢查询、复制延迟、Oracle 表空间/FRA 风险与缺失指标组
+- MySQL / TiDB 补充真实区间速率 counters、InnoDB buffer pool 命中率、临时表落盘率、复制线程状态与延迟；PostgreSQL 补充真实区间速率 counters、cache hit、temp files、WAL、replication lag 与 vacuum 风险；MongoDB 补充集合容量和索引大小映射
+- Oracle 作为独立 2 期指标包补齐 `v$sysmetric` 性能指标、sessions/processes 使用率、Top wait events、blocking sessions、表空间/TEMP/FRA/归档、Data Guard 状态、Top SQL 与 Top segment；权限不足时写入缺失指标组供采集诊断展示
+- 新增原生监控派生接口：`/monitor/native/overview/`、`/instances/{id}/health/`、`/top-sql/`、`/waits/`、`/capacity-growth/`、`/engine-detail/`、`/alerts/`
+- 告警一期复用 `monitor_collect_config.alert_rules_override`，支持实例级阈值规则覆盖（指标、比较符、阈值、持续次数、恢复通知、静默时间等 JSON 字段）
 - Prometheus + Grafana + Alertmanager 调整为可选外围集成；Prometheus SD 端点保留兼容旧部署
 - 监控队列新增 `collect_native_monitoring`、`collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入原生监控快照、`session_snapshot` 和 `slow_query_log`
 

@@ -412,6 +412,7 @@ class MysqlEngine:
         variables_rs = await self.query(db_name="", sql="SHOW GLOBAL VARIABLES", limit_num=0)
         version_rs = await self.query(db_name="", sql="SELECT VERSION() AS version", limit_num=1)
         process_rs = await self.processlist(command_type="ALL")
+        repl_rs = await self.query(db_name="", sql="SHOW SLAVE STATUS", limit_num=1)
 
         status = (
             {
@@ -443,6 +444,27 @@ class MysqlEngine:
         commits = _to_int(status.get("Com_commit")) or 0
         rollbacks = _to_int(status.get("Com_rollback")) or 0
         tps = round((commits + rollbacks) / uptime, 2) if uptime else None
+        buffer_reads = _to_int(status.get("Innodb_buffer_pool_reads")) or 0
+        buffer_read_requests = _to_int(status.get("Innodb_buffer_pool_read_requests")) or 0
+        buffer_hit_rate = (
+            round((1 - buffer_reads / buffer_read_requests) * 100, 2)
+            if buffer_read_requests
+            else None
+        )
+        disk_tmp_tables = _to_int(status.get("Created_tmp_disk_tables")) or 0
+        tmp_tables = _to_int(status.get("Created_tmp_tables")) or 0
+        tmp_disk_rate = round(disk_tmp_tables / tmp_tables * 100, 2) if tmp_tables else None
+        replication = {}
+        if repl_rs.is_success and repl_rs.rows and isinstance(repl_rs.rows[0], dict):
+            repl = repl_rs.rows[0]
+            replication = {
+                "lag_seconds": _to_int(repl.get("Seconds_Behind_Master")),
+                "io_thread": repl.get("Slave_IO_Running"),
+                "sql_thread": repl.get("Slave_SQL_Running"),
+                "master_host": repl.get("Master_Host"),
+                "last_io_error": repl.get("Last_IO_Error") or "",
+                "last_sql_error": repl.get("Last_SQL_Error") or "",
+            }
         return {
             "health": {"up": 1},
             "version": {
@@ -464,11 +486,29 @@ class MysqlEngine:
                 "tps": tps,
                 "slow_queries": _to_int(status.get("Slow_queries")),
                 "Innodb_row_lock_waits": _to_int(status.get("Innodb_row_lock_waits")),
+                "deadlocks": _to_int(status.get("Innodb_deadlocks")),
                 "errors": (_to_int(status.get("Connection_errors_internal")) or 0)
                 + (_to_int(status.get("Connection_errors_max_connections")) or 0),
             },
+            "innodb": {
+                "buffer_pool_hit_rate": buffer_hit_rate,
+                "buffer_pool_reads": buffer_reads,
+                "buffer_pool_read_requests": buffer_read_requests,
+                "row_lock_time_ms": _to_int(status.get("Innodb_row_lock_time")),
+                "row_lock_waits": _to_int(status.get("Innodb_row_lock_waits")),
+                "redo_log_writes": _to_int(status.get("Innodb_log_writes")),
+            },
+            "temp_tables": {
+                "created_tmp_tables": tmp_tables,
+                "created_tmp_disk_tables": disk_tmp_tables,
+                "disk_tmp_table_rate": tmp_disk_rate,
+            },
+            "counters": {
+                "queries": questions,
+                "transactions": commits + rollbacks,
+            },
             "variables": {"max_connections": max_connections},
-            "replication": {},
+            "replication": replication,
         }
 
     def get_supported_metric_groups(self) -> list[str]:
