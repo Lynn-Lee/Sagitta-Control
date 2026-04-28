@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import and_, case, distinct, func, or_, select
@@ -727,6 +728,8 @@ class MonitorService:
         if isinstance(version, dict):
             version = version.get("value") or version.get("version") or ""
         missing: dict[str, str] = {}
+        if isinstance(raw.get("missing_groups"), dict):
+            missing.update({str(k): str(v) for k, v in raw["missing_groups"].items()})
         if raw.get("error"):
             missing["health"] = "collect_failed"
         current_connections = MonitorService._first_number(
@@ -774,7 +777,7 @@ class MonitorService:
             "replication_lag_seconds": MonitorService._first_number(
                 raw.get("replication") or {}, "lag_seconds", "seconds_behind_master"
             ),
-            "extra_metrics": raw,
+            "extra_metrics": MonitorService._json_safe(raw),
         }
 
     @staticmethod
@@ -954,6 +957,8 @@ class MonitorService:
             return [MonitorService._json_safe(v) for v in value]
         if isinstance(value, (datetime, date)):
             return value.isoformat()
+        if isinstance(value, Decimal):
+            return int(value) if value == value.to_integral_value() else float(value)
         return value
 
     @staticmethod

@@ -397,8 +397,29 @@ export default function MonitorPage() {
   ]
 
   const tableColumns = [
-    { title: '表', dataIndex: 'table_name', fixed: 'left' as const, width: 220 },
-    { title: '库/Schema', dataIndex: 'db_name', width: 180 },
+    {
+      title: '表',
+      dataIndex: 'table_name',
+      fixed: 'left' as const,
+      width: 260,
+      ellipsis: true,
+      render: (value: string) => (
+        <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 230 }}>
+          {value}
+        </Text>
+      ),
+    },
+    {
+      title: '库/Schema',
+      dataIndex: 'db_name',
+      width: 200,
+      ellipsis: true,
+      render: (value: string) => (
+        <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 170 }}>
+          {value}
+        </Text>
+      ),
+    },
     { title: '总大小', dataIndex: 'total_size_bytes', sorter: (a: any, b: any) => a.total_size_bytes - b.total_size_bytes, render: formatBytes },
     { title: '数据大小', dataIndex: 'data_size_bytes', sorter: (a: any, b: any) => a.data_size_bytes - b.data_size_bytes, render: formatBytes },
     { title: '索引大小', dataIndex: 'index_size_bytes', sorter: (a: any, b: any) => a.index_size_bytes - b.index_size_bytes, render: formatBytes },

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from app.services.monitor import MonitorService
 
@@ -25,12 +26,31 @@ def test_normalize_metric_payload_keeps_missing_values_none():
 
 
 def test_normalize_metric_payload_records_collect_failure():
-    normalized = MonitorService._normalize_metric_payload({"health": {"up": 0}, "error": "permission denied"})
+    normalized = MonitorService._normalize_metric_payload(
+        {"health": {"up": 0}, "error": "permission denied"}
+    )
 
     assert normalized["status"] == "failed"
     assert normalized["is_up"] is False
     assert normalized["missing_groups"] == {"health": "collect_failed"}
     assert normalized["error"] == "permission denied"
+
+
+def test_normalize_metric_payload_preserves_partial_missing_groups():
+    normalized = MonitorService._normalize_metric_payload(
+        {
+            "health": {"up": 1},
+            "connections": {"current": Decimal("8"), "max_connections": Decimal("100")},
+            "stats": {"qps": Decimal("12.5")},
+            "missing_groups": {"stats": "missing v$sysmetric permission"},
+        }
+    )
+
+    assert normalized["status"] == "success"
+    assert normalized["missing_groups"] == {"stats": "missing v$sysmetric permission"}
+    assert normalized["connection_usage"] == 0.08
+    assert normalized["qps"] == 12.5
+    assert normalized["extra_metrics"]["stats"]["qps"] == 12.5
 
 
 def test_normalize_table_capacity_maps_common_engine_fields():

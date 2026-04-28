@@ -239,7 +239,9 @@ class OracleEngine:
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
         statement_id = f"SAGITTA_{uuid.uuid4().hex[:24].upper()}"
-        explain_sql = f"EXPLAIN PLAN SET STATEMENT_ID = '{statement_id}' FOR {sql.strip().rstrip(';')}"
+        explain_sql = (
+            f"EXPLAIN PLAN SET STATEMENT_ID = '{statement_id}' FOR {sql.strip().rstrip(';')}"
+        )
         rs = await asyncio.to_thread(self._run_statement_sync, explain_sql, None)
         if not rs.is_success:
             return rs
@@ -247,9 +249,13 @@ class OracleEngine:
         SELECT plan_table_output
         FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, :statement_id, 'TYPICAL +PREDICATE +ALIAS +COST +BYTES'))
         """
-        plan_rs = await asyncio.to_thread(self._run_query_sync, display_sql, {"statement_id": statement_id})
+        plan_rs = await asyncio.to_thread(
+            self._run_query_sync, display_sql, {"statement_id": statement_id}
+        )
         cleanup_sql = "DELETE FROM plan_table WHERE statement_id = :statement_id"
-        await asyncio.to_thread(self._run_statement_sync, cleanup_sql, {"statement_id": statement_id})
+        await asyncio.to_thread(
+            self._run_statement_sync, cleanup_sql, {"statement_id": statement_id}
+        )
         return plan_rs
 
     def _normalize_ddl_text(self, ddl: str) -> str:
@@ -294,10 +300,78 @@ class OracleEngine:
         return rs
 
     async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
-        rs = await self.get_all_tables(db_name)
+        owner = db_name.upper()
+        sql = """
+        WITH table_segments AS (
+            SELECT segment_name AS table_name, SUM(bytes) AS data_length
+            FROM all_segments
+            WHERE owner = :owner
+              AND segment_type IN (
+                'TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION',
+                'LOBSEGMENT', 'LOB PARTITION'
+              )
+            GROUP BY segment_name
+        ),
+        index_segments AS (
+            SELECT i.table_name, SUM(s.bytes) AS index_length
+            FROM all_indexes i
+            JOIN all_segments s
+              ON s.owner = i.owner
+             AND s.segment_name = i.index_name
+            WHERE i.table_owner = :owner
+              AND s.segment_type IN ('INDEX', 'INDEX PARTITION', 'INDEX SUBPARTITION')
+            GROUP BY i.table_name
+        )
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            COALESCE(ts.data_length, 0) AS data_length,
+            COALESCE(ix.index_length, 0) AS index_length,
+            COALESCE(ts.data_length, 0) + COALESCE(ix.index_length, 0) AS total_size
+        FROM all_tables t
+        LEFT JOIN table_segments ts ON ts.table_name = t.table_name
+        LEFT JOIN index_segments ix ON ix.table_name = t.table_name
+        WHERE t.owner = :owner
+        ORDER BY total_size DESC, t.table_name
+        """
+        fallback_sql = """
+        WITH table_segments AS (
+            SELECT segment_name AS table_name, SUM(bytes) AS data_length
+            FROM user_segments
+            WHERE segment_type IN (
+                'TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION',
+                'LOBSEGMENT', 'LOB PARTITION'
+              )
+            GROUP BY segment_name
+        ),
+        index_segments AS (
+            SELECT i.table_name, SUM(s.bytes) AS index_length
+            FROM user_indexes i
+            JOIN user_segments s
+              ON s.segment_name = i.index_name
+            WHERE s.segment_type IN ('INDEX', 'INDEX PARTITION', 'INDEX SUBPARTITION')
+            GROUP BY i.table_name
+        )
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            COALESCE(ts.data_length, 0) AS data_length,
+            COALESCE(ix.index_length, 0) AS index_length,
+            COALESCE(ts.data_length, 0) + COALESCE(ix.index_length, 0) AS total_size
+        FROM user_tables t
+        LEFT JOIN table_segments ts ON ts.table_name = t.table_name
+        LEFT JOIN index_segments ix ON ix.table_name = t.table_name
+        ORDER BY total_size DESC, t.table_name
+        """
+        rs = await asyncio.to_thread(self._run_query_sync, sql, {"owner": owner})
         if not rs.is_success:
+            logger.info("oracle_capacity_query_fallback_user_views: %s", rs.error)
+            rs = await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
+        if not rs.is_success:
+            logger.info("oracle_capacity_query_failed: %s", rs.error)
             return []
-        return [{"table_name": row[0]} for row in rs.rows]
+        columns = [str(col).lower() for col in rs.column_list]
+        return [dict(zip(columns, row, strict=False)) for row in rs.rows]
 
     async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = """
@@ -566,9 +640,7 @@ class OracleEngine:
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
         return await self.execute(workflow.db_name, workflow.sql_content)
 
-    async def processlist(
-        self, command_type: str = "ALL", **kwargs: Any
-    ) -> ResultSet:
+    async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
         sql = """
         SELECT
             s.sid AS session_id,
@@ -728,9 +800,7 @@ class OracleEngine:
         offset: int = 0,
     ) -> ResultSet:
         view_name = (
-            "dba_hist_active_sess_history"
-            if source == "awr"
-            else "v$active_session_history"
+            "dba_hist_active_sess_history" if source == "awr" else "v$active_session_history"
         )
         columns_rs = await self._ash_view_columns(view_name, source)
         if columns_rs.error:
@@ -741,11 +811,17 @@ class OracleEngine:
         sql_text_join, sql_text_expr = self._ash_sql_text_join(source)
         serial_expr = self._ash_column_expr(columns, ("SESSION_SERIAL#", "SESSION_SERIAL"), "NULL")
         host_expr = self._ash_column_expr(columns, ("MACHINE",), "CAST(NULL AS VARCHAR2(255))")
-        program_expr = self._ash_column_expr(columns, ("PROGRAM", "MODULE"), "CAST(NULL AS VARCHAR2(255))")
-        state_expr = self._ash_column_expr(columns, ("SESSION_STATE",), "CAST(NULL AS VARCHAR2(255))")
+        program_expr = self._ash_column_expr(
+            columns, ("PROGRAM", "MODULE"), "CAST(NULL AS VARCHAR2(255))"
+        )
+        state_expr = self._ash_column_expr(
+            columns, ("SESSION_STATE",), "CAST(NULL AS VARCHAR2(255))"
+        )
         sql_id_expr = self._ash_column_expr(columns, ("SQL_ID",), "CAST(NULL AS VARCHAR2(255))")
         event_expr = self._ash_column_expr(columns, ("EVENT",), "CAST(NULL AS VARCHAR2(255))")
-        blocking_expr = self._ash_column_expr(columns, ("BLOCKING_SESSION",), "CAST(NULL AS NUMBER)")
+        blocking_expr = self._ash_column_expr(
+            columns, ("BLOCKING_SESSION",), "CAST(NULL AS NUMBER)"
+        )
         sql = f"""
         SELECT * FROM (
             SELECT inner_q.*, ROWNUM AS rn FROM (
@@ -834,8 +910,160 @@ class OracleEngine:
             return rs
         return await asyncio.to_thread(self._run_query_sync, fallback_sql, params)
 
+    def _collect_metrics_sync(self) -> dict[str, Any]:
+        metrics: dict[str, Any] = {
+            "health": {"up": 0},
+            "connections": {},
+            "stats": {},
+            "queries": {},
+            "missing_groups": {},
+        }
+        conn = None
+        try:
+            conn = self._connect_sync()
+            metrics["health"]["up"] = 1
+        except Exception as exc:
+            error = _normalize_oracle_connect_error(exc)
+            metrics["error"] = error
+            metrics["missing_groups"]["health"] = error
+            return metrics
+
+        def fetch_one(group: str, sql: str, params: dict[str, Any] | None = None):
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, params or {})
+                    return cur.fetchone()
+            except Exception as exc:
+                metrics["missing_groups"][group] = _normalize_oracle_connect_error(exc)
+                logger.info("oracle_metric_group_failed group=%s error=%s", group, exc)
+                return None
+
+        def fetch_all(group: str, sql: str, params: dict[str, Any] | None = None):
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, params or {})
+                    return cur.fetchall()
+            except Exception as exc:
+                metrics["missing_groups"][group] = _normalize_oracle_connect_error(exc)
+                logger.info("oracle_metric_group_failed group=%s error=%s", group, exc)
+                return []
+
+        row = fetch_one(
+            "version",
+            """
+            SELECT banner_full
+            FROM v$version
+            WHERE banner_full LIKE 'Oracle Database%'
+               OR banner LIKE 'Oracle Database%'
+            FETCH FIRST 1 ROWS ONLY
+            """,
+        )
+        if not row:
+            row = fetch_one(
+                "version",
+                """
+                SELECT banner
+                FROM v$version
+                WHERE banner LIKE 'Oracle Database%'
+                  AND ROWNUM = 1
+                """,
+            )
+        if row and row[0]:
+            metrics["version"] = {"value": str(row[0])}
+
+        row = fetch_one(
+            "instance",
+            """
+            SELECT ROUND((SYSDATE - startup_time) * 86400) AS uptime_seconds
+            FROM v$instance
+            """,
+        )
+        if row and row[0] is not None:
+            metrics["uptime_seconds"] = row[0]
+
+        row = fetch_one(
+            "connections",
+            """
+            SELECT
+                COUNT(*) AS current_connections,
+                SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) AS active_sessions
+            FROM v$session
+            WHERE type = 'USER'
+            """,
+        )
+        if row:
+            metrics["connections"].update(
+                {
+                    "current": row[0],
+                    "active_sessions": row[1],
+                }
+            )
+
+        row = fetch_one(
+            "connections",
+            """
+            SELECT value
+            FROM v$parameter
+            WHERE name = 'sessions'
+            """,
+        )
+        if row and row[0] is not None:
+            metrics["connections"]["max_connections"] = row[0]
+
+        sysmetric_rows = fetch_all(
+            "stats",
+            """
+            SELECT metric_name, value
+            FROM v$sysmetric
+            WHERE group_id = 2
+              AND metric_name IN (
+                'Executions Per Sec',
+                'User Transaction Per Sec',
+                'Average Active Sessions',
+                'Current Logons Count'
+              )
+            """,
+        )
+        for metric_name, value in sysmetric_rows:
+            name = str(metric_name).lower()
+            if name == "executions per sec":
+                metrics["stats"]["qps"] = value
+            elif name == "user transaction per sec":
+                metrics["stats"]["tps"] = value
+            elif name == "average active sessions":
+                metrics["queries"]["active_sessions"] = value
+            elif name == "current logons count":
+                metrics["connections"].setdefault("current", value)
+
+        row = fetch_one(
+            "stats",
+            """
+            SELECT COUNT(*)
+            FROM v$session
+            WHERE blocking_session IS NOT NULL
+               OR event LIKE 'enq:%'
+            """,
+        )
+        if row and row[0] is not None:
+            metrics["stats"]["lock_waits"] = row[0]
+
+        row = fetch_one(
+            "stats",
+            """
+            SELECT COUNT(*)
+            FROM v$transaction
+            WHERE (SYSDATE - start_date) * 86400 >= 300
+            """,
+        )
+        if row and row[0] is not None:
+            metrics["stats"]["long_transactions"] = row[0]
+
+        if conn is not None:
+            conn.close()
+        return metrics
+
     async def collect_metrics(self) -> dict:
-        return {"health": {"up": 1 if (await self.test_connection()).is_success else 0}}
+        return await asyncio.to_thread(self._collect_metrics_sync)
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health"]
+        return ["health", "version", "instance", "connections", "stats"]
