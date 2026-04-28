@@ -301,16 +301,136 @@ class OracleEngine:
 
     async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
         owner = db_name.upper()
+        dba_sql = """
+        WITH block_size AS (
+            SELECT 8192 AS bytes FROM dual
+        ),
+        table_stats AS (
+            SELECT
+                table_name,
+                COALESCE(num_rows, 0) AS table_rows,
+                GREATEST(
+                    COALESCE(blocks, 0) * (SELECT bytes FROM block_size),
+                    COALESCE(num_rows, 0) * COALESCE(avg_row_len, 0),
+                    0
+                ) AS estimated_data_length
+            FROM dba_tables
+            WHERE owner = :owner
+        ),
+        index_stats AS (
+            SELECT
+                table_name,
+                SUM(COALESCE(leaf_blocks, 0) * (SELECT bytes FROM block_size)) AS estimated_index_length
+            FROM dba_indexes
+            WHERE table_owner = :owner
+            GROUP BY table_name
+        ),
+        table_segments AS (
+            SELECT segment_name AS table_name, SUM(bytes) AS data_length
+            FROM dba_segments
+            WHERE owner = :owner
+              AND segment_type IN ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
+            GROUP BY segment_name
+        ),
+        lob_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_data_length
+            FROM dba_lobs l
+            JOIN dba_segments s
+              ON s.owner = l.owner
+             AND s.segment_name = l.segment_name
+            WHERE l.owner = :owner
+              AND s.segment_type IN ('LOBSEGMENT', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
+        ),
+        lob_index_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_index_length
+            FROM dba_lobs l
+            JOIN dba_segments s
+              ON s.owner = l.owner
+             AND s.segment_name = l.index_name
+            WHERE l.owner = :owner
+              AND s.segment_type IN ('LOBINDEX', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
+        ),
+        index_segments AS (
+            SELECT i.table_name, SUM(s.bytes) AS index_length
+            FROM dba_indexes i
+            JOIN dba_segments s
+              ON s.owner = i.owner
+             AND s.segment_name = i.index_name
+            WHERE i.table_owner = :owner
+              AND s.segment_type IN ('INDEX', 'INDEX PARTITION', 'INDEX SUBPARTITION')
+            GROUP BY i.table_name
+        )
+        SELECT
+            t.table_name,
+            t.table_rows,
+            COALESCE(ts.data_length, t.estimated_data_length, 0)
+              + COALESCE(ls.lob_data_length, 0) AS data_length,
+            COALESCE(ix.index_length, ist.estimated_index_length, 0)
+              + COALESCE(lis.lob_index_length, 0) AS index_length,
+            COALESCE(ts.data_length, t.estimated_data_length, 0)
+              + COALESCE(ls.lob_data_length, 0)
+              + COALESCE(ix.index_length, ist.estimated_index_length, 0)
+              + COALESCE(lis.lob_index_length, 0) AS total_size
+        FROM table_stats t
+        LEFT JOIN table_segments ts ON ts.table_name = t.table_name
+        LEFT JOIN lob_segments ls ON ls.table_name = t.table_name
+        LEFT JOIN lob_index_segments lis ON lis.table_name = t.table_name
+        LEFT JOIN index_segments ix ON ix.table_name = t.table_name
+        LEFT JOIN index_stats ist ON ist.table_name = t.table_name
+        ORDER BY total_size DESC, t.table_name
+        """
         sql = """
-        WITH table_segments AS (
+        WITH block_size AS (
+            SELECT 8192 AS bytes FROM dual
+        ),
+        table_stats AS (
+            SELECT
+                table_name,
+                COALESCE(num_rows, 0) AS table_rows,
+                GREATEST(
+                    COALESCE(blocks, 0) * (SELECT bytes FROM block_size),
+                    COALESCE(num_rows, 0) * COALESCE(avg_row_len, 0),
+                    0
+                ) AS estimated_data_length
+            FROM all_tables
+            WHERE owner = :owner
+        ),
+        index_stats AS (
+            SELECT
+                table_name,
+                SUM(COALESCE(leaf_blocks, 0) * (SELECT bytes FROM block_size)) AS estimated_index_length
+            FROM all_indexes
+            WHERE table_owner = :owner
+            GROUP BY table_name
+        ),
+        table_segments AS (
             SELECT segment_name AS table_name, SUM(bytes) AS data_length
             FROM all_segments
             WHERE owner = :owner
-              AND segment_type IN (
-                'TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION',
-                'LOBSEGMENT', 'LOB PARTITION'
-              )
+              AND segment_type IN ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
             GROUP BY segment_name
+        ),
+        lob_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_data_length
+            FROM all_lobs l
+            JOIN all_segments s
+              ON s.owner = l.owner
+             AND s.segment_name = l.segment_name
+            WHERE l.owner = :owner
+              AND s.segment_type IN ('LOBSEGMENT', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
+        ),
+        lob_index_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_index_length
+            FROM all_lobs l
+            JOIN all_segments s
+              ON s.owner = l.owner
+             AND s.segment_name = l.index_name
+            WHERE l.owner = :owner
+              AND s.segment_type IN ('LOBINDEX', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
         ),
         index_segments AS (
             SELECT i.table_name, SUM(s.bytes) AS index_length
@@ -324,25 +444,45 @@ class OracleEngine:
         )
         SELECT
             t.table_name,
-            COALESCE(t.num_rows, 0) AS table_rows,
-            COALESCE(ts.data_length, 0) AS data_length,
-            COALESCE(ix.index_length, 0) AS index_length,
-            COALESCE(ts.data_length, 0) + COALESCE(ix.index_length, 0) AS total_size
-        FROM all_tables t
+            t.table_rows,
+            COALESCE(ts.data_length, t.estimated_data_length, 0)
+              + COALESCE(ls.lob_data_length, 0) AS data_length,
+            COALESCE(ix.index_length, ist.estimated_index_length, 0)
+              + COALESCE(lis.lob_index_length, 0) AS index_length,
+            COALESCE(ts.data_length, t.estimated_data_length, 0)
+              + COALESCE(ls.lob_data_length, 0)
+              + COALESCE(ix.index_length, ist.estimated_index_length, 0)
+              + COALESCE(lis.lob_index_length, 0) AS total_size
+        FROM table_stats t
         LEFT JOIN table_segments ts ON ts.table_name = t.table_name
+        LEFT JOIN lob_segments ls ON ls.table_name = t.table_name
+        LEFT JOIN lob_index_segments lis ON lis.table_name = t.table_name
         LEFT JOIN index_segments ix ON ix.table_name = t.table_name
-        WHERE t.owner = :owner
+        LEFT JOIN index_stats ist ON ist.table_name = t.table_name
         ORDER BY total_size DESC, t.table_name
         """
         fallback_sql = """
         WITH table_segments AS (
             SELECT segment_name AS table_name, SUM(bytes) AS data_length
             FROM user_segments
-            WHERE segment_type IN (
-                'TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION',
-                'LOBSEGMENT', 'LOB PARTITION'
-              )
+            WHERE segment_type IN ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
             GROUP BY segment_name
+        ),
+        lob_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_data_length
+            FROM user_lobs l
+            JOIN user_segments s
+              ON s.segment_name = l.segment_name
+            WHERE s.segment_type IN ('LOBSEGMENT', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
+        ),
+        lob_index_segments AS (
+            SELECT l.table_name, SUM(s.bytes) AS lob_index_length
+            FROM user_lobs l
+            JOIN user_segments s
+              ON s.segment_name = l.index_name
+            WHERE s.segment_type IN ('LOBINDEX', 'LOB PARTITION', 'LOB SUBPARTITION')
+            GROUP BY l.table_name
         ),
         index_segments AS (
             SELECT i.table_name, SUM(s.bytes) AS index_length
@@ -355,20 +495,137 @@ class OracleEngine:
         SELECT
             t.table_name,
             COALESCE(t.num_rows, 0) AS table_rows,
-            COALESCE(ts.data_length, 0) AS data_length,
-            COALESCE(ix.index_length, 0) AS index_length,
-            COALESCE(ts.data_length, 0) + COALESCE(ix.index_length, 0) AS total_size
+            COALESCE(
+                ts.data_length,
+                GREATEST(
+                    COALESCE(t.blocks, 0) * 8192,
+                    COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                    0
+                ),
+                0
+            )
+              + COALESCE(ls.lob_data_length, 0) AS data_length,
+            COALESCE(ix.index_length, COALESCE(ist.estimated_index_length, 0), 0)
+              + COALESCE(lis.lob_index_length, 0) AS index_length,
+            COALESCE(
+                ts.data_length,
+                GREATEST(
+                    COALESCE(t.blocks, 0) * 8192,
+                    COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                    0
+                ),
+                0
+            )
+              + COALESCE(ls.lob_data_length, 0)
+              + COALESCE(ix.index_length, COALESCE(ist.estimated_index_length, 0), 0)
+              + COALESCE(lis.lob_index_length, 0) AS total_size
         FROM user_tables t
         LEFT JOIN table_segments ts ON ts.table_name = t.table_name
+        LEFT JOIN lob_segments ls ON ls.table_name = t.table_name
+        LEFT JOIN lob_index_segments lis ON lis.table_name = t.table_name
         LEFT JOIN index_segments ix ON ix.table_name = t.table_name
+        LEFT JOIN (
+            SELECT table_name, SUM(COALESCE(leaf_blocks, 0) * 8192) AS estimated_index_length
+            FROM user_indexes
+            GROUP BY table_name
+        ) ist ON ist.table_name = t.table_name
         ORDER BY total_size DESC, t.table_name
         """
-        rs = await asyncio.to_thread(self._run_query_sync, sql, {"owner": owner})
-        if not rs.is_success:
-            logger.info("oracle_capacity_query_fallback_user_views: %s", rs.error)
-            rs = await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
-        if not rs.is_success:
-            logger.info("oracle_capacity_query_failed: %s", rs.error)
+        metadata_fallback_sql = """
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            GREATEST(
+                COALESCE(t.blocks, 0) * 8192,
+                COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                0
+            ) AS data_length,
+            COALESCE(ix.index_length, 0) AS index_length,
+            GREATEST(
+                COALESCE(t.blocks, 0) * 8192,
+                COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                0
+            ) + COALESCE(ix.index_length, 0) AS total_size
+        FROM all_tables t
+        LEFT JOIN (
+            SELECT table_name, SUM(COALESCE(leaf_blocks, 0) * 8192) AS index_length
+            FROM all_indexes
+            WHERE table_owner = :owner
+            GROUP BY table_name
+        ) ix ON ix.table_name = t.table_name
+        WHERE t.owner = :owner
+        ORDER BY total_size DESC, t.table_name
+        """
+        user_metadata_fallback_sql = """
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            GREATEST(
+                COALESCE(t.blocks, 0) * 8192,
+                COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                0
+            ) AS data_length,
+            COALESCE(ix.index_length, 0) AS index_length,
+            GREATEST(
+                COALESCE(t.blocks, 0) * 8192,
+                COALESCE(t.num_rows, 0) * COALESCE(t.avg_row_len, 0),
+                0
+            ) + COALESCE(ix.index_length, 0) AS total_size
+        FROM user_tables t
+        LEFT JOIN (
+            SELECT table_name, SUM(COALESCE(leaf_blocks, 0) * 8192) AS index_length
+            FROM user_indexes
+            GROUP BY table_name
+        ) ix ON ix.table_name = t.table_name
+        ORDER BY total_size DESC, t.table_name
+        """
+        legacy_sql = """
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            COALESCE(t.blocks, 0) * 8192 AS data_length,
+            0 AS index_length,
+            COALESCE(t.blocks, 0) * 8192 AS total_size
+        FROM all_tables t
+        WHERE t.owner = :owner
+        ORDER BY total_size DESC, t.table_name
+        """
+        user_legacy_sql = """
+        SELECT
+            t.table_name,
+            COALESCE(t.num_rows, 0) AS table_rows,
+            COALESCE(t.blocks, 0) * 8192 AS data_length,
+            0 AS index_length,
+            COALESCE(t.blocks, 0) * 8192 AS total_size
+        FROM user_tables t
+        ORDER BY total_size DESC, t.table_name
+        """
+        candidates = [
+            ("dba_segments", dba_sql, {"owner": owner}),
+            ("all_segments", sql, {"owner": owner}),
+            ("user_segments", fallback_sql, None),
+            ("all_metadata", metadata_fallback_sql, {"owner": owner}),
+            ("user_metadata", user_metadata_fallback_sql, None),
+            ("all_legacy_metadata", legacy_sql, {"owner": owner}),
+            ("user_legacy_metadata", user_legacy_sql, None),
+        ]
+        rs = None
+        zero_size_rows: list[dict[str, Any]] | None = None
+        for name, query, params in candidates:
+            rs = await asyncio.to_thread(self._run_query_sync, query, params)
+            if rs.is_success:
+                columns = [str(col).lower() for col in rs.column_list]
+                rows = [dict(zip(columns, row, strict=False)) for row in rs.rows]
+                if rows and any((row.get("total_size") or 0) for row in rows):
+                    return rows
+                if rows and zero_size_rows is None:
+                    zero_size_rows = rows
+                logger.info("oracle_capacity_query_zero_size source=%s owner=%s", name, owner)
+                continue
+            logger.info("oracle_capacity_query_failed source=%s error=%s", name, rs.error)
+        if zero_size_rows is not None:
+            return zero_size_rows
+        if rs is None or not rs.is_success:
             return []
         columns = [str(col).lower() for col in rs.column_list]
         return [dict(zip(columns, row, strict=False)) for row in rs.rows]
