@@ -82,6 +82,21 @@ function formatTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 19)
 }
 
+function formatDurationSeconds(value?: number | null) {
+  if (value === null || value === undefined) return '暂无数据'
+  const totalSeconds = Math.max(0, Math.floor(Number(value)))
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const parts: string[] = []
+  if (days) parts.push(`${days}天`)
+  if (hours) parts.push(`${hours}小时`)
+  if (minutes && parts.length < 2) parts.push(`${minutes}分钟`)
+  if (!parts.length) parts.push(`${seconds}秒`)
+  return parts.slice(0, 2).join(' ')
+}
+
 function StatusTag({ status }: { status?: string }) {
   const value = status || 'not_configured'
   const label: Record<string, string> = {
@@ -529,7 +544,7 @@ export default function MonitorPage() {
                           </div>
                           <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
                             <Descriptions.Item label="数据库版本">{formatMetric(latest?.version)}</Descriptions.Item>
-                            <Descriptions.Item label="运行时长">{formatMetric(latest?.uptime_seconds, 's')}</Descriptions.Item>
+                            <Descriptions.Item label="运行时长">{formatDurationSeconds(latest?.uptime_seconds)}</Descriptions.Item>
                             <Descriptions.Item label="最大连接">{formatMetric(latest?.max_connections)}</Descriptions.Item>
                             <Descriptions.Item label="长事务">{formatMetric(latest?.long_transactions)}</Descriptions.Item>
                             <Descriptions.Item label="复制延迟">{formatMetric(latest?.replication_lag_seconds, 's')}</Descriptions.Item>
