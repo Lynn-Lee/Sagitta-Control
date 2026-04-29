@@ -51,6 +51,7 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "ding_login_app_id": ("登录 AppKey/ClientId", "dingtalk", False, ""),
     "ding_login_app_secret": ("登录 AppSecret", "dingtalk", True, ""),
     "ding_login_enabled": ("启用钉钉扫码登录", "dingtalk", False, "false"),
+    "ding_agent_id": ("工作通知 AgentId", "dingtalk", False, ""),
     # ── 企业微信 ──────────────────────────────────────────────
     "wecom_webhook": ("通知Webhook地址", "wecom", True, ""),
     "wecom_enabled": ("启用企微通知", "wecom", False, "false"),

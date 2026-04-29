@@ -15,6 +15,9 @@ class UserCreate(BaseModel):
     display_name: str = ""
     email: str = ""
     phone: str = ""
+    dingtalk_user_id: str = ""
+    feishu_open_id: str = ""
+    wecom_userid: str = ""
     is_superuser: bool = False
     role_id: int | None = None
     manager_id: int | None = None
@@ -42,6 +45,9 @@ class UserUpdate(BaseModel):
     display_name: str | None = None
     email: str | None = None
     phone: str | None = None
+    dingtalk_user_id: str | None = None
+    feishu_open_id: str | None = None
+    wecom_userid: str | None = None
     is_active: bool | None = None
     is_superuser: bool | None = None
     role_id: int | None = None
@@ -58,6 +64,9 @@ class UserResponse(BaseModel):
     display_name: str
     email: str
     phone: str
+    dingtalk_user_id: str = ""
+    feishu_open_id: str = ""
+    wecom_userid: str = ""
     is_active: bool
     is_superuser: bool
     auth_type: str

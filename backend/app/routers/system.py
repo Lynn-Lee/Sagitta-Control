@@ -75,6 +75,9 @@ async def list_users(
                 "display_name": u.display_name,
                 "email": u.email,
                 "phone": u.phone,
+                "dingtalk_user_id": u.dingtalk_user_id,
+                "feishu_open_id": u.feishu_open_id,
+                "wecom_userid": u.wecom_userid,
                 "is_active": u.is_active,
                 "is_superuser": u.is_superuser,
                 "auth_type": u.auth_type,
@@ -184,6 +187,9 @@ async def get_user(
         "display_name": user.display_name,
         "email": user.email,
         "phone": user.phone,
+        "dingtalk_user_id": user.dingtalk_user_id,
+        "feishu_open_id": user.feishu_open_id,
+        "wecom_userid": user.wecom_userid,
         "is_active": user.is_active,
         "is_superuser": user.is_superuser,
         "auth_type": user.auth_type,
@@ -780,6 +786,10 @@ class MailTestRequest(BaseModel):
     to_email: str
 
 
+class NotifyUserTestRequest(BaseModel):
+    user_id: int
+
+
 class LdapTestRequest(BaseModel):
     test_username: str = ""
     test_password: str = ""
@@ -850,6 +860,32 @@ async def test_feishu_config(
     _user=Depends(require_perm("system_config_manage")),
 ):
     return await SystemConfigService.test_feishu(db)
+
+
+@router.post("/config/test/notify-user/", summary="测试应用消息精准通知")
+async def test_notify_user_config(
+    data: NotifyUserTestRequest,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    from app.services.notify import NotifyService
+
+    await NotifyService.send_event(
+        db,
+        {
+            "event_type": "approval_pending",
+            "subject_type": "system_config",
+            "subject_id": 0,
+            "app_type": "系统配置",
+            "title": "主动通知测试",
+            "applicant_id": data.user_id,
+            "applicant_name": "系统配置",
+            "user_ids": [data.user_id],
+            "remark": "如果你收到这条消息，说明精准通知配置可用。",
+            "detail_path": "/system/config",
+        },
+    )
+    return {"success": True, "message": "测试通知已发送，请查看投递日志确认各渠道结果"}
 
 
 @router.post("/config/test/ldap/", summary="测试 LDAP 配置")

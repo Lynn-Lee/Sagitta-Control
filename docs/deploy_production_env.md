@@ -117,7 +117,9 @@ POSTGRES_PASSWORD=<与 DATABASE_URL 中一致的强密码>
 # DINGTALK_WEBHOOK=...
 # FEISHU_WEBHOOK=...
 # SMTP_HOST=...
-# 登录后访问：系统配置 → 钉钉通知 / 飞书通知 / 邮件通知
+# 登录后访问：系统配置 → 钉钉通知 / 企业微信 / 飞书 / 邮件通知
+# 精准到人通知还需要在用户管理中维护用户 dingtalk_user_id / feishu_open_id / wecom_userid / email
+# 钉钉工作通知需配置 ding_agent_id；飞书/企微复用登录应用 AppSecret/AgentId 等配置
 ```
 
 ### 2.6 配置数据卷持久化
@@ -560,6 +562,7 @@ helm rollback sagittadb 2 -n sagittadb
 - [ ] Grafana Dashboard 已导入
 - [ ] Alertmanager 告警规则已配置（磁盘 / 内存 / 服务宕机）
 - [ ] 告警通知渠道（邮件/钉钉）已验证可达
+- [ ] 审批主动通知已验证：应用消息可达，邮件兜底可达，`notification_delivery_log` 可查询投递结果
 
 ---
 

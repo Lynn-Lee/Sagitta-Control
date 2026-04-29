@@ -32,6 +32,9 @@ class Users(BaseModel):
     password: Mapped[str] = mapped_column(String(128), nullable=False, comment="密码哈希")
     email: Mapped[str] = mapped_column(String(100), default="", comment="邮箱")
     phone: Mapped[str] = mapped_column(String(20), default="", comment="手机号")
+    dingtalk_user_id: Mapped[str] = mapped_column(String(100), default="", comment="钉钉用户ID")
+    feishu_open_id: Mapped[str] = mapped_column(String(100), default="", comment="飞书 Open ID")
+    wecom_userid: Mapped[str] = mapped_column(String(100), default="", comment="企业微信 UserID")
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否超级管理员")

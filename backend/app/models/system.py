@@ -1,7 +1,7 @@
 """
 系统配置 & 操作审计日志模型。
 """
-from sqlalchemy import Boolean, Index, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -49,4 +49,30 @@ class OperationLog(BaseModel):
         Index("ix_oplog_action", "action"),
         Index("ix_oplog_module", "module"),
         Index("ix_oplog_tenant", "tenant_id"),
+    )
+
+
+class NotificationDeliveryLog(BaseModel):
+    """主动通知投递日志。"""
+
+    __tablename__ = "notification_delivery_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, comment="通知事件")
+    subject_type: Mapped[str] = mapped_column(String(30), default="", comment="对象类型")
+    subject_id: Mapped[int] = mapped_column(Integer, default=0, comment="对象ID")
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, comment="通知渠道")
+    recipient_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sql_users.id", ondelete="SET NULL"), nullable=True, comment="收件用户ID"
+    )
+    recipient: Mapped[str] = mapped_column(String(200), default="", comment="收件地址/外部ID")
+    status: Mapped[str] = mapped_column(String(20), default="pending", comment="sent/failed/skipped")
+    error: Mapped[str] = mapped_column(Text, default="", comment="失败原因")
+
+    __table_args__ = (
+        Index("ix_notify_event", "event_type"),
+        Index("ix_notify_subject", "subject_type", "subject_id"),
+        Index("ix_notify_user", "recipient_user_id"),
+        Index("ix_notify_status", "status"),
+        Index("ix_notify_tenant", "tenant_id"),
     )

@@ -187,9 +187,10 @@
 ### Pack C1 — 系统管理 ✅
 
 **系统配置**
-- 7 个配置组：基础设置/邮件通知/钉钉通知/企业微信通知/飞书通知/LDAP 认证/AI 功能
+- 9 个配置组：基础设置/邮件通知/钉钉通知/企业微信通知/飞书通知/LDAP 认证/CAS/短信验证码/AI 功能
 - 敏感字段 Fernet 加密存储
 - 各渠道连通性测试（邮件发送测试已验证）
+- 精准通知测试：按用户 ID 触发飞书/企微/钉钉应用消息或邮件兜底，投递结果写入 `notification_delivery_log`
 - 配置保存后正确回填（包含敏感字段"已保存"提示）
 
 **审计日志**
@@ -250,9 +251,13 @@
 - 前端作业工作台：风险预案、提交审批、作业列表、执行处理、进度、批次日志、状态控制和恢复提示
 
 **通知服务**
-- 钉钉/企微/飞书三渠道并发通知
-- 已接入工单提交和审批节点
-- 签名验证（钉钉 HMAC-SHA256）
+- 主动通知已事件化：`approval_pending / approval_passed / approval_rejected / application_canceled / ready_to_execute / execution_started / execution_succeeded / execution_failed`
+- 已接入 SQL 工单、查询权限申请、数据归档申请：提交、每级审批流转、驳回/取消、待执行、执行开始、执行成功/失败均会通知对应责任人
+- 收件人解析覆盖 `users / manager / any_reviewer / user_group / role / group`，`any_reviewer` 按节点 `required_permission` 匹配当前审批能力
+- 精准到人优先走飞书应用消息、企微应用消息、钉钉工作通知；缺少外部账号或应用消息失败时邮件兜底
+- 用户管理新增 `dingtalk_user_id / feishu_open_id / wecom_userid` 字段，导入导出模板同步支持
+- 新增 `notification_delivery_log` 记录事件、对象、渠道、收件人、投递状态和失败原因
+- 旧 Webhook 群通知能力保留用于连通性测试和兜底场景；钉钉 Webhook 签名验证仍支持 HMAC-SHA256
 
 ### 品牌升级 ✅
 
@@ -379,10 +384,10 @@
 - `tests/unit/test_ldap_auth.py`：LDAP 认证服务（5 个测试）
 - `tests/unit/test_oauth_auth.py`：OAuth2 服务（8 个测试）
 - `tests/unit/test_archive_cancel.py`：归档撤回/执行权限/审批人可见性
-- `tests/unit/test_notify.py`：通知服务（14 个测试）— 钉钉/飞书/企微 mock HTTP
+- `tests/unit/test_notify.py`：通知服务（11+ 个测试）— 钉钉/飞书/企微 mock HTTP、渠道失败不中断主流程
 - `tests/unit/test_system_config.py`：配置服务（15 个测试）— get_value/update_batch/敏感字段加密
 - `tests/unit/test_workflow_service.py`：工单服务（11 个测试）— 状态枚举/格式化/check_sql
-- **总计：159 个单元测试全部通过，覆盖率 37.2%（单元测试层）**
+- **总计：单元测试持续补强，通知与 v2-lite 授权关键用例已通过**
 
 **集成测试**
 - `tests/integration/test_health.py`：健康检查端点

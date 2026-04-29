@@ -388,7 +388,36 @@ class ArchiveService:
             risk_remark=data.risk_remark or "",
         ))
         await db.flush()
-        await AuditService(workflow, WorkflowType.ARCHIVE).create_audit(db, operator, nodes_snapshot=nodes_snapshot)
+        audit = await AuditService(workflow, WorkflowType.ARCHIVE).create_audit(db, operator, nodes_snapshot=nodes_snapshot)
+        first_node = None
+        if audit.audit_auth_groups_info:
+            first_node = next(
+                (node for node in json.loads(audit.audit_auth_groups_info or "[]") if node.get("status") == 0),
+                None,
+            )
+        if first_node:
+            from app.services.notify import NotifyService
+
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "approval_pending",
+                    "subject_type": "workflow",
+                    "subject_id": workflow.id,
+                    "app_type": "数据归档",
+                    "title": workflow.workflow_name,
+                    "applicant_id": workflow.engineer_id,
+                    "applicant_name": workflow.engineer_display or workflow.engineer,
+                    "instance_id": workflow.instance_id,
+                    "db_name": workflow.db_name,
+                    "table_name": data.source_table,
+                    "node": first_node,
+                    "node_name": first_node.get("node_name"),
+                    "risk_level": (risk_plan or {}).get("level"),
+                    "exclude_user_ids": [workflow.engineer_id],
+                    "remark": "归档申请已提交，待审批",
+                    "detail_path": f"/workflow/{workflow.id}",
+                }
+            )
         return workflow
 
     @staticmethod
@@ -840,6 +869,25 @@ class ArchiveService:
             if wf:
                 wf.status = WorkflowStatus.EXECUTING
         await db.commit()
+        from app.services.notify import NotifyService
+
+        NotifyService.enqueue_event(
+            {
+                "event_type": "execution_started",
+                "subject_type": "workflow",
+                "subject_id": job.workflow_id or job.id,
+                "app_type": "数据归档",
+                "title": f"数据归档-{job.source_table}",
+                "applicant_id": job.created_by_id,
+                "applicant_name": job.created_by,
+                "user_ids": [job.created_by_id, operator_id],
+                "instance_id": job.source_instance_id,
+                "db_name": job.source_db,
+                "table_name": job.source_table,
+                "remark": "归档作业开始执行",
+                "detail_path": f"/workflow/{job.workflow_id}" if job.workflow_id else "/archive",
+            }
+        )
         try:
             if job.archive_mode == "purge":
                 await ArchiveService._execute_purge_job(db, job)
@@ -873,6 +921,23 @@ class ArchiveService:
                             ensure_ascii=False,
                         )
             await db.commit()
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "execution_succeeded" if job.status == ArchiveJobStatus.SUCCESS else "execution_failed",
+                    "subject_type": "workflow",
+                    "subject_id": job.workflow_id or job.id,
+                    "app_type": "数据归档",
+                    "title": f"数据归档-{job.source_table}",
+                    "applicant_id": job.created_by_id,
+                    "applicant_name": job.created_by,
+                    "user_ids": [job.created_by_id, operator_id],
+                    "instance_id": job.source_instance_id,
+                    "db_name": job.source_db,
+                    "table_name": job.source_table,
+                    "remark": job.error_message or f"处理行数：{job.processed_rows}",
+                    "detail_path": f"/workflow/{job.workflow_id}" if job.workflow_id else "/archive",
+                }
+            )
 
     @staticmethod
     async def dispatch_scheduled_jobs(db: AsyncSession, limit: int = 50) -> int:

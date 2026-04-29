@@ -101,6 +101,25 @@ async def _execute_async(workflow_id: int, operator_id: int):
         wf.executed_by_name = wf.executed_by_name or (user.username if user else "system")
         wf.status = WorkflowStatus.EXECUTING
         await db.commit()
+        from app.services.notify import NotifyService
+
+        NotifyService.enqueue_event(
+            {
+                "event_type": "execution_started",
+                "subject_type": "workflow",
+                "subject_id": wf.id,
+                "app_type": "SQL 工单",
+                "title": wf.workflow_name,
+                "applicant_id": wf.engineer_id,
+                "applicant_name": wf.engineer_display or wf.engineer,
+                "user_ids": [wf.engineer_id, operator_id],
+                "instance_id": wf.instance_id,
+                "instance_name": inst.instance_name,
+                "db_name": wf.db_name,
+                "remark": "SQL 工单开始执行",
+                "detail_path": f"/workflow/{wf.id}",
+            }
+        )
 
         # 执行 SQL
         db_engine = get_engine(inst)
@@ -133,6 +152,23 @@ async def _execute_async(workflow_id: int, operator_id: int):
                 remark=f"执行完成，状态：{wf.status}"
             )
         await db.commit()
+        NotifyService.enqueue_event(
+            {
+                "event_type": "execution_succeeded" if wf.status == WorkflowStatus.FINISH else "execution_failed",
+                "subject_type": "workflow",
+                "subject_id": wf.id,
+                "app_type": "SQL 工单",
+                "title": wf.workflow_name,
+                "applicant_id": wf.engineer_id,
+                "applicant_name": wf.engineer_display or wf.engineer,
+                "user_ids": [wf.engineer_id, operator_id],
+                "instance_id": wf.instance_id,
+                "instance_name": inst.instance_name,
+                "db_name": wf.db_name,
+                "remark": f"执行完成，状态：{wf.status}",
+                "detail_path": f"/workflow/{wf.id}",
+            }
+        )
 
     await engine.dispose()
 

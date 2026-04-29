@@ -20,7 +20,7 @@ from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply  # no
 from app.models.role import Role, UserGroup  # noqa: F401
 from app.models.session import SessionCollectConfig, SessionSnapshot  # noqa: F401
 from app.models.slowlog import SlowQueryConfig, SlowQueryLog  # noqa: F401
-from app.models.system import OperationLog, SystemConfig  # noqa: F401
+from app.models.system import NotificationDeliveryLog, OperationLog, SystemConfig  # noqa: F401
 from app.models.user import Permission, ResourceGroup, Users  # noqa: F401
 from app.models.workflow import (  # noqa: F401
     AuditStatus,
@@ -70,6 +70,7 @@ __all__ = [
     "MonitorPrivilege",
     "SystemConfig",
     "OperationLog",
+    "NotificationDeliveryLog",
     "MaskingRule",
     "WorkflowTemplate",
 ]

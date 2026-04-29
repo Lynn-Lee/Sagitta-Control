@@ -19,7 +19,6 @@ from app.schemas.workflow import (
 )
 from app.services.audit import AuditService
 from app.services.audit_log import AuditLogService
-from app.services.notify import NotifyService
 from app.services.risk_plan import RiskPlanService
 from app.services.workflow import WorkflowService
 
@@ -67,14 +66,6 @@ async def create_workflow(
         detail=f"提交工单 #{wf.id}：{wf.workflow_name}，实例ID={data.instance_id}，库={data.db_name}",
         request=request,
     )
-    # 通知审批人
-    import asyncio
-    asyncio.create_task(NotifyService.notify_workflow(
-        db=db, workflow_id=wf.id, workflow_name=wf.workflow_name,
-        status=0, operator=user.get("username", ""),
-        db_name=data.db_name,
-        remark="工单已提交，待审批",
-    ))
     return {"status": 0, "msg": "工单提交成功", "data": {"id": wf.id, "workflow_name": wf.workflow_name}}
 
 
@@ -150,14 +141,6 @@ async def audit_workflow(
         detail=f"{action_desc}工单 #{workflow_id}，备注：{data.remark or '无'}",
         request=request,
     )
-    # 通知工单提交人
-    new_status = result.get("status", 2 if data.action == "pass" else 1)
-    import asyncio
-    asyncio.create_task(NotifyService.notify_workflow(
-        db=db, workflow_id=workflow_id, workflow_name=f"工单#{workflow_id}",
-        status=new_status, operator=user.get("username", ""),
-        remark=data.remark or action_desc,
-    ))
     return {"status": 0, **result}
 
 

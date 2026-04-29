@@ -128,6 +128,44 @@ class AuditService:
         logger.info("audit_created: workflow=%s nodes=%d", self.workflow.id, len(groups_info))
         return audit
 
+    @staticmethod
+    def _enqueue_workflow_event(
+        workflow: SqlWorkflow,
+        audit: WorkflowAudit,
+        event_type: str,
+        *,
+        node: dict | None = None,
+        user_ids: list[int] | None = None,
+        permission: str | None = None,
+        operator: dict | None = None,
+        remark: str = "",
+    ) -> None:
+        from app.services.notify import NotifyService
+
+        workflow_type = int(getattr(audit, "workflow_type", WorkflowType.SQL))
+        app_type = "数据归档" if workflow_type == int(WorkflowType.ARCHIVE) else "SQL 工单"
+        payload = {
+            "event_type": event_type,
+            "subject_type": "workflow",
+            "subject_id": workflow.id,
+            "app_type": app_type,
+            "title": workflow.workflow_name,
+            "applicant_id": workflow.engineer_id,
+            "applicant_name": workflow.engineer_display or workflow.engineer,
+            "operator_name": (operator or {}).get("display_name") or (operator or {}).get("username") or "",
+            "instance_id": workflow.instance_id,
+            "db_name": workflow.db_name,
+            "node": node,
+            "node_name": node.get("node_name") if node else "",
+            "user_ids": user_ids or [],
+            "permission": permission,
+            "remark": remark,
+            "detail_path": f"/workflow/{workflow.id}",
+        }
+        if event_type == "approval_pending":
+            payload["exclude_user_ids"] = [workflow.engineer_id]
+        NotifyService.enqueue_event(payload)
+
     # ── 审批操作 ──────────────────────────────────────────────
 
     @staticmethod
@@ -212,6 +250,32 @@ class AuditService:
 
         await AuditService._write_log(db, audit.id, operator, OP_PASS, remark=remark or msg)
         await db.commit()
+        AuditService._enqueue_workflow_event(
+            workflow,
+            audit,
+            "approval_passed",
+            user_ids=[workflow.engineer_id],
+            operator=operator,
+            remark=remark or msg,
+        )
+        if next_pending:
+            AuditService._enqueue_workflow_event(
+                workflow,
+                audit,
+                "approval_pending",
+                node=next_pending,
+                operator=operator,
+                remark=msg,
+            )
+        else:
+            AuditService._enqueue_workflow_event(
+                workflow,
+                audit,
+                "ready_to_execute",
+                permission="archive_execute" if audit.workflow_type == int(WorkflowType.ARCHIVE) else "sql_execute",
+                operator=operator,
+                remark=msg,
+            )
         return {"msg": msg, "status": workflow.status}
 
     @staticmethod
@@ -243,6 +307,14 @@ class AuditService:
             db, audit.id, operator, OP_REJECT, remark=remark or f"{node_desc}审批人驳回"
         )
         await db.commit()
+        AuditService._enqueue_workflow_event(
+            workflow,
+            audit,
+            "approval_rejected",
+            user_ids=[workflow.engineer_id],
+            operator=operator,
+            remark=remark or f"{node_desc}审批人驳回",
+        )
         return {"msg": "工单已驳回", "status": workflow.status}
 
     @staticmethod
@@ -283,6 +355,14 @@ class AuditService:
             db, audit.id, operator, OP_CANCEL, remark=remark or "提交人/超管取消工单"
         )
         await db.commit()
+        AuditService._enqueue_workflow_event(
+            workflow,
+            audit,
+            "application_canceled",
+            user_ids=[workflow.engineer_id],
+            operator=operator,
+            remark=remark or "提交人/超管取消工单",
+        )
         return {"msg": "工单已取消", "status": workflow.status}
 
     # ── 审批人权限校验 ────────────────────────────────────────

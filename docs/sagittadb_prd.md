@@ -1,7 +1,7 @@
 # SagittaDB 矢准数据 — 产品需求文档（PRD）
 
-> **版本：** v2.6
-> **日期：** 2026-04-28
+> **版本：** v2.7
+> **日期：** 2026-04-29
 > **状态：** 内测中
 > **产品定位：** 企业级多引擎数据库管控平台，为 SaaS 3.0 预留接口
 
@@ -16,7 +16,7 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 **核心价值：矢向数据，精准管控**
 
 - **安全**：彻底修复原 Archery 5 个 P0 安全漏洞，所有敏感字段加密存储
-- **高效**：AI Text2SQL + SQL 工单模板提升 SQL 编写效率，全异步执行不阻塞
+- **高效**：AI Text2SQL + SQL 工单模板提升 SQL 编写效率，审批/执行主动通知责任人，全异步执行不阻塞
 - **全面**：支持 11 种数据库引擎，覆盖 MySQL/PostgreSQL/Oracle/MongoDB/Redis/ClickHouse 等
 - **可观测**：内建数据库原生指标采集、舰队健康评分、TopN 诊断、容量趋势与全流程操作审计，Prometheus/Grafana 作为可选外围集成
 
@@ -95,7 +95,9 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 | `observability_sql_analyze` | 执行计划、优化诊断、手工 SQL 诊断 |
 | `observability_collect_manage` | 管理指标、会话、SQL 采集配置并手动采集 |
 | `observability_alert_manage` | 管理告警规则 |
-| `archive_apply` | 数据归档申请执行 |
+| `archive_apply` | 数据归档申请 |
+| `archive_review` | 审批数据归档申请 |
+| `archive_execute` | 执行数据归档作业 |
 
 **超级管理员：** `is_superuser=True` 绕过所有权限检查
 
@@ -224,15 +226,35 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - 审批日志中的操作人优先显示用户显示名
 - 当前审批节点审批人打开详情页无需手动刷新即可看到审批按钮
 
-#### 2.3.4 工单通知
+#### 2.3.4 主动审批通知
 
-工单状态变更时，通过以下渠道通知相关人员：
-- 钉钉 Webhook（支持签名验证）
-- 企业微信 Webhook
-- 飞书 Webhook
-- 邮件（SMTP）
+SQL 工单、查询权限申请与数据归档申请均支持全生命周期主动通知，避免审批人或执行人只能登录系统刷新查看待办。
 
-通知内容：工单名称、状态变更、操作人、目标实例、查看详情链接
+**触发事件：**
+- `approval_pending`：提交申请或审批流转到下一节点，通知当前节点责任人
+- `approval_passed` / `approval_rejected`：审批通过或驳回，通知申请人
+- `application_canceled`：申请取消，通知申请人
+- `ready_to_execute`：全部审批通过，通知具备执行权限的 DBA/资源组 DBA/超管
+- `execution_started` / `execution_succeeded` / `execution_failed`：执行开始、成功、失败，通知申请人和执行人
+
+**收件人解析：**
+- `users`：通知节点指定用户
+- `manager`：通知申请人的直属上级
+- `any_reviewer`：按节点所需权限解析，如 `sql_review / query_review / archive_review`
+- `user_group / role / group`：按用户组、角色或资源组关系解析
+- 当前待审批提醒会排除申请人本人，避免自审场景重复打扰
+
+**投递渠道：**
+- 精准到人优先使用飞书应用消息、企业微信应用消息、钉钉工作通知
+- 用户缺少外部账号或应用消息失败时，自动降级为邮件（SMTP）
+- 机器人 Webhook 保留为群通知/连通性测试能力，不作为精准到人的主路径
+- 投递结果写入 `notification_delivery_log`，记录事件、渠道、收件人、状态与失败原因
+
+**用户资料要求：**
+- 用户管理支持维护 `dingtalk_user_id / feishu_open_id / wecom_userid / email`
+- 飞书复用 `feishu_app_id / feishu_app_secret`
+- 企业微信复用 `wecom_login_corp_id / wecom_login_agent_id / wecom_login_app_secret`
+- 钉钉复用 `ding_login_app_id / ding_login_app_secret`，并新增工作通知 `ding_agent_id`
 
 ### 2.4 在线查询
 

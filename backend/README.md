@@ -59,7 +59,7 @@ app/
 | Pack B — 观测中心 + 迁移脚本 | ✅ 完成 |
 | Pack C — 系统配置、审计日志、资源组、数据库注册 | ✅ 完成 |
 | Pack D — 数据脱敏、数据字典、工单模板、AI Text2SQL | ✅ 完成 |
-| Pack E — 多引擎补全、数据归档、SQL 回滚、通知服务 | 🔧 完成（85%）|
+| Pack E — 多引擎补全、数据归档、SQL 回滚、通知服务 | ✅ 完成 |
 | Pack F — 第三方登录（LDAP/钉钉/飞书/企微/CAS） | ✅ 完成 |
 | Pack G — 全链路测试、性能测试、安全扫描 | ✅ 完成 |
 | Pack H — Helm Chart、CI/CD、生产环境配置 | ✅ 完成 |
@@ -78,7 +78,9 @@ app/
 - TiDB 已拆为独立 `TidbEngine`，会话采集优先使用 `information_schema.CLUSTER_PROCESSLIST`
 - SQL 洞察新增 `SlowQueryLog / SlowQueryConfig`，支持平台查询历史、数据库统计/活动视图采集、实例级阈值/周期/保留配置、最近采集来源说明、SQL 指纹详情和 MySQL/PostgreSQL 执行计划分析
 - 数据归档升级为审批作业：`archive_job / archive_batch_log` 记录进度和批次日志，Celery `archive` 队列执行，支持暂停、继续、取消
-- Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`
+- 主动通知升级为事件化服务：SQL 工单、查询权限申请、数据归档在提交、每级审批、驳回/取消、待执行、执行开始、执行成功/失败时投递到当前责任人
+- 精准通知优先走飞书/企微/钉钉应用消息，缺少外部账号或应用消息失败时邮件兜底；投递结果记录到 `notification_delivery_log`
+- Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`、`0032_notification_delivery`
 
 ## 权限实现口径（v2-lite）
 
@@ -88,6 +90,7 @@ app/
 - 实例范围：`UserGroup -> ResourceGroup -> Instance`
 - 查询授权：`QueryPrivilege` 首发仅启用 `database / table`
 - 审批流：首发仅启用 `users / manager / any_reviewer`
+- 审批通知：`users / manager / any_reviewer / user_group / role / group` 节点均按当前节点解析收件人；`any_reviewer` 按节点 required permission 解析
 
 查询链路新增了权限排查接口：
 
@@ -119,7 +122,7 @@ mypy app/
 pytest tests/ -v --cov=app
 
 # v2-lite 授权单测
-./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
+./.venv/bin/python -m pytest tests/unit/test_notify.py tests/unit/test_authz_v2_lite.py
 
 # 会话诊断与慢日志单测
 ./.venv/bin/python -m pytest tests/unit/test_session_diagnostic.py tests/unit/test_slowlog_service.py -q

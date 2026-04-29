@@ -288,7 +288,35 @@ class WorkflowService:
 
         # 创建审批记录
         audit_svc = AuditService(workflow=workflow)
-        await audit_svc.create_audit(db, operator, nodes_snapshot=nodes_snapshot)
+        audit = await audit_svc.create_audit(db, operator, nodes_snapshot=nodes_snapshot)
+        first_node = None
+        if audit.audit_auth_groups_info:
+            first_node = next(
+                (node for node in json.loads(audit.audit_auth_groups_info or "[]") if node.get("status") == 0),
+                None,
+            )
+        if first_node:
+            from app.services.notify import NotifyService
+
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "approval_pending",
+                    "subject_type": "workflow",
+                    "subject_id": workflow.id,
+                    "app_type": "SQL 工单",
+                    "title": workflow.workflow_name,
+                    "applicant_id": workflow.engineer_id,
+                    "applicant_name": workflow.engineer_display or workflow.engineer,
+                    "instance_id": workflow.instance_id,
+                    "instance_name": inst.instance_name,
+                    "db_name": workflow.db_name,
+                    "node": first_node,
+                    "node_name": first_node.get("node_name"),
+                    "exclude_user_ids": [workflow.engineer_id],
+                    "remark": "工单已提交，待审批",
+                    "detail_path": f"/workflow/{workflow.id}",
+                }
+            )
 
         logger.info("workflow_created: id=%s name=%s", workflow.id, data.workflow_name)
         return workflow

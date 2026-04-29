@@ -894,6 +894,32 @@ class QueryPrivService:
         db.add(apply)
         await db.commit()
         await db.refresh(apply)
+        if apply.audit_auth_groups_info:
+            first_node = QueryPrivService._get_current_pending_node(apply)
+            if first_node:
+                from app.services.notify import NotifyService
+
+                NotifyService.enqueue_event(
+                    {
+                        "event_type": "approval_pending",
+                        "subject_type": "query_privilege",
+                        "subject_id": apply.id,
+                        "app_type": "查询权限申请",
+                        "title": apply.title,
+                        "applicant_id": user_id,
+                        "applicant_name": user.get("display_name") or user.get("username") or str(user_id),
+                        "instance_id": instance_id,
+                        "instance_name": inst.instance_name if inst else "",
+                        "db_name": db_name,
+                        "table_name": table_name or "",
+                        "node": first_node,
+                        "node_name": first_node.get("node_name"),
+                        "risk_level": risk_plan.level,
+                        "exclude_user_ids": [user_id],
+                        "remark": "查询权限申请已提交，待审批",
+                        "detail_path": "/query/privileges",
+                    }
+                )
         logger.info(
             "query_priv_apply created: user=%s instance=%s scope=%s",
             user_id,
@@ -1043,6 +1069,41 @@ class QueryPrivService:
                 if next_pending:
                     await db.commit()
                     await db.refresh(apply)
+                    from app.services.notify import NotifyService
+
+                    NotifyService.enqueue_event(
+                        {
+                            "event_type": "approval_passed",
+                            "subject_type": "query_privilege",
+                            "subject_id": apply.id,
+                            "app_type": "查询权限申请",
+                            "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
+                            "applicant_id": apply.user_id,
+                            "user_ids": [apply.user_id],
+                            "db_name": apply.db_name,
+                            "table_name": apply.table_name,
+                            "remark": remark or "当前审批节点已通过",
+                            "detail_path": "/query/privileges",
+                        }
+                    )
+                    NotifyService.enqueue_event(
+                        {
+                            "event_type": "approval_pending",
+                            "subject_type": "query_privilege",
+                            "subject_id": apply.id,
+                            "app_type": "查询权限申请",
+                            "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
+                            "applicant_id": apply.user_id,
+                            "db_name": apply.db_name,
+                            "table_name": apply.table_name,
+                            "node": next_pending,
+                            "node_name": next_pending.get("node_name"),
+                            "risk_level": getattr(apply, "risk_level", ""),
+                            "exclude_user_ids": [apply.user_id],
+                            "remark": "查询权限申请进入下一审批节点",
+                            "detail_path": "/query/privileges",
+                        }
+                    )
                     return apply
 
             apply.status = 1
@@ -1079,6 +1140,40 @@ class QueryPrivService:
 
         await db.commit()
         await db.refresh(apply)
+        from app.services.notify import NotifyService
+
+        if action == "pass":
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "approval_passed",
+                    "subject_type": "query_privilege",
+                    "subject_id": apply.id,
+                    "app_type": "查询权限申请",
+                    "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
+                    "applicant_id": apply.user_id,
+                    "user_ids": [apply.user_id],
+                    "db_name": apply.db_name,
+                    "table_name": getattr(apply, "table_name", ""),
+                    "remark": remark or "查询权限申请已全部审批通过",
+                    "detail_path": "/query/privileges",
+                }
+            )
+        elif action == "reject":
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "approval_rejected",
+                    "subject_type": "query_privilege",
+                    "subject_id": apply.id,
+                    "app_type": "查询权限申请",
+                    "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
+                    "applicant_id": apply.user_id,
+                    "user_ids": [apply.user_id],
+                    "db_name": apply.db_name,
+                    "table_name": getattr(apply, "table_name", ""),
+                    "remark": remark or "查询权限申请已驳回",
+                    "detail_path": "/query/privileges",
+                }
+            )
         return apply
 
     @staticmethod
@@ -1106,6 +1201,23 @@ class QueryPrivService:
         apply.status = 3
         await db.commit()
         await db.refresh(apply)
+        from app.services.notify import NotifyService
+
+        NotifyService.enqueue_event(
+            {
+                "event_type": "application_canceled",
+                "subject_type": "query_privilege",
+                "subject_id": apply.id,
+                "app_type": "查询权限申请",
+                "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
+                "applicant_id": apply.user_id,
+                "user_ids": [apply.user_id],
+                "db_name": getattr(apply, "db_name", ""),
+                "table_name": getattr(apply, "table_name", ""),
+                "remark": "查询权限申请已取消",
+                "detail_path": "/query/privileges",
+            }
+        )
         return apply
 
     @staticmethod

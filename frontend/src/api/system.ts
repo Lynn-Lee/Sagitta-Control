@@ -50,6 +50,7 @@ export const userApi = {
   create: (data: {
     username: string; password: string; display_name?: string
     email?: string; phone?: string; is_superuser?: boolean
+    dingtalk_user_id?: string; feishu_open_id?: string; wecom_userid?: string
     role_id?: number; manager_id?: number
     employee_id?: string; department?: string; title?: string
     user_group_ids?: number[]

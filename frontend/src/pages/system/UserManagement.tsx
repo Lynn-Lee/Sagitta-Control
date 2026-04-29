@@ -367,6 +367,18 @@ export default function UserManagement() {
       width: 140,
       render: v => v || <Text type="secondary">—</Text>,
     },
+    {
+      title: '通知账号',
+      width: 220,
+      render: (_, r) => {
+        const items = [
+          r.dingtalk_user_id ? '钉钉' : '',
+          r.feishu_open_id ? '飞书' : '',
+          r.wecom_userid ? '企微' : '',
+        ].filter(Boolean)
+        return items.length ? <Space wrap size={[4, 4]}>{items.map(item => <Tag key={item}>{item}</Tag>)}</Space> : <Text type="secondary">—</Text>
+      },
+    },
     { title: '角色', dataIndex: 'role_name', width: 120, render: (name, r) => {
       if (r.is_superuser) return <Tag color="red">超级管理员</Tag>
       return name ? <Tag color="blue">{name}</Tag> : <Tag>普通用户</Tag>
@@ -547,7 +559,7 @@ export default function UserManagement() {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys.map((key) => Number(key))),
           }}
-          scroll={{ x: 1460 }}
+          scroll={{ x: 1680 }}
           pagination={{
             current: page,
             total: data?.total,
@@ -574,6 +586,9 @@ export default function UserManagement() {
           <Form.Item name="password" label="密码" rules={editId ? [] : passwordRules}><Input.Password placeholder={editId ? '留空不修改' : '至少 8 位，含大小写字母、数字和特殊字符'} /></Form.Item>
           <Form.Item name="email" label="邮箱"><Input type="email" /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
+          <Form.Item name="dingtalk_user_id" label="钉钉用户 ID"><Input placeholder="用于钉钉工作通知精准投递" /></Form.Item>
+          <Form.Item name="feishu_open_id" label="飞书 Open ID"><Input placeholder="用于飞书应用消息精准投递" /></Form.Item>
+          <Form.Item name="wecom_userid" label="企微 UserID"><Input placeholder="用于企业微信应用消息精准投递" /></Form.Item>
           <Form.Item name="role_id" label="角色">
             <Select allowClear placeholder="选择角色（留空为普通用户）" options={roleOptions} showSearch optionFilterProp="label" />
           </Form.Item>

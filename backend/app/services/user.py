@@ -37,6 +37,9 @@ USER_IMPORT_HEADERS = [
     "display_name",
     "email",
     "phone",
+    "dingtalk_user_id",
+    "feishu_open_id",
+    "wecom_userid",
     "role",
     "manager_username",
     "manager_display_name",
@@ -60,6 +63,14 @@ USER_IMPORT_HEADER_ALIASES = {
     "phone": "phone",
     "手机号": "phone",
     "电话": "phone",
+    "dingtalk_user_id": "dingtalk_user_id",
+    "钉钉用户ID": "dingtalk_user_id",
+    "feishu_open_id": "feishu_open_id",
+    "飞书OpenID": "feishu_open_id",
+    "飞书 Open ID": "feishu_open_id",
+    "wecom_userid": "wecom_userid",
+    "企微UserID": "wecom_userid",
+    "企业微信UserID": "wecom_userid",
     "role": "role",
     "角色": "role",
     "manager_username": "manager_username",
@@ -93,6 +104,9 @@ USER_IMPORT_TEMPLATE_EXAMPLE = {
     "display_name": "张三",
     "email": "zhangsan@example.com",
     "phone": "13800138000",
+    "dingtalk_user_id": "0123456789",
+    "feishu_open_id": "ou_xxxxx",
+    "wecom_userid": "zhangsan",
     "role": "developer",
     "manager_username": "admin",
     "manager_display_name": "超级管理员",
@@ -129,6 +143,24 @@ USER_IMPORT_FIELD_DOCS = [
         "required": "否",
         "description": "手机号。",
         "example": "13800138000",
+    },
+    {
+        "field": "dingtalk_user_id",
+        "required": "否",
+        "description": "钉钉工作通知收件用户 ID。",
+        "example": "0123456789",
+    },
+    {
+        "field": "feishu_open_id",
+        "required": "否",
+        "description": "飞书应用消息收件 Open ID。",
+        "example": "ou_xxxxx",
+    },
+    {
+        "field": "wecom_userid",
+        "required": "否",
+        "description": "企业微信应用消息收件 UserID。",
+        "example": "zhangsan",
     },
     {
         "field": "role",
@@ -272,6 +304,12 @@ class UserService:
             user.email = data.email
         if data.phone is not None:
             user.phone = data.phone
+        if data.dingtalk_user_id is not None:
+            user.dingtalk_user_id = data.dingtalk_user_id
+        if data.feishu_open_id is not None:
+            user.feishu_open_id = data.feishu_open_id
+        if data.wecom_userid is not None:
+            user.wecom_userid = data.wecom_userid
         if data.is_active is not None:
             user.is_active = data.is_active
         if data.is_superuser is not None:
@@ -362,6 +400,9 @@ class UserService:
             display_name=data.display_name or data.username,
             email=data.email,
             phone=data.phone,
+            dingtalk_user_id=data.dingtalk_user_id,
+            feishu_open_id=data.feishu_open_id,
+            wecom_userid=data.wecom_userid,
             is_superuser=data.is_superuser,
             auth_type="local",
             role_id=data.role_id if data.role_id else None,
@@ -615,6 +656,9 @@ class UserService:
                     "display_name": user.display_name or "",
                     "email": user.email or "",
                     "phone": user.phone or "",
+                    "dingtalk_user_id": user.dingtalk_user_id or "",
+                    "feishu_open_id": user.feishu_open_id or "",
+                    "wecom_userid": user.wecom_userid or "",
                     "role": role_name,
                     "manager_username": user.manager.username if user.manager else "",
                     "manager_display_name": user.manager.display_name if user.manager else "",
@@ -839,6 +883,9 @@ class UserService:
                     display_name=row.get("display_name"),
                     email=row.get("email"),
                     phone=row.get("phone"),
+                    dingtalk_user_id=row.get("dingtalk_user_id"),
+                    feishu_open_id=row.get("feishu_open_id"),
+                    wecom_userid=row.get("wecom_userid"),
                     is_active=_normalize_bool(row.get("is_active"), default=existing.is_active),
                     is_superuser=_normalize_bool(
                         row.get("is_superuser"), default=existing.is_superuser
@@ -865,6 +912,9 @@ class UserService:
                 display_name=row.get("display_name") or username,
                 email=row.get("email", ""),
                 phone=row.get("phone", ""),
+                dingtalk_user_id=row.get("dingtalk_user_id", ""),
+                feishu_open_id=row.get("feishu_open_id", ""),
+                wecom_userid=row.get("wecom_userid", ""),
                 is_superuser=_normalize_bool(row.get("is_superuser"), default=False),
                 role_id=role_id,
                 manager_id=manager_id,

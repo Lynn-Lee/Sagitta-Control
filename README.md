@@ -11,7 +11,7 @@ SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效
 
 - **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，敏感字段加密存储，并内置本地密码复杂度、默认密码强制改密和 30 天轮换策略
 - **全面**：支持 11 种数据库引擎（MySQL / PostgreSQL / Oracle / MongoDB / Redis / ClickHouse 等）
-- **高效**：AI Text2SQL + SQL 工单模板 + 自定义审批流，全异步 Celery 执行不阻塞
+- **高效**：AI Text2SQL + SQL 工单模板 + 自定义审批流 + 主动审批通知，全异步 Celery 执行不阻塞
 - **可观测**：内建数据库原生指标采集、舰队健康评分、TopN 诊断、容量/表索引体积监控与全流程操作审计
 - **可解释权限**：v2-lite 权限体系已落地，权限拒绝可定位到身份 / 资源范围 / 数据授权层
 
@@ -92,7 +92,7 @@ SagittaDB/
 | Pack B | 观测中心 + 迁移脚本 | ✅ 100% |
 | Pack C | 系统配置、审计日志、资源组、数据库注册 | ✅ 100% |
 | Pack D | 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL | ✅ 100% |
-| Pack E | 多引擎补全、数据归档、SQL 回滚、通知服务 | 🔧 85% |
+| Pack E | 多引擎补全、数据归档、SQL 回滚、通知服务 | ✅ 100% |
 | 品牌升级 | SagittaDB 品牌 UI 全面更新 | ✅ 100% |
 | Pack F | 第三方登录（LDAP/钉钉/飞书/企微/CAS） | ✅ 100% |
 | Pack G | 全链路测试、性能测试、安全扫描 | ✅ 100% |
@@ -104,6 +104,7 @@ SagittaDB/
 | 密码安全策略 | 复杂度校验、默认/过期密码强制改密、到期前 7 天提醒、导入默认密码合规化 | ✅ 100% |
 | 数据库运行态诊断中心 | 观测中心实例优先工作台，融合舰队总览、会话洞察、SQL 洞察、容量、复制/引擎指标、告警和采集诊断 | ✅ 100% |
 | SQL 洞察采集 | SQL 执行信息采集配置、SQL 样本、SQL 指纹聚合、实时 SQL、执行计划与优化诊断 | ✅ 100% |
+| 主动审批通知 | SQL 工单、查询权限申请、数据归档全生命周期精准通知与投递日志 | ✅ 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ 100% |
 
 **总体完成度：100%（v1.0-GA）**
@@ -147,6 +148,7 @@ SagittaDB/
 - 查询拒绝时可通过 `POST /api/v1/query/access-check/` 返回拒绝层级与原因
 - 本地账号密码登录会校验密码安全策略：至少 8 位，包含数字、大写字母、小写字母和特殊字符；默认密码、弱密码或超过 30 天未修改时，仅签发短效改密令牌并要求改密后重新登录；到期前 7 天在登录后全局提示
 - 用户管理支持 Excel / CSV 批量导入导出，导出文件可直接修改后回灌
+- 用户管理支持维护 `dingtalk_user_id / feishu_open_id / wecom_userid`，用于审批与执行提醒精准投递
 - 用户批量导入界面的默认密码示例已调整为 `Sagitta@2026A`，与系统密码复杂度保持一致
 - 用户管理页内支持统一筛选与直接导出：关键词（含电话号码）、角色、用户组、部门、职位、状态
 - 用户组管理支持 Excel / CSV 批量导入导出，支持模板下载、失败记录导出与回灌更新
@@ -187,7 +189,8 @@ SagittaDB/
 - MySQL / PostgreSQL 慢 SQL 详情支持执行计划分析：MySQL 使用 `EXPLAIN FORMAT=JSON`，PostgreSQL 使用 `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`；其他引擎保留入口并返回明确的不支持提示。
 - SQL 洞察页面包含 `总览 / SQL 样本 / SQL 指纹 / 实时 SQL / 手工诊断 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
 - 数据归档已升级为审批作业：提交后生成归档审批工单，审批通过后由 Celery `archive` 队列分批执行，并支持暂停、继续、取消和批次日志查看。
-- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`。
+- 主动通知已接入 SQL 工单、查询权限申请与数据归档：提交、每级审批流转、驳回/取消、待执行、执行开始、执行成功/失败均通过 Celery `notify` 队列发送；应用消息优先，邮件兜底，投递结果写入 `notification_delivery_log`。
+- 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`、`0032_notification_delivery`。
 - 详细说明见 [docs/slowlog_diagnostic_v2.md](docs/slowlog_diagnostic_v2.md)。
 
 ## 最近验证
@@ -198,7 +201,7 @@ SagittaDB/
 cd frontend && npm run typecheck
 cd backend && python3 -m compileall app
 cd backend && ./.venv/bin/python -m pytest tests/unit/test_auth.py
-cd backend && ./.venv/bin/python -m pytest tests/unit/test_authz_v2_lite.py
+cd backend && ./.venv/bin/python -m pytest tests/unit/test_notify.py tests/unit/test_authz_v2_lite.py
 cd backend && ./.venv/bin/python -m pytest tests/unit/test_session_diagnostic.py tests/unit/test_slowlog_service.py -q
 cd frontend && ./node_modules/.bin/eslint src/pages/diagnostic/DiagnosticPage.tsx src/api/diagnostic.ts src/pages/slowlog/SlowlogPage.tsx src/api/slowlog.ts --ext ts,tsx --report-unused-disable-directives --max-warnings 0
 ```
