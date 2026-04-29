@@ -145,6 +145,8 @@ export interface SlowQueryConfigItem {
   last_collect_status: string
   last_collect_error: string
   last_collect_count: number
+  last_collect_sources: string[]
+  last_collect_message: string
   created_by: string
 }
 

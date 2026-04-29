@@ -1,4 +1,4 @@
-"""可观测中心路由（Sprint 5）。"""
+"""观测中心路由（Sprint 5）。"""
 
 import logging
 from datetime import UTC, datetime
@@ -115,7 +115,7 @@ async def native_overview(
 @router.put(
     "/native/instances/{instance_id}/config/",
     summary="配置原生监控采集",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def upsert_native_config(
     instance_id: int,
@@ -130,7 +130,7 @@ async def upsert_native_config(
 @router.post(
     "/native/instances/{instance_id}/collect/",
     summary="手动触发原生监控采集",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def collect_native_instance(
     instance_id: int,
@@ -204,7 +204,11 @@ async def native_health(
     return await MonitorService.get_native_health(db, instance_id, user)
 
 
-@router.get("/native/instances/{instance_id}/top-sql/", summary="实例 Top SQL")
+@router.get(
+    "/native/instances/{instance_id}/top-sql/",
+    summary="实例 Top SQL",
+    dependencies=[Depends(require_perm("observability_sql_view"))],
+)
 async def native_top_sql(
     instance_id: int,
     limit: int = QParam(20, ge=1, le=100),
@@ -254,7 +258,7 @@ async def native_alert_rules(
 @router.put(
     "/native/instances/{instance_id}/alerts/",
     summary="更新实例阈值告警规则",
-    dependencies=[Depends(require_perm("monitor_alert_manage"))],
+    dependencies=[Depends(require_perm("observability_alert_manage"))],
 )
 async def update_native_alert_rules(
     instance_id: int,
@@ -296,7 +300,7 @@ async def native_table_capacity(
 @router.get(
     "/configs/",
     summary="采集配置列表",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def list_configs(
     page: int = QParam(1, ge=1),
@@ -311,7 +315,7 @@ async def list_configs(
 @router.post(
     "/configs/",
     summary="新建采集配置",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def create_config(
     data: MonitorConfigCreate,
@@ -325,7 +329,7 @@ async def create_config(
 @router.put(
     "/configs/{config_id}/",
     summary="更新采集配置",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def update_config(
     config_id: int,
@@ -340,7 +344,7 @@ async def update_config(
 @router.delete(
     "/configs/{config_id}/",
     summary="删除采集配置",
-    dependencies=[Depends(require_perm("monitor_config_manage"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def delete_config(
     config_id: int,
@@ -395,7 +399,7 @@ async def list_applies(
 @router.post(
     "/privileges/audit/",
     summary="审批监控权限",
-    dependencies=[Depends(require_perm("monitor_review"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def audit_privilege(
     apply_id: int,

@@ -76,7 +76,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 预期：
 
 - 可见：`Dashboard`、`SQL 工单`、`在线查询`
-- 不可见：`可观测中心`、`运维工具`、`系统管理`、`审计日志`
+- 不可见：`观测中心`、`运维工具`、`系统管理`、`审计日志`
 
 ### TC-LITE-002 页面级权限兜底
 
@@ -99,7 +99,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 
 预期：
 
-- 可见：`Dashboard`、`SQL 工单`、`在线查询`、`可观测中心`、`运维工具`、`审计日志`
+- 可见：`Dashboard`、`SQL 工单`、`在线查询`、`观测中心`、`运维工具`、`审计日志`
 - 不应具备超管级全局能力
 
 ---
@@ -313,7 +313,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 步骤：
 
 1. 使用 `group_dba_user` 登录。
-2. 进入“可观测中心”。
+2. 进入“观测中心”。
 
 预期：
 

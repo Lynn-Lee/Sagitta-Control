@@ -150,9 +150,8 @@ async def _collect_slow_queries_with_db(db: AsyncSession, retention_days: int = 
     instances = (
         await db.execute(select(Instance).where(Instance.is_active.is_(True)))
     ).scalars().all()
-    saved = await SlowLogService.sync_platform_logs(db, threshold_ms=DEFAULT_SLOW_THRESHOLD_MS)
+    saved = 0
     failed = 0
-    unsupported = 0
     skipped = 0
     now = datetime.now(UTC)
 
@@ -173,10 +172,7 @@ async def _collect_slow_queries_with_db(db: AsyncSession, retention_days: int = 
             )
             saved += count
             if err:
-                if "暂不支持" in err:
-                    unsupported += 1
-                else:
-                    failed += 1
+                failed += 1
         except Exception as exc:
             logger.warning(
                 "slow_query_collect_failed instance_id=%s error=%s",
@@ -195,7 +191,7 @@ async def _collect_slow_queries_with_db(db: AsyncSession, retention_days: int = 
         "instances": len(instances),
         "saved": saved,
         "failed": failed,
-        "unsupported": unsupported,
+        "unsupported": 0,
         "skipped": skipped,
         "deleted": deleted,
         "retention_days": effective_retention_days,

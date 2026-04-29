@@ -994,6 +994,97 @@ class OracleEngine:
         """
         return await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
 
+    async def collect_sql_activity(
+        self,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        sql = """
+        SELECT *
+        FROM (
+            SELECT
+                'oracle_activity' AS source,
+                'oracle:' || s.sid || ':' || NVL(s.sql_id, '') AS source_ref,
+                s.schemaname AS db_name,
+                DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
+                CASE
+                  WHEN s.sql_exec_start IS NOT NULL
+                  THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
+                  ELSE s.last_call_et * 1000
+                END AS duration_ms,
+                s.username AS username,
+                s.machine AS client_host,
+                s.sql_id AS sql_id,
+                s.event AS event,
+                s.status AS state
+            FROM v$session s
+            LEFT JOIN v$sql q
+              ON s.sql_id = q.sql_id
+             AND s.sql_child_number = q.child_number
+            WHERE s.type = 'USER'
+              AND s.audsid != USERENV('SESSIONID')
+              AND s.sql_id IS NOT NULL
+              AND (
+                CASE
+                  WHEN s.sql_exec_start IS NOT NULL
+                  THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
+                  ELSE s.last_call_et * 1000
+                END
+              ) >= :min_duration_ms
+            ORDER BY duration_ms DESC
+        )
+        WHERE ROWNUM <= :limit
+        """
+        rs = await asyncio.to_thread(
+            self._run_query_sync,
+            sql,
+            {"min_duration_ms": int(min_duration_ms), "limit": int(limit)},
+        )
+        if rs.is_success:
+            return rs
+
+        fallback = await self.processlist(command_type="ALL")
+        if fallback.is_success:
+            fallback.warning = f"v$sql SQL 活动采集不可用，已降级为会话视图：{rs.error}"
+            mapped_rows = [
+                {str(col).lower(): value for col, value in zip(fallback.column_list, row, strict=False)}
+                if isinstance(row, (tuple, list))
+                else row
+                for row in fallback.rows
+            ]
+            fallback.column_list = [
+                "source",
+                "source_ref",
+                "db_name",
+                "sql_text",
+                "duration_ms",
+                "username",
+                "client_host",
+                "sql_id",
+                "event",
+                "state",
+            ]
+            fallback.rows = [
+                {
+                    "source": "oracle_activity",
+                    "source_ref": f"oracle:{row.get('session_id', '')}:{row.get('sql_id', '')}" if isinstance(row, dict) else "",
+                    "db_name": row.get("db_name", "") if isinstance(row, dict) else "",
+                    "sql_text": row.get("sql_text", "") if isinstance(row, dict) else "",
+                    "duration_ms": row.get("duration_ms", 0) if isinstance(row, dict) else 0,
+                    "username": row.get("username", "") if isinstance(row, dict) else "",
+                    "client_host": row.get("host", "") if isinstance(row, dict) else "",
+                    "sql_id": row.get("sql_id", "") if isinstance(row, dict) else "",
+                    "event": row.get("event", "") if isinstance(row, dict) else "",
+                    "state": row.get("state", "") if isinstance(row, dict) else "",
+                }
+                for row in mapped_rows[: int(limit)]
+                if isinstance(row, dict)
+                and row.get("sql_text")
+                and int(float(row.get("duration_ms") or 0)) >= int(min_duration_ms)
+            ]
+            fallback.affected_rows = len(fallback.rows)
+        return fallback
+
     async def kill_connection(self, thread_id: int, serial: str | int | None = None) -> ResultSet:
         if serial in (None, ""):
             return ResultSet(error="Oracle Kill 会话必须提供 serial")

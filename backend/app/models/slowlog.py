@@ -76,9 +76,11 @@ class SlowQueryConfig(BaseModel):
     retention_days: Mapped[int] = mapped_column(Integer, default=30, comment="保留天数")
     collect_limit: Mapped[int] = mapped_column(Integer, default=100, comment="单次采集上限")
     last_collect_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="最近采集时间")
-    last_collect_status: Mapped[str] = mapped_column(String(20), default="never", comment="never/success/partial/failed/unsupported")
+    last_collect_status: Mapped[str] = mapped_column(String(20), default="never", comment="never/success/partial/failed")
     last_collect_error: Mapped[str] = mapped_column(Text, default="", comment="最近采集错误")
     last_collect_count: Mapped[int] = mapped_column(Integer, default=0, comment="最近新增条数")
+    last_collect_sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False, comment="最近采集来源")
+    last_collect_message: Mapped[str] = mapped_column(Text, default="", comment="最近采集说明")
     created_by: Mapped[str] = mapped_column(String(100), default="", comment="创建人")
 
     __table_args__ = (

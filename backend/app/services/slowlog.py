@@ -38,6 +38,29 @@ from app.services.monitor import MonitorService
 
 DEFAULT_SLOW_THRESHOLD_MS = 1000
 SUPPORTED_NATIVE_TYPES = {"mysql", "pgsql", "redis"}
+SQL_ACTIVITY_TYPES = {"tidb", "starrocks", "oracle"}
+RELATIONAL_DB_TYPES = {
+    "mysql",
+    "pgsql",
+    "postgres",
+    "postgresql",
+    "oracle",
+    "tidb",
+    "starrocks",
+    "mssql",
+    "sqlserver",
+    "clickhouse",
+    "doris",
+}
+SOURCE_LABELS = {
+    "mysql_slowlog": "MySQL 统计视图",
+    "pgsql_statements": "PostgreSQL 统计视图",
+    "redis_slowlog": "Redis SLOWLOG",
+    "tidb_statements": "TiDB SQL 活动",
+    "starrocks_queries": "StarRocks SQL 活动",
+    "oracle_activity": "Oracle 会话/ASH",
+    "platform_history": "平台历史",
+}
 SQL_TAG_OPTIONS: dict[str, list[str]] = {
     "mysql": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
     "tidb": ["SELECT *", "缺少 WHERE", "扫描行数高", "返回行数高", "超长耗时", "慢导出", "前导通配符", "需结合执行计划"],
@@ -219,6 +242,8 @@ class SlowLogService:
                 last_collect_status=cfg.last_collect_status,
                 last_collect_error=cfg.last_collect_error,
                 last_collect_count=cfg.last_collect_count,
+                last_collect_sources=cfg.last_collect_sources or [],
+                last_collect_message=cfg.last_collect_message,
                 created_by=cfg.created_by,
             ))
         return len(items), items
@@ -310,7 +335,7 @@ class SlowLogService:
 
     @staticmethod
     async def scoped_instance_ids(db: AsyncSession, user: dict) -> list[int] | None:
-        if user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", []):
+        if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return None
         rg_ids = user.get("resource_groups", [])
         if not rg_ids:
@@ -967,7 +992,7 @@ class SlowLogService:
             ).hexdigest()
             if item.source != "platform":
                 source_ref = f"{instance.id}:{source_ref}"
-            if item.source in {"mysql_slowlog", "pgsql_statements"}:
+            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "starrocks_queries", "oracle_activity"}:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
             exists = await db.execute(
                 select(SlowQueryLog.id).where(
@@ -1011,6 +1036,77 @@ class SlowLogService:
         return saved
 
     @staticmethod
+    def _source_message(sources: list[str]) -> str:
+        labels = [SOURCE_LABELS.get(source, source) for source in sources]
+        return " + ".join(dict.fromkeys(label for label in labels if label))
+
+    @staticmethod
+    def _is_unsupported_message(message: str) -> bool:
+        lowered = (message or "").lower()
+        return "暂不支持" in message or "unsupported" in lowered or "not support" in lowered
+
+    @staticmethod
+    async def _collect_native_source(
+        db: AsyncSession,
+        instance: Instance,
+        engine: Any,
+        *,
+        limit: int,
+        since: datetime | None,
+        threshold_ms: int,
+    ) -> tuple[int, str, str]:
+        db_type = instance.db_type.lower()
+        if db_type not in SUPPORTED_NATIVE_TYPES or not hasattr(engine, "collect_slow_queries"):
+            return 0, "", ""
+        rs = await engine.collect_slow_queries(
+            since=since,
+            limit=limit,
+            min_duration_ms=threshold_ms,
+        )
+        if rs.error:
+            return 0, "", rs.error
+        if rs.warning and SlowLogService._is_unsupported_message(rs.warning):
+            return 0, "", ""
+        rows = SlowLogService.normalize_engine_result(instance, rs)
+        rows = [row for row in rows if row.duration_ms >= threshold_ms]
+        saved = await SlowLogService.save_engine_rows(db, instance, rows)
+        source = rows[0].source if rows else {
+            "mysql": "mysql_slowlog",
+            "pgsql": "pgsql_statements",
+            "postgres": "pgsql_statements",
+            "postgresql": "pgsql_statements",
+            "redis": "redis_slowlog",
+        }.get(db_type, f"{db_type}_sql_activity")
+        return saved, source, ""
+
+    @staticmethod
+    async def _collect_activity_source(
+        db: AsyncSession,
+        instance: Instance,
+        engine: Any,
+        *,
+        limit: int,
+        threshold_ms: int,
+    ) -> tuple[int, str, str]:
+        db_type = instance.db_type.lower()
+        if db_type not in SQL_ACTIVITY_TYPES or not hasattr(engine, "collect_sql_activity"):
+            return 0, "", ""
+        rs = await engine.collect_sql_activity(limit=limit, min_duration_ms=threshold_ms)
+        if rs.error:
+            return 0, "", rs.error
+        if rs.warning and SlowLogService._is_unsupported_message(rs.warning):
+            return 0, "", ""
+        rows = SlowLogService.normalize_engine_result(instance, rs)
+        rows = [row for row in rows if row.duration_ms >= threshold_ms]
+        saved = await SlowLogService.save_engine_rows(db, instance, rows)
+        source = rows[0].source if rows else {
+            "tidb": "tidb_statements",
+            "starrocks": "starrocks_queries",
+            "oracle": "oracle_activity",
+        }.get(db_type, f"{db_type}_sql_activity")
+        return saved, source, ""
+
+    @staticmethod
     async def collect_instance(
         db: AsyncSession,
         instance: Instance,
@@ -1025,45 +1121,80 @@ class SlowLogService:
             config.last_collect_status = "disabled"
             config.last_collect_error = ""
             config.last_collect_count = 0
+            config.last_collect_sources = []
+            config.last_collect_message = "采集已禁用"
             await db.commit()
-            return 0, "慢日志采集未启用"
+            return 0, "SQL 采集未启用"
+        db_type = instance.db_type.lower()
         limit = min(limit, config.collect_limit)
-        if instance.db_type not in SUPPORTED_NATIVE_TYPES:
-            config.last_collect_at = datetime.now(UTC)
-            config.last_collect_status = "unsupported"
-            config.last_collect_error = f"{instance.db_type} 暂不支持原生慢日志采集"
-            config.last_collect_count = 0
-            await db.commit()
-            return 0, f"{instance.db_type} 暂不支持原生慢日志采集"
         engine = get_engine(instance)
-        if not hasattr(engine, "collect_slow_queries"):
-            config.last_collect_at = datetime.now(UTC)
-            config.last_collect_status = "unsupported"
-            config.last_collect_error = f"{instance.db_type} 暂不支持原生慢日志采集"
-            config.last_collect_count = 0
-            await db.commit()
-            return 0, f"{instance.db_type} 暂不支持原生慢日志采集"
-        rs = await engine.collect_slow_queries(
-            since=since,
+        saved = 0
+        sources: list[str] = []
+        db_errors: list[str] = []
+
+        native_count, native_source, native_error = await SlowLogService._collect_native_source(
+            db,
+            instance,
+            engine,
             limit=limit,
-            min_duration_ms=config.threshold_ms,
+            since=since,
+            threshold_ms=config.threshold_ms,
         )
-        if rs.error:
-            config.last_collect_at = datetime.now(UTC)
-            config.last_collect_status = "failed"
-            config.last_collect_error = rs.error
-            config.last_collect_count = 0
-            await db.commit()
-            return 0, rs.error
-        rows = SlowLogService.normalize_engine_result(instance, rs)
-        rows = [row for row in rows if row.duration_ms >= config.threshold_ms]
-        saved = await SlowLogService.save_engine_rows(db, instance, rows)
+        saved += native_count
+        if native_source:
+            sources.append(native_source)
+        if native_error:
+            db_errors.append(native_error)
+
+        activity_count, activity_source, activity_error = await SlowLogService._collect_activity_source(
+            db,
+            instance,
+            engine,
+            limit=limit,
+            threshold_ms=config.threshold_ms,
+        )
+        saved += activity_count
+        if activity_source:
+            sources.append(activity_source)
+        if activity_error:
+            db_errors.append(activity_error)
+
+        platform_error = ""
+        platform_count = 0
+        if db_type in RELATIONAL_DB_TYPES:
+            try:
+                platform_count = await SlowLogService.sync_platform_logs(
+                    db,
+                    threshold_ms=config.threshold_ms,
+                    since=since,
+                    instance_id=instance.id,
+                )
+                saved += platform_count
+                sources.append("platform_history")
+            except Exception as exc:  # pragma: no cover - defensive DB failure path
+                platform_error = str(exc)
+
+        sources = list(dict.fromkeys(source for source in sources if source))
+        has_any_source = bool(sources)
+        if has_any_source and db_errors:
+            status = "partial"
+            error = "; ".join(db_errors + ([platform_error] if platform_error else []))[:4000]
+        elif has_any_source:
+            status = "success"
+            error = ""
+        else:
+            status = "failed"
+            errors = db_errors + ([platform_error] if platform_error else [])
+            error = "; ".join(errors)[:4000] or "未找到可用的 SQL 执行信息采集来源"
+
         config.last_collect_at = datetime.now(UTC)
-        config.last_collect_status = "success"
-        config.last_collect_error = ""
+        config.last_collect_status = status
+        config.last_collect_error = error
         config.last_collect_count = saved
+        config.last_collect_sources = sources
+        config.last_collect_message = SlowLogService._source_message(sources)
         await db.commit()
-        return saved, ""
+        return saved, error if status == "failed" else ""
 
     @staticmethod
     def normalize_engine_result(instance: Instance, rs: ResultSet) -> list[SlowQueryEngineRow]:

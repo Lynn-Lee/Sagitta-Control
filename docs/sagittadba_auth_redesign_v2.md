@@ -40,18 +40,19 @@
 | Role name | 中文名 | `is_system` | 关键权限差异 | 典型用户 |
 |---|---|---|---|---|
 | `superadmin` | 超级管理员 | ✅ | `is_superuser=True`，绕过一切检查 | 平台管理员 |
-| `dba` | 全局 DBA | ✅ | 包含 `query_all_instances` + `monitor_all_instances`，可见所有实例 | 基础设施 DBA |
-| `dba_group` | 资源组 DBA | ✅ | **不含** `query_all_instances` + `monitor_all_instances`，实例范围限于资源组 | 业务 DBA、外包 DBA |
-| `developer` | 开发工程师 | ✅ | `sql_submit` + `query_submit` + `query_applypriv`，不默认拥有监控/运维入口 | 研发工程师 |
+| `dba` | 全局 DBA | ✅ | 包含 `query_all_instances` + `observability_instance_all`，可见所有实例 | 基础设施 DBA |
+| `dba_group` | 资源组 DBA | ✅ | **不含** `query_all_instances` + `observability_instance_all`，实例范围限于资源组 | 业务 DBA、外包 DBA |
+| `developer` | 开发工程师 | ✅ | `sql_submit` + `query_submit` + `query_applypriv`，不默认拥有观测诊断入口 | 研发工程师 |
 
 ### dba 与 dba_group 共有的核心权限码
 
 ```
 sql_submit, sql_review, sql_execute, sql_execute_for_resource_group,
-process_view, process_kill, instance_manage,
+observability_session_view, observability_session_kill, instance_manage,
 query_submit, query_applypriv, query_review, query_mgtpriv,
 query_resource_group_instance,
-monitor_config_manage, monitor_apply, monitor_review,
+observability_sql_view, observability_sql_analyze,
+observability_collect_manage, observability_alert_manage,
 archive_apply, audit_user
 ```
 
@@ -59,7 +60,7 @@ archive_apply, audit_user
 
 ```
 query_all_instances      # 可查询所有实例（不受资源组限制）
-monitor_all_instances    # 可监控所有实例
+observability_instance_all    # 可查看所有实例观测数据
 ```
 
 管理员可在角色详情页增删权限码和菜单可见性，但不能删除或重命名 `is_system=True` 的内置角色。
@@ -67,15 +68,14 @@ monitor_all_instances    # 可监控所有实例
 ### 菜单可见性控制
 
 菜单实现以权限码为准，不再维护“角色 -> 菜单”的第二套真相：
-`menu_dashboard` / `menu_sqlworkflow` / `menu_query` / `menu_ops` / `menu_monitor` / `menu_system` / `menu_audit`
+`menu_dashboard` / `menu_sqlworkflow` / `menu_query` / `menu_observability` / `menu_system` / `menu_audit`
 
 | 菜单 | superadmin | dba | dba_group | developer |
 |---|---|---|---|---|
 | Dashboard | ✅ | ✅ | ✅ | ✅ |
 | SQL 工单 | ✅ | ✅ | ✅ | ✅(仅提交) |
 | 在线查询 | ✅ | ✅(全部实例) | ✅(所在组实例) | ✅(授权后) |
-| 运维中心 | ✅ | ✅ | ✅ | ❌ |
-| 可观测中心 | ✅ | ✅ | ✅(所在组) | ❌ |
+| 观测中心 | ✅ | ✅ | ✅(所在组) | ❌ |
 | 系统管理 | ✅ | ❌ | ❌ | ❌ |
 
 ---

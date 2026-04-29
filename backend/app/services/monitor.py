@@ -1,4 +1,4 @@
-"""可观测中心 + Dashboard 统计服务（Sprint 5）。"""
+"""观测中心 + Dashboard 统计服务（Sprint 5）。"""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ class MonitorService:
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
-        if user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", []):
+        if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return True
         user_rg_ids = set(user.get("resource_groups", []))
         instance_rg_ids = {rg.id for rg in instance.resource_groups}
@@ -76,7 +76,7 @@ class MonitorService:
         query = select(MonitorCollectConfig, Instance.instance_name).join(
             Instance, MonitorCollectConfig.instance_id == Instance.id
         )
-        if not (user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", [])):
+        if not (user.get("is_superuser") or "observability_instance_all" in user.get("permissions", [])):
             user_rg_ids = user.get("resource_groups", [])
             if not user_rg_ids:
                 return 0, []
@@ -274,7 +274,7 @@ class MonitorService:
 
     @staticmethod
     async def check_privilege(db: AsyncSession, user: dict, instance_id: int) -> bool:
-        if user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", []):
+        if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return True
         instance_result = await db.execute(
             select(Instance)
@@ -304,7 +304,7 @@ class MonitorService:
         db: AsyncSession, user: dict, status: int | None = None, page: int = 1, page_size: int = 20
     ) -> tuple[int, list]:
         query = select(MonitorPrivilegeApply)
-        if not user.get("is_superuser") and "monitor_review" not in user.get("permissions", []):
+        if not user.get("is_superuser") and "observability_collect_manage" not in user.get("permissions", []):
             query = query.where(MonitorPrivilegeApply.user_id == user["id"])
         if status is not None:
             query = query.where(MonitorPrivilegeApply.status == status)
@@ -360,7 +360,7 @@ class MonitorService:
             .options(selectinload(Instance.resource_groups))
             .where(Instance.is_active.is_(True))
         )
-        if not (user.get("is_superuser") or "monitor_all_instances" in user.get("permissions", [])):
+        if not (user.get("is_superuser") or "observability_instance_all" in user.get("permissions", [])):
             user_rg_ids = user.get("resource_groups", [])
             privileged_instance_ids = (
                 (

@@ -102,7 +102,7 @@ APP_ENV=production
 DEBUG=false
 LOG_LEVEL=WARNING
 
-# ── 可观测中心 ───────────────────────────────────────
+# ── 观测中心 ───────────────────────────────────────
 PROMETHEUS_URL=http://prometheus:9090
 ALERTMANAGER_URL=http://alertmanager:9093
 GRAFANA_URL=https://your-domain.com:3000     # 修改为实际域名

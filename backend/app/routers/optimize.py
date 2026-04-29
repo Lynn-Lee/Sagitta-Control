@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import current_user
+from app.core.deps import current_user, require_perm
 from app.engines.registry import get_engine
 from app.models.instance import Instance
 from app.schemas.optimize import OptimizeAnalyzeRequest, OptimizeAnalyzeResponse
@@ -50,7 +50,7 @@ class OptimizeRequest(BaseModel):
 @router.post("/analyze/", response_model=OptimizeAnalyzeResponse, summary="SQL 优化 v2 统一诊断")
 async def analyze_sql(
     data: OptimizeAnalyzeRequest,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
 ):
     return await OptimizeService.analyze(db, user, data)
@@ -59,7 +59,7 @@ async def analyze_sql(
 @router.post("/explain/", summary="EXPLAIN 执行计划")
 async def explain_sql(
     data: OptimizeRequest,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -94,7 +94,7 @@ async def explain_sql(
 @router.post("/advice/", summary="SQL 优化建议（sqlglot 规则引擎）")
 async def sql_advice(
     data: OptimizeRequest,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
 ):
     """

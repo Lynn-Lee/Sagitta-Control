@@ -59,7 +59,7 @@ def _parse_oracle_dt(value: str | None) -> datetime | None:
     "/processlist/",
     summary="查看会话列表",
     response_model=SessionListResponse,
-    dependencies=[Depends(require_perm("process_view"))],
+    dependencies=[Depends(require_perm("observability_session_view"))],
 )
 async def get_processlist(
     instance_id: int = QParam(..., description="实例ID"),
@@ -86,7 +86,7 @@ async def get_processlist(
     "/sessions/history/",
     summary="查看历史会话采样",
     response_model=SessionHistoryResponse,
-    dependencies=[Depends(require_perm("process_view"))],
+    dependencies=[Depends(require_perm("observability_session_view"))],
 )
 async def list_session_history(
     instance_id: int | None = None,
@@ -134,7 +134,7 @@ async def list_session_history(
     "/sessions/configs/",
     summary="查看会话采集配置",
     response_model=SessionCollectConfigListResponse,
-    dependencies=[Depends(require_perm("process_view"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def list_session_collect_configs(
     user: dict = Depends(current_user),
@@ -148,7 +148,7 @@ async def list_session_collect_configs(
     "/sessions/configs/",
     summary="创建或更新会话采集配置",
     response_model=SessionCollectConfigItem,
-    dependencies=[Depends(require_perm("process_kill"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def upsert_session_collect_config(
     data: SessionCollectConfigUpsert,
@@ -177,7 +177,7 @@ async def upsert_session_collect_config(
     "/sessions/configs/{config_id}/",
     summary="更新会话采集配置",
     response_model=SessionCollectConfigItem,
-    dependencies=[Depends(require_perm("process_kill"))],
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def update_session_collect_config(
     config_id: int,
@@ -207,7 +207,7 @@ async def update_session_collect_config(
     "/sessions/oracle-ash/",
     summary="Oracle ASH/AWR 历史会话",
     response_model=SessionHistoryResponse,
-    dependencies=[Depends(require_perm("process_view"))],
+    dependencies=[Depends(require_perm("observability_session_view"))],
 )
 async def list_oracle_ash_history(
     instance_id: int = QParam(...),
@@ -242,7 +242,7 @@ async def list_oracle_ash_history(
     return {"total": len(items), "items": items}
 
 
-@router.post("/kill/", summary="Kill 会话", dependencies=[Depends(require_perm("process_kill"))])
+@router.post("/kill/", summary="Kill 会话", dependencies=[Depends(require_perm("observability_session_kill"))])
 async def kill_session(
     request: Request,
     payload: KillSessionRequest | None = Body(default=None),

@@ -172,6 +172,8 @@ class SlowQueryConfigItem(BaseModel):
     last_collect_status: str = "never"
     last_collect_error: str = ""
     last_collect_count: int = 0
+    last_collect_sources: list[str] = Field(default_factory=list)
+    last_collect_message: str = ""
     created_by: str = ""
 
     model_config = {"from_attributes": True}

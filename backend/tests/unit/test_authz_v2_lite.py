@@ -34,15 +34,17 @@ class TestBuiltinRolePermissions:
         developer = _role_permissions("developer")
         assert "menu_query" in developer
         assert "menu_schema" in developer
-        assert "menu_monitor" not in developer
-        assert "process_view" not in developer
-        assert "archive_apply" not in developer
+        assert "menu_observability" not in developer
+        assert "observability_session_view" not in developer
+        assert "observability_sql_view" not in developer
 
     def test_dba_group_is_resource_scoped_monitor_admin(self):
         dba_group = _role_permissions("dba_group")
-        assert "menu_monitor" in dba_group
-        assert "monitor_config_manage" in dba_group
-        assert "monitor_all_instances" not in dba_group
+        assert "menu_observability" in dba_group
+        assert "observability_collect_manage" in dba_group
+        assert "observability_session_view" in dba_group
+        assert "observability_sql_view" in dba_group
+        assert "observability_instance_all" not in dba_group
 
     def test_high_risk_sql_submit_permission_is_dba_only_by_default(self):
         assert "sql_submit_high_risk" in _role_permissions("superadmin")

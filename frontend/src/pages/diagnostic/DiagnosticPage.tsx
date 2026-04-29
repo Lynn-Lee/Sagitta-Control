@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
@@ -43,8 +43,13 @@ const defaultHistoryFilters = () => {
   }
 }
 
-export default function DiagnosticPage() {
-  const [instanceId, setInstanceId] = useState<number | undefined>()
+type SessionInsightPanelProps = {
+  embedded?: boolean
+  instanceId?: number | null
+}
+
+export function SessionInsightPanel({ embedded = false, instanceId: externalInstanceId }: SessionInsightPanelProps) {
+  const [instanceId, setInstanceId] = useState<number | undefined>(externalInstanceId || undefined)
   const [historySource, setHistorySource] = useState<HistorySource>('platform')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(50)
@@ -58,7 +63,17 @@ export default function DiagnosticPage() {
   const [msgApi, msgCtx] = message.useMessage()
   const qc = useQueryClient()
   const hasPermission = useAuthStore((s) => s.hasPermission)
-  const canKill = hasPermission('process_kill')
+  const canKill = hasPermission('observability_session_kill')
+  const canManageCollect = hasPermission('observability_collect_manage')
+
+  useEffect(() => {
+    if (!externalInstanceId) return
+    setInstanceId(externalInstanceId)
+    setHistorySource('platform')
+    historyForm.setFieldValue('db_name', undefined)
+    setHistoryFilters((prev: any) => ({ ...prev, db_name: undefined }))
+    setHistoryPage(1)
+  }, [externalInstanceId, historyForm])
 
   const { data: instanceData } = useQuery({
     queryKey: ['instances-for-diag'],
@@ -87,6 +102,7 @@ export default function DiagnosticPage() {
   const configQuery = useQuery({
     queryKey: ['session-collect-configs'],
     queryFn: () => diagnosticApi.listConfigs(),
+    enabled: canManageCollect,
   })
 
   const killMut = useMutation({
@@ -300,36 +316,41 @@ export default function DiagnosticPage() {
       key: 'action',
       width: 90,
       fixed: 'right',
-      render: (_, row) => <Button size="small" disabled={!canKill} onClick={() => openConfigModal(row)}>编辑</Button>,
+      render: (_, row) => <Button size="small" disabled={!canManageCollect} onClick={() => openConfigModal(row)}>编辑</Button>,
     },
   ]
 
   return (
     <div>
       {msgCtx}
-      <PageHeader title="会话管理" marginBottom={20} />
+      {!embedded && <PageHeader title="会话洞察" marginBottom={20} />}
 
       <FilterCard marginBottom={16}>
         <Space wrap>
-          <Select
-            placeholder="选择实例"
-            style={{ width: 260 }}
-            onChange={(value) => {
-              setInstanceId(value)
-              setHistorySource('platform')
-              historyForm.setFieldValue('db_name', undefined)
-              setHistoryFilters((prev: any) => ({ ...prev, db_name: undefined }))
-              setHistoryPage(1)
-            }}
-            showSearch
-            optionFilterProp="label"
-          >
-            {instanceData?.items?.map((item: InstanceItem) => (
-              <Select.Option key={item.id} value={item.id} label={item.instance_name}>
-                <Tag color="blue">{formatDbTypeLabel(item.db_type)}</Tag> {item.instance_name}
-              </Select.Option>
-            ))}
-          </Select>
+          {!embedded ? (
+            <Select
+              placeholder="选择实例"
+              style={{ width: 260 }}
+              value={instanceId}
+              onChange={(value) => {
+                setInstanceId(value)
+                setHistorySource('platform')
+                historyForm.setFieldValue('db_name', undefined)
+                setHistoryFilters((prev: any) => ({ ...prev, db_name: undefined }))
+                setHistoryPage(1)
+              }}
+              showSearch
+              optionFilterProp="label"
+            >
+              {instanceData?.items?.map((item: InstanceItem) => (
+                <Select.Option key={item.id} value={item.id} label={item.instance_name}>
+                  <Tag color="blue">{formatDbTypeLabel(item.db_type)}</Tag> {item.instance_name}
+                </Select.Option>
+              ))}
+            </Select>
+          ) : (
+            <Text strong>{selectedInstance ? `${selectedInstance.instance_name} / ${formatDbTypeLabel(selectedInstance.db_type)}` : '请选择实例'}</Text>
+          )}
           <Button icon={<ReloadOutlined />} onClick={() => refetch()} disabled={!instanceId}>刷新</Button>
           <Text type="secondary" style={{ fontSize: 12 }}>
             在线 {processData?.total ?? 0} 个会话{hideIdle ? `，当前显示 ${onlineItems.length} 个非空闲会话` : ''}
@@ -461,13 +482,14 @@ export default function DiagnosticPage() {
           {
             key: 'config',
             label: '采集配置',
+            disabled: !canManageCollect,
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <FilterCard>
                   <Space>
                     <Button
                       type="primary"
-                      disabled={!instanceId || !canKill}
+                      disabled={!instanceId || !canManageCollect}
                       loading={configQuery.isLoading}
                       onClick={() => openConfigModal()}
                     >
@@ -545,4 +567,8 @@ export default function DiagnosticPage() {
       </Modal>
     </div>
   )
+}
+
+export default function DiagnosticPage() {
+  return <SessionInsightPanel />
 }

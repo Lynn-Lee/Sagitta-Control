@@ -56,7 +56,7 @@ app/
 | Sprint 1 — 认证、用户、实例管理 | ✅ 完成 |
 | Sprint 2 — 引擎层、在线查询、查询权限 | ✅ 完成 |
 | Pack A — SQL 工单全流程 + 运维工具 | ✅ 完成 |
-| Pack B — 可观测中心 + 迁移脚本 | ✅ 完成 |
+| Pack B — 观测中心 + 迁移脚本 | ✅ 完成 |
 | Pack C — 系统配置、审计日志、资源组、数据库注册 | ✅ 完成 |
 | Pack D — 数据脱敏、数据字典、工单模板、AI Text2SQL | ✅ 完成 |
 | Pack E — 多引擎补全、数据归档、SQL 回滚、通知服务 | 🔧 完成（85%）|
@@ -76,7 +76,7 @@ app/
 - 会话诊断新增 `SessionSnapshot` 和 `collect_session_snapshots`，并已重做为连接/会话视角：在线会话展示完整连接清单（含空闲连接），历史会话区分平台采样快照与 Oracle ASH/AWR 活跃采样
 - 会话时长字段拆分为 `connection_age_ms / state_duration_ms / active_duration_ms / transaction_age_ms`，`duration_ms/time_seconds` 仅保留为兼容字段
 - TiDB 已拆为独立 `TidbEngine`，会话采集优先使用 `information_schema.CLUSTER_PROCESSLIST`
-- 慢日志分析新增 `SlowQueryLog / SlowQueryConfig`，支持平台查询历史同步、原生慢日志采集、实例级阈值/周期/保留配置、SQL 指纹详情和 MySQL/PostgreSQL 执行计划分析
+- SQL 洞察新增 `SlowQueryLog / SlowQueryConfig`，支持平台查询历史、数据库统计/活动视图采集、实例级阈值/周期/保留配置、最近采集来源说明、SQL 指纹详情和 MySQL/PostgreSQL 执行计划分析
 - 数据归档升级为审批作业：`archive_job / archive_batch_log` 记录进度和批次日志，Celery `archive` 队列执行，支持暂停、继续、取消
 - Alembic 已新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`
 

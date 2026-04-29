@@ -24,6 +24,7 @@ import {
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text, Paragraph } = Typography
@@ -31,20 +32,32 @@ const { RangePicker } = DatePicker
 const { useBreakpoint } = Grid
 
 const SOURCE_OPTIONS = [
-  { label: '平台查询', value: 'platform' },
-  { label: 'MySQL 原生', value: 'mysql_slowlog' },
-  { label: 'PG 统计', value: 'pgsql_statements' },
+  { label: '平台历史', value: 'platform' },
+  { label: 'MySQL 统计视图', value: 'mysql_slowlog' },
+  { label: 'PostgreSQL 统计视图', value: 'pgsql_statements' },
   { label: 'Redis SLOWLOG', value: 'redis_slowlog' },
+  { label: 'TiDB SQL 活动', value: 'tidb_statements' },
+  { label: 'StarRocks SQL 活动', value: 'starrocks_queries' },
+  { label: 'Oracle 会话/ASH', value: 'oracle_activity' },
   { label: '会话采样', value: 'session_history' },
 ]
 
 const SOURCE_COLOR: Record<string, string> = {
   platform: 'blue',
+  platform_history: 'blue',
   mysql_slowlog: 'orange',
   pgsql_statements: 'green',
   redis_slowlog: 'red',
+  tidb_statements: 'cyan',
+  starrocks_queries: 'geekblue',
+  oracle_activity: 'volcano',
   session_history: 'purple',
 }
+
+const SOURCE_LABELS: Record<string, string> = Object.fromEntries(
+  SOURCE_OPTIONS.map(item => [item.value, item.label]),
+)
+SOURCE_LABELS.platform_history = '平台历史'
 
 const RISK_COLOR = (value: number) => value >= 70 ? 'red' : value >= 35 ? 'gold' : 'green'
 const SEVERITY_COLOR: Record<string, string> = {
@@ -54,7 +67,14 @@ const SEVERITY_COLOR: Record<string, string> = {
   ok: 'success',
 }
 
-const sourceLabel = (source: string) => SOURCE_OPTIONS.find(i => i.value === source)?.label || source
+const sourceLabel = (source: string) => SOURCE_LABELS[source] || source
+const collectStatusColor = (status: string) => {
+  if (status === 'success') return 'success'
+  if (status === 'partial') return 'warning'
+  if (status === 'failed') return 'error'
+  if (status === 'disabled') return 'default'
+  return 'processing'
+}
 const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD HH:mm:ss') : '—'
 const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
 const TREND_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
@@ -70,13 +90,21 @@ function buildTrendRows(groups: SlowQueryGroupTrend[], metric: 'count' | 'avg_du
   })
 }
 
-export default function SlowlogPage() {
+type SqlInsightPanelProps = {
+  embedded?: boolean
+  instanceId?: number | null
+}
+
+export function SqlInsightPanel({ embedded = false, instanceId: externalInstanceId }: SqlInsightPanelProps) {
   const screens = useBreakpoint()
   const isMobile = !screens.md
   const queryClient = useQueryClient()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canAnalyze = hasPermission('observability_sql_analyze')
+  const canManageCollect = hasPermission('observability_collect_manage')
   const [msgApi, msgCtx] = message.useMessage()
   const [page, setPage] = useState(1)
-  const [instanceId, setInstanceId] = useState<number | undefined>()
+  const [instanceId, setInstanceId] = useState<number | undefined>(externalInstanceId || undefined)
   const [dbName, setDbName] = useState('')
   const [source, setSource] = useState<string | undefined>()
   const [sqlKeyword, setSqlKeyword] = useState('')
@@ -118,7 +146,6 @@ export default function SlowlogPage() {
   })
 
   const selectedInstance = instanceData?.items?.find(i => i.id === instanceId)
-  const unsupportedNative = selectedInstance && !['mysql', 'pgsql', 'redis'].includes(selectedInstance.db_type)
   const selectedDbType = selectedInstance?.db_type?.toLowerCase() || ''
   const engineTagOptions = useMemo(
     () => selectedDbType ? (tagOptionsQuery.data?.items?.[selectedDbType] || []) : [],
@@ -128,6 +155,14 @@ export default function SlowlogPage() {
     () => engineTagOptions.map(item => ({ label: item, value: item })),
     [engineTagOptions],
   )
+
+  useEffect(() => {
+    if (!externalInstanceId) return
+    setInstanceId(externalInstanceId)
+    setDbName('')
+    setPage(1)
+    manualForm.setFieldValue('instance_id', externalInstanceId)
+  }, [externalInstanceId, manualForm])
 
   useEffect(() => {
     if (!tag) return
@@ -188,6 +223,7 @@ export default function SlowlogPage() {
   const configQuery = useQuery({
     queryKey: ['slowlog-configs'],
     queryFn: () => slowlogApi.configs(),
+    enabled: canManageCollect,
   })
 
   const overview = overviewQuery.data
@@ -199,16 +235,16 @@ export default function SlowlogPage() {
   const collectMut = useMutation<SlowQueryCollectResponse>({
     mutationFn: () => slowlogApi.collect({ instance_id: instanceId, limit: 100 }),
     onSuccess: (data) => {
-      msgApi.success(`采集完成：新增 ${data.saved} 条，失败 ${data.failed}，不支持 ${data.unsupported}`)
+      msgApi.success(`采集完成：新增 ${data.saved} 条，失败 ${data.failed}`)
       queryClient.invalidateQueries({ queryKey: ['slowlog-overview'] })
       queryClient.invalidateQueries({ queryKey: ['slowlog-logs'] })
       queryClient.invalidateQueries({ queryKey: ['slowlog-fingerprints'] })
       queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
       if (data.saved === 0) {
         Modal.info({
-          title: '本次没有新增慢 SQL',
+          title: '本次没有新增 SQL 样本',
           maskClosable: false,
-          content: '请检查实例采集配置里的慢 SQL 阈值、最近 1 天时间范围、数据库原生慢日志能力，以及平台查询历史中是否存在符合条件的记录。',
+          content: '请检查实例采集配置里的 SQL 阈值、最近 1 天时间范围、数据库统计/活动视图，以及平台查询历史中是否存在符合条件的记录。',
         })
       }
       if (data.errors?.length) {
@@ -388,7 +424,7 @@ export default function SlowlogPage() {
       render: (_, row) => (
         <Space size={4}>
           <Button size="small" icon={<EyeOutlined />} onClick={() => openLogDetail(row)} />
-          <Button size="small" icon={<BulbOutlined />} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)} />
+          <Button size="small" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)} />
         </Space>
       ),
     },
@@ -491,7 +527,7 @@ export default function SlowlogPage() {
         <Space size={4}>
           <Button size="small" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)} />
           <Button size="small" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)} />
-          <Button size="small" icon={<BulbOutlined />} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)} />
+          <Button size="small" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)} />
         </Space>
       ),
     },
@@ -514,21 +550,28 @@ export default function SlowlogPage() {
     { title: '保留', dataIndex: 'retention_days', width: 90, render: (v: number) => `${v}天` },
     { title: '上限', dataIndex: 'collect_limit', width: 90 },
     {
-      title: '最近采集 / 错误',
+      title: '最近采集 / 来源',
       key: 'last_collect',
-      width: 260,
+      width: 300,
       render: (_, row) => (
         <Space direction="vertical" size={0}>
           <Space size={4}>
-            <Tag color={row.last_collect_status === 'success' ? 'success' : row.last_collect_status === 'failed' ? 'error' : 'default'}>
+            <Tag color={collectStatusColor(row.last_collect_status)}>
               {row.last_collect_status}
             </Tag>
             <Text type="secondary">{row.last_collect_count} 条</Text>
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>{formatTime(row.last_collect_at)}</Text>
-          {row.last_collect_error && (
+          {row.last_collect_message && row.last_collect_status !== 'failed' && (
+            <Tooltip title={(row.last_collect_sources || []).map(sourceLabel).join(' + ') || row.last_collect_message}>
+              <Text type="secondary" ellipsis style={{ width: 270, display: 'block', fontSize: 12 }}>
+                {row.last_collect_message}
+              </Text>
+            </Tooltip>
+          )}
+          {row.last_collect_status === 'failed' && row.last_collect_error && (
             <Tooltip title={row.last_collect_error}>
-              <Text type="danger" ellipsis style={{ width: 230, display: 'block', fontSize: 12 }}>
+              <Text type="danger" ellipsis style={{ width: 270, display: 'block', fontSize: 12 }}>
                 {row.last_collect_error}
               </Text>
             </Tooltip>
@@ -544,6 +587,7 @@ export default function SlowlogPage() {
         <Switch
           size="small"
           checked={v}
+          disabled={!canManageCollect}
           loading={configUpdateMut.isPending}
           onChange={(checked) => configUpdateMut.mutate({ id: row.id, data: { is_enabled: checked } })}
         />
@@ -554,7 +598,7 @@ export default function SlowlogPage() {
       key: 'actions',
       fixed: 'right',
       width: 100,
-      render: (_, row) => <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>编辑</Button>,
+      render: (_, row) => <Button size="small" icon={<SettingOutlined />} disabled={!canManageCollect} onClick={() => openConfig(row)}>编辑</Button>,
     },
   ]
 
@@ -580,7 +624,7 @@ export default function SlowlogPage() {
         <Button
           size="small"
           icon={<BulbOutlined />}
-          disabled={!instanceId || !getRealtimeSql(row)}
+          disabled={!canAnalyze || !instanceId || !getRealtimeSql(row)}
           loading={diagnoseMut.isPending}
           onClick={() => {
             setSqlDetail(null)
@@ -711,10 +755,12 @@ export default function SlowlogPage() {
   return (
     <div>
       {msgCtx}
-      <PageHeader
-        title="SQL 分析"
-        meta={`共 ${overview?.total ?? 0} 条 SQL 样本，${overview?.fingerprint_count ?? 0} 个指纹`}
-      />
+      {!embedded && (
+        <PageHeader
+          title="SQL 洞察"
+          meta={`共 ${overview?.total ?? 0} 条 SQL 样本，${overview?.fingerprint_count ?? 0} 个指纹`}
+        />
+      )}
 
       <FilterCard marginBottom={16}>
         <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
@@ -724,21 +770,25 @@ export default function SlowlogPage() {
             style={{ width: filterWidth(360) }}
             onChange={(_, strs) => { setDateRange(strs[0] ? [dayjs(strs[0]).toISOString(), dayjs(strs[1]).toISOString()] : null); setPage(1) }}
           />
-          <Select
-            placeholder="实例"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            style={{ width: filterWidth(210) }}
-            value={instanceId}
-            onChange={(v) => { setInstanceId(v); setDbName(''); setPage(1) }}
-            onClear={() => setDbName('')}
-            options={(instanceData?.items || []).map(inst => ({
-              value: inst.id,
-              label: inst.instance_name,
-              children: inst.instance_name,
-            }))}
-          />
+          {!embedded ? (
+            <Select
+              placeholder="实例"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: filterWidth(210) }}
+              value={instanceId}
+              onChange={(v) => { setInstanceId(v); setDbName(''); setPage(1) }}
+              onClear={() => setDbName('')}
+              options={(instanceData?.items || []).map(inst => ({
+                value: inst.id,
+                label: inst.instance_name,
+                children: inst.instance_name,
+              }))}
+            />
+          ) : (
+            <Text strong>{selectedInstance ? `${selectedInstance.instance_name} / ${formatDbTypeLabel(selectedInstance.db_type)}` : '请选择实例'}</Text>
+          )}
           <Select
             placeholder="数据库"
             allowClear
@@ -767,16 +817,10 @@ export default function SlowlogPage() {
           />
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
           <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
-          <Button icon={<CloudDownloadOutlined />} type="primary" loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
+          <Button icon={<CloudDownloadOutlined />} type="primary" disabled={!canManageCollect} loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
           <Button onClick={resetFilters}>重置</Button>
         </Space>
       </FilterCard>
-
-      {unsupportedNative && (
-        <Card size="small" style={{ marginBottom: 16 }}>
-          <Text type="secondary">{formatDbTypeLabel(selectedInstance.db_type)} 当前仅支持平台查询历史和手工 SQL 诊断，暂不支持原生 SQL 采集。</Text>
-        </Card>
-      )}
 
       <Tabs
         activeKey={activeTab}
@@ -939,7 +983,7 @@ export default function SlowlogPage() {
                       <Input.TextArea rows={10} style={{ fontFamily: '"JetBrains Mono", monospace' }} />
                     </Form.Item>
                     <Space>
-                      <Button type="primary" icon={<BulbOutlined />} htmlType="submit" loading={manualDiagnoseMut.isPending}>
+                      <Button type="primary" icon={<BulbOutlined />} htmlType="submit" disabled={!canAnalyze} loading={manualDiagnoseMut.isPending}>
                         开始诊断
                       </Button>
                       <Button onClick={() => { manualForm.resetFields(); setManualDiagnosis(null) }}>
@@ -960,6 +1004,7 @@ export default function SlowlogPage() {
           {
             key: 'configs',
             label: '采集配置',
+            disabled: !canManageCollect,
             children: (
               <Card styles={{ body: { padding: 0 } }}>
                 <Table
@@ -996,6 +1041,7 @@ export default function SlowlogPage() {
               <Button
                 type="primary"
                 icon={<BulbOutlined />}
+                disabled={!canAnalyze}
                 loading={diagnoseMut.isPending}
                 onClick={() => diagnoseMut.mutate({ log_id: sqlDetail.id })}
               >
@@ -1004,7 +1050,7 @@ export default function SlowlogPage() {
               <Button
                 icon={<LineChartOutlined />}
                 loading={explainMut.isPending}
-                disabled={!['mysql', 'pgsql'].includes(sqlDetail.db_type)}
+                disabled={!canAnalyze || !['mysql', 'pgsql'].includes(sqlDetail.db_type)}
                 onClick={() => explainMut.mutate(sqlDetail.id)}
               >
                 执行计划
@@ -1066,6 +1112,7 @@ export default function SlowlogPage() {
                   <Button
                     type="primary"
                     icon={<BulbOutlined />}
+                    disabled={!canAnalyze}
                     loading={diagnoseMut.isPending}
                     onClick={() => diagnoseMut.mutate({ fingerprint: detailQuery.data.fingerprint.sql_fingerprint, instance_id: instanceId })}
                   >
@@ -1147,6 +1194,7 @@ export default function SlowlogPage() {
           configUpdateMut.mutate({ id: editingConfig.id, data: values }, { onSuccess: closeConfig })
         }}
         confirmLoading={configUpdateMut.isPending}
+        okButtonProps={{ disabled: !canManageCollect }}
         maskClosable={false}
       >
         <Form form={configForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -1197,4 +1245,8 @@ export default function SlowlogPage() {
       </Modal>
     </div>
   )
+}
+
+export default function SlowlogPage() {
+  return <SqlInsightPanel />
 }

@@ -32,11 +32,10 @@
 
 | 模块 | 权限码 | 说明 |
 |------|--------|------|
-| 菜单 | `menu_dashboard` `menu_sqlworkflow` `menu_monitor` | 控制菜单可见性 |
+| 菜单 | `menu_dashboard` `menu_sqlworkflow` `menu_observability` | 控制菜单可见性 |
 | SQL 工单 | `sql_submit` `sql_review` `sql_execute` `sql_execute_for_resource_group` | 提交/审核/执行 |
 | 在线查询 | `query_submit` `query_applypriv` `query_review` `query_mgtpriv` `query_all_instances` `query_resource_group_instance` | 查询及权限申请审批 |
-| 会话诊断 | `process_view` `process_kill` | 查看/Kill 数据库会话 |
-| 监控 | `monitor_all_instances` `monitor_config_manage` `monitor_apply` `monitor_review` `monitor_alert_manage` | 监控配置与告警 |
+| 观测中心 | `observability_instance_all` `observability_session_view` `observability_session_kill` `observability_sql_view` `observability_sql_analyze` `observability_collect_manage` `observability_alert_manage` | 实例观测、会话洞察、SQL 洞察、采集配置与告警 |
 | 归档 | `archive_apply` `archive_review` | 数据归档申请审批 |
 | 系统管理 | `system_config_manage` `instance_manage` `resource_group_manage` `user_manage` `audit_user` | 系统级管理 |
 
@@ -277,7 +276,7 @@ return steps
 | 角色名 | 典型权限 | 适用人员 |
 |--------|----------|----------|
 | `superadmin` | 全部权限 | 系统管理员 |
-| `dba` | `instance_manage` + `sql_review` + `sql_execute` + `query_all_instances` + `monitor_all_instances` | DBA |
+| `dba` | `instance_manage` + `sql_review` + `sql_execute` + `query_all_instances` + `observability_instance_all` | DBA |
 | `developer` | `sql_submit` + `query_submit` + `query_applypriv` + `archive_apply` | 开发工程师 |
 | `auditor` | `sql_review` + `query_review` + `audit_user` | 审计/安全 |
 | `viewer` | `menu_dashboard` + `query_submit`（需申请后） | 只读用户 |

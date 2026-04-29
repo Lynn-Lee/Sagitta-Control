@@ -401,7 +401,7 @@ class MysqlEngine:
         review.error = "execute_workflow 将在 Sprint 3 实现"
         return review
 
-    # ── 可观测中心 ────────────────────────────────────────────
+    # ── 观测中心 ────────────────────────────────────────────
 
     async def collect_metrics(self) -> dict[str, Any]:
         """采集 MySQL 核心健康指标。"""

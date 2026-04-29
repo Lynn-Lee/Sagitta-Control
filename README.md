@@ -7,7 +7,7 @@
 
 ## 产品简介
 
-SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效地完成 SQL 审核上线、在线查询、慢日志分析、数据库监控等全流程数据库管理工作。
+SagittaDB 通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效地完成 SQL 审核上线、在线查询、SQL 洞察、数据库运行态诊断等全流程数据库管理工作。
 
 - **安全**：修复原 Archery 5 个 P0 安全漏洞，Token 黑名单 fail-close，敏感字段加密存储，并内置本地密码复杂度、默认密码强制改密和 30 天轮换策略
 - **全面**：支持 11 种数据库引擎（MySQL / PostgreSQL / Oracle / MongoDB / Redis / ClickHouse 等）
@@ -89,7 +89,7 @@ SagittaDB/
 | Sprint 1 | 认证、用户、实例管理 | ✅ 100% |
 | Sprint 2 | 引擎层、在线查询、查询权限 | ✅ 100% |
 | Pack A | SQL 工单全流程 + 运维工具 | ✅ 100% |
-| Pack B | 可观测中心 + 迁移脚本 | ✅ 100% |
+| Pack B | 观测中心 + 迁移脚本 | ✅ 100% |
 | Pack C | 系统配置、审计日志、资源组、数据库注册 | ✅ 100% |
 | Pack D | 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL | ✅ 100% |
 | Pack E | 多引擎补全、数据归档、SQL 回滚、通知服务 | 🔧 85% |
@@ -102,8 +102,8 @@ SagittaDB/
 | 数据库权限管控 | is_active 启停控制、普通用户不可见禁用库、管理员标灰"已禁用" | ✅ 100% |
 | 授权体系 v2-lite | 角色权限、用户组资源范围、库/表级查询授权、权限排查接口 | ✅ 100% |
 | 密码安全策略 | 复杂度校验、默认/过期密码强制改密、到期前 7 天提醒、导入默认密码合规化 | ✅ 100% |
-| 会话诊断与慢日志分析 | 在线/历史会话、慢日志采集配置、SQL 指纹聚合、MySQL/PG 执行计划分析 | ✅ 100% |
-| 原生可观测中心 | 舰队总览、健康评分、风险原因、真实区间 QPS/TPS、Top SQL/等待事件/容量增长、Oracle 专属指标包、阈值告警规则，不依赖 Prometheus/Grafana | ✅ 100% |
+| 数据库运行态诊断中心 | 观测中心实例优先工作台，融合舰队总览、会话洞察、SQL 洞察、容量、复制/引擎指标、告警和采集诊断 | ✅ 100% |
+| SQL 洞察采集 | SQL 执行信息采集配置、SQL 样本、SQL 指纹聚合、实时 SQL、执行计划与优化诊断 | ✅ 100% |
 | Bug 修复 | MySQL DictCursor 修复、PG 表缺失修复、前端下拉框截断修复 | ✅ 100% |
 
 **总体完成度：100%（v1.0-GA）**
@@ -183,9 +183,9 @@ SagittaDB/
 - 会话管理已重做为连接/会话视角：在线会话默认展示完整连接清单（含空闲连接），SQL 仅作为会话上下文；前端展示连接时长、状态时长、当前操作时长和事务时长，并支持隐藏空闲会话。
 - 历史会话分为平台采样快照和 Oracle ASH/AWR 活跃采样：周期性 `collect_session_snapshots` 会写入 `session_snapshot`，前端可按实例、来源、用户、数据库、状态、命令、SQL 关键字和多种时长筛选历史会话。
 - TiDB 已拆为独立 `TidbEngine`，复用 MySQL 协议连接能力但使用 TiDB 专属会话采集，优先读取 `information_schema.CLUSTER_PROCESSLIST`。
-- 慢日志分析已升级到 v2：新增 `slow_query_log` 与 `slow_query_config`，支持平台查询历史同步、MySQL/PG/Redis 原生采集、SQL 指纹聚合、实例级采集配置和最近采集状态。
+- SQL 洞察已升级为实例级 SQL 执行信息采集：`slow_query_log` 统一保存平台历史、MySQL/PG/Redis 统计来源以及 TiDB/StarRocks/Oracle SQL 活动来源；`slow_query_config` 保存阈值、周期、保留策略、最近采集状态、采集来源和来源说明。
 - MySQL / PostgreSQL 慢 SQL 详情支持执行计划分析：MySQL 使用 `EXPLAIN FORMAT=JSON`，PostgreSQL 使用 `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`；其他引擎保留入口并返回明确的不支持提示。
-- 慢日志页面包含 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
+- SQL 洞察页面包含 `总览 / SQL 样本 / SQL 指纹 / 实时 SQL / 手工诊断 / 采集配置`，指纹详情展示趋势、实例/库/用户/来源分布、结构化优化建议和样例 SQL。
 - 数据归档已升级为审批作业：提交后生成归档审批工单，审批通过后由 Celery `archive` 队列分批执行，并支持暂停、继续、取消和批次日志查看。
 - 新增 Alembic 迁移：`0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0022_session_collect_config`、`0023_archive_jobs`、`0024_session_duration_ms`、`0025_session_duration_fields`。
 - 详细说明见 [docs/slowlog_diagnostic_v2.md](docs/slowlog_diagnostic_v2.md)。
@@ -222,7 +222,7 @@ cd frontend && ./node_modules/.bin/eslint src/pages/diagnostic/DiagnosticPage.ts
 - 登录页强制改密流程改为页内表单，提示文案会完整展示长度、数字、大小写字母、特殊字符和 30 天轮换要求
 - 顶部右侧用户入口已改为单行 flex 布局，头像/用户名不再换行；`index.html` 走 no-cache，避免强刷后仍命中旧前端资源
 - 左侧主导航与系统管理子菜单已切换为统一的自定义单色 SVG 图标，并继续跟随 Ant Design 的默认尺寸、颜色与选中态机制
-- `SQL 工单`、`在线查询`、`运维工具` 的子菜单图标也已切换为同一套自定义 SVG；其中“慢日志分析”图标已按视觉尺寸做过一次收紧校准，避免在侧栏中显得偏小
+- `SQL 工单`、`在线查询`、`观测中心` 的菜单图标已切换为同一套自定义 SVG，并保持侧栏视觉尺寸一致
 - 业务弹窗与业务抽屉已统一关闭遮罩点击自动关闭；用户点击黑色遮罩不再误关表单，但仍保留右上角 `X`、`Esc` 与取消按钮等显式关闭方式
 - 前端数据库类型显示统一为官方命名：`MySQL / PostgreSQL / Oracle / TiDB / StarRocks / Doris / ClickHouse / MongoDB / Cassandra / Redis / Elasticsearch / OpenSearch`
 - 核心后台表格页已统一固定列宽、横向滚动基线、长文本省略与关键业务字段展示

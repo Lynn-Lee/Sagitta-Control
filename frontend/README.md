@@ -89,15 +89,15 @@ src/
 │   ├── common/      通用组件（AuthGuard、PageHeader、FilterCard、SectionCard 等）
 │   ├── layout/      布局组件（MainLayout、Header、Sider）
 │   ├── editor/      SQL 编辑器（Monaco 封装）
-│   └── monitor/     可观测中心组件（指标卡、趋势图等）
+│   └── monitor/     观测中心组件（指标卡、趋势图等）
 └── pages/           页面组件（按路由模块划分）
     ├── auth/        登录、2FA
     ├── dashboard/   Dashboard
     ├── workflow/    SQL 工单
     ├── query/       在线查询
-    ├── monitor/     可观测中心（默认实例概览；监控 Tab 按实例查看指标）
-    ├── diagnostic/  在线/历史会话诊断
-    ├── slowlog/     慢日志分析与指纹诊断
+    ├── monitor/     观测中心（舰队总览 + 实例诊断工作台）
+    ├── diagnostic/  会话洞察嵌入面板与兼容页
+    ├── slowlog/     SQL 洞察嵌入面板与兼容页
     ├── instance/    实例管理
     ├── system/      系统管理
     └── audit/       审计日志
@@ -120,12 +120,12 @@ src/
 
 - `MainLayout`：桌面侧栏 + 移动端抽屉双模式，内容区内边距随断点自适应
 - `MainLayout`：主导航与系统管理子菜单支持统一的自定义 SVG 图标，图标保持 Ant Design 默认尺寸、颜色继承与选中态表现
-- `MainLayout`：`SQL 工单`、`在线查询`、`运维工具` 子菜单已补齐对应的自定义 SVG 图标；“慢日志分析”图标额外做了可视边界收紧，保证与同列菜单图标的视觉尺寸一致
+- `MainLayout`：`SQL 工单`、`在线查询`、`观测中心` 菜单已补齐对应的自定义 SVG 图标，并保持同列菜单图标的视觉尺寸一致
 - `QueryPage`：查询结果表格只渲染当前页数据，结果区支持统一导出、权限排查与自适应高度
 - `LoginPage`：登录卡片支持窄屏自适应，OAuth 按钮区改为可换行布局
 - `DashboardPage`：统计卡片文案与后端真实聚合语义对齐
 - `DiagnosticPage`：连接/会话视角的在线会话、平台历史会话快照和 Oracle ASH/AWR 活跃采样切换；展示连接时长、状态时长、当前操作时长和事务时长，支持隐藏空闲会话与多条件历史筛选
-- `SlowlogPage`：支持慢 SQL 总览、明细、指纹聚合、指纹详情、执行计划分析、实时慢查询和采集配置
+- `SlowlogPage`：支持 SQL 洞察总览、SQL 样本、指纹聚合、指纹详情、执行计划分析、实时 SQL 和实例级 SQL 采集配置
 - 公共骨架组件：
   - `PageHeader`：统一页面标题、说明文案和右侧操作区
   - `FilterCard`：统一筛选区卡片边框、圆角和内边距
@@ -142,6 +142,6 @@ src/
 | Sprint 2 — 在线查询（Monaco + 结果表格）| ✅ 完成 |
 | Sprint 3 — SQL 工单（提交/审核/执行/WebSocket）| ✅ 完成 |
 | Sprint 4 — 运维工具页面 | ✅ 完成 |
-| Sprint 5 — 可观测中心（Recharts 趋势图）| ✅ 完成 |
+| Sprint 5 — 观测中心（Recharts 趋势图）| ✅ 完成 |
 | Sprint 6 — 联调测试、品牌升级 | ✅ 完成 |
 | 权限前端收敛 | ✅ 完成（菜单权限码化、页面级 PermissionGuard、查询权限排查展示） |

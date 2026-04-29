@@ -1,5 +1,5 @@
 """
-可观测中心模型（3 张新增表）。
+观测中心模型（3 张新增表）。
 """
 from datetime import date, datetime
 

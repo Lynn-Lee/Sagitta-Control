@@ -260,15 +260,89 @@ async def test_scoped_instance_ids_without_resource_groups_is_empty():
 
 
 @pytest.mark.asyncio
-async def test_collect_instance_unsupported_engine_returns_message():
+async def test_collect_instance_uses_platform_history_when_database_source_is_unavailable(monkeypatch):
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: SimpleNamespace())
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
     count, err = await SlowLogService.collect_instance(
         AsyncMock(),
         SimpleNamespace(id=1, db_type="oracle", instance_name="ora-prod"),
-        config=SimpleNamespace(is_enabled=True, collect_limit=100),
+        config=config,
+    )
+
+    assert (count, err) == (0, "")
+    assert config.last_collect_status == "success"
+    assert config.last_collect_sources == ["platform_history"]
+    assert config.last_collect_message == "平台历史"
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_marks_partial_when_database_source_fails_but_platform_succeeds(monkeypatch):
+    engine = SimpleNamespace(collect_sql_activity=AsyncMock(return_value=ResultSet(error="v$sql 权限不足")))
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=2))
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(
+        AsyncMock(),
+        SimpleNamespace(id=1, db_type="oracle", instance_name="ora-prod"),
+        config=config,
+    )
+
+    assert (count, err) == (2, "")
+    assert config.last_collect_status == "partial"
+    assert config.last_collect_error == "v$sql 权限不足"
+    assert config.last_collect_sources == ["platform_history"]
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_marks_failed_when_all_sources_fail(monkeypatch):
+    engine = SimpleNamespace(collect_sql_activity=AsyncMock(return_value=ResultSet(error="v$sql 权限不足")))
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(side_effect=RuntimeError("query_log 不可用")))
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(
+        AsyncMock(),
+        SimpleNamespace(id=1, db_type="oracle", instance_name="ora-prod"),
+        config=config,
     )
 
     assert count == 0
-    assert "暂不支持" in err
+    assert "v$sql 权限不足" in err
+    assert "query_log 不可用" in err
+    assert config.last_collect_status == "failed"
 
 
 @pytest.mark.asyncio
@@ -282,6 +356,7 @@ async def test_collect_instance_passes_config_threshold_to_engine(monkeypatch):
         )
     )
     monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
 
     exists_result = MagicMock()
     exists_result.scalar_one_or_none.return_value = None
@@ -299,6 +374,8 @@ async def test_collect_instance_passes_config_threshold_to_engine(monkeypatch):
         last_collect_status="",
         last_collect_error="",
         last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
     )
 
     count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
@@ -367,6 +444,8 @@ async def test_list_configs_backfills_visible_instances_without_overwriting(monk
             last_collect_status="success",
             last_collect_error="",
             last_collect_count=3,
+            last_collect_sources=["mysql_slowlog", "platform_history"],
+            last_collect_message="MySQL 统计视图 + 平台历史",
             created_by="alice",
         ),
         2: SimpleNamespace(
@@ -381,6 +460,8 @@ async def test_list_configs_backfills_visible_instances_without_overwriting(monk
             last_collect_status="idle",
             last_collect_error="",
             last_collect_count=0,
+            last_collect_sources=[],
+            last_collect_message="",
             created_by="bob",
         ),
     }
@@ -394,6 +475,7 @@ async def test_list_configs_backfills_visible_instances_without_overwriting(monk
     assert [item.threshold_ms for item in items] == [100, 2500]
     assert items[0].collect_interval == 60
     assert items[0].last_collect_count == 3
+    assert items[0].last_collect_message == "MySQL 统计视图 + 平台历史"
     assert ensure_default.await_count == 2
 
 

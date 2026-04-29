@@ -199,12 +199,10 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/query/history', icon: <HistoryOutlined />, label: '查询历史' },
     ],
   },
-  { key: '/monitor', icon: <MenuIcon component={MonitorMenuSvg} label="可观测中心" />, label: '可观测中心', permission: 'menu_monitor' },
+  { key: '/monitor', icon: <MenuIcon component={MonitorMenuSvg} label="观测中心" />, label: '观测中心', permission: 'menu_observability' },
   {
-    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', anyPermissions: ['menu_ops', 'archive_apply', 'archive_review', 'archive_execute'],
+    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'],
     children: [
-      { key: '/diagnostic', icon: <MenuIcon component={DiagnosticMenuSvg} label="会话管理" />, label: '会话管理', permission: 'menu_ops' },
-      { key: '/sql-analysis', icon: <MenuIcon component={OptimizeMenuSvg} label="SQL 分析" />, label: 'SQL 分析', permission: 'menu_ops' },
       { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'] },
     ],
   },

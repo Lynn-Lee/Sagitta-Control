@@ -16,7 +16,7 @@
 | 技术栈（后端） | FastAPI + SQLAlchemy 2.0 async + Celery 5 + PostgreSQL 16 |
 | 技术栈（前端） | React 18 + TypeScript + Vite + Ant Design 5 |
 | 引擎层 | EngineBase Protocol + sqlglot（替代 goInception 解析） |
-| 可观测中心 | 数据库原生指标采集 + 舰队健康评分 + TopN 诊断 + 容量快照（Prometheus/Grafana 可选） |
+| 观测中心 | 数据库原生指标采集 + 舰队健康评分 + TopN 诊断 + 容量快照（Prometheus/Grafana 可选） |
 | SaaS 预留 | 全部模型含 tenant_id，初期固定为 1 |
 | 部署方式 | Docker Compose（开发/测试）/ K8s + Helm（生产预留）|
 
@@ -30,7 +30,7 @@
 | Sprint 1 | 认证、用户、实例管理 | ✅ | 100% |
 | Sprint 2 | 引擎层、在线查询、查询权限 | ✅ | 100% |
 | Pack A (S3+S4) | SQL 工单全流程 + 运维工具 | ✅ | 100% |
-| Pack B (S5+S6) | 可观测中心 + 迁移脚本 | ✅ | 100% |
+| Pack B (S5+S6) | 观测中心 + 迁移脚本 | ✅ | 100% |
 | Pack C1 | 系统配置、审计日志、资源组、个人设置 | ✅ | 100% |
 | Pack C2 | 实例数据库注册管理 | ✅ | 100% |
 | Pack D | 数据脱敏、数据字典、SQL 工单模板、AI Text2SQL | ✅ | 100% |
@@ -47,8 +47,8 @@
 | 密码安全策略 | 本地账号复杂度、默认/过期密码强制改密、30 天轮换、到期前 7 天提醒 | ✅ | 100% |
 | 统一治理视角 | Dashboard、查询权限、SQL 工单统一 self/group/instance_scope/global 视角 | ✅ | 100% |
 | 查询权限撤销审计 | 已生效查询权限撤销、撤销记录、历史软删除回填、Dashboard 撤销统计 | ✅ | 100% |
-| 会话诊断与慢日志分析 | 连接/会话视角在线与历史快照、Oracle ASH/AWR 活跃采样、慢日志采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
-| 可观测中心 2 期 | 舰队总览、健康评分、真实区间 QPS/TPS、Top SQL/等待事件/容量增长、Oracle 指标包、阈值告警规则 | ✅ | 100% |
+| 会话洞察与 SQL 洞察 | 连接/会话视角在线与历史快照、Oracle ASH/AWR 活跃采样、SQL 执行信息采集配置、SQL 指纹、MySQL/PG 执行计划 | ✅ | 100% |
+| 观测中心 2 期 | 舰队总览、健康评分、真实区间 QPS/TPS、Top SQL/等待事件/容量增长、Oracle 指标包、阈值告警规则 | ✅ | 100% |
 
 **总体完成度：100%（v1.0-GA），v2-lite 首发范围已完成并进入体验收口与持续验收阶段**
 
@@ -148,13 +148,13 @@
 - 自动识别实例数据库类型生成对应方言 SQL
 - 系统配置中配置 API Key
 
-**运维工具**
-- 会话管理（processlist / kill）已重做为连接/会话视角，支持完整在线连接清单、平台历史会话快照与 Oracle ASH/AWR 活跃采样
-- 慢日志分析 v2：平台查询历史同步、原生慢日志采集、SQL 指纹聚合、实例级采集配置、指纹详情、结构化优化建议、MySQL/PostgreSQL 执行计划分析
+**观测中心**
+- 会话洞察（processlist / kill）已重做为连接/会话视角，支持完整在线连接清单、平台历史会话快照与 Oracle ASH/AWR 活跃采样
+- SQL 洞察：SQL 执行信息采集、平台历史同步、数据库统计/活动视图采集、SQL 指纹聚合、实例级采集配置、来源说明、指纹详情、结构化优化建议、MySQL/PostgreSQL 执行计划分析
 - SQL 优化建议（sqlglot 规则）
 - 数据字典（三级浏览：实例→数据库→表→字段结构）
 
-### Pack B — 可观测中心 ✅
+### Pack B — 观测中心 ✅
 
 - Dashboard 在线查询概览（8 个卡片、查询趋势、查询用户 Top 10、治理趋势、待审批库存趋势，按统一治理视角裁剪；治理失败次数包含查询执行失败及查询权限申请/审批失败；新增撤销查询权限数和撤销权限趋势）
 - Dashboard SQL 工单概览（10 个卡片、工单提交趋势、工单治理趋势、执行趋势、待审批库存趋势、5 个 Top 图，按权限范围裁剪；审批相关排行按业务对象范围统计而非个人审批待办）
@@ -162,8 +162,8 @@
 - 在线查询结果区支持自适应高度、分页、`row_num` 行号列、当前页/全部结果导出
 - 在线查询新增 `查询历史` 页面：支持时间范围、操作人、实例、数据库、操作类型、脱敏、SQL 关键字筛选，支持 SQL 明细查看、复制和收藏
 - 查询历史复用 v2-lite 查询治理范围；查询/导出成功与失败统一写入 `query_log`，迁移新增 `0017_query_log_history_audit` 和 `0018_qlog_snapshot_backfill`
-- 可观测中心边界收敛为“数据库实例监控”，平台治理统计继续归属首页 Dashboard
-- 可观测中心前端入口升级为默认“舰队总览”和“监控”两个 Tab：舰队总览负责全局健康卡片、风险排序、DB 类型/风险等级/采集状态筛选与单实例/批量配置采集操作，监控 Tab 按实例查看诊断详情
+- 观测中心边界收敛为“实例优先的数据库运行态诊断中心”，平台治理统计继续归属首页 Dashboard
+- 观测中心前端入口升级为“舰队总览”和“实例诊断工作台”：舰队总览负责全局健康卡片、风险排序、DB 类型/风险等级/采集状态筛选与单实例/批量配置采集操作，实例诊断工作台按实例组织概览、性能趋势、会话洞察、SQL 洞察、容量、复制/引擎指标、告警和采集诊断
 - 原生监控配置管理：启停、实例指标采集间隔、容量采集间隔、指标保留天数、采集状态与错误
 - 新增原生采样快照：`monitor_metric_snapshot`、`monitor_database_capacity_snapshot`、`monitor_table_capacity_snapshot`
 - 实例详情支持概览、性能趋势（1h/6h/24h/7d）、库/Schema 容量、表/索引容量、会话阻塞、Top SQL、复制状态、等待事件、容量增长、告警规则与采集诊断
@@ -175,12 +175,12 @@
 - Prometheus + Grafana + Alertmanager 调整为可选外围集成；Prometheus SD 端点保留兼容旧部署
 - 监控队列新增 `collect_native_monitoring`、`collect_session_snapshots` 与 `collect_slow_queries` 定时任务，分别写入原生监控快照、`session_snapshot` 和 `slow_query_log`
 
-**会话诊断与慢日志补充**
-- Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0024_session_duration_ms`、`0025_session_duration_fields`
+**会话洞察与 SQL 洞察补充**
+- Alembic 新增 `0019_session_snapshot`、`0020_slow_query_log`、`0021_slow_query_v2`、`0024_session_duration_ms`、`0025_session_duration_fields`、`0030_observability_permission_rework`、`0031_sql_activity_collect_semantics`
 - `session_snapshot` 保存实例、DB 类型、会话 ID、用户、主机、命令、状态、连接时长、状态时长、当前操作时长、事务时长、SQL 上下文、等待事件、阻塞会话、采集来源与采集错误
-- `slow_query_log` 统一保存 `platform / mysql_slowlog / pgsql_statements / redis_slowlog` 来源慢 SQL
-- `slow_query_config` 保存实例级启用状态、慢 SQL 阈值、采集间隔、保留天数、采集上限与最近采集状态
-- 慢日志页面新增 `总览 / 慢 SQL 明细 / 指纹聚合 / 实时慢查询 / 采集配置`
+- `slow_query_log` 统一保存平台历史、MySQL/PG/Redis 统计来源以及 TiDB/StarRocks/Oracle SQL 活动来源
+- `slow_query_config` 保存实例级启用状态、SQL 阈值、采集间隔、保留天数、采集上限、最近采集状态、采集来源与来源说明
+- SQL 洞察页面新增 `总览 / SQL 样本 / SQL 指纹 / 实时 SQL / 手工诊断 / 采集配置`
 - 指纹详情支持趋势、实例/库/用户/来源分布、结构化建议和样例 SQL
 - 执行计划分析首发支持 MySQL `EXPLAIN FORMAT=JSON` 和 PostgreSQL `EXPLAIN (FORMAT JSON, BUFFERS, VERBOSE)`
 
@@ -558,8 +558,8 @@
 | Role | 中文名 | 关键特征 |
 |---|---|---|
 | `superadmin` | 超级管理员 | is_superuser=True，绕过一切检查 |
-| `dba` | 全局 DBA | 运维权限 + query_all_instances + monitor_all_instances |
-| `dba_group` | 资源组 DBA | 运维权限，实例范围限于资源组 |
+| `dba` | 全局 DBA | 运维权限 + query_all_instances + observability_instance_all |
+| `dba_group` | 资源组 DBA | 运维与观测权限，实例范围限于资源组 |
 | `developer` | 开发工程师 | 工单提交 + 查询申请，需授权才能查库 |
 
 ### 本次补充验证

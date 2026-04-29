@@ -103,3 +103,53 @@ class TidbEngine(MysqlEngine):
             WHERE 1 = 1
             {command_filter}
         """
+
+    async def collect_sql_activity(
+        self,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        min_seconds = max(0, int(min_duration_ms)) / 1000
+        sql = f"""
+            SELECT
+              'tidb_statements' AS source,
+              CONCAT('tidb:', ID, ':', IFNULL(DIGEST, '')) AS source_ref,
+              DB AS db_name,
+              INFO AS sql_text,
+              TIME * 1000 AS duration_ms,
+              USER AS username,
+              HOST AS client_host,
+              DIGEST AS digest,
+              COMMAND AS command,
+              STATE AS state
+            FROM information_schema.CLUSTER_PROCESSLIST
+            WHERE INFO IS NOT NULL
+              AND TIME >= {min_seconds}
+            ORDER BY TIME DESC
+            LIMIT {int(limit)}
+        """
+        rs = await self.query(db_name="", sql=sql, limit_num=0)
+        if rs.is_success:
+            return rs
+
+        fallback_sql = f"""
+            SELECT
+              'tidb_statements' AS source,
+              CONCAT('tidb:', ID) AS source_ref,
+              DB AS db_name,
+              INFO AS sql_text,
+              TIME * 1000 AS duration_ms,
+              USER AS username,
+              HOST AS client_host,
+              COMMAND AS command,
+              STATE AS state
+            FROM information_schema.PROCESSLIST
+            WHERE INFO IS NOT NULL
+              AND TIME >= {min_seconds}
+            ORDER BY TIME DESC
+            LIMIT {int(limit)}
+        """
+        fallback = await self.query(db_name="", sql=fallback_sql, limit_num=0)
+        if fallback.is_success:
+            fallback.warning = f"CLUSTER_PROCESSLIST 不可用，已降级为本节点 PROCESSLIST：{rs.error}"
+        return fallback

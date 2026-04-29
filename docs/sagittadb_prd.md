@@ -11,7 +11,7 @@
 
 ### 1.1 产品简介
 
-SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数据库管控平台。通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效地完成 SQL 审核上线、在线查询、慢日志分析、数据库监控等全流程数据库管理工作。
+SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数据库管控平台。通过统一的 Web 界面，帮助 DBA 和研发团队安全、高效地完成 SQL 审核上线、在线查询、SQL 洞察、数据库运行态诊断等全流程数据库管理工作。
 
 **核心价值：矢向数据，精准管控**
 
@@ -87,10 +87,14 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 | `resource_group_manage` | 资源组管理 |
 | `system_config_manage` | 系统配置修改 |
 | `audit_user` | 查看审计日志 |
-| `process_view` | 查看数据库会话 |
-| `process_kill` | Kill 数据库会话 |
-| `monitor_config_manage` | 监控配置管理 |
-| `monitor_review` | 监控权限申请审批 |
+| `menu_observability` | 进入观测中心 |
+| `observability_instance_all` | 查看全部实例观测数据 |
+| `observability_session_view` | 查看在线会话、历史会话、ASH/AWR |
+| `observability_session_kill` | Kill 数据库会话 |
+| `observability_sql_view` | 查看 SQL 样本、SQL 指纹、实时 SQL |
+| `observability_sql_analyze` | 执行计划、优化诊断、手工 SQL 诊断 |
+| `observability_collect_manage` | 管理指标、会话、SQL 采集配置并手动采集 |
+| `observability_alert_manage` | 管理告警规则 |
 | `archive_apply` | 数据归档申请执行 |
 
 **超级管理员：** `is_superuser=True` 绕过所有权限检查
@@ -272,19 +276,20 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - 查看数据库当前在线连接/会话/线程/进程（processlist / pg_stat_activity / v$session）
 - 默认展示完整连接清单（含空闲连接），可快速隐藏空闲会话
 - 显示：会话 ID、用户、来源 IP、客户端程序、库/Schema、命令、状态、连接时长、状态时长、当前操作时长、事务时长、等待事件、阻塞会话、SQL 上下文
-- 支持 Kill 指定会话（需 `process_kill` 权限）
+- 支持 Kill 指定会话（需 `observability_session_kill` 权限）
 - 支持引擎：MySQL/TiDB/PostgreSQL/Oracle/MongoDB/ClickHouse/Redis/StarRocks 等已实现 `processlist` 能力的实例类型
 - 平台定时采集会话快照，支持按时间范围、实例、用户、数据库、状态、命令、SQL 关键字和多种时长查询历史会话
 - Oracle 支持 ASH/AWR 活跃采样入口，适用于历史活跃会话与性能排查，但不等同于全量连接历史
 
-#### 2.5.2 慢日志分析
+#### 2.5.2 SQL 洞察
 
-- 统一展示平台在线查询历史与数据库原生慢日志记录
-- 支持按实例、数据库、来源、时间范围、SQL 关键字和耗时阈值筛选
+- 统一展示平台在线查询历史、数据库统计视图和 SQL 活动视图采集到的 SQL 执行信息
+- 支持按实例、数据库、采集来源、时间范围、SQL 关键字和耗时阈值筛选
 - 支持 SQL 指纹聚合，展示调用次数、平均/P95/最大耗时、扫描行数、返回行数和最后出现时间
 - 支持指纹详情：趋势、实例分布、数据库分布、用户分布、来源分布、样例 SQL 与结构化优化建议
-- 支持实例级慢日志采集配置：启用状态、慢 SQL 阈值、采集间隔、保留天数、单次采集上限和最近采集状态
-- 支持 MySQL / PostgreSQL 执行计划分析；Redis 展示 SLOWLOG；其他引擎第三版分批接入
+- 支持实例级 SQL 采集配置：启用状态、SQL 阈值、采集间隔、保留天数、单次采集上限、最近采集状态、采集来源和来源说明
+- MySQL / PostgreSQL / Redis 继续使用统计或原生命令来源；TiDB / StarRocks / Oracle 使用 SQL 活动视图并叠加平台历史；其他关系型引擎暂以平台历史兜底
+- 支持 MySQL / PostgreSQL 执行计划分析；其他引擎按已实现能力逐步接入
 
 #### 2.5.3 SQL 优化
 
@@ -339,12 +344,12 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 | WAL 查询 | PostgreSQL | 生成逻辑复制槽查询语句 |
 | 工具说明文档 | Oracle/MSSQL/MongoDB 等 | 返回对应工具的使用说明 |
 
-### 2.6 可观测中心
+### 2.6 观测中心
 
 #### 2.6.1 产品边界
 
-- 可观测中心聚焦“数据库实例健康与问题定位”，包括舰队健康、连接/会话、吞吐、慢查询/锁等待、复制状态、库/表容量、容量增长、Top SQL、等待事件和采集诊断。
-- 平台治理类统计（在线查询概览、SQL 工单概览、实例与库治理概览、归档概览）归属首页 Dashboard，不并入可观测中心。
+- 观测中心聚焦“实例优先的数据库运行态诊断”，包括舰队健康、连接/会话、吞吐、SQL 样本/锁等待、复制状态、库/表容量、容量增长、Top SQL、等待事件和采集诊断。
+- 平台治理类统计（在线查询概览、SQL 工单概览、实例与库治理概览、归档概览）归属首页 Dashboard，不并入观测中心。
 - 首版不要求用户部署 Prometheus/Grafana；后端按实例引擎原生采集指标并入库。
 - 实例账号能读取到多少指标就展示多少；读取不到的指标保持为空，并在采集诊断中提示权限不足、引擎不支持或采集失败原因。Oracle 等高权限视图采集失败时必须保留基础健康指标，不能因单个指标组失败导致整实例采集失败。
 
@@ -412,17 +417,17 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
   - 查询权限审批失败
 - SQL 工单与在线查询的审批相关排行，均统计“当前权限范围内业务对象涉及的审批处理情况”，不等同于当前登录人的个人审批待办/已办工作量
 
-#### 2.6.3 原生数据库监控
+#### 2.6.3 实例诊断工作台
 
-- 可观测中心首屏为“舰队总览”，展示实例总数、在线率、异常实例、采集失败、连接压力、容量风险、复制延迟、锁等待/长事务等卡片。
+- 观测中心首屏为“舰队总览”，展示实例总数、在线率、异常实例、采集失败、连接压力、容量风险、复制延迟、锁等待/长事务等卡片。
 - 实例列表按健康风险排序，展示健康分、风险等级、风险原因、数据库类型、采集开关、采集状态、连接使用率、QPS/TPS、慢查询、容量、复制延迟和最后采集时间。
 - 舰队总览支持按数据库类型、风险等级和采集状态筛选。
 - 每个实例派生 `health_score / risk_level / risk_reasons`，健康评分扣分维度包括不可用、采集失败、连接使用率高、锁等待、长事务、慢查询、复制延迟、Oracle 表空间/FRA 风险和缺失指标组。
-- 实例详情包含概览、性能、库容量、表容量、会话、慢 SQL、复制、等待事件、容量增长、告警、采集诊断；Oracle 实例额外展示 Oracle 专属页。
+- 实例详情包含概览、性能趋势、会话洞察、SQL 洞察、容量、复制/引擎指标、告警和采集诊断；Oracle 实例额外展示 Oracle 专属页。
 - 指标采样入库，趋势支持 1 小时、6 小时、24 小时、7 天；QPS/TPS 优先按采集间隔 counters 计算真实区间速率，缺少 counters 时回退到引擎提供值。
 - 库容量展示库/Schema 总大小、数据大小、索引大小、表数量和行数估算。
 - 表容量展示表名、库名、数据大小、索引大小、总大小和行数估算，支持排序、库过滤和表名搜索。
-- TopN 诊断接口展示 Top SQL、等待事件/阻塞会话、Top 增长库、Top 大表，并复用现有会话诊断和慢日志能力作为下钻入口。
+- TopN 诊断接口展示 Top SQL、等待事件/阻塞会话、Top 增长库、Top 大表，并复用会话洞察和 SQL 洞察作为下钻入口。
 - 原生采集配置支持启停、实例指标采集间隔、容量采集间隔和保留天数。
 - Celery `monitor` 队列定时执行 `collect_native_monitoring`，采集任务失败不会阻断其他实例。
 
@@ -435,18 +440,18 @@ SagittaDB（矢准数据）是基于 Archery v1.14.0 深度重构的企业级数
 - MongoDB：connections、opcounters、memory、replication、currentOp 与集合容量。
 - ClickHouse / StarRocks：健康、查询/集群节点指标、容量和慢查询能力按引擎可用视图逐步增强。
 
-#### 2.6.4 监控权限与采集诊断
+#### 2.6.4 观测权限与采集诊断
 
-- 监控查看范围遵循 v2-lite 资源组范围和 `monitor_all_instances` 权限。
-- `monitor_config_manage` 用户可配置采集并手动触发采集。
-- `monitor_alert_manage` 用户可维护实例级阈值告警覆盖规则。
+- 观测查看范围遵循 v2-lite 资源组范围和 `observability_instance_all` 权限。
+- `observability_collect_manage` 用户可配置指标、会话、SQL 采集并手动触发采集。
+- `observability_alert_manage` 用户可维护实例级阈值告警覆盖规则。
 - 采集诊断展示最近指标采集时间、容量采集时间、采集状态、错误信息和缺失指标组原因。
 - 指标为空时不显示为 0，统一展示“暂无数据”或权限/配置提示。
 - 缺失指标组必须可读，方便 DBA 为监控账号补充 `v$`、`dba_`、`performance_schema`、`pg_stat_*` 等原生监控权限。
 
 #### 2.6.5 可选外部监控集成
 
-- Prometheus/Grafana/Alertmanager 作为可选外围部署能力保留，不是可观测中心首版核心依赖。
+- Prometheus/Grafana/Alertmanager 作为可选外围部署能力保留，不是观测中心首版核心依赖。
 - 既有 Prometheus SD 端点可继续用于兼容旧部署，但 `/monitor` 页面不再以 Exporter 配置为主流程。
 
 #### 2.6.6 监控配置管理（历史兼容）
@@ -625,8 +630,8 @@ PostgreSQL(:5432)  Redis(:6379)   Celery Worker
 | `query_privileges` | 在线查询权限记录 |
 | `monitor_collect_config` | 监控采集配置 |
 | `session_snapshot` | 会话历史快照 |
-| `slow_query_log` | 慢 SQL 明细与指纹分析来源 |
-| `slow_query_config` | 慢日志采集配置与最近采集状态 |
+| `slow_query_log` | SQL 样本与指纹分析来源 |
+| `slow_query_config` | SQL 采集配置、最近采集状态与来源说明 |
 
 ---
 
@@ -637,7 +642,7 @@ PostgreSQL(:5432)  Redis(:6379)   Celery Worker
 | 时间节点 | 交付内容 |
 |---|---|
 | Sprint 0~2 | 项目骨架、认证、实例管理、引擎层、在线查询 |
-| Pack A~B | SQL 工单全流程、运维工具、可观测中心 |
+| Pack A~B | SQL 工单全流程、运维工具、观测中心 |
 | Pack C1~C2 | 系统配置、审计日志、资源组、数据库注册 |
 | Pack D | 数据脱敏、数据字典、工单模板、AI Text2SQL |
 | Pack E | 多引擎补全、数据归档、SQL 回滚辅助、通知服务 |

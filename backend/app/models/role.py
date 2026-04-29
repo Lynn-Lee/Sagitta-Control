@@ -43,7 +43,7 @@ class Role(BaseModel):
 
     内置角色（is_system=True）不可删除：
     - superadmin: 超级管理员，is_superuser=True，绕过一切检查
-    - dba: 全局 DBA，拥有 query_all_instances + monitor_all_instances
+    - dba: 全局 DBA，拥有 query_all_instances + observability_instance_all
     - dba_group: 资源组 DBA，运维权限但实例范围限于资源组
     - developer: 开发工程师，工单提交 + 查询申请
 

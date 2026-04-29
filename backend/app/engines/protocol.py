@@ -175,7 +175,7 @@ class EngineProtocol(Protocol):
         """修改数据库参数。"""
         return ResultSet()
 
-    # ── 可观测中心（新增）────────────────────────────────────
+    # ── 观测中心（新增）────────────────────────────────────
 
     async def collect_metrics(self) -> dict[str, Any]:
         """
@@ -193,6 +193,14 @@ class EngineProtocol(Protocol):
     ) -> ResultSet:
         """采集引擎原生慢 SQL/慢命令摘要。"""
         return ResultSet(warning=f"{self.db_type} 暂不支持原生慢日志采集")
+
+    async def collect_sql_activity(
+        self,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        """采集通用 SQL 执行活动。"""
+        return ResultSet(warning=f"{self.db_type} 暂不支持 SQL 活动采集")
 
     async def explain_query(
         self,

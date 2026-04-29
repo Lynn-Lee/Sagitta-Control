@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # ─── CORS ─────────────────────────────────────────────────
     CORS_ORIGINS: list[str] = ["http://localhost", "http://localhost:5173", "http://localhost:3000"]
 
-    # ─── 可观测中心 ────────────────────────────────────────────
+    # ─── 观测中心 ────────────────────────────────────────────
     PROMETHEUS_URL: str = "http://localhost:9090"
     ALERTMANAGER_URL: str = "http://localhost:9093"
     GRAFANA_URL: str = "http://localhost:3000"

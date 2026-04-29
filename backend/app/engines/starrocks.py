@@ -376,6 +376,50 @@ class StarRocksEngine(MysqlEngine):
             ]
         return rs
 
+    async def collect_sql_activity(
+        self,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        rs = await self.processlist(command_type="ALL")
+        if not rs.is_success:
+            return rs
+        rows: list[dict[str, Any]] = []
+        for row in rs.rows[: int(limit)]:
+            info = self._row_get(row, "Info", "INFO", "sql_text")
+            duration_ms = int(float(self._row_get(row, "Time", "TIME", "time_seconds") or 0) * 1000)
+            if not info or duration_ms < min_duration_ms:
+                continue
+            session_id = self._row_get(row, "Id", "ID", "session_id")
+            rows.append(
+                {
+                    "source": "starrocks_queries",
+                    "source_ref": f"starrocks:{session_id}",
+                    "db_name": self._row_get(row, "Db", "DB", "db_name"),
+                    "sql_text": info,
+                    "duration_ms": duration_ms,
+                    "username": self._row_get(row, "User", "USER", "username"),
+                    "client_host": self._row_get(row, "Host", "HOST", "client_host"),
+                    "command": self._row_get(row, "Command", "COMMAND", "command"),
+                    "state": self._row_get(row, "State", "STATE", "state"),
+                }
+            )
+        return ResultSet(
+            column_list=[
+                "source",
+                "source_ref",
+                "db_name",
+                "sql_text",
+                "duration_ms",
+                "username",
+                "client_host",
+                "command",
+                "state",
+            ],
+            rows=rows,
+            affected_rows=len(rows),
+        )
+
     async def kill_connection(self, thread_id: int) -> ResultSet:
         rs = await self.query(db_name="", sql=f"KILL {int(thread_id)}", limit_num=0)
         if rs.error and self._is_privilege_error(rs.error):

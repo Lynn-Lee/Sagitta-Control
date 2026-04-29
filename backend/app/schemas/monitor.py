@@ -1,5 +1,5 @@
 """
-可观测中心 Pydantic Schema（Sprint 5）。
+观测中心 Pydantic Schema（Sprint 5）。
 """
 from datetime import date
 

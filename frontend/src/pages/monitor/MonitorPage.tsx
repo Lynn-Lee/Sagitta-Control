@@ -3,10 +3,13 @@ import type { MenuProps } from 'antd'
 import { Alert, Button, Card, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
 import { AlertOutlined, ApiOutlined, BarChartOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
+import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
 import { useAuthStore } from '@/store/auth'
 
 const { Text } = Typography
@@ -158,16 +161,24 @@ export default function MonitorPage() {
   const screens = useBreakpoint()
   const isMobile = !screens.md
   const queryClient = useQueryClient()
-  const canManageConfig = useAuthStore((s) => s.hasPermission('monitor_config_manage'))
-  const canManageAlerts = useAuthStore((s) => s.hasPermission('monitor_alert_manage'))
+  const [searchParams, setSearchParams] = useSearchParams()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canManageConfig = hasPermission('observability_collect_manage')
+  const canManageAlerts = hasPermission('observability_alert_manage')
+  const canViewSessions = hasPermission('observability_session_view')
+  const canViewSql = hasPermission('observability_sql_view')
   const [msgApi, msgCtx] = message.useMessage()
-  const [mainTab, setMainTab] = useState('instance-overview')
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const requestedView = searchParams.get('view')
+  const requestedInstanceId = Number(searchParams.get('instance_id') || 0) || null
+  const [mainTab, setMainTab] = useState(requestedView ? 'monitor' : 'instance-overview')
+  const [workbenchTab, setWorkbenchTab] = useState(requestedView === 'sessions' ? 'sessions' : requestedView === 'sql' ? 'sql' : 'overview')
+  const [selectedId, setSelectedId] = useState<number | null>(requestedInstanceId)
   const [dbTypeFilter, setDbTypeFilter] = useState<string | undefined>()
   const [riskFilter, setRiskFilter] = useState<string | undefined>()
   const [collectStatusFilter, setCollectStatusFilter] = useState<string | undefined>()
   const [trendHours, setTrendHours] = useState(24)
   const [alertRulesText, setAlertRulesText] = useState('{}')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
   const [configScope, setConfigScope] = useState<'single' | 'all'>('single')
   const [configOpen, setConfigOpen] = useState(false)
@@ -215,7 +226,7 @@ export default function MonitorPage() {
   const { data: topSqlData } = useQuery({
     queryKey: ['native-monitor-top-sql', activeId],
     queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`).then(r => r.data),
-    enabled: !!activeId,
+    enabled: !!activeId && canViewSql,
   })
   const { data: waitsData } = useQuery({
     queryKey: ['native-monitor-waits', activeId],
@@ -248,6 +259,17 @@ export default function MonitorPage() {
     enabled: !!activeId,
   })
   const showOverviewActions = mainTab === 'instance-overview'
+
+  useEffect(() => {
+    if (requestedInstanceId) setSelectedId(requestedInstanceId)
+    if (requestedView === 'sessions') {
+      setMainTab('monitor')
+      setWorkbenchTab('sessions')
+    } else if (requestedView === 'sql') {
+      setMainTab('monitor')
+      setWorkbenchTab('sql')
+    }
+  }, [requestedInstanceId, requestedView])
 
   useEffect(() => {
     setAlertRulesText(JSON.stringify(alertRules?.rules || {}, null, 2))
@@ -392,21 +414,44 @@ export default function MonitorPage() {
   const showInstanceMonitor = (instanceId: number) => {
     selectInstance(instanceId)
     setMainTab('monitor')
+    setWorkbenchTab('overview')
+    setSearchParams({ instance_id: String(instanceId), view: 'overview' })
   }
 
-  const refreshMonitorData = () => {
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-    if (!activeId) return
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-health', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-top-sql', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', activeId] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', activeId] })
+  const openWorkbench = (instanceId: number, tab: string) => {
+    selectInstance(instanceId)
+    setMainTab('monitor')
+    setWorkbenchTab(tab)
+    setSearchParams({ instance_id: String(instanceId), view: tab === 'sql' ? 'sql' : tab === 'sessions' ? 'sessions' : tab })
+  }
+
+  const refreshMonitorData = async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    const minimumVisibleDelay = new Promise(resolve => setTimeout(resolve, 300))
+    const refreshTasks = [
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] }),
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] }),
+    ]
+    if (activeId) {
+      refreshTasks.push(
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-health', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-top-sql', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', activeId] }),
+        queryClient.invalidateQueries({ queryKey: ['native-monitor-alerts', activeId] }),
+      )
+    }
+    try {
+      await Promise.all([Promise.all(refreshTasks), minimumVisibleDelay])
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const openConfig = (target?: MonitorInstance | null) => {
@@ -512,7 +557,24 @@ export default function MonitorPage() {
     { title: '采集状态', width: 120, render: (_: any, row: MonitorInstance) => <StatusTag status={row.last_collect_status} /> },
     { title: '连接使用率', width: 130, render: (_: any, row: MonitorInstance) => row.latest?.connection_usage !== null && row.latest?.connection_usage !== undefined ? <Progress percent={Math.round(row.latest.connection_usage * 100)} size="small" /> : <Text type="secondary">暂无数据</Text> },
     { title: 'QPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.qps) },
-    { title: '慢查询', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.slow_queries) },
+    {
+      title: '慢查询',
+      width: 110,
+      render: (_: any, row: MonitorInstance) => (
+        <Button type="link" size="small" style={{ padding: 0 }} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sql') }}>
+          {formatMetric(row.latest?.slow_queries)}
+        </Button>
+      ),
+    },
+    {
+      title: '锁/长事务',
+      width: 120,
+      render: (_: any, row: MonitorInstance) => (
+        <Button type="link" size="small" style={{ padding: 0 }} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sessions') }}>
+          {formatMetric((row.latest?.lock_waits || 0) + (row.latest?.long_transactions || 0))}
+        </Button>
+      ),
+    },
     { title: 'TPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.tps) },
     { title: '容量', width: 130, render: (_: any, row: MonitorInstance) => formatBytes(row.latest?.total_size_bytes) },
     { title: '复制延迟', width: 110, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.replication_lag_seconds, 's') },
@@ -521,10 +583,12 @@ export default function MonitorPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 300,
+      width: 420,
       render: (_: any, row: MonitorInstance) => (
         <Space onClick={(event) => event.stopPropagation()}>
           <Button size="small" icon={<BarChartOutlined />} onClick={() => showInstanceMonitor(row.instance_id)}>查看监控</Button>
+          {canViewSessions && <Button size="small" icon={<FieldTimeOutlined />} onClick={() => openWorkbench(row.instance_id, 'sessions')}>会话</Button>}
+          {canViewSql && <Button size="small" icon={<AlertOutlined />} onClick={() => openWorkbench(row.instance_id, 'sql')}>SQL</Button>}
           {canManageConfig && <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>}
           {canManageConfig && <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集</Button>}
         </Space>
@@ -602,11 +666,13 @@ export default function MonitorPage() {
     <div>
       {msgCtx}
       <PageHeader
-        title="可观测中心"
+        title="观测中心"
         marginBottom={20}
         actions={(
           <Space wrap style={isMobile ? { width: '100%' } : undefined}>
-            <Button icon={<ReloadOutlined />} onClick={refreshMonitorData}>刷新</Button>
+            <Button icon={<ReloadOutlined />} loading={isRefreshing} disabled={isRefreshing} onClick={refreshMonitorData}>
+              {isRefreshing ? '刷新中' : '刷新'}
+            </Button>
             {showOverviewActions && canManageConfig && (
               <Dropdown menu={{ items: bulkConfigItems }} disabled={!instances.length || saveAllConfig.isPending || disableAllConfig.isPending}>
                 <Button icon={<SettingOutlined />} loading={saveAllConfig.isPending || disableAllConfig.isPending}>
@@ -621,7 +687,14 @@ export default function MonitorPage() {
 
       <Tabs
         activeKey={mainTab}
-        onChange={setMainTab}
+        onChange={(key) => {
+          setMainTab(key)
+          if (key === 'instance-overview') {
+            setSearchParams({})
+          } else if (activeId) {
+            setSearchParams({ instance_id: String(activeId), view: workbenchTab })
+          }
+        }}
         items={[
           {
             key: 'instance-overview',
@@ -663,7 +736,7 @@ export default function MonitorPage() {
                   rowKey="instance_id"
                   loading={isLoading}
                   tableLayout="fixed"
-                  scroll={{ x: 1760 }}
+                  scroll={{ x: 2040 }}
                   pagination={false}
                   rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
                   onRow={(row) => ({
@@ -677,7 +750,7 @@ export default function MonitorPage() {
           },
           {
             key: 'monitor',
-            label: <span><BarChartOutlined />监控</span>,
+            label: <span><BarChartOutlined />实例诊断工作台</span>,
             children: activeId ? (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -714,6 +787,14 @@ export default function MonitorPage() {
                 {latest?.error && <Alert type="error" showIcon message="最近采集失败" description={latest.error} />}
 
                 <Tabs
+                  activeKey={workbenchTab}
+                  onChange={(key) => {
+                    setWorkbenchTab(key)
+                    if (activeId) {
+                      const view = key === 'sessions' ? 'sessions' : key === 'sql' ? 'sql' : key
+                      setSearchParams({ instance_id: String(activeId), view })
+                    }
+                  }}
                   items={[
                     {
                       key: 'overview',
@@ -804,23 +885,27 @@ export default function MonitorPage() {
                     },
                     {
                       key: 'sessions',
-                      label: <span><FieldTimeOutlined />会话</span>,
-                      children: (
+                      label: <span><FieldTimeOutlined />会话洞察</span>,
+                      disabled: !canViewSessions,
+                      children: canViewSessions ? (
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                          <Alert type="info" showIcon message="会话诊断入口" description="当前页展示阻塞与等待摘要；完整 processlist、kill 会话和历史 ASH 请进入会话管理页面继续处理。" />
+                          <Alert type="info" showIcon message="会话洞察" description="在线会话、阻塞链、历史会话和 Oracle ASH/AWR 均使用当前实例上下文。" />
                           <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 920 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
+                          <SessionInsightPanel embedded instanceId={activeId} />
                         </Space>
-                      ),
+                      ) : <TableEmptyState title="暂无会话洞察权限" />,
                     },
                     {
-                      key: 'top-sql',
-                      label: <span><AlertOutlined />慢 SQL</span>,
-                      children: (
+                      key: 'sql',
+                      label: <span><AlertOutlined />SQL 洞察</span>,
+                      disabled: !canViewSql,
+                      children: canViewSql ? (
                         <Space direction="vertical" size={12} style={{ width: '100%' }}>
                           {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
                           <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 1100 }} pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                          <SqlInsightPanel embedded instanceId={activeId} />
                         </Space>
-                      ),
+                      ) : <TableEmptyState title="暂无 SQL 洞察权限" />,
                     },
                     {
                       key: 'replication',
