@@ -11,6 +11,7 @@ import TableEmptyState from '@/components/common/TableEmptyState'
 import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
 import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
 import { useAuthStore } from '@/store/auth'
+import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text } = Typography
 const { Option } = Select
@@ -661,7 +662,7 @@ export default function MonitorPage() {
             {row.instance_name}
           </Button>
           <Space size={4}>
-            <Tag>{row.db_type}</Tag>
+            <Tag>{formatDbTypeLabel(row.db_type)}</Tag>
             <Text type="secondary">ID:{row.instance_id}</Text>
           </Space>
         </Space>
@@ -840,7 +841,7 @@ export default function MonitorPage() {
                 <Card size="small" styles={{ body: { padding: 12 } }}>
                   <Space wrap>
                     <Select allowClear placeholder="数据库类型" style={{ width: 180 }} value={dbTypeFilter} onChange={setDbTypeFilter}>
-                      {dbTypeOptions.map(type => <Option key={type} value={type}>{type}</Option>)}
+                      {dbTypeOptions.map(type => <Option key={type} value={type}>{formatDbTypeLabel(type)}</Option>)}
                     </Select>
                     <Select allowClear placeholder="风险等级" style={{ width: 160 }} value={riskFilter} onChange={setRiskFilter}>
                       <Option value="critical">严重</Option>
@@ -891,10 +892,10 @@ export default function MonitorPage() {
                       options={instances.map(item => ({
                         value: item.instance_id,
                         label: item.instance_name,
-                        children: `${item.instance_name} ${item.db_type}`,
+                        children: `${item.instance_name} ${formatDbTypeLabel(item.db_type)}`,
                       }))}
                     />
-                    <Tag>{active?.db_type || detail?.instance?.db_type}</Tag>
+                    <Tag>{formatDbTypeLabel(active?.db_type || detail?.instance?.db_type)}</Tag>
                     <ConfigStatusTag row={{ config_id: detail?.config?.id || active?.config_id, config_enabled: detail?.config?.is_enabled ?? active?.config_enabled }} />
                     <StatusTag status={detail?.config?.last_collect_status || active?.last_collect_status} />
                     <RiskTag level={health.risk_level} label={health.risk_label} />
