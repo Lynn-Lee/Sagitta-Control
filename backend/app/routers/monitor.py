@@ -20,6 +20,7 @@ from app.schemas.monitor import (
     MonitorConfigUpdate,
     MonitorPrivApplyRequest,
     NativeMonitorConfigUpsert,
+    UnifiedCollectConfigUpsert,
 )
 from app.services.monitor import DashboardService, MonitorService
 
@@ -125,6 +126,45 @@ async def upsert_native_config(
 ):
     cfg = await MonitorService.upsert_native_config(db, instance_id, data, user)
     return {"status": 0, "msg": "监控采集配置已保存", "data": {"id": cfg.id}}
+
+
+@router.get(
+    "/native/collect-configs/",
+    summary="统一采集配置列表",
+)
+async def unified_collect_configs(
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.list_unified_collect_configs(db, user)
+
+
+@router.put(
+    "/native/instances/{instance_id}/collect-configs/",
+    summary="统一配置实例采集",
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
+)
+async def upsert_unified_collect_config(
+    instance_id: int,
+    data: UnifiedCollectConfigUpsert,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    item = await MonitorService.upsert_unified_collect_config(db, instance_id, data, user)
+    return {"status": 0, "msg": "采集配置已保存", "data": item}
+
+
+@router.put(
+    "/native/collect-configs/bulk/",
+    summary="批量统一配置采集",
+    dependencies=[Depends(require_perm("observability_collect_manage"))],
+)
+async def bulk_upsert_unified_collect_configs(
+    data: UnifiedCollectConfigUpsert,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.bulk_upsert_unified_collect_configs(db, data, user)
 
 
 @router.post(

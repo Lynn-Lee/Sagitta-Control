@@ -111,6 +111,26 @@ class NativeMonitorConfigUpsert(BaseModel):
     retention_days: int = Field(default=30, ge=1, le=365)
 
 
+class UnifiedSessionCollectConfig(BaseModel):
+    is_enabled: bool = True
+    collect_interval: int = Field(default=60, ge=10, le=86400)
+    retention_days: int = Field(default=30, ge=1, le=365)
+
+
+class UnifiedSqlCollectConfig(BaseModel):
+    is_enabled: bool = True
+    threshold_ms: int = Field(default=1000, ge=0, le=3600000)
+    collect_interval: int = Field(default=300, ge=30, le=86400)
+    retention_days: int = Field(default=30, ge=1, le=365)
+    collect_limit: int = Field(default=100, ge=1, le=1000)
+
+
+class UnifiedCollectConfigUpsert(BaseModel):
+    native: NativeMonitorConfigUpsert = Field(default_factory=NativeMonitorConfigUpsert)
+    session: UnifiedSessionCollectConfig = Field(default_factory=UnifiedSessionCollectConfig)
+    sql: UnifiedSqlCollectConfig = Field(default_factory=UnifiedSqlCollectConfig)
+
+
 class MonitorSnapshotResponse(BaseModel):
     instance_id: int
     collected_at: str | None = None

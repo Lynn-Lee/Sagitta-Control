@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Card, DatePicker, Descriptions, Drawer, Form, Grid, Input, InputNumber, Modal, Progress, Select,
-  Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
+  Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { BulbOutlined, CloudDownloadOutlined, CopyOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { BulbOutlined, CloudDownloadOutlined, CopyOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts'
@@ -13,7 +13,6 @@ import { optimizeApi, type OptimizeAnalyzeResponse, type OptimizeFinding, type O
 import {
   slowlogApi,
   type SlowQueryCollectResponse,
-  type SlowQueryConfigItem,
   type SlowQueryExplainResponse,
   type SlowQueryFingerprintItem,
   type SlowQueryGroupStat,
@@ -68,13 +67,6 @@ const SEVERITY_COLOR: Record<string, string> = {
 }
 
 const sourceLabel = (source: string) => SOURCE_LABELS[source] || source
-const collectStatusColor = (status: string) => {
-  if (status === 'success') return 'success'
-  if (status === 'partial') return 'warning'
-  if (status === 'failed') return 'error'
-  if (status === 'disabled') return 'default'
-  return 'processing'
-}
 const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD HH:mm:ss') : '—'
 const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
 const TREND_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
@@ -122,10 +114,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
   const [diagnosis, setDiagnosis] = useState<OptimizeAnalyzeResponse | null>(null)
   const [manualDiagnosis, setManualDiagnosis] = useState<OptimizeAnalyzeResponse | null>(null)
   const [manualForm] = Form.useForm()
-  const [configOpen, setConfigOpen] = useState(false)
-  const [editingConfig, setEditingConfig] = useState<SlowQueryConfigItem | null>(null)
   const [explainResult, setExplainResult] = useState<SlowQueryExplainResponse | null>(null)
-  const [configForm] = Form.useForm()
 
   const filterWidth = (width: number) => (isMobile ? '100%' : width)
 
@@ -220,12 +209,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
     enabled: !!detailFingerprint,
   })
 
-  const configQuery = useQuery({
-    queryKey: ['slowlog-configs'],
-    queryFn: () => slowlogApi.configs(),
-    enabled: canManageCollect,
-  })
-
   const overview = overviewQuery.data
   const primaryStats = instanceId ? (overview?.database_stats || []) : (overview?.instance_stats || [])
   const primaryStatsTitle = instanceId ? '数据库 / Schema 统计' : '实例统计'
@@ -267,15 +250,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
     onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '采集失败'),
   })
 
-  const configUpdateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<SlowQueryConfigItem> }) => slowlogApi.updateConfig(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
-      msgApi.success('配置已更新')
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '更新失败'),
-  })
-
   const explainMut = useMutation({
     mutationFn: (logId: number) => slowlogApi.explain({ log_id: logId }),
     onSuccess: setExplainResult,
@@ -301,7 +275,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
   })
 
   const resetFilters = () => {
-    setInstanceId(undefined)
+    setInstanceId(embedded ? externalInstanceId || undefined : undefined)
     setDbName('')
     setSource(undefined)
     setSqlKeyword('')
@@ -342,24 +316,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       // Keep the drawer responsive while detail data loads.
       setDetailFingerprint(row.sql_fingerprint)
     }
-  }
-
-  const openConfig = (record: SlowQueryConfigItem) => {
-    setEditingConfig(record)
-    configForm.setFieldsValue({
-      is_enabled: record.is_enabled,
-      threshold_ms: record.threshold_ms,
-      collect_interval: record.collect_interval,
-      retention_days: record.retention_days,
-      collect_limit: record.collect_limit,
-    })
-    setConfigOpen(true)
-  }
-
-  const closeConfig = () => {
-    setConfigOpen(false)
-    setEditingConfig(null)
-    configForm.resetFields()
   }
 
   const commonColumns: ColumnsType<SlowQueryLogItem> = [
@@ -530,75 +486,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           <Button size="small" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)} />
         </Space>
       ),
-    },
-  ]
-
-  const configColumns: ColumnsType<SlowQueryConfigItem> = [
-    {
-      title: '实例',
-      key: 'instance',
-      width: 220,
-      render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{row.instance_name || `#${row.instance_id}`}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{formatDbTypeLabel(row.db_type)}</Text>
-        </Space>
-      ),
-    },
-    { title: '阈值', dataIndex: 'threshold_ms', width: 100, render: formatMs },
-    { title: '间隔', dataIndex: 'collect_interval', width: 90, render: (v: number) => `${v}s` },
-    { title: '保留', dataIndex: 'retention_days', width: 90, render: (v: number) => `${v}天` },
-    { title: '上限', dataIndex: 'collect_limit', width: 90 },
-    {
-      title: '最近采集 / 来源',
-      key: 'last_collect',
-      width: 300,
-      render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Space size={4}>
-            <Tag color={collectStatusColor(row.last_collect_status)}>
-              {row.last_collect_status}
-            </Tag>
-            <Text type="secondary">{row.last_collect_count} 条</Text>
-          </Space>
-          <Text type="secondary" style={{ fontSize: 12 }}>{formatTime(row.last_collect_at)}</Text>
-          {row.last_collect_message && row.last_collect_status !== 'failed' && (
-            <Tooltip title={(row.last_collect_sources || []).map(sourceLabel).join(' + ') || row.last_collect_message}>
-              <Text type="secondary" ellipsis style={{ width: 270, display: 'block', fontSize: 12 }}>
-                {row.last_collect_message}
-              </Text>
-            </Tooltip>
-          )}
-          {row.last_collect_status === 'failed' && row.last_collect_error && (
-            <Tooltip title={row.last_collect_error}>
-              <Text type="danger" ellipsis style={{ width: 270, display: 'block', fontSize: 12 }}>
-                {row.last_collect_error}
-              </Text>
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-    {
-      title: '启用',
-      dataIndex: 'is_enabled',
-      width: 80,
-      render: (v: boolean, row) => (
-        <Switch
-          size="small"
-          checked={v}
-          disabled={!canManageCollect}
-          loading={configUpdateMut.isPending}
-          onChange={(checked) => configUpdateMut.mutate({ id: row.id, data: { is_enabled: checked } })}
-        />
-      ),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      fixed: 'right',
-      width: 100,
-      render: (_, row) => <Button size="small" icon={<SettingOutlined />} disabled={!canManageCollect} onClick={() => openConfig(row)}>编辑</Button>,
     },
   ]
 
@@ -818,7 +705,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
           <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
           <Button icon={<CloudDownloadOutlined />} type="primary" disabled={!canManageCollect} loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
-          <Button onClick={resetFilters}>重置</Button>
+          <Button onClick={resetFilters}>{embedded ? '重置条件' : '重置'}</Button>
         </Space>
       </FilterCard>
 
@@ -1001,25 +888,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
               </Space>
             ),
           },
-          {
-            key: 'configs',
-            label: '采集配置',
-            disabled: !canManageCollect,
-            children: (
-              <Card styles={{ body: { padding: 0 } }}>
-                <Table
-                  dataSource={(configQuery.data?.items || []).map(row => ({ ...row, key: row.id }))}
-                  columns={configColumns}
-                  loading={configQuery.isLoading || configQuery.isFetching}
-                  size="small"
-                  tableLayout="fixed"
-                  scroll={{ x: 1020 }}
-                  pagination={false}
-                  locale={{ emptyText: <TableEmptyState title="暂无可见实例配置" /> }}
-                />
-              </Card>
-            ),
-          },
         ]}
       />
 
@@ -1183,47 +1051,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           {renderDiagnosisPanel(diagnosis)}
         </Space>
       </Drawer>
-
-      <Modal
-        title={editingConfig ? `编辑采集配置：${editingConfig.instance_name || `#${editingConfig.instance_id}`}` : '编辑采集配置'}
-        open={configOpen}
-        onCancel={closeConfig}
-        onOk={async () => {
-          const values = await configForm.validateFields()
-          if (!editingConfig) return
-          configUpdateMut.mutate({ id: editingConfig.id, data: values }, { onSuccess: closeConfig })
-        }}
-        confirmLoading={configUpdateMut.isPending}
-        okButtonProps={{ disabled: !canManageCollect }}
-        maskClosable={false}
-      >
-        <Form form={configForm} layout="vertical" style={{ marginTop: 16 }}>
-          {editingConfig && (
-            <Alert
-              type="info"
-              showIcon
-              message={editingConfig.instance_name || `#${editingConfig.instance_id}`}
-              description={formatDbTypeLabel(editingConfig.db_type)}
-              style={{ marginBottom: 16 }}
-            />
-          )}
-          <Form.Item name="is_enabled" label="启用采集" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item name="threshold_ms" label="SQL 耗时阈值（ms）" rules={[{ required: true }]}>
-            <InputNumber min={0} max={3600000} step={500} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="collect_interval" label="采集间隔（秒）" rules={[{ required: true }]}>
-            <InputNumber min={30} max={86400} step={30} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="retention_days" label="保留天数" rules={[{ required: true }]}>
-            <InputNumber min={1} max={365} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="collect_limit" label="单次采集上限" rules={[{ required: true }]}>
-            <InputNumber min={1} max={1000} style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         title="指纹样例"

@@ -1,7 +1,13 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from app.core.exceptions import AppException
 from app.models.monitor import MonitorMetricSnapshot
+from app.schemas.monitor import UnifiedCollectConfigUpsert
 from app.services.monitor import MonitorService
 
 
@@ -112,3 +118,94 @@ def test_apply_delta_rates_prefers_interval_counters():
 
     assert normalized["qps"] == 10
     assert normalized["tps"] == 1
+
+
+@pytest.mark.asyncio
+async def test_unified_collect_config_list_uses_accessible_instances(monkeypatch):
+    instances = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+    monkeypatch.setattr(MonitorService, "_accessible_instances", AsyncMock(return_value=instances))
+    monkeypatch.setattr(
+        MonitorService,
+        "_unified_collect_config_item",
+        AsyncMock(side_effect=[
+            {"instance_id": 1, "native": {}, "session": {}, "sql": {}},
+            {"instance_id": 2, "native": {}, "session": {}, "sql": {}},
+        ]),
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+
+    result = await MonitorService.list_unified_collect_configs(db, {"is_superuser": True})
+
+    assert result["total"] == 2
+    assert [item["instance_id"] for item in result["items"]] == [1, 2]
+    db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unified_collect_config_rejects_resource_group_outside_instance():
+    instance = SimpleNamespace(id=9, is_active=True, resource_groups=[SimpleNamespace(id=2)])
+    execute_result = MagicMock()
+    execute_result.scalar_one_or_none.return_value = instance
+    db = SimpleNamespace(execute=AsyncMock(return_value=execute_result))
+
+    with pytest.raises(AppException):
+        await MonitorService.upsert_unified_collect_config(
+            db,
+            9,
+            UnifiedCollectConfigUpsert(),
+            {"is_superuser": False, "permissions": [], "resource_groups": [1]},
+        )
+
+
+@pytest.mark.asyncio
+async def test_unified_collect_config_updates_all_three_collectors(monkeypatch):
+    instance = SimpleNamespace(id=3, instance_name="mysql-prod", db_type="mysql", resource_groups=[])
+    execute_result = MagicMock()
+    execute_result.scalar_one_or_none.return_value = instance
+    db = SimpleNamespace(execute=AsyncMock(return_value=execute_result))
+    native_upsert = AsyncMock()
+    session_upsert = AsyncMock()
+    slow_upsert = AsyncMock()
+    monkeypatch.setattr(MonitorService, "upsert_native_config", native_upsert)
+    monkeypatch.setattr(
+        "app.services.session_diagnostic.SessionDiagnosticService.upsert_config",
+        session_upsert,
+    )
+    monkeypatch.setattr("app.services.slowlog.SlowLogService.upsert_config", slow_upsert)
+    monkeypatch.setattr(
+        MonitorService,
+        "_unified_collect_config_item",
+        AsyncMock(return_value={"instance_id": 3, "native": {}, "session": {}, "sql": {}}),
+    )
+
+    result = await MonitorService.upsert_unified_collect_config(
+        db,
+        3,
+        UnifiedCollectConfigUpsert(),
+        {"is_superuser": True, "username": "admin", "permissions": []},
+    )
+
+    assert result["instance_id"] == 3
+    native_upsert.assert_awaited_once()
+    session_upsert.assert_awaited_once()
+    slow_upsert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_bulk_unified_collect_config_applies_visible_instances(monkeypatch):
+    instances = [
+        SimpleNamespace(id=1, instance_name="mysql-prod"),
+        SimpleNamespace(id=2, instance_name="pg-prod"),
+    ]
+    monkeypatch.setattr(MonitorService, "_accessible_instances", AsyncMock(return_value=instances))
+    monkeypatch.setattr(MonitorService, "upsert_unified_collect_config", AsyncMock(return_value={}))
+
+    result = await MonitorService.bulk_upsert_unified_collect_configs(
+        SimpleNamespace(),
+        UnifiedCollectConfigUpsert(),
+        {"is_superuser": True},
+    )
+
+    assert result["total"] == 2
+    assert result["success"] == 2
+    assert result["failed"] == []

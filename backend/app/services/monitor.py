@@ -354,6 +354,178 @@ class MonitorService:
         return cfg
 
     @staticmethod
+    async def _accessible_instances(db: AsyncSession, user: dict) -> list[Instance]:
+        stmt = (
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.is_active.is_(True))
+        )
+        if not (user.get("is_superuser") or "observability_instance_all" in user.get("permissions", [])):
+            user_rg_ids = user.get("resource_groups", [])
+            privileged_instance_ids = (
+                (
+                    await db.execute(
+                        select(MonitorPrivilege.instance_id).where(
+                            MonitorPrivilege.user_id == user.get("id"),
+                            MonitorPrivilege.valid_date >= date.today(),
+                            MonitorPrivilege.is_deleted == 0,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if user_rg_ids:
+                stmt = (
+                    stmt.join(Instance.resource_groups.of_type(ResourceGroup))
+                    .where(or_(ResourceGroup.id.in_(user_rg_ids), Instance.id.in_(privileged_instance_ids)))
+                    .distinct()
+                )
+            elif privileged_instance_ids:
+                stmt = stmt.where(Instance.id.in_(privileged_instance_ids))
+            else:
+                return []
+        result = await db.execute(stmt.order_by(Instance.id.desc()))
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def _unified_collect_config_item(
+        db: AsyncSession,
+        instance: Instance,
+        user: dict,
+    ) -> dict[str, Any]:
+        from app.models.session import SessionCollectConfig
+        from app.models.slowlog import SlowQueryConfig
+
+        native_cfg = (
+            await db.execute(
+                select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance.id)
+            )
+        ).scalar_one_or_none()
+        session_cfg = (
+            await db.execute(
+                select(SessionCollectConfig).where(SessionCollectConfig.instance_id == instance.id)
+            )
+        ).scalar_one_or_none()
+        sql_cfg = (
+            await db.execute(
+                select(SlowQueryConfig).where(SlowQueryConfig.instance_id == instance.id)
+            )
+        ).scalar_one_or_none()
+
+        def iso(value: Any) -> str | None:
+            return value.isoformat() if value else None
+
+        return {
+            "instance_id": instance.id,
+            "instance_name": instance.instance_name,
+            "db_type": instance.db_type,
+            "native": {
+                "id": native_cfg.id if native_cfg else None,
+                "is_enabled": native_cfg.is_enabled if native_cfg else False,
+                "collect_interval": native_cfg.collect_interval if native_cfg else 60,
+                "capacity_collect_interval": native_cfg.capacity_collect_interval if native_cfg else 3600,
+                "retention_days": native_cfg.retention_days if native_cfg else 30,
+                "last_metric_collect_at": iso(native_cfg.last_metric_collect_at) if native_cfg else None,
+                "last_capacity_collect_at": iso(native_cfg.last_capacity_collect_at) if native_cfg else None,
+                "last_collect_status": native_cfg.last_collect_status if native_cfg else "not_configured",
+                "last_collect_error": native_cfg.last_collect_error if native_cfg else "",
+            },
+            "session": {
+                "id": session_cfg.id if session_cfg else None,
+                "is_enabled": session_cfg.is_enabled if session_cfg else True,
+                "collect_interval": session_cfg.collect_interval if session_cfg else 60,
+                "retention_days": session_cfg.retention_days if session_cfg else 30,
+                "last_collect_at": iso(session_cfg.last_collect_at) if session_cfg else None,
+                "last_collect_status": session_cfg.last_collect_status if session_cfg else "never",
+                "last_collect_error": session_cfg.last_collect_error if session_cfg else "",
+                "last_collect_count": session_cfg.last_collect_count if session_cfg else 0,
+            },
+            "sql": {
+                "id": sql_cfg.id if sql_cfg else None,
+                "is_enabled": sql_cfg.is_enabled if sql_cfg else True,
+                "threshold_ms": sql_cfg.threshold_ms if sql_cfg else 1000,
+                "collect_interval": sql_cfg.collect_interval if sql_cfg else 300,
+                "retention_days": sql_cfg.retention_days if sql_cfg else 30,
+                "collect_limit": sql_cfg.collect_limit if sql_cfg else 100,
+                "last_collect_at": iso(sql_cfg.last_collect_at) if sql_cfg else None,
+                "last_collect_status": sql_cfg.last_collect_status if sql_cfg else "never",
+                "last_collect_error": sql_cfg.last_collect_error if sql_cfg else "",
+                "last_collect_count": sql_cfg.last_collect_count if sql_cfg else 0,
+                "last_collect_sources": sql_cfg.last_collect_sources if sql_cfg else [],
+                "last_collect_message": sql_cfg.last_collect_message if sql_cfg else "",
+            },
+        }
+
+    @staticmethod
+    async def list_unified_collect_configs(db: AsyncSession, user: dict) -> dict[str, Any]:
+        instances = await MonitorService._accessible_instances(db, user)
+        items = [
+            await MonitorService._unified_collect_config_item(db, instance, user)
+            for instance in instances
+        ]
+        return {"total": len(items), "items": items}
+
+    @staticmethod
+    async def upsert_unified_collect_config(
+        db: AsyncSession,
+        instance_id: int,
+        data: Any,
+        user: dict,
+    ) -> dict[str, Any]:
+        from app.schemas.diagnostic import SessionCollectConfigUpsert
+        from app.schemas.slowlog import SlowQueryConfigUpsert
+        from app.services.session_diagnostic import SessionDiagnosticService
+        from app.services.slowlog import SlowLogService
+
+        instance_result = await db.execute(
+            select(Instance)
+            .options(selectinload(Instance.resource_groups))
+            .where(Instance.id == instance_id, Instance.is_active.is_(True))
+        )
+        instance = instance_result.scalar_one_or_none()
+        if not instance:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        if not MonitorService._can_access_instance(user, instance):
+            raise AppException("不能配置资源组外实例的采集", code=403)
+
+        await MonitorService.upsert_native_config(db, instance_id, data.native, user)
+        await SessionDiagnosticService.upsert_config(
+            db,
+            SessionCollectConfigUpsert(instance_id=instance_id, **data.session.model_dump()),
+            user,
+        )
+        await SlowLogService.upsert_config(
+            db,
+            SlowQueryConfigUpsert(instance_id=instance_id, **data.sql.model_dump()),
+            user,
+        )
+        return await MonitorService._unified_collect_config_item(db, instance, user)
+
+    @staticmethod
+    async def bulk_upsert_unified_collect_configs(
+        db: AsyncSession,
+        data: Any,
+        user: dict,
+    ) -> dict[str, Any]:
+        instances = await MonitorService._accessible_instances(db, user)
+        success = 0
+        failed: list[str] = []
+        for instance in instances:
+            try:
+                await MonitorService.upsert_unified_collect_config(db, instance.id, data, user)
+                success += 1
+            except Exception as exc:
+                failed.append(f"{instance.instance_name}: {exc}")
+        return {
+            "status": 0,
+            "msg": f"已配置 {success}/{len(instances)} 个实例",
+            "total": len(instances),
+            "success": success,
+            "failed": failed,
+        }
+
+    @staticmethod
     async def list_native_instances(db: AsyncSession, user: dict) -> list[dict]:
         stmt = (
             select(Instance)

@@ -70,12 +70,66 @@ interface MonitorOverview {
   items: MonitorInstance[]
 }
 
+interface UnifiedCollectConfigItem {
+  instance_id: number
+  instance_name: string
+  db_type: string
+  native: {
+    id?: number | null
+    is_enabled: boolean
+    collect_interval: number
+    capacity_collect_interval: number
+    retention_days: number
+    last_metric_collect_at?: string | null
+    last_capacity_collect_at?: string | null
+    last_collect_status: string
+    last_collect_error: string
+  }
+  session: {
+    id?: number | null
+    is_enabled: boolean
+    collect_interval: number
+    retention_days: number
+    last_collect_at?: string | null
+    last_collect_status: string
+    last_collect_error: string
+    last_collect_count: number
+  }
+  sql: {
+    id?: number | null
+    is_enabled: boolean
+    threshold_ms: number
+    collect_interval: number
+    retention_days: number
+    collect_limit: number
+    last_collect_at?: string | null
+    last_collect_status: string
+    last_collect_error: string
+    last_collect_count: number
+    last_collect_sources: string[]
+    last_collect_message: string
+  }
+}
+
+interface UnifiedCollectConfigListResponse {
+  total: number
+  items: UnifiedCollectConfigItem[]
+}
+
+interface BulkCollectConfigResponse {
+  total: number
+  success: number
+  failed: string[]
+}
+
 const statusColor: Record<string, string> = {
   success: 'success',
   partial: 'warning',
   failed: 'error',
   pending: 'processing',
   not_configured: 'default',
+  never: 'default',
+  skipped: 'default',
 }
 
 const riskColor: Record<string, string> = {
@@ -130,6 +184,8 @@ function StatusTag({ status }: { status?: string }) {
     failed: '采集失败',
     pending: '待采集',
     not_configured: '未配置',
+    never: '未采集',
+    skipped: '已跳过',
   }
   return <Tag color={statusColor[value] || 'default'}>{label[value] || value}</Tag>
 }
@@ -195,10 +251,19 @@ export default function MonitorPage() {
     queryKey: ['native-monitor-overview'],
     queryFn: () => apiClient.get('/monitor/native/overview/').then(r => r.data),
   })
+  const { data: collectConfigData } = useQuery<UnifiedCollectConfigListResponse>({
+    queryKey: ['unified-collect-configs'],
+    queryFn: () => apiClient.get('/monitor/native/collect-configs/').then(r => r.data),
+  })
   const allInstances: MonitorInstance[] = useMemo(
     () => overview?.items || data?.items || [],
     [overview?.items, data?.items],
   )
+  const collectConfigByInstance = useMemo(() => {
+    const map = new Map<number, UnifiedCollectConfigItem>()
+    ;(collectConfigData?.items || []).forEach(item => map.set(item.instance_id, item))
+    return map
+  }, [collectConfigData?.items])
   const instances = useMemo(() => allInstances.filter(item => {
     if (dbTypeFilter && item.db_type !== dbTypeFilter) return false
     if (riskFilter && item.risk_level !== riskFilter) return false
@@ -275,54 +340,63 @@ export default function MonitorPage() {
     setAlertRulesText(JSON.stringify(alertRules?.rules || {}, null, 2))
   }, [alertRules?.rules])
 
+  const invalidateCollectConfigQueries = (instanceId?: number | null) => {
+    queryClient.invalidateQueries({ queryKey: ['unified-collect-configs'] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
+    queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
+    queryClient.invalidateQueries({ queryKey: ['session-collect-configs'] })
+    queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
+    if (instanceId) {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', instanceId] })
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
+    }
+  }
+
   const saveConfig = useMutation({
-    mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/config/`, values).then(r => r.data),
+    mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/collect-configs/`, values).then(r => r.data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', variables.instanceId] })
+      invalidateCollectConfigQueries(variables.instanceId)
       setConfigOpen(false)
       setConfigTarget(null)
-      msgApi.success('监控采集配置已保存')
+      msgApi.success('采集配置已保存')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '保存失败'),
   })
-  const saveAllConfig = useMutation({
-    mutationFn: async (values: any) => {
-      const results = await Promise.allSettled(
-        instances.map(item => apiClient.put(`/monitor/native/instances/${item.instance_id}/config/`, values)),
-      )
-      const failed = results.filter(result => result.status === 'rejected').length
-      return { total: instances.length, success: instances.length - failed, failed }
-    },
+  const saveAllConfig = useMutation<BulkCollectConfigResponse, any, any>({
+    mutationFn: (values: any) => apiClient.put<BulkCollectConfigResponse>('/monitor/native/collect-configs/bulk/', values).then(r => r.data),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
+      invalidateCollectConfigQueries()
       setConfigOpen(false)
       setConfigTarget(null)
-      msgApi.success(`已配置 ${result.success}/${result.total} 个实例${result.failed ? `，失败 ${result.failed} 个` : ''}`)
+      msgApi.success(`已配置 ${result.success}/${result.total} 个实例${result.failed?.length ? `，失败 ${result.failed.length} 个` : ''}`)
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量保存失败'),
   })
-  const disableAllConfig = useMutation({
-    mutationFn: async () => {
-      const results = await Promise.allSettled(
-        instances.map(item => apiClient.put(`/monitor/native/instances/${item.instance_id}/config/`, {
-          is_enabled: false,
-          collect_interval: item.collect_interval || 60,
-          capacity_collect_interval: item.capacity_collect_interval || 3600,
-          retention_days: item.retention_days || 30,
-        })),
-      )
-      const failed = results.filter(result => result.status === 'rejected').length
-      return { total: instances.length, success: instances.length - failed, failed }
-    },
+  const disableAllConfig = useMutation<BulkCollectConfigResponse, any, void>({
+    mutationFn: () => apiClient.put<BulkCollectConfigResponse>('/monitor/native/collect-configs/bulk/', {
+      native: {
+        is_enabled: false,
+        collect_interval: 60,
+        capacity_collect_interval: 3600,
+        retention_days: 30,
+      },
+      session: {
+        is_enabled: false,
+        collect_interval: 60,
+        retention_days: 30,
+      },
+      sql: {
+        is_enabled: false,
+        threshold_ms: 1000,
+        collect_interval: 300,
+        retention_days: 30,
+        collect_limit: 100,
+      },
+    }).then(r => r.data),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
-      msgApi.success(`已关闭 ${result.success}/${result.total} 个实例采集${result.failed ? `，失败 ${result.failed} 个` : ''}`)
+      invalidateCollectConfigQueries()
+      msgApi.success(`已关闭 ${result.success}/${result.total} 个实例采集${result.failed?.length ? `，失败 ${result.failed.length} 个` : ''}`)
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量关闭失败'),
   })
@@ -340,6 +414,7 @@ export default function MonitorPage() {
       queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['unified-collect-configs'] })
       msgApi.success('采集完成')
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '采集失败'),
@@ -432,6 +507,7 @@ export default function MonitorPage() {
     const refreshTasks = [
       queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] }),
       queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] }),
+      queryClient.invalidateQueries({ queryKey: ['unified-collect-configs'] }),
     ]
     if (activeId) {
       refreshTasks.push(
@@ -457,14 +533,29 @@ export default function MonitorPage() {
   const openConfig = (target?: MonitorInstance | null) => {
     const item = target || active
     if (!item) return
+    const cfg = collectConfigByInstance.get(item.instance_id)
     selectInstance(item.instance_id)
     setConfigTarget(item)
     setConfigScope('single')
     form.setFieldsValue({
-      is_enabled: item.config_enabled ?? true,
-      collect_interval: item.collect_interval || 60,
-      capacity_collect_interval: item.capacity_collect_interval || 3600,
-      retention_days: item.retention_days || 30,
+      native: {
+        is_enabled: cfg?.native?.is_enabled ?? item.config_enabled ?? false,
+        collect_interval: cfg?.native?.collect_interval || item.collect_interval || 60,
+        capacity_collect_interval: cfg?.native?.capacity_collect_interval || item.capacity_collect_interval || 3600,
+        retention_days: cfg?.native?.retention_days || item.retention_days || 30,
+      },
+      session: {
+        is_enabled: cfg?.session?.is_enabled ?? true,
+        collect_interval: cfg?.session?.collect_interval || 60,
+        retention_days: cfg?.session?.retention_days || 30,
+      },
+      sql: {
+        is_enabled: cfg?.sql?.is_enabled ?? true,
+        threshold_ms: cfg?.sql?.threshold_ms ?? 1000,
+        collect_interval: cfg?.sql?.collect_interval || 300,
+        retention_days: cfg?.sql?.retention_days || 30,
+        collect_limit: cfg?.sql?.collect_limit || 100,
+      },
     })
     setConfigOpen(true)
   }
@@ -473,10 +564,24 @@ export default function MonitorPage() {
     setConfigScope('all')
     setConfigTarget(null)
     form.setFieldsValue({
-      is_enabled: true,
-      collect_interval: 60,
-      capacity_collect_interval: 3600,
-      retention_days: 30,
+      native: {
+        is_enabled: true,
+        collect_interval: 60,
+        capacity_collect_interval: 3600,
+        retention_days: 30,
+      },
+      session: {
+        is_enabled: true,
+        collect_interval: 60,
+        retention_days: 30,
+      },
+      sql: {
+        is_enabled: true,
+        threshold_ms: 1000,
+        collect_interval: 300,
+        retention_days: 30,
+        collect_limit: 100,
+      },
     })
     setConfigOpen(true)
   }
@@ -484,7 +589,7 @@ export default function MonitorPage() {
   const triggerDisableAllConfig = () => {
     Modal.confirm({
       title: '关闭全部实例配置/采集',
-      content: `将关闭当前列表中 ${instances.length} 个实例的原生监控定时采集配置，已采集的历史指标不会被删除。`,
+      content: `将关闭当前列表中 ${instances.length} 个实例的指标、会话和 SQL 定时采集配置，已采集的历史数据不会被删除。`,
       okText: '关闭配置/采集',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -523,6 +628,26 @@ export default function MonitorPage() {
       onClick: triggerDisableAllConfig,
     },
   ]
+
+  const renderCollectOverview = (row: MonitorInstance) => {
+    const cfg = collectConfigByInstance.get(row.instance_id)
+    return (
+      <Space direction="vertical" size={2}>
+        <Space size={4} wrap>
+          <Tag color={cfg?.native?.is_enabled ? 'success' : 'default'}>指标/容量</Tag>
+          <StatusTag status={cfg?.native?.last_collect_status || row.last_collect_status} />
+        </Space>
+        <Space size={4} wrap>
+          <Tag color={cfg?.session?.is_enabled ? 'success' : 'default'}>会话</Tag>
+          <StatusTag status={cfg?.session?.last_collect_status || 'never'} />
+        </Space>
+        <Space size={4} wrap>
+          <Tag color={cfg?.sql?.is_enabled ? 'success' : 'default'}>SQL</Tag>
+          <StatusTag status={cfg?.sql?.last_collect_status || 'never'} />
+        </Space>
+      </Space>
+    )
+  }
 
   const columns = [
     {
@@ -579,6 +704,7 @@ export default function MonitorPage() {
     { title: '容量', width: 130, render: (_: any, row: MonitorInstance) => formatBytes(row.latest?.total_size_bytes) },
     { title: '复制延迟', width: 110, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.replication_lag_seconds, 's') },
     { title: '最后采集', width: 180, render: (_: any, row: MonitorInstance) => formatTime(row.last_metric_collect_at) },
+    { title: '采集配置', width: 190, render: (_: any, row: MonitorInstance) => renderCollectOverview(row) },
     {
       title: '操作',
       key: 'actions',
@@ -590,7 +716,7 @@ export default function MonitorPage() {
           {canViewSessions && <Button size="small" icon={<FieldTimeOutlined />} onClick={() => openWorkbench(row.instance_id, 'sessions')}>会话</Button>}
           {canViewSql && <Button size="small" icon={<AlertOutlined />} onClick={() => openWorkbench(row.instance_id, 'sql')}>SQL</Button>}
           {canManageConfig && <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>}
-          {canManageConfig && <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集</Button>}
+          {canManageConfig && <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集指标</Button>}
         </Space>
       ),
     },
@@ -680,7 +806,7 @@ export default function MonitorPage() {
                 </Button>
               </Dropdown>
             )}
-            {showOverviewActions && canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>立即采集全部</Button>}
+            {showOverviewActions && canManageConfig && <Button type="primary" icon={<PlayCircleOutlined />} disabled={!instances.length} loading={collectAll.isPending} onClick={triggerCollectAll}>立即采集全部指标</Button>}
           </Space>
         )}
       />
@@ -736,7 +862,7 @@ export default function MonitorPage() {
                   rowKey="instance_id"
                   loading={isLoading}
                   tableLayout="fixed"
-                  scroll={{ x: 2040 }}
+                  scroll={{ x: 2230 }}
                   pagination={false}
                   rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
                   onRow={(row) => ({
@@ -1016,7 +1142,7 @@ export default function MonitorPage() {
       />
 
       <Modal
-        title={configScope === 'all' ? '原生监控采集配置 - 全部实例' : `原生监控采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
+        title={configScope === 'all' ? '统一采集配置 - 全部实例' : `统一采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
         open={configOpen}
         onCancel={() => {
           setConfigOpen(false)
@@ -1032,27 +1158,80 @@ export default function MonitorPage() {
         })}
         confirmLoading={saveConfig.isPending || saveAllConfig.isPending}
         maskClosable={false}
+        width={720}
       >
         <Alert
           type="info"
           showIcon
           style={{ marginTop: 8 }}
           message={configScope === 'all' ? '该配置将应用到全部可见实例' : '该配置仅作用于当前实例'}
-          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置。打开“启用采集”就是一键开启全部实例，关闭它就是一键停用全部实例；手动立即采集不会改变这个开关。` : '保存后，SagittaDB 会使用该实例配置的账号读取该实例可见范围内的监控指标。手动立即采集不会改变这个开关。'}
+          description={configScope === 'all' ? `保存后会为当前列表中的 ${instances.length} 个实例写入相同采集配置。手动立即采集指标不会改变这些开关。` : '保存后会同时更新当前实例的指标/容量、会话和 SQL 采集配置。手动立即采集指标不会改变这些开关。'}
         />
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="is_enabled" label={configScope === 'all' ? '启用全部实例采集' : '启用采集'} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item name="collect_interval" label="实例指标采集间隔（秒）" rules={[{ required: true }]}>
-            <InputNumber min={10} max={3600} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="capacity_collect_interval" label="容量采集间隔（秒）" rules={[{ required: true }]}>
-            <InputNumber min={300} max={86400} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="retention_days" label="指标保留天数" rules={[{ required: true }]}>
-            <InputNumber min={1} max={365} style={{ width: '100%' }} />
-          </Form.Item>
+          <Tabs
+            items={[
+              {
+                key: 'native',
+                label: '原生监控',
+                children: (
+                  <>
+                    <Form.Item name={['native', 'is_enabled']} label="启用指标/容量采集" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item name={['native', 'collect_interval']} label="实例指标采集间隔（秒）" rules={[{ required: true }]}>
+                      <InputNumber min={10} max={3600} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['native', 'capacity_collect_interval']} label="容量采集间隔（秒）" rules={[{ required: true }]}>
+                      <InputNumber min={300} max={86400} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['native', 'retention_days']} label="指标保留天数" rules={[{ required: true }]}>
+                      <InputNumber min={1} max={365} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'session',
+                label: '会话采集',
+                children: (
+                  <>
+                    <Form.Item name={['session', 'is_enabled']} label="启用会话采集" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item name={['session', 'collect_interval']} label="会话采样间隔（秒）" rules={[{ required: true }]}>
+                      <InputNumber min={10} max={86400} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['session', 'retention_days']} label="会话数据保留天数" rules={[{ required: true }]}>
+                      <InputNumber min={1} max={365} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'sql',
+                label: 'SQL 采集',
+                children: (
+                  <>
+                    <Form.Item name={['sql', 'is_enabled']} label="启用 SQL 采集" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item name={['sql', 'threshold_ms']} label="SQL 耗时阈值（ms）" rules={[{ required: true }]}>
+                      <InputNumber min={0} max={3600000} step={500} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['sql', 'collect_interval']} label="SQL 采集间隔（秒）" rules={[{ required: true }]}>
+                      <InputNumber min={30} max={86400} step={30} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['sql', 'retention_days']} label="SQL 数据保留天数" rules={[{ required: true }]}>
+                      <InputNumber min={1} max={365} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name={['sql', 'collect_limit']} label="单次采集上限" rules={[{ required: true }]}>
+                      <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </>
+                ),
+              },
+            ]}
+          />
         </Form>
       </Modal>
     </div>
