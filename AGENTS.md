@@ -38,7 +38,7 @@ pip install -e ".[dev]"
 # 运行
 uvicorn app.main:app --reload --port 8000
 
-# 数据库迁移（当前 head: 0032_notification_delivery）
+# 数据库迁移（当前 head: 0034_license_online_activation）
 alembic upgrade head
 alembic revision --autogenerate -m "describe change"
 alembic downgrade -1
@@ -180,7 +180,7 @@ L3: QueryPrivilege 库级/表级授权（valid_date 有效期控制）
 
 **工单审批流快照**：工单创建时将 ApprovalFlowNode 快照到 `WorkflowAudit.audit_auth_groups_info`（JSON），此后修改审批流模板不影响在途工单。
 
-### Alembic 迁移历史（当前已到 0032）
+### Alembic 迁移历史（当前已到 0034）
 
 ```
 0001_initial_schema        — 初始完整表结构
@@ -215,6 +215,8 @@ L3: QueryPrivilege 库级/表级授权（valid_date 有效期控制）
 0030_observability_permission_rework — 观测权限重构
 0031_sql_activity_collect_semantics — SQL 活动采集语义
 0032_notification_delivery — 用户外部通知身份 + notification_delivery_log
+0033_license_record — 商业授权记录
+0034_license_online_activation — 在线激活/续期元数据
 ```
 
 ### Frontend (`frontend/src/`)
@@ -356,3 +358,4 @@ Elasticsearch / MSSQL / Cassandra / Doris 引擎骨架已实现但未在真实�
 | `system_config` | 系统配置 KV（9个分组，敏感值 Fernet 加密）|
 | `operation_log` | 操作审计日志 |
 | `notification_delivery_log` | 主动通知投递日志（事件/对象/渠道/收件人/状态/错误）|
+| `license_record` | 商业授权记录（试用/离线导入/在线激活、features、limits、远端状态）|

@@ -15,6 +15,7 @@ celery_app = Celery(
         "app.tasks.notify",
         "app.tasks.archive",
         "app.tasks.monitor",
+        "app.tasks.license",
     ],
 )
 
@@ -68,6 +69,11 @@ celery_app.conf.update(
             "task": "collect_native_monitoring",
             "schedule": 60.0,
             "options": {"queue": "monitor"},
+        },
+        "refresh-online-license-daily": {
+            "task": "refresh_online_license",
+            "schedule": crontab(hour=2, minute=10),
+            "options": {"queue": "default"},
         },
     },
 )

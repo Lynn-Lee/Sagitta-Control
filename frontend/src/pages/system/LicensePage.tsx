@@ -43,7 +43,11 @@ export default function LicensePage() {
   const [status, setStatus] = useState<LicenseStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [activating, setActivating] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [licenseText, setLicenseText] = useState('')
+  const [activationCode, setActivationCode] = useState('')
+  const [customerId, setCustomerId] = useState('')
 
   const loadStatus = async () => {
     setLoading(true)
@@ -89,6 +93,40 @@ export default function LicensePage() {
     }
   }
 
+  const handleActivate = async () => {
+    if (!activationCode.trim()) {
+      message.warning('请输入激活码')
+      return
+    }
+    setActivating(true)
+    try {
+      await licenseApi.activate({
+        activation_code: activationCode.trim(),
+        customer_id: customerId.trim() || undefined,
+      })
+      message.success('License 激活成功')
+      setActivationCode('')
+      await loadStatus()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || 'License 激活失败')
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await licenseApi.refresh()
+      message.success('License 刷新成功')
+      await loadStatus()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || 'License 刷新失败')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   return (
     <div>
       <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
@@ -100,11 +138,15 @@ export default function LicensePage() {
       </Space>
 
       <Alert
-        type={alertType as any}
+        type={(status?.warning_level === 'critical' ? 'error' : status?.warning_level === 'warning' ? 'warning' : alertType) as any}
         showIcon
         style={{ marginBottom: 16 }}
-        message={status ? statusLabel[status.status] || status.status : '读取授权状态中'}
-        description={status?.reason || '正在检查当前部署的授权状态'}
+        message={
+          status?.needs_renewal
+            ? `授权将在 ${status.days_remaining ?? 0} 天后到期`
+            : status ? statusLabel[status.status] || status.status : '读取授权状态中'
+        }
+        description={status?.needs_renewal ? '请及时完成续期或联网刷新，避免到期后核心功能被限制。' : status?.reason || '正在检查当前部署的授权状态'}
       />
 
       <Row gutter={[16, 16]}>
@@ -140,6 +182,9 @@ export default function LicensePage() {
               <Descriptions.Item label="License ID">{status?.license_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="客户 ID">{status?.customer_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="客户名称">{status?.company_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="在线激活 ID">{status?.activation_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="远端状态">{status?.remote_status || '-'}</Descriptions.Item>
+              <Descriptions.Item label="最后联网校验">{formatDate(status?.last_online_check_at)}</Descriptions.Item>
               <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
               <Descriptions.Item label="生效时间">{formatDate(status?.not_before)}</Descriptions.Item>
               <Descriptions.Item label="过期时间">{formatDate(status?.expires_at)}</Descriptions.Item>
@@ -167,6 +212,45 @@ export default function LicensePage() {
                 {!Object.keys(status?.limits || {}).length && <Text type="secondary">不限</Text>}
               </div>
             </div>
+          </Card>
+        </Col>
+
+        <Col xs={24}>
+          <Card title="在线激活与续期">
+            <Form layout="vertical">
+              <Row gutter={12}>
+                <Col xs={24} md={10}>
+                  <Form.Item label="激活码">
+                    <Input
+                      value={activationCode}
+                      onChange={(event) => setActivationCode(event.target.value)}
+                      placeholder="请输入授权激活码"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item label="客户 ID">
+                    <Input
+                      value={customerId}
+                      onChange={(event) => setCustomerId(event.target.value)}
+                      placeholder="未填写时使用后端配置"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={6}>
+                  <Form.Item label=" ">
+                    <Space>
+                      <Button type="primary" onClick={handleActivate} loading={activating}>
+                        在线激活
+                      </Button>
+                      <Button onClick={handleRefresh} loading={refreshing}>
+                        联网刷新
+                      </Button>
+                    </Space>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Form>
           </Card>
         </Col>
 

@@ -943,18 +943,38 @@ async def import_license(
 @router.post("/license/activate", summary="在线激活 License")
 async def activate_license(
     data: LicenseActivateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_superuser),
+    user=Depends(current_superuser),
 ):
-    return await LicenseService.activate(db, data.model_dump())
+    status_data = await LicenseService.activate(db, data.model_dump())
+    await AuditLogService.write(
+        db,
+        user,
+        action="activate_license",
+        module="system",
+        detail=f"在线激活 License：{status_data.get('license_id') or '-'}",
+        request=request,
+    )
+    return {"status": 0, "msg": "License 激活成功", "data": status_data}
 
 
 @router.post("/license/refresh", summary="在线续期 License")
 async def refresh_license(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_superuser),
+    user=Depends(current_superuser),
 ):
-    return await LicenseService.refresh(db)
+    status_data = await LicenseService.refresh(db)
+    await AuditLogService.write(
+        db,
+        user,
+        action="refresh_license",
+        module="system",
+        detail=f"刷新 License：{status_data.get('license_id') or '-'}",
+        request=request,
+    )
+    return {"status": 0, "msg": "License 刷新成功", "data": status_data}
 
 
 # ═══════════════════════════════════════════════════════════

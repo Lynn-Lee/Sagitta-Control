@@ -11,10 +11,15 @@ export type LicenseStatus = {
   edition: string
   features: string[]
   limits: Record<string, number | string>
+  activation_id?: string
+  remote_status?: string
+  last_online_check_at?: string | null
   issued_at?: string | null
   not_before?: string | null
   expires_at?: string | null
   days_remaining?: number | null
+  needs_renewal?: boolean
+  warning_level?: 'warning' | 'critical' | string
 }
 
 export const licenseApi = {

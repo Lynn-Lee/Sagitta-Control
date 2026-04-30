@@ -98,6 +98,10 @@ class LicenseRecord(BaseModel):
     edition: Mapped[str] = mapped_column(String(50), default="trial", comment="版本")
     features: Mapped[list] = mapped_column(JSON, default=list, comment="授权功能")
     limits: Mapped[dict] = mapped_column(JSON, default=dict, comment="授权额度")
+    activation_code: Mapped[str] = mapped_column(String(100), default="", comment="激活码")
+    activation_id: Mapped[str] = mapped_column(String(100), default="", comment="在线激活 ID")
+    server_url: Mapped[str] = mapped_column(String(500), default="", comment="授权服务器地址")
+    remote_status: Mapped[str] = mapped_column(String(20), default="", comment="授权服务器返回状态")
     issued_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="签发时间"
     )
@@ -106,6 +110,9 @@ class LicenseRecord(BaseModel):
     )
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="过期时间"
+    )
+    last_online_check_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="最后联网校验时间"
     )
     last_check_status: Mapped[str] = mapped_column(String(20), default="ok", comment="最后检查状态")
     last_check_reason: Mapped[str] = mapped_column(String(500), default="", comment="最后检查原因")

@@ -58,7 +58,14 @@ The tag push builds the final customer images and deployment package.
 
 ## Customer Deployment
 
-Give customers the generated `SagittaDB-Enterprise-v<version>.zip` and the matching license file. The package pins exact image versions in `docker-compose.yml`; customers should not use `latest`.
+Give customers the generated `SagittaDB-Enterprise-v<version>.zip` and either a matching offline license file or an online activation code. The package pins exact image versions in `docker-compose.yml`; customers should not use `latest`.
+
+Online activation and refresh are documented in `docs/license_operations_v2.md`.
+The license server is maintained in the separate private repository
+`https://github.com/Lynn-Lee/SagittaDB-License-Server` and deployed separately
+from customer SagittaDB images; see `docs/license_server_deploy.md`. Customers
+receive only the SagittaDB deployment package plus an activation code or offline
+license file.
 
 Customers upgrade with:
 

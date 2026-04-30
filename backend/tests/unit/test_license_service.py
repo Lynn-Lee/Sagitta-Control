@@ -1,4 +1,6 @@
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -115,3 +117,53 @@ async def test_check_access_rejects_missing_feature(monkeypatch):
     check = await LicenseService.check_access(object(), "/api/v1/query/execute", "POST")
     assert not check.allowed
     assert check.feature == "query"
+
+
+@pytest.mark.asyncio
+async def test_activate_imports_online_license(monkeypatch, keypair, valid_payload):
+    doc = _license_doc(valid_payload, keypair)
+    call_server = AsyncMock(
+        return_value={"status": "active", "activation_id": "act-001", "license": doc}
+    )
+    store_license = AsyncMock(return_value={"status": "licensed", "license_id": "lic-001"})
+    monkeypatch.setattr("app.services.license.settings.LICENSE_SERVER_URL", "http://license.local")
+    monkeypatch.setattr(LicenseService, "_call_license_server", call_server)
+    monkeypatch.setattr(LicenseService, "_store_license", store_license)
+
+    result = await LicenseService.activate(
+        object(),
+        {"activation_code": "SGT-001", "customer_id": "acme"},
+    )
+
+    assert result["status"] == "licensed"
+    call_server.assert_awaited_once()
+    store_license.assert_awaited_once()
+    assert store_license.await_args.kwargs["source"] == "online"
+    assert store_license.await_args.kwargs["activation_id"] == "act-001"
+
+
+@pytest.mark.asyncio
+async def test_refresh_marks_revoked_license_invalid(monkeypatch):
+    record = SimpleNamespace(
+        source="online",
+        activation_id="act-001",
+        license_id="lic-001",
+        customer_id="acme",
+        status="licensed",
+        remote_status="active",
+        last_online_check_at=None,
+        last_check_status="ok",
+        last_check_reason="",
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(LicenseService, "_current_record", AsyncMock(return_value=record))
+    monkeypatch.setattr(LicenseService, "_call_license_server", AsyncMock(return_value={"status": "revoked"}))
+    monkeypatch.setattr(LicenseService, "status", AsyncMock(return_value={"status": "invalid"}))
+
+    result = await LicenseService.refresh(db)
+
+    assert result["status"] == "invalid"
+    assert record.status == "invalid"
+    assert record.remote_status == "revoked"
+    assert record.last_check_status == "invalid"
+    db.commit.assert_awaited_once()

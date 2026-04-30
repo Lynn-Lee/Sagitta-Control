@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import HTTPException
@@ -146,6 +147,41 @@ class LicenseService:
             raise HTTPException(status_code=400, detail="License 客户标识不匹配")
 
     @staticmethod
+    def _license_server_url() -> str:
+        url = settings.LICENSE_SERVER_URL.strip().rstrip("/")
+        if not url:
+            raise HTTPException(status_code=501, detail="暂未配置授权服务器")
+        return url
+
+    @staticmethod
+    def _license_server_headers() -> dict[str, str]:
+        token = settings.LICENSE_SERVER_TOKEN.strip()
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
+    @staticmethod
+    async def _call_license_server(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        url = LicenseService._license_server_url() + path
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers=LicenseService._license_server_headers(),
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"授权服务器不可用：{exc}") from exc
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="授权服务器返回格式无效") from exc
+        if response.status_code >= 400:
+            detail = data.get("detail") if isinstance(data, dict) else ""
+            raise HTTPException(status_code=response.status_code, detail=detail or "授权服务器拒绝请求")
+        if not isinstance(data, dict):
+            raise HTTPException(status_code=502, detail="授权服务器返回格式无效")
+        return data
+
+    @staticmethod
     def verify_license_document(raw_license: str | dict[str, Any]) -> tuple[dict[str, Any], str, str]:
         payload, signature, normalized_raw = LicenseService._parse_license_document(raw_license)
         LicenseService._validate_payload_shape(payload)
@@ -229,6 +265,12 @@ class LicenseService:
             record.last_check_status = status
             record.last_check_reason = reason
             await db.commit()
+        warning_level = ""
+        if status in {"trial", "licensed"} and days_remaining is not None:
+            if days_remaining <= 7:
+                warning_level = "critical"
+            elif days_remaining <= 30:
+                warning_level = "warning"
         return {
             "status": status,
             "reason": reason,
@@ -240,18 +282,32 @@ class LicenseService:
             "edition": record.edition,
             "features": record.features or [],
             "limits": record.limits or {},
+            "activation_id": record.activation_id,
+            "remote_status": record.remote_status,
+            "last_online_check_at": record.last_online_check_at.isoformat() if record.last_online_check_at else None,
             "issued_at": record.issued_at.isoformat() if record.issued_at else None,
             "not_before": record.not_before.isoformat() if record.not_before else None,
             "expires_at": record.expires_at.isoformat() if record.expires_at else None,
             "days_remaining": days_remaining,
+            "needs_renewal": warning_level != "",
+            "warning_level": warning_level,
         }
 
     @staticmethod
-    async def import_license(db: AsyncSession, raw_license: str | dict[str, Any]) -> dict[str, Any]:
+    async def _store_license(
+        db: AsyncSession,
+        raw_license: str | dict[str, Any],
+        *,
+        source: str,
+        activation_code: str = "",
+        activation_id: str = "",
+        remote_status: str = "",
+        server_url: str = "",
+    ) -> dict[str, Any]:
         payload, signature, normalized_raw = LicenseService.verify_license_document(raw_license)
         await db.execute(update(LicenseRecord).values(is_current=False))
         record = LicenseRecord(
-            source="import",
+            source=source,
             status="licensed",
             is_current=True,
             raw_license=normalized_raw,
@@ -263,9 +319,14 @@ class LicenseService:
             edition=str(payload.get("edition", "enterprise")),
             features=list(payload.get("features") or []),
             limits=dict(payload.get("limits") or {}),
+            activation_code=activation_code,
+            activation_id=activation_id,
+            server_url=server_url,
+            remote_status=remote_status,
             issued_at=LicenseService._parse_datetime(payload.get("issued_at")),
             not_before=LicenseService._parse_datetime(payload.get("not_before")),
             expires_at=LicenseService._parse_datetime(payload.get("expires_at")),
+            last_online_check_at=LicenseService._utcnow() if source == "online" else None,
             last_check_status="ok",
             last_check_reason="License 已导入",
         )
@@ -281,16 +342,73 @@ class LicenseService:
         return await LicenseService.status(db)
 
     @staticmethod
-    async def activate(_: AsyncSession, __: dict[str, Any]) -> dict[str, Any]:
-        if not settings.LICENSE_SERVER_URL.strip():
-            raise HTTPException(status_code=501, detail="暂未配置授权服务器")
-        raise HTTPException(status_code=501, detail="在线激活接口预留，当前版本未启用")
+    async def import_license(db: AsyncSession, raw_license: str | dict[str, Any]) -> dict[str, Any]:
+        return await LicenseService._store_license(db, raw_license, source="import")
 
     @staticmethod
-    async def refresh(_: AsyncSession) -> dict[str, Any]:
-        if not settings.LICENSE_SERVER_URL.strip():
-            raise HTTPException(status_code=501, detail="暂未配置授权服务器")
-        raise HTTPException(status_code=501, detail="在线续期接口预留，当前版本未启用")
+    async def activate(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:
+        activation_code = str(data.get("activation_code") or "").strip()
+        customer_id = str(data.get("customer_id") or settings.LICENSE_CUSTOMER_ID or "").strip()
+        if not activation_code:
+            raise HTTPException(status_code=400, detail="请输入激活码")
+        if not customer_id:
+            raise HTTPException(status_code=400, detail="请输入客户标识")
+        server_data = await LicenseService._call_license_server(
+            "/api/v1/licenses/activate",
+            {
+                "activation_code": activation_code,
+                "customer_id": customer_id,
+                "product": "sagittadb",
+            },
+        )
+        license_doc = server_data.get("license")
+        if not license_doc:
+            raise HTTPException(status_code=502, detail="授权服务器未返回 License")
+        return await LicenseService._store_license(
+            db,
+            license_doc,
+            source="online",
+            activation_code=activation_code,
+            activation_id=str(server_data.get("activation_id") or ""),
+            remote_status=str(server_data.get("status") or "active"),
+            server_url=LicenseService._license_server_url(),
+        )
+
+    @staticmethod
+    async def refresh(db: AsyncSession) -> dict[str, Any]:
+        current = await LicenseService._current_record(db)
+        if not current or current.source != "online":
+            raise HTTPException(status_code=400, detail="当前 License 不是在线激活授权，无法联网续期")
+        server_data = await LicenseService._call_license_server(
+            "/api/v1/licenses/refresh",
+            {
+                "activation_id": current.activation_id,
+                "license_id": current.license_id,
+                "customer_id": current.customer_id,
+                "product": "sagittadb",
+            },
+        )
+        remote_status = str(server_data.get("status") or "active")
+        if remote_status in {"revoked", "suspended"}:
+            current.status = "invalid"
+            current.remote_status = remote_status
+            current.last_online_check_at = LicenseService._utcnow()
+            current.last_check_status = "invalid"
+            current.last_check_reason = "License 已被授权服务器吊销" if remote_status == "revoked" else "License 已被授权服务器冻结"
+            await db.commit()
+            return await LicenseService.status(db)
+        license_doc = server_data.get("license")
+        if not license_doc:
+            raise HTTPException(status_code=502, detail="授权服务器未返回 License")
+        return await LicenseService._store_license(
+            db,
+            license_doc,
+            source="online",
+            activation_code=current.activation_code,
+            activation_id=str(server_data.get("activation_id") or current.activation_id),
+            remote_status=remote_status,
+            server_url=LicenseService._license_server_url(),
+        )
 
     @staticmethod
     async def check_access(db: AsyncSession, path: str, method: str) -> LicenseCheck:

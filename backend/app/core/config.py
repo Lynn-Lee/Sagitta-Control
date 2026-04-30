@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     LICENSE_PUBLIC_KEY: str = ""
     LICENSE_CUSTOMER_ID: str = ""
     LICENSE_SERVER_URL: str = ""
+    LICENSE_SERVER_TOKEN: str = ""
+    LICENSE_AUTO_REFRESH_ENABLED: bool = True
+    LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
     LICENSE_TRIAL_DAYS: int = 30
 
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
