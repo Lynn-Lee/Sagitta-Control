@@ -103,18 +103,27 @@ async def _execute_async(workflow_id: int, operator_id: int):
         await db.commit()
         from app.services.notify import NotifyService
 
+        workflow_title = getattr(wf, "workflow_name", f"工单 #{wf.id}")
+        applicant_id = getattr(wf, "engineer_id", 0) or 0
+        applicant_name = (
+            getattr(wf, "engineer_display", "")
+            or getattr(wf, "engineer", "")
+            or "system"
+        )
+        instance_name = getattr(inst, "instance_name", "")
+        notify_user_ids = [user_id for user_id in {applicant_id, operator_id} if user_id]
         NotifyService.enqueue_event(
             {
                 "event_type": "execution_started",
                 "subject_type": "workflow",
                 "subject_id": wf.id,
                 "app_type": "SQL 工单",
-                "title": wf.workflow_name,
-                "applicant_id": wf.engineer_id,
-                "applicant_name": wf.engineer_display or wf.engineer,
-                "user_ids": [wf.engineer_id, operator_id],
+                "title": workflow_title,
+                "applicant_id": applicant_id,
+                "applicant_name": applicant_name,
+                "user_ids": notify_user_ids,
                 "instance_id": wf.instance_id,
-                "instance_name": inst.instance_name,
+                "instance_name": instance_name,
                 "db_name": wf.db_name,
                 "remark": "SQL 工单开始执行",
                 "detail_path": f"/workflow/{wf.id}",
@@ -158,12 +167,12 @@ async def _execute_async(workflow_id: int, operator_id: int):
                 "subject_type": "workflow",
                 "subject_id": wf.id,
                 "app_type": "SQL 工单",
-                "title": wf.workflow_name,
-                "applicant_id": wf.engineer_id,
-                "applicant_name": wf.engineer_display or wf.engineer,
-                "user_ids": [wf.engineer_id, operator_id],
+                "title": workflow_title,
+                "applicant_id": applicant_id,
+                "applicant_name": applicant_name,
+                "user_ids": notify_user_ids,
                 "instance_id": wf.instance_id,
-                "instance_name": inst.instance_name,
+                "instance_name": instance_name,
                 "db_name": wf.db_name,
                 "remark": f"执行完成，状态：{wf.status}",
                 "detail_path": f"/workflow/{wf.id}",

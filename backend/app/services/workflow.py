@@ -289,9 +289,10 @@ class WorkflowService:
         audit_svc = AuditService(workflow=workflow)
         audit = await audit_svc.create_audit(db, operator, nodes_snapshot=nodes_snapshot)
         first_node = None
-        if audit.audit_auth_groups_info:
+        audit_nodes_raw = getattr(audit, "audit_auth_groups_info", None)
+        if isinstance(audit_nodes_raw, str) and audit_nodes_raw:
             first_node = next(
-                (node for node in json.loads(audit.audit_auth_groups_info or "[]") if node.get("status") == 0),
+                (node for node in json.loads(audit_nodes_raw or "[]") if node.get("status") == 0),
                 None,
             )
         if first_node:

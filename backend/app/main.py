@@ -65,8 +65,20 @@ app.add_middleware(
 
 @app.middleware("http")
 async def license_enforcement_middleware(request, call_next):
-    async with AsyncSessionLocal() as db:
-        check = await LicenseService.check_access(db, request.url.path, request.method)
+    try:
+        async with AsyncSessionLocal() as db:
+            check = await LicenseService.check_access(db, request.url.path, request.method)
+    except Exception:
+        logger.exception("license_check_failed")
+        if settings.APP_ENV == "production":
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "License 校验暂时不可用",
+                    "code": "LICENSE_UNAVAILABLE",
+                },
+            )
+        return await call_next(request)
     if not check.allowed:
         return JSONResponse(
             status_code=403,

@@ -144,17 +144,18 @@ class AuditService:
 
         workflow_type = int(getattr(audit, "workflow_type", WorkflowType.SQL))
         app_type = "数据归档" if workflow_type == int(WorkflowType.ARCHIVE) else "SQL 工单"
+        applicant_id = getattr(workflow, "engineer_id", 0) or 0
         payload = {
             "event_type": event_type,
             "subject_type": "workflow",
             "subject_id": workflow.id,
             "app_type": app_type,
-            "title": workflow.workflow_name,
-            "applicant_id": workflow.engineer_id,
-            "applicant_name": workflow.engineer_display or workflow.engineer,
+            "title": getattr(workflow, "workflow_name", f"工单 #{workflow.id}"),
+            "applicant_id": applicant_id,
+            "applicant_name": getattr(workflow, "engineer_display", "") or getattr(workflow, "engineer", ""),
             "operator_name": (operator or {}).get("display_name") or (operator or {}).get("username") or "",
-            "instance_id": workflow.instance_id,
-            "db_name": workflow.db_name,
+            "instance_id": getattr(workflow, "instance_id", 0),
+            "db_name": getattr(workflow, "db_name", ""),
             "node": node,
             "node_name": node.get("node_name") if node else "",
             "user_ids": user_ids or [],
@@ -163,7 +164,7 @@ class AuditService:
             "detail_path": f"/workflow/{workflow.id}",
         }
         if event_type == "approval_pending":
-            payload["exclude_user_ids"] = [workflow.engineer_id]
+            payload["exclude_user_ids"] = [applicant_id] if applicant_id else []
         NotifyService.enqueue_event(payload)
 
     # ── 审批操作 ──────────────────────────────────────────────
@@ -359,7 +360,7 @@ class AuditService:
             workflow,
             audit,
             "application_canceled",
-            user_ids=[workflow.engineer_id],
+            user_ids=[getattr(workflow, "engineer_id", 0)] if getattr(workflow, "engineer_id", 0) else [],
             operator=operator,
             remark=remark or "提交人/超管取消工单",
         )
