@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import current_user, require_perm
+from app.core.deps import require_perm
 from app.engines.registry import get_engine
 from app.models.instance import Instance
 from app.schemas.optimize import OptimizeAnalyzeRequest, OptimizeAnalyzeResponse

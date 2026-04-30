@@ -241,11 +241,10 @@ class WorkflowService:
             raise AppException(f"SQL 预检查失败：{review_error}", code=400)
 
         error_count = getattr(review_set, 'error_count', 0)
-        if error_count > 0:
-            if not (is_privileged_high_risk_sql and can_submit_high_risk_sql):
-                if is_privileged_high_risk_sql:
-                    raise AppException("高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限", code=403)
-                raise AppException("SQL 预检查不通过，请修改后重新提交", code=400)
+        if error_count > 0 and not (is_privileged_high_risk_sql and can_submit_high_risk_sql):
+            if is_privileged_high_risk_sql:
+                raise AppException("高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限", code=403)
+            raise AppException("SQL 预检查不通过，请修改后重新提交", code=400)
 
         if is_privileged_high_risk_sql and not can_submit_high_risk_sql:
             raise AppException("高危 SQL 工单需要高危提交权限，请联系 DBA 提交或申请权限", code=403)

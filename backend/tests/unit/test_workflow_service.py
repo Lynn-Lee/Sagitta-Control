@@ -221,19 +221,18 @@ class TestWorkflowCreateHighRiskSubmit:
         with patch("app.services.workflow.get_engine", return_value=engine), patch(
             "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
             AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
-        ):
-            with pytest.raises(AppException) as exc_info:
-                await WorkflowService.create(
-                    db,
-                    self._request(sql),
-                    {
-                        "id": 7,
-                        "username": "developer",
-                        "resource_groups": [3],
-                        "permissions": ["sql_submit"],
-                        "is_superuser": False,
-                    },
-                )
+        ), pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(
+                db,
+                self._request(sql),
+                {
+                    "id": 7,
+                    "username": "developer",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit"],
+                    "is_superuser": False,
+                },
+            )
 
         assert exc_info.value.code == 403
         assert "高危 SQL 工单需要高危提交权限" in exc_info.value.message
@@ -297,19 +296,18 @@ class TestWorkflowCreateHighRiskSubmit:
         with patch("app.services.workflow.get_engine", return_value=engine), patch(
             "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
             AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
-        ):
-            with pytest.raises(AppException) as exc_info:
-                await WorkflowService.create(
-                    db,
-                    self._request(sql, risk_remark=""),
-                    {
-                        "id": 2,
-                        "username": "dba",
-                        "resource_groups": [3],
-                        "permissions": ["sql_submit", "sql_submit_high_risk"],
-                        "is_superuser": False,
-                    },
-                )
+        ), pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(
+                db,
+                self._request(sql, risk_remark=""),
+                {
+                    "id": 2,
+                    "username": "dba",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit", "sql_submit_high_risk"],
+                    "is_superuser": False,
+                },
+            )
 
         assert exc_info.value.message == "高风险工单必须填写风险/回滚说明"
 
@@ -324,19 +322,18 @@ class TestWorkflowCreateHighRiskSubmit:
         with patch("app.services.workflow.get_engine", return_value=engine), patch(
             "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
             AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
-        ):
-            with pytest.raises(AppException) as exc_info:
-                await WorkflowService.create(
-                    db,
-                    self._request(sql),
-                    {
-                        "id": 2,
-                        "username": "dba",
-                        "resource_groups": [3],
-                        "permissions": ["sql_submit", "sql_submit_high_risk"],
-                        "is_superuser": False,
-                    },
-                )
+        ), pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(
+                db,
+                self._request(sql),
+                {
+                    "id": 2,
+                    "username": "dba",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit", "sql_submit_high_risk"],
+                    "is_superuser": False,
+                },
+            )
 
         assert exc_info.value.code == 400
         assert exc_info.value.message == "SQL 预检查不通过，请修改后重新提交"
@@ -351,19 +348,18 @@ class TestWorkflowCreateHighRiskSubmit:
         with patch("app.services.workflow.get_engine", return_value=engine), patch(
             "app.services.approval_flow.ApprovalFlowService.snapshot_for_workflow",
             AsyncMock(return_value=[{"order": 1, "node_name": "DBA 审批", "status": 0}]),
-        ):
-            with pytest.raises(AppException) as exc_info:
-                await WorkflowService.create(
-                    db,
-                    self._request(sql),
-                    {
-                        "id": 2,
-                        "username": "dba",
-                        "resource_groups": [3],
-                        "permissions": ["sql_submit", "sql_submit_high_risk"],
-                        "is_superuser": False,
-                    },
-                )
+        ), pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(
+                db,
+                self._request(sql),
+                {
+                    "id": 2,
+                    "username": "dba",
+                    "resource_groups": [3],
+                    "permissions": ["sql_submit", "sql_submit_high_risk"],
+                    "is_superuser": False,
+                },
+            )
 
         assert exc_info.value.code == 400
         assert exc_info.value.message == "SQL 预检查失败：连接数据库失败"

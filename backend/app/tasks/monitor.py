@@ -22,7 +22,7 @@ from app.services.session_diagnostic import (
     SessionDiagnosticService,
     is_collect_due,
 )
-from app.services.slowlog import DEFAULT_SLOW_THRESHOLD_MS, SlowLogService
+from app.services.slowlog import SlowLogService
 
 logger = logging.getLogger(__name__)
 

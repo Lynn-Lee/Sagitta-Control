@@ -21,9 +21,13 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.models.role import Role, UserGroup, group_resource_group, role_permission, user_group_member
+from app.models.role import (
+    Role,
+    group_resource_group,
+    role_permission,
+    user_group_member,
+)
 from app.models.system import NotificationDeliveryLog
 from app.models.user import Permission, Users
 
