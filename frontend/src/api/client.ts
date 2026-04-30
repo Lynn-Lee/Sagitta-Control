@@ -81,6 +81,14 @@ apiClient.interceptors.response.use(
       }
     }
 
+    if (
+      error.response?.status === 403 &&
+      (error.response.data as any)?.code === 'LICENSE_REQUIRED' &&
+      window.location.pathname !== '/system/license'
+    ) {
+      window.location.href = '/system/license'
+    }
+
     return Promise.reject(error)
   }
 )

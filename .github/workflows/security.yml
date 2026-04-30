@@ -2,9 +2,13 @@ name: Security Scan
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - "release/**"
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - "release/**"
   schedule:
     # 每周一 UTC 02:00 执行定期安全扫描
     - cron: "0 2 * * 1"
@@ -131,8 +135,8 @@ jobs:
   trivy:
     name: Trivy Container Scan
     runs-on: ubuntu-latest
-    # 仅在 main 分支推送时扫描镜像（PR 阶段跳过镜像构建）
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # 仅在 main/release 分支推送时扫描镜像（PR 阶段跳过镜像构建）
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
 
     steps:
       - uses: actions/checkout@v4

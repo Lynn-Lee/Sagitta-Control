@@ -480,6 +480,9 @@ class InstanceService:
 
     @staticmethod
     async def create(db: AsyncSession, data: InstanceCreate) -> Instance:
+        from app.services.license import LicenseService
+
+        await LicenseService.enforce_max_instances(db)
         # 检查实例名唯一性
         existing = await db.execute(
             select(Instance).where(Instance.instance_name == data.instance_name)

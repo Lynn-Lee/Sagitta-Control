@@ -390,6 +390,9 @@ class UserService:
 
     @staticmethod
     async def create_user(db: AsyncSession, data: UserCreate, *, auto_commit: bool = True) -> Users:
+        from app.services.license import LicenseService
+
+        await LicenseService.enforce_max_users(db)
         existing = await UserService.get_by_username(db, data.username)
         if existing:
             raise ConflictException(f"用户名 '{data.username}' 已存在")

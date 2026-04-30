@@ -1,0 +1,193 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Form,
+  Input,
+  Row,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+  message,
+} from 'antd'
+import { ReloadOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
+import { licenseApi, type LicenseStatus } from '@/api/license'
+
+const { TextArea } = Input
+const { Text } = Typography
+
+const statusColor: Record<string, string> = {
+  trial: 'gold',
+  licensed: 'green',
+  expired: 'red',
+  invalid: 'red',
+}
+
+const statusLabel: Record<string, string> = {
+  trial: '试用中',
+  licensed: '正式授权',
+  expired: '已过期',
+  invalid: '无效',
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString()
+}
+
+export default function LicensePage() {
+  const [status, setStatus] = useState<LicenseStatus | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [licenseText, setLicenseText] = useState('')
+
+  const loadStatus = async () => {
+    setLoading(true)
+    try {
+      setStatus(await licenseApi.status())
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadStatus()
+  }, [])
+
+  const alertType = useMemo(() => {
+    if (!status) return 'info'
+    if (status.status === 'licensed') return 'success'
+    if (status.status === 'trial') return 'warning'
+    return 'error'
+  }, [status])
+
+  const handleImport = async () => {
+    if (!licenseText.trim()) {
+      message.warning('请粘贴 License JSON')
+      return
+    }
+    setImporting(true)
+    try {
+      let payload: string | Record<string, unknown> = licenseText
+      try {
+        payload = JSON.parse(licenseText)
+      } catch {
+        payload = licenseText
+      }
+      await licenseApi.import(payload)
+      message.success('License 导入成功')
+      setLicenseText('')
+      await loadStatus()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || 'License 导入失败')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div>
+      <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+        <Space>
+          <SafetyCertificateOutlined style={{ fontSize: 22, color: '#165DFF' }} />
+          <Typography.Title level={4} style={{ margin: 0 }}>授权管理</Typography.Title>
+        </Space>
+        <Button icon={<ReloadOutlined />} onClick={loadStatus} loading={loading}>刷新</Button>
+      </Space>
+
+      <Alert
+        type={alertType as any}
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={status ? statusLabel[status.status] || status.status : '读取授权状态中'}
+        description={status?.reason || '正在检查当前部署的授权状态'}
+      />
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card loading={loading}>
+            <Statistic
+              title="剩余天数"
+              value={status?.days_remaining ?? 0}
+              suffix="天"
+              valueStyle={{ color: status?.status === 'expired' ? '#cf1322' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card loading={loading}>
+            <Statistic title="版本" value={status?.edition || '-'} />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card loading={loading}>
+            <Statistic title="来源" value={status?.source || '-'} />
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={14}>
+          <Card title="当前授权" loading={loading}>
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="状态">
+                <Tag color={statusColor[status?.status || ''] || 'default'}>
+                  {status ? statusLabel[status.status] || status.status : '-'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="License ID">{status?.license_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="客户 ID">{status?.customer_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="客户名称">{status?.company_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
+              <Descriptions.Item label="生效时间">{formatDate(status?.not_before)}</Descriptions.Item>
+              <Descriptions.Item label="过期时间">{formatDate(status?.expires_at)}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <Card title="权益与额度" loading={loading}>
+            <div style={{ marginBottom: 12 }}>
+              <Text type="secondary">功能模块</Text>
+              <div style={{ marginTop: 8 }}>
+                {(status?.features || []).map((feature) => (
+                  <Tag key={feature} color="blue" style={{ marginBottom: 6 }}>{feature}</Tag>
+                ))}
+                {!status?.features?.length && <Text type="secondary">-</Text>}
+              </div>
+            </div>
+            <div>
+              <Text type="secondary">额度限制</Text>
+              <div style={{ marginTop: 8 }}>
+                {Object.entries(status?.limits || {}).map(([key, value]) => (
+                  <Tag key={key} color="purple" style={{ marginBottom: 6 }}>{key}: {String(value)}</Tag>
+                ))}
+                {!Object.keys(status?.limits || {}).length && <Text type="secondary">不限</Text>}
+              </div>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24}>
+          <Card title="导入离线 License">
+            <Form layout="vertical">
+              <Form.Item label="License JSON">
+                <TextArea
+                  rows={10}
+                  value={licenseText}
+                  onChange={(event) => setLicenseText(event.target.value)}
+                  placeholder='{"payload": {...}, "signature": "..."}'
+                />
+              </Form.Item>
+              <Button type="primary" icon={<UploadOutlined />} onClick={handleImport} loading={importing}>
+                导入 License
+              </Button>
+            </Form>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  )
+}

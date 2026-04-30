@@ -7,9 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.routers import (
@@ -28,6 +29,7 @@ from app.routers import (
     system,
     workflow,
 )
+from app.services.license import LicenseService
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def license_enforcement_middleware(request, call_next):
+    async with AsyncSessionLocal() as db:
+        check = await LicenseService.check_access(db, request.url.path, request.method)
+    if not check.allowed:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": check.reason,
+                "code": "LICENSE_REQUIRED",
+                "license_status": check.status,
+                "feature": check.feature,
+            },
+        )
+    return await call_next(request)
 
 # ─── 异常处理 ─────────────────────────────────────────────────
 register_exception_handlers(app)

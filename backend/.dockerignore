@@ -1,0 +1,26 @@
+.DS_Store
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.log
+*.sqlite3
+
+.git/
+.github/
+tests/
+coverage.xml
+htmlcov/
+README.md
+Dockerfile.bak.1
+celerybeat-schedule
+downloads/
+bandit-report.json
+pip-audit-report.json
+
+# Keep optional driver assets explicit. Put only redistributable runtime files here.
+vendor/oracle/README.md

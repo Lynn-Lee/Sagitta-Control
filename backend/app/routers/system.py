@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import current_user, require_perm
+from app.core.deps import current_superuser, current_user, require_perm
 from app.schemas.role import (
     RoleCreate,
     RoleUpdate,
@@ -24,6 +24,7 @@ from app.schemas.user import (
     UserUpdate,
 )
 from app.services.audit_log import AuditLogService
+from app.services.license import LicenseService
 from app.services.role import RoleService, UserGroupService
 from app.services.system_config import SystemConfigService
 from app.services.user import ResourceGroupService, UserService
@@ -165,6 +166,7 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_perm("user_manage")),
 ):
+    await LicenseService.enforce_max_users(db)
     user = await UserService.create_user(db, data)
     return {"status": 0, "msg": "用户创建成功", "data": {"id": user.id, "username": user.username}}
 
@@ -795,6 +797,15 @@ class LdapTestRequest(BaseModel):
     test_password: str = ""
 
 
+class LicenseImportRequest(BaseModel):
+    license: dict | str
+
+
+class LicenseActivateRequest(BaseModel):
+    activation_code: str = ""
+    customer_id: str = ""
+
+
 @router.get("/config/", summary="获取系统配置（按分组）")
 async def get_system_config(
     db: AsyncSession = Depends(get_db),
@@ -895,6 +906,55 @@ async def test_ldap_config(
     _user=Depends(require_perm("system_config_manage")),
 ):
     return await SystemConfigService.test_ldap(db, data.test_username, data.test_password)
+
+
+# ═══════════════════════════════════════════════════════════
+# 商业授权
+# ═══════════════════════════════════════════════════════════
+
+
+@router.get("/license/status", summary="License 授权状态")
+async def get_license_status(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(current_user),
+):
+    return await LicenseService.status(db)
+
+
+@router.post("/license/import", summary="导入离线 License")
+async def import_license(
+    data: LicenseImportRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_superuser),
+):
+    status_data = await LicenseService.import_license(db, data.license)
+    await AuditLogService.write(
+        db,
+        user,
+        action="import_license",
+        module="system",
+        detail=f"导入 License：{status_data.get('license_id') or '-'}",
+        request=request,
+    )
+    return {"status": 0, "msg": "License 导入成功", "data": status_data}
+
+
+@router.post("/license/activate", summary="在线激活 License")
+async def activate_license(
+    data: LicenseActivateRequest,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(current_superuser),
+):
+    return await LicenseService.activate(db, data.model_dump())
+
+
+@router.post("/license/refresh", summary="在线续期 License")
+async def refresh_license(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(current_superuser),
+):
+    return await LicenseService.refresh(db)
 
 
 # ═══════════════════════════════════════════════════════════

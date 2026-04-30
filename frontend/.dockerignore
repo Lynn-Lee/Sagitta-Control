@@ -1,0 +1,12 @@
+.DS_Store
+.git/
+.github/
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+*.local
+README.md
+src/**/*.test.*
+src/test/

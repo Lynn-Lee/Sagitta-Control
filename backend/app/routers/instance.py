@@ -12,6 +12,7 @@ from app.schemas.instance import (
 )
 from app.services.instance import InstanceService, TunnelService
 from app.services.instance_database import InstanceDatabaseService
+from app.services.license import LicenseService
 from app.services.query_priv import QueryPrivService
 
 router = APIRouter()
@@ -98,6 +99,7 @@ async def create_instance(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
+    await LicenseService.enforce_max_instances(db)
     _validate_resource_group_scope(user, data.resource_group_ids)
     inst = await InstanceService.create(db, data)
     return {"status": 0, "msg": "实例创建成功", "data": InstanceService.to_response(inst)}

@@ -1,0 +1,353 @@
+"""Enterprise license verification and enforcement."""
+
+from __future__ import annotations
+
+import base64
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from fastapi import HTTPException
+from sqlalchemy import Select, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.models.instance import Instance
+from app.models.system import LicenseRecord
+from app.models.user import Users
+
+LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", "instance"}
+TRIAL_FEATURES = sorted(LICENSE_FEATURES)
+LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
+    ("/api/v1/workflow", "workflow"),
+    ("/api/v1/query", "query"),
+    ("/api/v1/archive", "archive"),
+    ("/api/v1/monitor", "monitor"),
+    ("/api/v1/ai", "ai"),
+    ("/api/v1/masking", "masking"),
+    ("/api/v1/workflow-templates", "workflow"),
+    ("/api/v1/instances", "instance"),
+)
+LICENSE_PROTECTED_SYSTEM_PREFIXES = (
+    "/api/v1/system/config",
+    "/api/v1/system/users",
+    "/api/v1/system/groups",
+    "/api/v1/system/roles",
+    "/api/v1/system/user-groups",
+    "/api/v1/system/resource-groups",
+    "/api/v1/system/approval-flows",
+)
+LICENSE_EXEMPT_PREFIXES = (
+    "/api/v1/auth",
+    "/api/v1/system/license",
+    "/health",
+    "/",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+)
+
+
+@dataclass(slots=True)
+class LicenseCheck:
+    allowed: bool
+    status: str
+    reason: str = ""
+    feature: str = ""
+
+
+class LicenseService:
+    """Validate signed license files and derive runtime access decisions."""
+
+    @staticmethod
+    def _utcnow() -> datetime:
+        return datetime.now(UTC)
+
+    @staticmethod
+    def _parse_datetime(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        normalized = value.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
+
+    @staticmethod
+    def _canonical_payload(payload: dict[str, Any]) -> bytes:
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+
+    @staticmethod
+    def _b64decode(value: str) -> bytes:
+        padded = value + "=" * (-len(value) % 4)
+        return base64.urlsafe_b64decode(padded.encode())
+
+    @staticmethod
+    def _load_public_key() -> Ed25519PublicKey:
+        key = settings.LICENSE_PUBLIC_KEY.strip()
+        if not key:
+            raise HTTPException(status_code=400, detail="未配置 License 公钥")
+        if "BEGIN PUBLIC KEY" in key:
+            from cryptography.hazmat.primitives import serialization
+
+            loaded = serialization.load_pem_public_key(key.encode())
+            if not isinstance(loaded, Ed25519PublicKey):
+                raise HTTPException(status_code=400, detail="License 公钥类型无效")
+            return loaded
+        raw = LicenseService._b64decode(key)
+        return Ed25519PublicKey.from_public_bytes(raw)
+
+    @staticmethod
+    def _parse_license_document(raw_license: str | dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+        if isinstance(raw_license, str):
+            try:
+                doc = json.loads(raw_license)
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=400, detail="License JSON 格式无效") from exc
+        else:
+            doc = raw_license
+        if not isinstance(doc, dict):
+            raise HTTPException(status_code=400, detail="License 必须是 JSON 对象")
+        payload = doc.get("payload")
+        signature = doc.get("signature")
+        if not isinstance(payload, dict) or not isinstance(signature, str) or not signature:
+            raise HTTPException(status_code=400, detail="License 必须包含 payload 和 signature")
+        normalized_raw = json.dumps(doc, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return payload, signature, normalized_raw
+
+    @staticmethod
+    def _validate_payload_shape(payload: dict[str, Any]) -> None:
+        required = {
+            "license_id",
+            "customer_id",
+            "company_name",
+            "edition",
+            "not_before",
+            "expires_at",
+            "features",
+            "limits",
+            "issued_at",
+        }
+        missing = sorted(required - set(payload))
+        if missing:
+            raise HTTPException(status_code=400, detail=f"License 缺少字段：{', '.join(missing)}")
+        if not isinstance(payload.get("features"), list):
+            raise HTTPException(status_code=400, detail="License features 必须是数组")
+        if not isinstance(payload.get("limits"), dict):
+            raise HTTPException(status_code=400, detail="License limits 必须是对象")
+
+    @staticmethod
+    def _validate_customer(payload: dict[str, Any]) -> None:
+        expected = settings.LICENSE_CUSTOMER_ID.strip()
+        if expected and payload.get("customer_id") != expected:
+            raise HTTPException(status_code=400, detail="License 客户标识不匹配")
+
+    @staticmethod
+    def verify_license_document(raw_license: str | dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+        payload, signature, normalized_raw = LicenseService._parse_license_document(raw_license)
+        LicenseService._validate_payload_shape(payload)
+        LicenseService._validate_customer(payload)
+        public_key = LicenseService._load_public_key()
+        try:
+            public_key.verify(
+                LicenseService._b64decode(signature),
+                LicenseService._canonical_payload(payload),
+            )
+        except (InvalidSignature, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="License 签名无效") from exc
+        return payload, signature, normalized_raw
+
+    @staticmethod
+    async def _current_record(db: AsyncSession) -> LicenseRecord | None:
+        result = await db.execute(
+            select(LicenseRecord)
+            .where(LicenseRecord.is_current.is_(True))
+            .order_by(LicenseRecord.created_at.desc(), LicenseRecord.id.desc())
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def ensure_trial(db: AsyncSession) -> LicenseRecord:
+        current = await LicenseService._current_record(db)
+        if current:
+            return current
+        now = LicenseService._utcnow()
+        trial = LicenseRecord(
+            source="trial",
+            status="trial",
+            is_current=True,
+            license_id="trial",
+            customer_id=settings.LICENSE_CUSTOMER_ID or "trial",
+            company_name="试用版",
+            edition="trial",
+            features=TRIAL_FEATURES,
+            limits={},
+            issued_at=now,
+            not_before=now,
+            expires_at=now + timedelta(days=settings.LICENSE_TRIAL_DAYS),
+            last_check_status="ok",
+            last_check_reason="试用期内",
+        )
+        db.add(trial)
+        await db.commit()
+        await db.refresh(trial)
+        return trial
+
+    @staticmethod
+    def evaluate_record(record: LicenseRecord) -> tuple[str, str]:
+        now = LicenseService._utcnow()
+        not_before = record.not_before
+        expires_at = record.expires_at
+        if not_before and not_before.tzinfo is None:
+            not_before = not_before.replace(tzinfo=UTC)
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if not_before and now < not_before:
+            return "invalid", "License 尚未生效"
+        if expires_at and now > expires_at:
+            return "expired", "License 已过期"
+        if record.status == "invalid":
+            return "invalid", record.last_check_reason or "License 无效"
+        return ("trial", "试用期内") if record.source == "trial" else ("licensed", "License 有效")
+
+    @staticmethod
+    async def status(db: AsyncSession) -> dict[str, Any]:
+        record = await LicenseService.ensure_trial(db)
+        status, reason = LicenseService.evaluate_record(record)
+        now = LicenseService._utcnow()
+        days_remaining: int | None = None
+        if record.expires_at:
+            expires_at = record.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            seconds = (expires_at - now).total_seconds()
+            days_remaining = max(0, int((seconds + 86399) // 86400))
+        if record.last_check_status != status or record.last_check_reason != reason:
+            record.last_check_status = status
+            record.last_check_reason = reason
+            await db.commit()
+        return {
+            "status": status,
+            "reason": reason,
+            "source": record.source,
+            "is_trial": record.source == "trial",
+            "license_id": record.license_id,
+            "customer_id": record.customer_id,
+            "company_name": record.company_name,
+            "edition": record.edition,
+            "features": record.features or [],
+            "limits": record.limits or {},
+            "issued_at": record.issued_at.isoformat() if record.issued_at else None,
+            "not_before": record.not_before.isoformat() if record.not_before else None,
+            "expires_at": record.expires_at.isoformat() if record.expires_at else None,
+            "days_remaining": days_remaining,
+        }
+
+    @staticmethod
+    async def import_license(db: AsyncSession, raw_license: str | dict[str, Any]) -> dict[str, Any]:
+        payload, signature, normalized_raw = LicenseService.verify_license_document(raw_license)
+        await db.execute(update(LicenseRecord).values(is_current=False))
+        record = LicenseRecord(
+            source="import",
+            status="licensed",
+            is_current=True,
+            raw_license=normalized_raw,
+            payload=payload,
+            signature=signature,
+            license_id=str(payload.get("license_id", "")),
+            customer_id=str(payload.get("customer_id", "")),
+            company_name=str(payload.get("company_name", "")),
+            edition=str(payload.get("edition", "enterprise")),
+            features=list(payload.get("features") or []),
+            limits=dict(payload.get("limits") or {}),
+            issued_at=LicenseService._parse_datetime(payload.get("issued_at")),
+            not_before=LicenseService._parse_datetime(payload.get("not_before")),
+            expires_at=LicenseService._parse_datetime(payload.get("expires_at")),
+            last_check_status="ok",
+            last_check_reason="License 已导入",
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        status, reason = LicenseService.evaluate_record(record)
+        if status != "licensed":
+            record.status = status
+            record.last_check_status = status
+            record.last_check_reason = reason
+            await db.commit()
+        return await LicenseService.status(db)
+
+    @staticmethod
+    async def activate(_: AsyncSession, __: dict[str, Any]) -> dict[str, Any]:
+        if not settings.LICENSE_SERVER_URL.strip():
+            raise HTTPException(status_code=501, detail="暂未配置授权服务器")
+        raise HTTPException(status_code=501, detail="在线激活接口预留，当前版本未启用")
+
+    @staticmethod
+    async def refresh(_: AsyncSession) -> dict[str, Any]:
+        if not settings.LICENSE_SERVER_URL.strip():
+            raise HTTPException(status_code=501, detail="暂未配置授权服务器")
+        raise HTTPException(status_code=501, detail="在线续期接口预留，当前版本未启用")
+
+    @staticmethod
+    async def check_access(db: AsyncSession, path: str, method: str) -> LicenseCheck:
+        if method.upper() == "OPTIONS" or any(path == p or path.startswith(p + "/") for p in LICENSE_EXEMPT_PREFIXES):
+            return LicenseCheck(True, "exempt")
+        feature = LicenseService.feature_for_path(path)
+        if not feature and not any(path.startswith(prefix) for prefix in LICENSE_PROTECTED_SYSTEM_PREFIXES):
+            return LicenseCheck(True, "unprotected")
+        state = await LicenseService.status(db)
+        status = state["status"]
+        if status in {"trial", "licensed"}:
+            if status == "licensed" and feature:
+                features = set(state.get("features") or [])
+                if feature not in features:
+                    return LicenseCheck(False, status, f"当前 License 未授权功能：{feature}", feature)
+            return LicenseCheck(True, status, feature=feature or "system")
+        return LicenseCheck(False, status, state.get("reason") or "License 无效", feature or "system")
+
+    @staticmethod
+    def feature_for_path(path: str) -> str:
+        for prefix, feature in LICENSE_PROTECTED_FEATURE_BY_PREFIX:
+            if path.startswith(prefix):
+                return feature
+        return ""
+
+    @staticmethod
+    async def enforce_limit(db: AsyncSession, limit_name: str, query: Select[Any], label: str) -> None:
+        state = await LicenseService.status(db)
+        if state["status"] not in {"trial", "licensed"}:
+            raise HTTPException(status_code=403, detail=state.get("reason") or "License 无效")
+        limits = state.get("limits") or {}
+        limit = limits.get(limit_name)
+        if limit in (None, "", 0):
+            return
+        try:
+            max_allowed = int(limit)
+        except (TypeError, ValueError):
+            return
+        result = await db.execute(query)
+        current = int(result.scalar_one() or 0)
+        if current >= max_allowed:
+            raise HTTPException(status_code=403, detail=f"{label}数量已达到 License 限额：{max_allowed}")
+
+    @staticmethod
+    async def enforce_max_users(db: AsyncSession) -> None:
+        await LicenseService.enforce_limit(
+            db,
+            "max_users",
+            select(func.count()).select_from(Users).where(Users.is_active.is_(True)),
+            "用户",
+        )
+
+    @staticmethod
+    async def enforce_max_instances(db: AsyncSession) -> None:
+        await LicenseService.enforce_limit(
+            db,
+            "max_instances",
+            select(func.count()).select_from(Instance).where(Instance.is_active.is_(True)),
+            "实例",
+        )

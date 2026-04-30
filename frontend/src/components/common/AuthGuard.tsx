@@ -1,9 +1,28 @@
-import { type ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { type ReactNode, useEffect } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
+import { licenseApi } from '@/api/license'
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isAuthenticated || location.pathname === '/system/license') return
+    let cancelled = false
+    licenseApi.status()
+      .then((status) => {
+        if (!cancelled && ['expired', 'invalid'].includes(status.status)) {
+          navigate('/system/license', { replace: true })
+        }
+      })
+      .catch(() => {
+        // API-level license enforcement remains authoritative.
+      })
+    return () => { cancelled = true }
+  }, [isAuthenticated, location.pathname, navigate])
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }

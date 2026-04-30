@@ -1,7 +1,9 @@
 """
 系统配置 & 操作审计日志模型。
 """
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -75,4 +77,43 @@ class NotificationDeliveryLog(BaseModel):
         Index("ix_notify_user", "recipient_user_id"),
         Index("ix_notify_status", "status"),
         Index("ix_notify_tenant", "tenant_id"),
+    )
+
+
+class LicenseRecord(BaseModel):
+    """商业授权记录。"""
+
+    __tablename__ = "license_record"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/import/online")
+    status: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/licensed/invalid/expired")
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否当前授权")
+    raw_license: Mapped[str] = mapped_column(Text, default="", comment="原始 license JSON")
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, comment="License payload")
+    signature: Mapped[str] = mapped_column(Text, default="", comment="License 签名")
+    license_id: Mapped[str] = mapped_column(String(100), default="", comment="License ID")
+    customer_id: Mapped[str] = mapped_column(String(100), default="", comment="客户 ID")
+    company_name: Mapped[str] = mapped_column(String(200), default="", comment="客户名称")
+    edition: Mapped[str] = mapped_column(String(50), default="trial", comment="版本")
+    features: Mapped[list] = mapped_column(JSON, default=list, comment="授权功能")
+    limits: Mapped[dict] = mapped_column(JSON, default=dict, comment="授权额度")
+    issued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="签发时间"
+    )
+    not_before: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="生效时间"
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="过期时间"
+    )
+    last_check_status: Mapped[str] = mapped_column(String(20), default="ok", comment="最后检查状态")
+    last_check_reason: Mapped[str] = mapped_column(String(500), default="", comment="最后检查原因")
+
+    __table_args__ = (
+        Index("ix_license_current", "is_current"),
+        Index("ix_license_status", "status"),
+        Index("ix_license_customer", "customer_id"),
+        Index("ix_license_expires", "expires_at"),
+        Index("ix_license_tenant", "tenant_id"),
     )

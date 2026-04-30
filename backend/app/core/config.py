@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # ─── 商业授权 ─────────────────────────────────────────────
+    LICENSE_PUBLIC_KEY: str = ""
+    LICENSE_CUSTOMER_ID: str = ""
+    LICENSE_SERVER_URL: str = ""
+    LICENSE_TRIAL_DAYS: int = 30
+
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
     TENANT_ID: int = 1
 

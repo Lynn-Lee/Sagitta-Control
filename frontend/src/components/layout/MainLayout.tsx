@@ -217,6 +217,7 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/system/user-groups', icon: <MenuIcon component={UserGroupMenuSvg} label="用户组管理" />, label: '用户组管理' },
       { key: '/system/approval-flows', icon: <ApartmentOutlined />, label: '审批流管理' },
       { key: '/system/config', icon: <MenuIcon component={SystemConfigMenuSvg} label="系统配置" />, label: '系统配置' },
+      { key: '/system/license', icon: <SafetyCertificateOutlined />, label: '授权管理' },
       { key: '/masking', icon: <EyeInvisibleOutlined />, label: '数据脱敏规则' },
     ],
   },

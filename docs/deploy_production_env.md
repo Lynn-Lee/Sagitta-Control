@@ -1,231 +1,225 @@
-# SagittaDB 生产环境部署文档
+# SagittaDB 生产部署文档
 
-> **文档版本：** v1.2 · 2026-04-11
-> **适用版本：** SagittaDB v1.0-GA
-> **部署方式：** 方案一 Docker Compose 生产模式 / 方案二 Kubernetes + Helm Chart
-> **目标读者：** 运维工程师、DevOps、系统管理员
+> 文档版本：v1.0
+> 适用版本：SagittaDB v1.0-GA + v2-lite 授权体系
+> 目标读者：实施工程师、DevOps、系统管理员、运维工程师
 
----
+## 1. 部署目标
 
-## 一、部署方案选择
+本文档说明如何将 SagittaDB 部署为正式生产环境。部署文档只覆盖“如何上线”，长期巡检、备份恢复、故障处理和安全检查请参考 [运维文档](operations_guide.md)。
 
-| 维度 | 方案一：Docker Compose 生产模式 | 方案二：Kubernetes + Helm |
+SagittaDB 支持两种生产部署模式：
+
+| 模式 | 适用场景 | 推荐程度 |
 |---|---|---|
-| **适用规模** | 小型团队（< 50 人），单机部署 | 中大型团队，多节点高可用 |
-| **部署复杂度** | 低，1台服务器即可 | 高，需要 K8s 集群 |
-| **高可用** | 单点，无横向扩展 | 多副本，HPA 自动扩缩容 |
-| **运维成本** | 低 | 中等（需熟悉 K8s） |
-| **推荐场景** | 企业内网，非关键业务 | 生产关键业务，需 SLA 保障 |
+| Docker Compose 生产模式 | 单机、企业内网、中小团队、PoC 转生产。 | 推荐作为首选交付方式。 |
+| Kubernetes + Helm | 多节点、高可用、云原生平台、统一集群管理。 | 适合已有 K8s 能力的企业。 |
 
----
+## 2. 部署架构
 
-## 二、方案一：Docker Compose 生产模式
+```text
+User Browser
+  -> HTTPS / Nginx
+  -> Frontend
+  -> Backend API
+  -> PostgreSQL / Redis
+  -> Celery Worker
+  -> Database Engines
+```
 
-### 2.1 服务器要求
+核心服务：
+
+| 服务 | 说明 |
+|---|---|
+| `frontend` | 前端静态资源服务和 API 反向代理。 |
+| `backend` | FastAPI 后端 API。 |
+| `celery_worker` | 异步执行 SQL、通知、归档和采集任务。 |
+| `celery_beat` | 定时任务调度。 |
+| `postgres` | 平台元数据数据库。 |
+| `redis` | Celery broker、Token 黑名单和临时缓存。 |
+| `flower` | Celery 任务监控。 |
+| `prometheus` / `grafana` / `alertmanager` | 可选外围监控组件。 |
+
+## 3. 服务器要求
+
+### 3.1 Docker Compose 模式
 
 | 资源 | 最低配置 | 推荐配置 |
 |---|---|---|
 | CPU | 4 核 | 8 核 |
 | 内存 | 8 GB | 16 GB |
 | 系统盘 | 50 GB SSD | 100 GB SSD |
-| 数据盘 | 100 GB | 500 GB（独立挂载） |
-| 操作系统 | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
-| 网络 | 独立公网 IP | 公网 IP + 域名 + SSL |
+| 数据盘 | 100 GB | 500 GB 以上，独立挂载 |
+| 操作系统 | Ubuntu 22.04 LTS / Rocky Linux 9 | Ubuntu 22.04 LTS |
+| 网络 | 企业内网可达目标数据库 | HTTPS 域名 + 内网数据库网络 |
 
-### 2.2 服务器初始化
+### 3.2 Kubernetes 模式
+
+| 资源 | 建议 |
+|---|---|
+| Kubernetes | 1.25+ |
+| 节点 | 至少 3 个工作节点 |
+| 存储 | 支持动态 PVC 的持久化存储 |
+| Ingress | Nginx Ingress / Traefik / 企业标准网关 |
+| Secret 管理 | Kubernetes Secret 或企业密钥管理系统 |
+
+## 4. 生产环境安全要求
+
+上线前必须完成以下安全配置：
+
+- `APP_ENV=production`。
+- `DEBUG=false`。
+- `SECRET_KEY` 替换为 32 位以上随机字符串。
+- `POSTGRES_PASSWORD` 和 `REDIS_PASSWORD` 替换为强密码。
+- `DATABASE_URL` 与 `DATABASE_URL_SYNC` 使用生产数据库账号和密码。
+- 对外只暴露 HTTPS 入口，不向公网暴露 PostgreSQL、Redis、Flower、Prometheus、Grafana 管理口。
+- 生产环境默认不开放 `/docs`，如需访问仅允许内网临时开放。
+- 首次初始化后立即修改默认管理员密码。
+- 升级、迁移和发布前必须执行数据库备份。
+- 不得随意修改 `SECRET_KEY`，否则已加密数据无法解密。
+
+生成密钥示例：
 
 ```bash
-# 更新系统
-sudo apt-get update && sudo apt-get upgrade -y
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
-# 安装 Docker
+## 5. Docker Compose 生产部署
+
+### 5.1 安装 Docker
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 newgrp docker
-
-# 验证安装
 docker --version
 docker compose version
+```
 
-# 创建数据目录（建议挂载独立数据盘）
+### 5.2 准备目录
+
+```bash
 sudo mkdir -p /data/sagittadb/{postgres,redis,prometheus,grafana,downloads,backups}
 sudo chown -R $USER:$USER /data/sagittadb
 ```
 
-### 2.3 拉取代码
+### 5.3 获取代码
 
 ```bash
 cd /opt
-sudo git clone https://github.com/Lynn-Lee/SagittaDB.git
-sudo chown -R $USER:$USER SagittaDB
+git clone https://github.com/Lynn-Lee/SagittaDB.git
 cd SagittaDB
 ```
 
-### 2.4 生成密钥
+私有交付场景可替换为企业内部 Git 地址或离线代码包。
 
-```bash
-# 生成 SECRET_KEY（JWT 签名密钥）
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-
-# 生成 PostgreSQL 强密码
-python3 -c "import secrets; print(secrets.token_urlsafe(24))"
-```
-
-记录生成的值，填入下一步的 `.env` 文件。
-
-### 2.5 配置生产环境变量
+### 5.4 配置环境变量
 
 ```bash
 cp .env.example .env
 vim .env
 ```
 
-**生产环境 `.env` 必须修改的配置项：**
+生产必改项：
 
 ```bash
-# ── 数据库（生产环境必须修改密码）───────────────────
-DATABASE_URL=postgresql+asyncpg://sagitta:<强密码>@postgres:5432/sagittadb
-DATABASE_URL_SYNC=postgresql+psycopg2://sagitta:<强密码>@postgres:5432/sagittadb
-
-# ── Redis（生产环境必须修改密码）────────────────────
-REDIS_URL=redis://:<Redis强密码>@redis:6379/0
-REDIS_PASSWORD=<Redis强密码>
-
-# ── 安全（生产环境必须替换，系统启动时会强制校验）────
-# 若使用默认值且 APP_ENV=production，后端启动时将抛出 ValueError 并拒绝启动
-SECRET_KEY=<上一步生成的随机字符串，至少32位>
-ACCESS_TOKEN_EXPIRE_MINUTES=30     # 生产建议缩短至 30 分钟
-REFRESH_TOKEN_EXPIRE_DAYS=3        # 生产建议缩短至 3 天
-
-# ── 应用环境 ─────────────────────────────────────────
 APP_ENV=production
 DEBUG=false
 LOG_LEVEL=WARNING
 
-# ── 观测中心 ───────────────────────────────────────
-PROMETHEUS_URL=http://prometheus:9090
-ALERTMANAGER_URL=http://alertmanager:9093
-GRAFANA_URL=https://your-domain.com:3000     # 修改为实际域名
+SECRET_KEY=<随机32位以上字符串>
 
-# ── PostgreSQL Docker 初始化 ─────────────────────────
 POSTGRES_DB=sagittadb
 POSTGRES_USER=sagitta
-POSTGRES_PASSWORD=<与 DATABASE_URL 中一致的强密码>
+POSTGRES_PASSWORD=<PostgreSQL强密码>
 
-# ── 通知配置（通过系统配置页面管理）──────────────────
-# 以下配置已废弃，请通过 Web UI「系统配置」页面配置
-# DINGTALK_WEBHOOK=...
-# FEISHU_WEBHOOK=...
-# SMTP_HOST=...
-# 登录后访问：系统配置 → 钉钉通知 / 企业微信 / 飞书 / 邮件通知
-# 精准到人通知还需要在用户管理中维护用户 dingtalk_user_id / feishu_open_id / wecom_userid / email
-# 钉钉工作通知需配置 ding_agent_id；飞书/企微复用登录应用 AppSecret/AgentId 等配置
+REDIS_PASSWORD=<Redis强密码>
+REDIS_URL=redis://:<Redis强密码>@redis:6379/0
+
+DATABASE_URL=postgresql+asyncpg://sagitta:<PostgreSQL强密码>@postgres:5432/sagittadb
+DATABASE_URL_SYNC=postgresql+psycopg2://sagitta:<PostgreSQL强密码>@postgres:5432/sagittadb
+
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=3
 ```
 
-### 2.6 配置数据卷持久化
+认证、通知、AI 等运行时配置在系统管理页面配置，不需要写入环境变量。
 
-修改 `docker-compose.yml`，将数据卷挂载到独立数据盘：
+### 5.5 Oracle 11g 特殊配置
+
+如果需要连接 Oracle 11.2 或更早版本，需要启用 Thick 模式并提供 Oracle Instant Client：
 
 ```bash
-# 在 volumes 节点末尾，将命名卷改为绑定挂载
-# 编辑 docker-compose.yml，将以下内容
-#   pg_data:
-# 改为
-#   pg_data:
-#     driver: local
-#     driver_opts:
-#       type: none
-#       o: bind
-#       device: /data/sagittadb/postgres
+ORACLE_DRIVER_MODE=thick
+ORACLE_CLIENT_LIB_DIR=
+ORACLE_CLIENT_CONFIG_DIR=
 ```
 
-或更简单地，在 `.env` 中添加：
+将 Instant Client 解压到 `backend/vendor/oracle/instantclient_*` 后重新构建后端相关镜像。
+
+### 5.6 启动服务
+
+从项目根目录执行：
 
 ```bash
-PG_DATA_PATH=/data/sagittadb/postgres
-REDIS_DATA_PATH=/data/sagittadb/redis
-GRAFANA_DATA_PATH=/data/sagittadb/grafana
-PROM_DATA_PATH=/data/sagittadb/prometheus
-```
-
-### 2.7 启动生产服务
-
-```bash
-# 使用生产覆盖文件叠加启动
+docker compose -f deploy/docker-compose.yml build
 docker compose -f deploy/docker-compose.yml up -d
-
-# 查看启动状态
-docker compose ps
-
-# 等待 postgres healthy（约 10-20 秒）
-watch -n 2 "docker compose ps | grep postgres"
+docker compose -f deploy/docker-compose.yml ps
 ```
 
-### 2.8 初始化数据库
+等待 `postgres` 和 `redis` 健康后执行迁移：
 
 ```bash
-# 执行迁移
-docker compose exec backend alembic upgrade head
-
-# 初始化系统（创建管理员账号）
-curl -X POST http://localhost:8000/api/v1/system/init/
+docker compose -f deploy/docker-compose.yml exec backend alembic upgrade head
 ```
 
-**⚠️ 重要：立即修改默认管理员密码**
+### 5.7 初始化系统
 
 ```bash
-# 使用 admin / Admin@2024! 首次登录会进入强制改密流程；
-# 新密码必须至少 8 位，并同时包含数字、大写字母、小写字母和特殊字符。
+curl -X POST http://127.0.0.1:8000/api/v1/system/init/
 ```
 
-### 2.9 配置 Nginx 反向代理 + SSL
+随后访问前端入口，使用初始化管理员账号登录，并按提示修改默认密码。新密码必须符合复杂度要求：至少 8 位，包含数字、大写字母、小写字母和特殊字符。
 
-生产环境需要通过域名 + HTTPS 访问，推荐在宿主机安装 Nginx 作为外层代理：
+### 5.8 配置 HTTPS 入口
 
-```bash
-sudo apt-get install -y nginx certbot python3-certbot-nginx
+生产环境建议使用宿主机 Nginx 或企业网关统一接入 HTTPS。
 
-# 申请 Let's Encrypt 证书
-sudo certbot --nginx -d your-domain.com
-
-# 配置 /etc/nginx/sites-available/sagittadb
-```
+示例 Nginx 配置：
 
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name your-domain.com;
+    server_name db.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/db.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/db.example.com/privkey.pem;
 
-    # 安全头
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
 
-    # 前端
     location / {
-        proxy_pass http://localhost:80;
+        proxy_pass http://127.0.0.1:80;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # API
     location /api/ {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        client_max_body_size 50m;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_read_timeout 120s;
+        client_max_body_size 50m;
     }
 
-    # WebSocket
     location /ws/ {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -235,519 +229,136 @@ server {
 
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name db.example.com;
     return 301 https://$host$request_uri;
 }
 ```
 
-```bash
-sudo ln -s /etc/nginx/sites-available/sagittadb /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-### 2.10 配置防火墙
+### 5.9 防火墙建议
 
 ```bash
-sudo ufw allow 22/tcp      # SSH
-sudo ufw allow 80/tcp      # HTTP（重定向至 HTTPS）
-sudo ufw allow 443/tcp     # HTTPS
-sudo ufw deny 8000/tcp     # 禁止直接访问后端（通过 Nginx 代理）
-sudo ufw deny 5432/tcp     # 禁止外部访问 PostgreSQL
-sudo ufw deny 6379/tcp     # 禁止外部访问 Redis
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw deny 5432/tcp
+sudo ufw deny 6379/tcp
+sudo ufw deny 5555/tcp
+sudo ufw deny 9090/tcp
+sudo ufw deny 3000/tcp
 sudo ufw enable
 ```
 
-### 2.11 配置自动备份
+如果 Flower、Prometheus、Grafana 需要访问，应通过 VPN、堡垒机或内网网段限制。
 
-```bash
-# 设置备份环境变量
-export POSTGRES_HOST=localhost
-export POSTGRES_PASSWORD=<数据库密码>
-export BACKUP_DIR=/data/sagittadb/backups
-export BACKUP_RETAIN_DAYS=30
+## 6. Kubernetes + Helm 部署
 
-# 添加 crontab（每天凌晨 2 点自动备份）
-crontab -e
-# 添加以下行：
-0 2 * * * POSTGRES_HOST=localhost POSTGRES_PASSWORD=<密码> BACKUP_DIR=/data/sagittadb/backups bash /opt/SagittaDB/deploy/backup/backup-postgres.sh >> /var/log/sagittadb-backup.log 2>&1
-```
+### 6.1 前置条件
 
-若需上传至 S3：
+- Kubernetes 集群可用。
+- `kubectl` 已配置目标集群上下文。
+- 已安装 Helm 3。
+- 已准备 Ingress、StorageClass、镜像仓库和 TLS 证书。
 
-```bash
-0 2 * * * POSTGRES_HOST=localhost POSTGRES_PASSWORD=<密码> S3_BUCKET=your-bucket bash /opt/SagittaDB/deploy/backup/backup-postgres.sh
-```
-
-### 2.12 生产模式各服务规格
-
-| 服务 | CPU 限制 | 内存限制 | 说明 |
-|---|---|---|---|
-| postgres | 2 核 | 2 GB | 主数据库 |
-| redis | 1 核 | 512 MB | 缓存/消息队列 |
-| backend | 2 核 | 1 GB | 4 个 uvicorn workers |
-| celery_worker | 4 核 | 2 GB | 8 并发任务 |
-| celery_beat | 0.5 核 | 256 MB | 定时任务调度 |
-| flower | 0.5 核 | 256 MB | Celery 监控 |
-| frontend | 0.5 核 | 128 MB | Nginx 静态文件 |
-| prometheus | 1 核 | 1 GB | 指标存储 |
-| grafana | 1 核 | 512 MB | 可视化 |
-
----
-
-## 三、方案二：Kubernetes + Helm Chart
-
-### 3.1 集群要求
-
-| 资源 | 最低要求 | 推荐生产配置 |
-|---|---|---|
-| K8s 版本 | 1.27+ | 1.29+ |
-| 节点数 | 3 | 5（2 master + 3 worker） |
-| 每节点 CPU | 4 核 | 8 核 |
-| 每节点内存 | 8 GB | 16 GB |
-| 存储 | 支持 ReadWriteOnce PVC | gp3 StorageClass（AWS EKS） |
-| Ingress | nginx-ingress-controller | nginx-ingress-controller |
-| 证书管理 | cert-manager | cert-manager（Let's Encrypt） |
-
-### 3.2 前置依赖安装
-
-```bash
-# 安装 kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# 安装 Helm 3
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-# 验证
-kubectl version --client
-helm version
-```
-
-### 3.3 添加 Bitnami Chart 仓库
-
-Helm Chart 依赖 bitnami/postgresql 和 bitnami/redis：
-
-```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-```
-
-### 3.4 创建命名空间
-
-```bash
-kubectl create namespace sagittadb
-```
-
-### 3.5 生成并创建 Secret
-
-**⚠️ 绝不要将密钥明文写入 values 文件并提交 Git。使用 K8s Secret 或 Sealed Secrets。**
-
-```bash
-# 生成 SECRET_KEY
-SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-
-# 生成数据库密码
-DB_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
-
-# 生成 Redis 密码
-REDIS_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(20))")
-
-# 创建 K8s Secret
-kubectl create secret generic sagittadb-secrets \
-  --namespace sagittadb \
-  --from-literal=secret-key="${SECRET_KEY}" \
-  --from-literal=db-password="${DB_PASSWORD}" \
-  --from-literal=redis-password="${REDIS_PASSWORD}"
-```
-
-### 3.6 安装 nginx-ingress-controller
-
-```bash
-helm upgrade --install ingress-nginx ingress-nginx \
-  --repo https://kubernetes.github.io/ingress-nginx \
-  --namespace ingress-nginx \
-  --create-namespace
-
-# 获取 Ingress 外部 IP（等待约 2 分钟）
-kubectl get svc -n ingress-nginx ingress-nginx-controller
-```
-
-将域名 DNS A 记录指向该 IP。
-
-### 3.7 安装 cert-manager（自动 HTTPS 证书）
-
-```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
-
-# 等待 cert-manager 就绪
-kubectl wait --namespace cert-manager \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/instance=cert-manager \
-  --timeout=120s
-```
-
-创建 ClusterIssuer：
-
-```yaml
-# clusterissuer.yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com    # 修改为实际邮箱
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-```
-
-```bash
-kubectl apply -f clusterissuer.yaml
-```
-
-### 3.8 定制 prod values
-
-编辑 `deploy/helm/sagittadb/values-prod.yaml`，修改以下关键项：
-
-```yaml
-image:
-  registry: ghcr.io
-  repository: lynn-lee/sagittadb/backend   # 修改为实际仓库
-  tag: "1.0.0"
-
-frontend:
-  image:
-    registry: ghcr.io
-    repository: lynn-lee/sagittadb/frontend
-    tag: "1.0.0"
-
-ingress:
-  hosts:
-    - host: sagittadb.yourdomain.com       # 修改为实际域名
-      paths:
-        - path: /api
-          pathType: Prefix
-          backend: backend
-        - path: /
-          pathType: Prefix
-          backend: frontend
-  tls:
-    - secretName: sagittadb-prod-tls
-      hosts:
-        - sagittadb.yourdomain.com
-
-externalDatabase:
-  host: "your-rds-endpoint.rds.amazonaws.com"   # 修改为实际 RDS 地址
-  port: 5432
-  database: sagittadb
-  username: sagitta
-
-externalRedis:
-  host: "your-elasticache.cache.amazonaws.com"   # 修改为实际 Redis 地址
-  port: 6379
-  db: 0
-```
-
-### 3.9 部署 Chart
+### 6.2 配置 Values
 
 ```bash
 cd deploy/helm
-
-helm upgrade --install sagittadb ./sagittadb \
-  --namespace sagittadb \
-  --create-namespace \
-  -f sagittadb/values-prod.yaml \
-  --set app.secretKey="$(kubectl get secret sagittadb-secrets -n sagittadb -o jsonpath='{.data.secret-key}' | base64 -d)" \
-  --set externalDatabase.password="$(kubectl get secret sagittadb-secrets -n sagittadb -o jsonpath='{.data.db-password}' | base64 -d)" \
-  --set externalRedis.password="$(kubectl get secret sagittadb-secrets -n sagittadb -o jsonpath='{.data.redis-password}' | base64 -d)" \
-  --wait \
-  --timeout 10m
+helm dependency update sagittadb/
+cp sagittadb/values-prod.yaml /tmp/sagittadb-values.yaml
+vim /tmp/sagittadb-values.yaml
 ```
 
-### 3.10 验证部署状态
+重点检查：
+
+- 镜像地址与 tag。
+- `SECRET_KEY`、数据库密码、Redis 密码。
+- Ingress 域名和 TLS。
+- PostgreSQL、Redis、下载目录等持久化存储。
+- Backend、Worker、Frontend 副本数与资源限制。
+
+### 6.3 安装
 
 ```bash
-# 查看所有 Pod 状态
-kubectl get pods -n sagittadb
-
-# 查看 Ingress 状态（确认 HTTPS 证书）
-kubectl get ingress -n sagittadb
-
-# 查看 HPA 状态
-kubectl get hpa -n sagittadb
-
-# 查看服务日志
-kubectl logs -n sagittadb deployment/sagittadb-backend --tail=50
-kubectl logs -n sagittadb deployment/sagittadb-worker --tail=50
+helm install sagittadb deploy/helm/sagittadb -f /tmp/sagittadb-values.yaml
 ```
 
-### 3.11 初始化系统
+升级：
 
 ```bash
-# 等待 backend Pod 就绪后
-BACKEND_POD=$(kubectl get pod -n sagittadb -l app.kubernetes.io/component=backend -o jsonpath='{.items[0].metadata.name}')
-
-# 执行数据库迁移（initContainer 会自动执行，此命令用于验证）
-kubectl exec -n sagittadb $BACKEND_POD -- alembic current
-
-# 初始化系统
-kubectl exec -n sagittadb $BACKEND_POD -- \
-  python -c "import httpx; r = httpx.post('http://localhost:8000/api/v1/system/init/'); print(r.json())"
+helm upgrade sagittadb deploy/helm/sagittadb -f /tmp/sagittadb-values.yaml
 ```
 
-或通过外部访问：
+查看状态：
 
 ```bash
-curl -X POST https://sagittadb.yourdomain.com/api/v1/system/init/
+kubectl get pods
+kubectl get svc
+kubectl get ingress
 ```
 
-### 3.12 Helm 升级与回滚
+Helm Chart 中的 initContainer 会在应用启动前执行 `alembic upgrade head`。如果企业要求手动审批迁移，可在上线流程中单独执行迁移任务。
+
+## 7. 发布升级
+
+仓库提供标准生产发布脚本：
 
 ```bash
-# 升级到新版本
-helm upgrade sagittadb ./sagittadb \
-  --namespace sagittadb \
-  -f sagittadb/values-prod.yaml \
-  --set image.tag="1.0.1" \
-  --set app.secretKey="..."
-
-# 查看发布历史
-helm history sagittadb -n sagittadb
-
-# 回滚到上一版本
-helm rollback sagittadb -n sagittadb
-
-# 回滚到指定版本
-helm rollback sagittadb 2 -n sagittadb
-```
-
----
-
-## 四、生产环境安全加固清单
-
-部署完成后，逐项确认以下安全措施：
-
-### 4.1 密钥与凭证
-
-- [ ] `SECRET_KEY` 已替换为随机 32+ 字符字符串
-- [ ] 数据库密码强度 ≥ 20 位（含大小写+数字+特殊字符）
-- [ ] Redis 密码已设置
-- [ ] 默认管理员密码 `Admin@2024!` 已修改，且新密码符合复杂度要求并纳入 30 天轮换
-- [ ] 敏感配置未明文出现在 Git 仓库中
-- [ ] `.env` 文件权限为 `600`（`chmod 600 .env`）
-
-### 4.2 网络访问控制
-
-- [ ] PostgreSQL（5432）不对外网暴露
-- [ ] Redis（6379）不对外网暴露
-- [ ] Flower（5555）不对外网暴露，仅内网/VPN 可访问
-- [ ] Grafana（3000）不对外网暴露，仅内网/VPN 可访问
-- [ ] 所有外部访问通过 HTTPS（443）
-- [ ] HTTP（80）强制重定向至 HTTPS
-
-### 4.3 数据安全
-
-- [ ] PostgreSQL 定期备份已配置（每日 cron）
-- [ ] 备份文件已测试恢复流程
-- [ ] 若使用 S3，备份桶已开启版本控制和加密
-
-### 4.4 监控告警
-
-- [ ] Prometheus 正常采集指标
-- [ ] Grafana Dashboard 已导入
-- [ ] Alertmanager 告警规则已配置（磁盘 / 内存 / 服务宕机）
-- [ ] 告警通知渠道（邮件/钉钉）已验证可达
-- [ ] 审批主动通知已验证：应用消息可达，邮件兜底可达，`notification_delivery_log` 可查询投递结果
-
----
-
-## 五、数据库备份与恢复
-
-### 5.1 手动备份
-
-```bash
-# Docker Compose 环境
-POSTGRES_HOST=localhost \
-POSTGRES_PASSWORD=<密码> \
-BACKUP_DIR=/data/sagittadb/backups \
-bash deploy/backup/backup-postgres.sh
-
-# K8s 环境
-kubectl exec -n sagittadb $BACKEND_POD -- \
-  bash -c "PGPASSWORD=<密码> pg_dump -h <DB_HOST> -U sagitta sagittadb | gzip" \
-  > /local/path/sagittadb_$(date +%Y%m%d).sql.gz
-```
-
-### 5.2 从备份恢复
-
-```bash
-# Docker Compose 环境
-bash deploy/backup/restore-postgres.sh \
-  /data/sagittadb/backups/sagittadb_sagitta_20260326_020000.sql.gz
-
-# 手动恢复（任意环境）
-zcat sagittadb_xxx.sql.gz | \
-  PGPASSWORD=<密码> psql -h localhost -U sagitta -d sagittadb
-```
-
-### 5.3 备份验证（每月执行一次）
-
-```bash
-# 1. 创建验证库
-docker compose exec postgres createdb -U sagitta sagittadb_verify
-
-# 2. 恢复到验证库
-bash deploy/backup/restore-postgres.sh /path/to/backup.sql.gz sagittadb_verify
-
-# 3. 验证关键数据
-docker compose exec postgres psql -U sagitta -d sagittadb_verify \
-  -c "SELECT COUNT(*) FROM sql_users; SELECT COUNT(*) FROM sql_workflow;"
-
-# 4. 清理验证库
-docker compose exec postgres dropdb -U sagitta sagittadb_verify
-```
-
----
-
-## 六、运维手册
-
-### 6.1 滚动更新（Docker Compose）
-
-```bash
-# 推荐：在生产服务器项目目录执行标准发布脚本
 bash deploy/update-prod.sh
+```
 
-# 发布指定 tag / 分支 / commit
+常用参数：
+
+```bash
 bash deploy/update-prod.sh --ref v1.0.1
-
-# 已确认有近期备份时，可以跳过备份
 bash deploy/update-prod.sh --skip-backup
-
-# 无缓存构建并在成功后清理悬空镜像
 bash deploy/update-prod.sh --no-cache --prune
 ```
 
-`deploy/update-prod.sh` 会自动完成：检查工作区、拉取 `origin/main` 最新 Git 代码、通过 compose 内置 `postgres` 容器执行备份、构建生产镜像、启动依赖服务、执行 `alembic upgrade head`、重建应用服务、检查本机健康接口并输出服务状态。失败时脚本会打印 `backend / frontend / celery_worker` 近期日志，便于回滚或定位。
+推荐生产升级流程：
 
-默认备份目录为 `/data/sagittadb/backups`，默认保留 7 天；可在执行脚本前通过 `BACKUP_DIR` 和 `BACKUP_RETAIN_DAYS` 覆盖。
+1. 通知业务窗口。
+2. 备份 PostgreSQL。
+3. 拉取目标版本。
+4. 构建镜像。
+5. 执行 Alembic 迁移。
+6. 重启应用服务。
+7. 验证健康检查、登录、工单、查询和异步任务。
+8. 保留旧版本镜像和备份，直到观察期结束。
 
-### 6.2 查看生产日志
+## 8. 回滚策略
 
-```bash
-# 实时日志（带时间戳）
-docker compose logs -f --timestamps backend | grep -v "health"
+### 8.1 应用回滚
 
-# 只看错误
-docker compose logs backend 2>&1 | grep -i "error\|exception\|traceback"
-
-# 按时间范围
-docker compose logs --since="2026-03-26T10:00:00" --until="2026-03-26T11:00:00" backend
-```
-
-### 6.3 紧急故障处理
+如果仅应用代码异常，数据库结构未发生不兼容变更，可回滚到上一版本镜像或 Git tag：
 
 ```bash
-# 后端服务无响应 → 重启
-docker compose -f deploy/docker-compose.yml restart backend
-
-# PostgreSQL 磁盘满 → 清理
-du -sh /data/sagittadb/postgres     # 检查占用
-docker compose exec postgres vacuumdb -U sagitta --analyze sagittadb  # 清理垃圾
-
-# Redis 内存告警 → 查看占用
-docker compose exec redis redis-cli -a <密码> info memory
-docker compose exec redis redis-cli -a <密码> flushdb  # ⚠️ 仅在缓存数据无关紧要时使用
-
-# Celery 任务堆积 → 清空队列
-docker compose exec redis redis-cli -a <密码> del celery
-docker compose -f deploy/docker-compose.yml restart celery_worker
+git checkout <previous_tag>
+docker compose -f deploy/docker-compose.yml build
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-### 6.4 性能调优
+### 8.2 数据库回滚
 
-| 场景 | 调整参数 | 文件 |
-|---|---|---|
-| 并发请求量大 | 增加 `--workers` 数量（≤ 2×CPU核数） | `deploy/docker-compose.yml` backend command |
-| SQL 执行慢 | 增加 celery_worker concurrency | `deploy/docker-compose.yml` celery_worker command |
-| PostgreSQL 慢查询 | 调整 `max_connections`、`shared_buffers` | postgres 环境变量 |
-| Redis 内存不足 | 增加 memory limit 或使用独立 Redis 集群 | `docker-compose.yml` redis |
-
----
-
-## 七、版本升级流程
-
-```
-1. 查看 Release Notes（GitHub Releases）
-2. 备份当前数据库
-3. 测试环境验证新版本
-4. 维护窗口通知用户
-5. 生产环境执行升级
-6. 执行 alembic upgrade head（如有 schema 变更）
-7. 验证核心功能
-8. 恢复服务，通知用户
-```
-
-具体步骤：
+如果迁移已改变数据库结构，优先使用升级前备份恢复。只有在明确确认 Alembic downgrade 安全时，才执行：
 
 ```bash
-# 升级到 origin/main 最新提交
-bash deploy/update-prod.sh
-
-# 或升级到指定版本
-bash deploy/update-prod.sh --ref v1.0.1
+docker compose -f deploy/docker-compose.yml exec backend alembic downgrade -1
 ```
 
----
+生产环境建议以备份恢复作为主要回滚手段。
 
-## 八、监控指标参考
+## 9. 部署验收
 
-| 指标 | 告警阈值 | 说明 |
-|---|---|---|
-| 磁盘使用率 | > 80% | 及时扩容或清理 |
-| 内存使用率 | > 85% | 检查内存泄漏 |
-| CPU 使用率 | > 70%（持续5分钟） | 考虑横向扩展 |
-| PostgreSQL 连接数 | > max_connections × 80% | 调整连接池 |
-| Celery 队列积压 | > 100 个任务 | 增加 Worker 副本 |
-| 登录接口 P95 | > 1s | 排查 DB 慢查询 |
-| 工单执行失败率 | > 5% | 检查引擎连接 |
+上线后至少完成以下验收：
 
-Prometheus 告警规则文件位于 `deploy/prometheus/rules/`，Grafana Dashboard 模板位于 `deploy/grafana/`。
-
----
-
-## 九、端口与服务清单
-
-### 对外暴露（通过 Nginx 反向代理）
-
-| URL 路径 | 后端服务 | 说明 |
-|---|---|---|
-| `https://domain.com/` | frontend:80 | React SPA |
-| `https://domain.com/api/` | backend:8000 | REST API |
-| `https://domain.com/ws/` | backend:8000 | WebSocket |
-| `https://domain.com/docs` | backend:8000 | API 文档（生产建议关闭） |
-
-### 仅内网/VPN 访问
-
-| 端口 | 服务 | 说明 |
-|---|---|---|
-| 5555 | Flower | Celery 任务监控 |
-| 3000 | Grafana | 监控仪表板 |
-| 9090 | Prometheus | 指标查询 |
-| 9093 | Alertmanager | 告警管理 |
-
-### 禁止外网访问
-
-| 端口 | 服务 |
-|---|---|
-| 5432 | PostgreSQL |
-| 6379 | Redis |
-| 8000 | FastAPI 直接访问 |
-
----
-
-*SagittaDB 矢准数据 · 生产环境部署文档 v1.0 · 2026-03-26*
+- 前端可通过 HTTPS 正常访问。
+- `/health` 返回正常。
+- 管理员可以登录并修改密码。
+- Alembic 版本为最新 head。
+- Celery Worker 和 Beat 正常运行。
+- 能创建实例并测试连接。
+- 能同步数据库/Schema。
+- 能完成一条 SQL 工单从提交到执行的闭环。
+- 能完成查询权限申请、审批和在线查询。
+- 能查看审计日志和查询历史。
+- 备份脚本可执行并生成备份文件。
