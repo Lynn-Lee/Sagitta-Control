@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     LICENSE_AUTO_REFRESH_ENABLED: bool = True
     LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
     LICENSE_TRIAL_DAYS: int = 30
+    LICENSE_DEPLOYMENT_ID: str = ""
 
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
     TENANT_ID: int = 1

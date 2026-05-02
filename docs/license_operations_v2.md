@@ -14,10 +14,17 @@ LICENSE_SERVER_URL=https://sagitta.loveai.asia
 LICENSE_SERVER_TOKEN=<optional bearer token>
 LICENSE_AUTO_REFRESH_ENABLED=true
 LICENSE_RENEWAL_NOTIFY_DAYS=30,7
+LICENSE_DEPLOYMENT_ID=<stable random deployment id>
 ```
 
 When `LICENSE_SERVER_URL` is empty, offline import still works and online
 activation/refresh returns a clear configuration error.
+
+`LICENSE_DEPLOYMENT_ID` should be generated once per customer deployment and
+kept stable across upgrades. SagittaDB derives a deployment fingerprint from the
+customer id and this deployment id. Online activation sends that fingerprint to
+the license server, and signed licenses that include `deployment_fingerprint`
+are rejected when imported into a different deployment.
 
 ## Internal Authority Tool
 
@@ -37,7 +44,8 @@ python3 tools/license_authority.py create-activation \
   --company-name "Acme Corp" \
   --days 365 \
   --max-instances 20 \
-  --max-users 200
+  --max-users 200 \
+  --deployment-fingerprint <fingerprint from the SagittaDB license page>
 ```
 
 View the authorization ledger:
@@ -92,10 +100,12 @@ python3 tools/license_authority.py export-license \
 ## Customer Flow
 
 - Customer enters the activation code in System Management -> License.
-- SagittaDB calls `/api/v1/licenses/activate`, receives a signed license, then verifies it locally with the embedded public key.
-- Refresh calls `/api/v1/licenses/refresh`. If the authority returns `revoked` or `suspended`, SagittaDB marks the local license invalid.
+- SagittaDB calls `/api/v1/licenses/activate` with its deployment fingerprint, receives a signed license, then verifies it locally with the embedded public key.
+- Refresh calls `/api/v1/licenses/refresh` with the same fingerprint. If the authority returns `revoked` or `suspended`, SagittaDB marks the local license invalid.
 - SagittaDB shows a renewal warning when a trial or paid license has 30 days or fewer remaining, and a critical warning at 7 days or fewer.
-- Offline license files continue to use `tools/license_issue.py`.
+- Offline license files continue to use `tools/license_issue.py`; pass
+  `--deployment-fingerprint` to bind an offline license to one customer
+  deployment.
 
 ## Internal Production Verification
 

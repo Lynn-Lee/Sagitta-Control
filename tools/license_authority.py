@@ -22,8 +22,6 @@ from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
 
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
 DEFAULT_DB = "license_authority.json"
@@ -116,6 +114,7 @@ def public_activation(code: str, activation: dict[str, Any]) -> dict[str, Any]:
         "status": activation.get("status", "active"),
         "features": activation.get("features") or DEFAULT_FEATURES,
         "limits": activation.get("limits") or {},
+        "deployment_fingerprint": activation.get("deployment_fingerprint", ""),
         "not_before": activation.get("not_before", ""),
         "expires_at": activation.get("expires_at", ""),
         "last_issued_at": activation.get("last_issued_at", ""),
@@ -134,7 +133,7 @@ def build_payload(activation: dict[str, Any], license_id: str) -> dict[str, Any]
     now = datetime.now(UTC)
     not_before = parse_dt(activation.get("not_before", "")) if activation.get("not_before") else now
     expires_at = parse_dt(activation["expires_at"])
-    return {
+    payload = {
         "license_id": license_id,
         "customer_id": activation["customer_id"],
         "company_name": activation["company_name"],
@@ -145,35 +144,42 @@ def build_payload(activation: dict[str, Any], license_id: str) -> dict[str, Any]
         "features": activation.get("features") or DEFAULT_FEATURES,
         "limits": activation.get("limits") or {},
     }
+    if activation.get("deployment_fingerprint"):
+        payload["deployment_fingerprint"] = activation["deployment_fingerprint"]
+    return payload
 
 
-class ActivateRequest(BaseModel):
-    activation_code: str
-    customer_id: str
-    product: str = "sagittadb"
+def create_app(db_path: Path) -> Any:
+    try:
+        from fastapi import FastAPI, Header, HTTPException
+        from pydantic import BaseModel
+    except ModuleNotFoundError as exc:
+        raise SystemExit("serve requires fastapi and pydantic; run from the backend environment") from exc
 
+    class ActivateRequest(BaseModel):
+        activation_code: str
+        customer_id: str
+        deployment_fingerprint: str = ""
+        product: str = "sagittadb"
 
-class RefreshRequest(BaseModel):
-    activation_id: str = ""
-    license_id: str = ""
-    customer_id: str
-    product: str = "sagittadb"
+    class RefreshRequest(BaseModel):
+        activation_id: str = ""
+        license_id: str = ""
+        customer_id: str
+        deployment_fingerprint: str = ""
+        product: str = "sagittadb"
 
+    class StatusRequest(BaseModel):
+        activation_code: str
+        status: str
 
-class StatusRequest(BaseModel):
-    activation_code: str
-    status: str
+    class RenewRequest(BaseModel):
+        activation_code: str
+        days: int | None = None
+        expires_at: str = ""
+        features: list[str] | None = None
+        limits: dict[str, int] | None = None
 
-
-class RenewRequest(BaseModel):
-    activation_code: str
-    days: int | None = None
-    expires_at: str = ""
-    features: list[str] | None = None
-    limits: dict[str, int] | None = None
-
-
-def create_app(db_path: Path) -> FastAPI:
     app = FastAPI(title="SagittaDB License Authority", version="0.1.0")
 
     def verify_token(authorization: str | None) -> None:
@@ -240,7 +246,19 @@ def create_app(db_path: Path) -> FastAPI:
             raise HTTPException(status_code=403, detail="客户标识不匹配")
         if activation.get("status", "active") != "active":
             raise HTTPException(status_code=403, detail=f"激活码状态不可用：{activation.get('status')}")
-        append_audit(store, "activate", data.activation_code, {"customer_id": data.customer_id})
+        existing_fingerprint = activation.get("deployment_fingerprint", "")
+        if existing_fingerprint and data.deployment_fingerprint and existing_fingerprint != data.deployment_fingerprint:
+            append_audit(store, "activate_rejected", data.activation_code, {"reason": "deployment_fingerprint_mismatch"})
+            save_store(db_path, store)
+            raise HTTPException(status_code=403, detail="部署指纹不匹配")
+        if data.deployment_fingerprint and not existing_fingerprint:
+            activation["deployment_fingerprint"] = data.deployment_fingerprint
+        append_audit(
+            store,
+            "activate",
+            data.activation_code,
+            {"customer_id": data.customer_id, "deployment_fingerprint": activation.get("deployment_fingerprint", "")},
+        )
         return issue_for_activation(store, data.activation_code, activation)
 
     @app.post("/api/v1/licenses/refresh")
@@ -265,6 +283,11 @@ def create_app(db_path: Path) -> FastAPI:
             raise HTTPException(status_code=404, detail="授权记录不存在")
         if activation.get("customer_id") != data.customer_id:
             raise HTTPException(status_code=403, detail="客户标识不匹配")
+        existing_fingerprint = activation.get("deployment_fingerprint", "")
+        if existing_fingerprint and data.deployment_fingerprint and existing_fingerprint != data.deployment_fingerprint:
+            append_audit(store, "refresh_blocked", code or data.activation_id, {"reason": "deployment_fingerprint_mismatch"})
+            save_store(db_path, store)
+            raise HTTPException(status_code=403, detail="部署指纹不匹配")
         status = activation.get("status", "active")
         if status in {"revoked", "suspended"}:
             append_audit(store, "refresh_blocked", code or data.activation_id, {"status": status})
@@ -368,6 +391,7 @@ def command_create_activation(args: argparse.Namespace) -> int:
         "status": "active",
         "features": parse_features(args.features),
         "limits": parse_limits(args),
+        "deployment_fingerprint": args.deployment_fingerprint,
         "not_before": parse_dt(args.not_before).isoformat() if args.not_before else "",
         "expires_at": expires_at.isoformat(),
         "created_at": now.isoformat(),
@@ -421,6 +445,8 @@ def command_renew(args: argparse.Namespace) -> int:
     limits = parse_limits(args)
     if limits:
         activation["limits"] = limits
+    if args.deployment_fingerprint:
+        activation["deployment_fingerprint"] = args.deployment_fingerprint
     activation["updated_at"] = datetime.now(UTC).isoformat()
     append_audit(store, "renew", args.activation_code, public_activation(args.activation_code, activation))
     save_store(db_path, store)
@@ -479,6 +505,7 @@ def parse_args() -> argparse.Namespace:
     create.add_argument("--features", default=",".join(DEFAULT_FEATURES))
     create.add_argument("--max-instances", type=int, default=0)
     create.add_argument("--max-users", type=int, default=0)
+    create.add_argument("--deployment-fingerprint", default="")
     create.set_defaults(func=command_create_activation)
 
     status = subparsers.add_parser("set-status", help="set activation status: active/suspended/revoked")
@@ -499,6 +526,7 @@ def parse_args() -> argparse.Namespace:
     renew.add_argument("--features", default="")
     renew.add_argument("--max-instances", type=int, default=0)
     renew.add_argument("--max-users", type=int, default=0)
+    renew.add_argument("--deployment-fingerprint", default="")
     renew.set_defaults(func=command_renew)
 
     export = subparsers.add_parser("export-license", help="export the last issued signed license")

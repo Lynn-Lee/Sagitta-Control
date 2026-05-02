@@ -71,8 +71,10 @@ docker compose exec license_postgres pg_dump -U license sagittadb_license > lice
    - `LICENSE_CUSTOMER_ID`
    - `LICENSE_SERVER_URL=https://sagitta.loveai.asia`
    - `LICENSE_SERVER_TOKEN` if an edge proxy injects or requires one for product endpoints.
+   - `LICENSE_DEPLOYMENT_ID` generated once and kept stable across upgrades.
 3. Create a customer and activation code in the license server web admin.
 4. Activate from SagittaDB System Management -> License.
 5. Run `deploy/customer/verify-license.sh <activation-code> <customer-id>`.
-6. Suspend the activation code in the license server and run SagittaDB license refresh; core APIs should be blocked.
-7. Restore the activation code to active or create a new code, activate again, and confirm core APIs recover.
+6. Try the same activation code from a different deployment fingerprint; it should be rejected.
+7. Suspend the activation code in the license server and run SagittaDB license refresh; core APIs should be blocked.
+8. Restore the activation code to active or create a new code, activate again, and confirm core APIs recover.

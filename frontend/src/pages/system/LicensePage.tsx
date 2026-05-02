@@ -184,6 +184,7 @@ export default function LicensePage() {
               <Descriptions.Item label="客户名称">{status?.company_name || '-'}</Descriptions.Item>
               <Descriptions.Item label="在线激活 ID">{status?.activation_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="远端状态">{status?.remote_status || '-'}</Descriptions.Item>
+              <Descriptions.Item label="部署指纹">{status?.deployment_fingerprint || '-'}</Descriptions.Item>
               <Descriptions.Item label="最后联网校验">{formatDate(status?.last_online_check_at)}</Descriptions.Item>
               <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
               <Descriptions.Item label="生效时间">{formatDate(status?.not_before)}</Descriptions.Item>

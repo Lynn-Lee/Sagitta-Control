@@ -78,6 +78,27 @@ def test_verify_license_document_rejects_customer_mismatch(keypair, valid_payloa
     assert "客户标识不匹配" in exc.value.detail
 
 
+def test_verify_license_document_rejects_deployment_fingerprint_mismatch(
+    monkeypatch, keypair, valid_payload
+):
+    monkeypatch.setattr("app.services.license.settings.LICENSE_DEPLOYMENT_ID", "deploy-a")
+    valid_payload["deployment_fingerprint"] = "wrong"
+    doc = _license_doc(valid_payload, keypair)
+    with pytest.raises(HTTPException) as exc:
+        LicenseService.verify_license_document(doc)
+    assert exc.value.status_code == 400
+    assert "部署指纹不匹配" in exc.value.detail
+
+
+def test_deployment_fingerprint_uses_customer_and_deployment_id(monkeypatch):
+    monkeypatch.setattr("app.services.license.settings.LICENSE_DEPLOYMENT_ID", "deploy-a")
+    first = LicenseService.deployment_fingerprint("acme")
+    second = LicenseService.deployment_fingerprint("other")
+
+    assert len(first) == 64
+    assert first != second
+
+
 def test_evaluate_record_expired_and_not_before():
     now = datetime.now(UTC)
     expired = LicenseRecord(
@@ -137,6 +158,7 @@ async def test_activate_imports_online_license(monkeypatch, keypair, valid_paylo
 
     assert result["status"] == "licensed"
     call_server.assert_awaited_once()
+    assert call_server.await_args.args[1]["deployment_fingerprint"]
     store_license.assert_awaited_once()
     assert store_license.await_args.kwargs["source"] == "online"
     assert store_license.await_args.kwargs["activation_id"] == "act-001"

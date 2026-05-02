@@ -19,7 +19,6 @@ from typing import Any
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
 
 
@@ -72,6 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--features", default=",".join(DEFAULT_FEATURES), help="comma separated feature list")
     parser.add_argument("--max-instances", type=int, default=0, help="0 means unlimited")
     parser.add_argument("--max-users", type=int, default=0, help="0 means unlimited")
+    parser.add_argument("--deployment-fingerprint", default="", help="bind license to one SagittaDB deployment")
     parser.add_argument("--out", default="", help="output path; stdout when omitted")
     return parser.parse_args()
 
@@ -120,6 +120,8 @@ def main() -> int:
         "features": features,
         "limits": limits,
     }
+    if args.deployment_fingerprint:
+        payload["deployment_fingerprint"] = args.deployment_fingerprint
     signature = b64url(private_key.sign(canonical_payload(payload)))
     document = {"payload": payload, "signature": signature}
     output = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True)

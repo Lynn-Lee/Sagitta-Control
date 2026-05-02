@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -159,6 +160,13 @@ class LicenseService:
         return {"Authorization": f"Bearer {token}"} if token else {}
 
     @staticmethod
+    def deployment_fingerprint(customer_id: str = "") -> str:
+        deployment_id = settings.LICENSE_DEPLOYMENT_ID.strip() or settings.SECRET_KEY.strip()
+        customer = customer_id or settings.LICENSE_CUSTOMER_ID.strip() or "trial"
+        material = f"sagittadb:{customer}:{deployment_id}".encode()
+        return hashlib.sha256(material).hexdigest()
+
+    @staticmethod
     async def _call_license_server(path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = LicenseService._license_server_url() + path
         try:
@@ -194,6 +202,11 @@ class LicenseService:
             )
         except (InvalidSignature, ValueError) as exc:
             raise HTTPException(status_code=400, detail="License 签名无效") from exc
+        expected_fingerprint = str(payload.get("deployment_fingerprint") or "").strip()
+        if expected_fingerprint:
+            actual_fingerprint = LicenseService.deployment_fingerprint(str(payload.get("customer_id") or ""))
+            if expected_fingerprint != actual_fingerprint:
+                raise HTTPException(status_code=400, detail="License 部署指纹不匹配")
         return payload, signature, normalized_raw
 
     @staticmethod
@@ -284,6 +297,8 @@ class LicenseService:
             "limits": record.limits or {},
             "activation_id": record.activation_id,
             "remote_status": record.remote_status,
+            "deployment_fingerprint": record.deployment_fingerprint
+            or LicenseService.deployment_fingerprint(record.customer_id),
             "last_online_check_at": record.last_online_check_at.isoformat() if record.last_online_check_at else None,
             "issued_at": record.issued_at.isoformat() if record.issued_at else None,
             "not_before": record.not_before.isoformat() if record.not_before else None,
@@ -323,6 +338,8 @@ class LicenseService:
             activation_id=activation_id,
             server_url=server_url,
             remote_status=remote_status,
+            deployment_fingerprint=str(payload.get("deployment_fingerprint") or "").strip()
+            or LicenseService.deployment_fingerprint(str(payload.get("customer_id") or "")),
             issued_at=LicenseService._parse_datetime(payload.get("issued_at")),
             not_before=LicenseService._parse_datetime(payload.get("not_before")),
             expires_at=LicenseService._parse_datetime(payload.get("expires_at")),
@@ -358,6 +375,7 @@ class LicenseService:
             {
                 "activation_code": activation_code,
                 "customer_id": customer_id,
+                "deployment_fingerprint": LicenseService.deployment_fingerprint(customer_id),
                 "product": "sagittadb",
             },
         )
@@ -385,6 +403,7 @@ class LicenseService:
                 "activation_id": current.activation_id,
                 "license_id": current.license_id,
                 "customer_id": current.customer_id,
+                "deployment_fingerprint": LicenseService.deployment_fingerprint(current.customer_id),
                 "product": "sagittadb",
             },
         )

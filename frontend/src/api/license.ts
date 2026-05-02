@@ -13,6 +13,7 @@ export type LicenseStatus = {
   limits: Record<string, number | string>
   activation_id?: string
   remote_status?: string
+  deployment_fingerprint?: string
   last_online_check_at?: string | null
   issued_at?: string | null
   not_before?: string | null

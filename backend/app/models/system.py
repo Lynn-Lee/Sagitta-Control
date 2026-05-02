@@ -102,6 +102,7 @@ class LicenseRecord(BaseModel):
     activation_id: Mapped[str] = mapped_column(String(100), default="", comment="在线激活 ID")
     server_url: Mapped[str] = mapped_column(String(500), default="", comment="授权服务器地址")
     remote_status: Mapped[str] = mapped_column(String(20), default="", comment="授权服务器返回状态")
+    deployment_fingerprint: Mapped[str] = mapped_column(String(100), default="", comment="部署指纹")
     issued_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="签发时间"
     )
@@ -122,5 +123,6 @@ class LicenseRecord(BaseModel):
         Index("ix_license_status", "status"),
         Index("ix_license_customer", "customer_id"),
         Index("ix_license_expires", "expires_at"),
+        Index("ix_license_deployment_fingerprint", "deployment_fingerprint"),
         Index("ix_license_tenant", "tenant_id"),
     )
