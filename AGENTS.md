@@ -5,7 +5,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Overview
 
 SagittaDB 矢准数据 — 企业级多引擎数据库管控平台（重构自 Archery v1.14.0）。  
-当前版本：**v1.0-GA + v2-lite 授权体系**，内测中。
+当前代码线：**v1.0-GA 商业化交付线 + v2-lite 授权体系 + License v2 在线激活/部署指纹绑定**。
 
 **Stack**: FastAPI 0.110 + SQLAlchemy 2.0 async + Alembic + Celery 5 + PostgreSQL 16 (backend)  
 React 18 + Vite 5 + TypeScript + Ant Design 5 + TanStack Query v5 + Zustand (frontend)
@@ -38,7 +38,7 @@ pip install -e ".[dev]"
 # 运行
 uvicorn app.main:app --reload --port 8000
 
-# 数据库迁移（当前 head: 0034_license_online_activation）
+# 数据库迁移（当前 head: 0035_license_deployment_fingerprint）
 alembic upgrade head
 alembic revision --autogenerate -m "describe change"
 alembic downgrade -1
@@ -52,8 +52,8 @@ celery -A app.celery_app flower --port=5555            # Web 监控
 ruff format . && ruff check . && mypy app/
 
 # 测试（需要 sagittadb_test 数据库已存在）
-pytest tests/unit/ -v --cov=app --cov-fail-under=35   # 单元测试（152个，覆盖率门限35%）
-pytest tests/integration/ -v                           # 集成测试（31个）
+pytest tests/unit/ -v --cov=app --cov-fail-under=35   # 单元测试（当前 556 个，覆盖率门限35%）
+pytest tests/integration/ -v                           # 集成测试（当前 43 个）
 pytest tests/unit/test_auth.py::test_hash_password     # 单个测试
 pytest tests/ -k "keyword"                             # 按关键字过滤
 locust -f tests/perf/locustfile.py --host http://localhost:8000  # 性能测试
@@ -134,7 +134,8 @@ services/         纯 Python 业务逻辑，接受 db session 参数，不自建
   masking.py      sqlglot 解析 SELECT 列 → 匹配脱敏规则（替代 goInception，支持20+方言）
   audit.py        操作日志写入 operation_log
   rollback.py     sqlglot 静态逆向 SQL + my2sql 命令生成 + PG WAL 查询语句
-  text2sql.py     自然语言→SQL（Codex API，_DEFAULT_MODEL = Codex-sonnet-4-20250514）
+  text2sql.py     自然语言→SQL（Anthropic Messages API，_DEFAULT_MODEL = claude-sonnet-4-20250514）
+  license.py      商业授权校验/导入/在线激活/刷新，校验 deployment_fingerprint 绑定
   notify.py       主动通知服务：审批/执行事件、收件人解析、飞书/企微/钉钉应用消息、邮件兜底、Webhook 兼容
   sms_auth.py     短信验证码（阿里云/腾讯云/自定义HTTP，Redis限流60s/天10次）
   approval_flow.py 审批流模板 CRUD + snapshot_for_workflow()（工单创建时快照节点）
@@ -148,6 +149,7 @@ tasks/            Celery tasks（5个队列：default/execute/notify/archive/mon
   archive.py      数据归档（purge/dest 模式，分批执行）
   monitor.py      监控指标采集
   notify.py       通知任务（send_notification_event，notify 队列）
+  license.py      在线授权每日刷新 + 续期提醒（refresh_online_license）
 ```
 
 ### v2-lite 授权体系（当前落地版本）
@@ -180,7 +182,7 @@ L3: QueryPrivilege 库级/表级授权（valid_date 有效期控制）
 
 **工单审批流快照**：工单创建时将 ApprovalFlowNode 快照到 `WorkflowAudit.audit_auth_groups_info`（JSON），此后修改审批流模板不影响在途工单。
 
-### Alembic 迁移历史（当前已到 0034）
+### Alembic 迁移历史（当前已到 0035）
 
 ```
 0001_initial_schema        — 初始完整表结构
@@ -217,6 +219,7 @@ L3: QueryPrivilege 库级/表级授权（valid_date 有效期控制）
 0032_notification_delivery — 用户外部通知身份 + notification_delivery_log
 0033_license_record — 商业授权记录
 0034_license_online_activation — 在线激活/续期元数据
+0035_license_deployment_fingerprint — License 绑定部署指纹
 ```
 
 ### Frontend (`frontend/src/`)
@@ -250,6 +253,11 @@ components/
 | `SECRET_KEY` | JWT 签名 + Fernet 加密密钥派生，**生产环境不可更改否则加密数据全失效** |
 | `APP_ENV` | `development`（开启 /docs）/ `production`（阻断默认 SECRET_KEY 启动） |
 | `ENABLE_GOINCEPTION` | 可选 MySQL SQL 审核增强，默认 false |
+| `LICENSE_PUBLIC_KEY` | License 签名验签公钥 |
+| `LICENSE_CUSTOMER_ID` | 在线激活绑定的客户 ID |
+| `LICENSE_SERVER_URL` / `LICENSE_SERVER_TOKEN` | 在线激活/刷新授权服务配置 |
+| `LICENSE_DEPLOYMENT_ID` | 可选部署 ID；参与生成 deployment_fingerprint，未设置时回退 SECRET_KEY |
+| `LICENSE_AUTO_REFRESH_ENABLED` / `LICENSE_RENEWAL_NOTIFY_DAYS` | 自动刷新与续期提醒策略 |
 
 所有认证/通知/AI 配置（LDAP、OAuth、钉钉、飞书、企微、邮件、Anthropic API Key）均在  
 `SystemConfig` 表（9个分组）通过 `/api/v1/system/config` 接口管理，**无需重启服务**。
@@ -266,7 +274,7 @@ components/
 
 ```
 tests/
-  unit/           152 个单元测试（完全 mock，不依赖真实 DB）
+  unit/           556 个单元测试（多数 mock，不依赖真实 DB）
     test_auth.py              密码哈希/JWT/Fernet 加密/Schema 验证
     test_masking.py           sqlglot 列提取/脱敏规则
     test_engine_registry.py
@@ -276,9 +284,11 @@ tests/
     test_notify.py            钉钉/飞书/企微 mock HTTP、通知失败不中断主流程
     test_system_config.py     配置服务/敏感字段加密
     test_workflow_service.py  工单状态/审批链路
-    test_authz_v2_lite.py     v2-lite 授权链路（13个测试）
+    test_authz_v2_lite.py     v2-lite 授权链路、资源范围、查询权限、数据字典权限
+    test_license_service.py / test_license_task.py  License 验签、部署指纹、在线刷新与续期提醒
+    test_archive_*.py / test_risk_plan.py / test_query_guard.py  归档、风险预案和查询安全防护
 
-  integration/    31 个集成测试（需要真实 PostgreSQL sagittadb_test 库 + Redis）
+  integration/    43 个集成测试（需要真实 PostgreSQL sagittadb_test 库 + Redis）
     conftest.py   每个测试独立创建 AsyncEngine（避免 asyncpg 跨 event loop 错误）
                   admin 默认密码: Admin@2024!，首次通过 POST /api/v1/system/init/ 初始化
     test_health / test_auth_api / test_instance_api / test_workflow_api
@@ -327,7 +337,8 @@ Elasticsearch / MSSQL / Cassandra / Doris 引擎骨架已实现但未在真实�
 | OAuth2 | 后端处理 code 换 token → 重定向前端携带 token，前端无需接触 client_secret |
 | 审批人类型 | `users`（指定用户 ID 列表）/ `manager`（直属上级 manager_id）/ `any_reviewer`（任意审批员）；通知解析还兼容 `user_group` / `role` / `group` |
 | 归档实现 | 纯 Python 通过引擎层执行，不依赖 pt-archiver，各 DB 分批语法独立适配 |
-| AI Text2SQL | `Codex-sonnet-4-20250514`，配置从 SystemConfig 读 API Key |
+| AI Text2SQL | Anthropic Messages API，默认 `claude-sonnet-4-20250514`，配置从 SystemConfig 读 API Key 和模型 |
+| 商业授权 | LicenseRecord 支持 trial/import/online；在线激活与刷新校验签名、客户 ID 和 `deployment_fingerprint` |
 
 ---
 
@@ -358,4 +369,4 @@ Elasticsearch / MSSQL / Cassandra / Doris 引擎骨架已实现但未在真实�
 | `system_config` | 系统配置 KV（9个分组，敏感值 Fernet 加密）|
 | `operation_log` | 操作审计日志 |
 | `notification_delivery_log` | 主动通知投递日志（事件/对象/渠道/收件人/状态/错误）|
-| `license_record` | 商业授权记录（试用/离线导入/在线激活、features、limits、远端状态）|
+| `license_record` | 商业授权记录（试用/离线导入/在线激活、features、limits、远端状态、deployment_fingerprint）|
