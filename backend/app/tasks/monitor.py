@@ -1,4 +1,4 @@
-"""Monitor and session sampling tasks."""
+"""监控与会话采样任务。"""
 
 import asyncio
 import importlib
@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 async def _run_with_task_session(collector: Any, *args: Any, **kwargs: Any) -> dict:
-    """Run a monitor collector with a Celery-local async engine.
+    """使用 Celery 进程内的本地 async engine 运行监控采集器。
 
-    Celery tasks call ``asyncio.run`` for each invocation, so sharing the FastAPI
-    global async engine can leave asyncpg connections attached to an old loop.
+    Celery 任务每次执行都会调用 ``asyncio.run``，如果复用 FastAPI 全局 async engine，
+    asyncpg 连接可能仍绑定在旧事件循环上。
     """
     importlib.import_module("app.models")
     engine = create_async_engine(

@@ -1,4 +1,4 @@
-"""Notification Celery tasks."""
+"""通知 Celery 任务。"""
 from __future__ import annotations
 
 import asyncio

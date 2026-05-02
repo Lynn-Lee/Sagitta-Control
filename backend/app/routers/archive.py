@@ -1,4 +1,4 @@
-"""Data archive routes."""
+"""数据归档路由。"""
 from __future__ import annotations
 
 from datetime import datetime

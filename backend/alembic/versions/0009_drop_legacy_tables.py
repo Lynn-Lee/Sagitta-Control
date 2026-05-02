@@ -1,4 +1,4 @@
-"""Phase 4: Drop legacy user_permission and user_resource_group tables.
+"""Phase 4：删除旧版 user_permission 和 user_resource_group 表。
 
 In v2, permissions are managed through role_permission (Role → Permission),
 and resource group access is through group_resource_group (UserGroup → ResourceGroup).

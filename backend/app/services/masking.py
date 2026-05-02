@@ -136,7 +136,7 @@ class DataMaskingService:
 
     @staticmethod
     def _matches_pattern(value: str, pattern: str) -> bool:
-        """Case-insensitive exact or shell-style wildcard match."""
+        """不区分大小写的精确匹配或 shell 风格通配符匹配。"""
         if not pattern:
             return False
         value_lower = value.lower()

@@ -18,7 +18,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
-        // API-level license enforcement remains authoritative.
+        // API 层 License 校验仍是最终权限来源。
       })
     return () => { cancelled = true }
   }, [isAuthenticated, location.pathname, navigate])

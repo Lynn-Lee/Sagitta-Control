@@ -1,4 +1,4 @@
-"""query privilege apply add approval flow fields
+"""查询权限申请新增审批流字段
 
 Revision ID: 0010_query_priv_apply_flow
 Revises: 0009

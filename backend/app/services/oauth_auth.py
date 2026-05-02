@@ -217,7 +217,7 @@ async def handle_wecom_callback(
         raise ValueError("企业微信登录配置不完整")
 
     async with httpx.AsyncClient(timeout=10) as client:
-        # Step 1: 获取企业级 access token
+        # 第 1 步：获取企业级 access token
         token_resp = await client.get(
             "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
             params={"corpid": corp_id, "corpsecret": app_secret},
@@ -228,7 +228,7 @@ async def handle_wecom_callback(
             raise ValueError(f"企微获取 Token 失败: {token_data.get('errmsg')}")
         access_token = token_data["access_token"]
 
-        # Step 2: code → UserId
+        # 第 2 步：code → UserId
         uid_resp = await client.get(
             "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo",
             params={"access_token": access_token, "code": code},
@@ -239,7 +239,7 @@ async def handle_wecom_callback(
             raise ValueError(f"企微获取用户身份失败: {uid_data.get('errmsg')}")
         user_id = uid_data.get("UserId") or uid_data.get("OpenId", "")
 
-        # Step 3: 获取用户详情（仅 UserId 情况下有完整信息）
+        # 第 3 步：获取用户详情（仅 UserId 情况下有完整信息）
         name = ""
         email = ""
         if uid_data.get("UserId"):
@@ -260,7 +260,7 @@ async def handle_wecom_callback(
 # ── CAS（Central Authentication Service）────────────────────
 
 def _normalize_cas_server_url(raw_url: str) -> str:
-    """Return the CAS base URL, accepting common endpoint URLs from admins."""
+    """返回 CAS 基础 URL，并兼容管理员常填的端点 URL。"""
     url = raw_url.strip().rstrip("/")
     for suffix in (
         "/p3/serviceValidate",

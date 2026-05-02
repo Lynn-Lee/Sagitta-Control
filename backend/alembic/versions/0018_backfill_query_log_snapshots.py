@@ -1,4 +1,4 @@
-"""backfill query log snapshot fields
+"""回填 query_log 快照字段
 
 Revision ID: 0018_qlog_snapshot_backfill
 Revises: 0017_query_log_history_audit

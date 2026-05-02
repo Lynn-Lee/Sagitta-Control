@@ -1,4 +1,4 @@
-"""Engine skeleton - Sprint 2/4 will implement fully."""
+"""Doris 引擎骨架，真实环境验证后补齐完整能力。"""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

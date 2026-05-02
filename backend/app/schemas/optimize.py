@@ -1,4 +1,4 @@
-"""SQL optimization v2 schemas."""
+"""SQL 优化 v2 Schema。"""
 
 from typing import Any, Literal
 
@@ -9,7 +9,7 @@ OptimizeSource = Literal["manual", "slowlog", "fingerprint"]
 
 
 class OptimizeAnalyzeRequest(BaseModel):
-    """Unified SQL optimization analysis request."""
+    """统一的 SQL 优化分析请求。"""
 
     log_id: int | None = None
     fingerprint: str | None = None
@@ -72,4 +72,3 @@ class OptimizeAnalyzeResponse(BaseModel):
     raw: Any = None
     sql: str = ""
     msg: str = ""
-

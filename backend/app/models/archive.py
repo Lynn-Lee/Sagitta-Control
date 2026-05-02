@@ -1,4 +1,4 @@
-"""Archive job models."""
+"""数据归档作业模型。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -30,7 +30,7 @@ class ArchiveBatchStatus(StrEnum):
 
 
 class ArchiveJob(BaseModel):
-    """Long-running archive/cleanup job."""
+    """长时间运行的数据归档或清理作业。"""
 
     __tablename__ = "archive_job"
 
@@ -84,7 +84,7 @@ class ArchiveJob(BaseModel):
 
 
 class ArchiveBatchLog(BaseModel):
-    """Per-batch execution log for an archive job."""
+    """归档作业的批次执行日志。"""
 
     __tablename__ = "archive_batch_log"
 

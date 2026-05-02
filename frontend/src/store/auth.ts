@@ -1,7 +1,7 @@
 /**
  * 认证状态管理。
  * 使用 Zustand persist + localStorage 持久化 token。
- * storage name: 'sagittadb-auth'
+ * 存储名称：'sagittadb-auth'
  */
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'

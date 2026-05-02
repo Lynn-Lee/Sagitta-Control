@@ -1,19 +1,19 @@
 # SagittaDB Enterprise v__SAGITTADB_VERSION__
 
-This package is the customer deployment artifact for SagittaDB Enterprise. It contains deployment configuration only. Application code is delivered through versioned Docker images.
+这是 SagittaDB Enterprise 的客户部署包。部署包只包含部署配置；应用代码通过带版本号的 Docker 镜像交付。
 
-## Images
+## 镜像
 
-- Backend: `__IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__`
-- Frontend: `__IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__`
+- 后端：`__IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__`
+- 前端：`__IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__`
 
-Do not use `latest` for production deployments. Keep the explicit version tag in `docker-compose.yml`.
+生产环境不要使用 `latest`，请保留 `docker-compose.yml` 中的明确版本标签。
 
-## First Deployment
+## 首次部署
 
 ```bash
 cp .env.example .env
-# Edit .env and replace every CHANGE_ME value.
+# 编辑 .env，替换所有 CHANGE_ME 值。
 docker login ghcr.io
 docker compose pull
 docker compose up -d postgres redis
@@ -22,17 +22,17 @@ docker compose up -d
 docker compose ps
 ```
 
-Open `http://<server>/` after the frontend service is healthy.
+前端服务健康后，访问 `http://<server>/`。
 
-## Upgrade
+## 升级
 
-For an online upgrade:
+在线升级：
 
 ```bash
 ./upgrade.sh __SAGITTADB_VERSION__
 ```
 
-For a manual upgrade, update image tags in `docker-compose.yml`, then run:
+手工升级时，先更新 `docker-compose.yml` 中的镜像标签，再执行：
 
 ```bash
 docker compose pull
@@ -42,9 +42,9 @@ docker compose up -d
 curl -fsS http://127.0.0.1:8000/health
 ```
 
-## Offline Image Import
+## 离线镜像导入
 
-If the server cannot access the registry, import images provided by SagittaDB support:
+如果服务器无法访问镜像仓库，请导入 SagittaDB 支持团队提供的镜像包：
 
 ```bash
 docker load < sagittadb-backend-__SAGITTADB_VERSION__.tar
@@ -54,4 +54,4 @@ docker compose up -d
 
 ## License
 
-Import the license file from the SagittaDB system administration page after login. Keep license files outside this deployment package when sharing logs or configuration.
+登录后在 SagittaDB 系统管理页面导入 License 文件，或输入在线激活码完成授权。共享日志或配置时，请不要把 License 文件一并打包。

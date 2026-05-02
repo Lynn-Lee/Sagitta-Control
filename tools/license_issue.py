@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Issue SagittaDB Enterprise license files.
+"""签发 SagittaDB Enterprise License 文件。
 
-Private keys must be provided through SAGITTADB_LICENSE_PRIVATE_KEY and must not be
-committed to the repository or copied into customer images.
+私钥必须通过 SAGITTADB_LICENSE_PRIVATE_KEY 提供，禁止提交到仓库或复制到客户镜像。
 """
 
 from __future__ import annotations
@@ -59,20 +58,20 @@ def generate_keypair() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Issue SagittaDB Enterprise license")
-    parser.add_argument("--generate-keypair", action="store_true", help="print a new Ed25519 keypair and exit")
-    parser.add_argument("--license-id", required=False, help="license identifier")
-    parser.add_argument("--customer-id", required=False, help="customer identifier")
-    parser.add_argument("--company-name", required=False, help="customer company name")
-    parser.add_argument("--edition", default="enterprise", help="edition name")
-    parser.add_argument("--days", type=int, default=365, help="validity days from now")
-    parser.add_argument("--not-before", default="", help="ISO datetime; defaults to now")
-    parser.add_argument("--expires-at", default="", help="ISO datetime; overrides --days")
-    parser.add_argument("--features", default=",".join(DEFAULT_FEATURES), help="comma separated feature list")
-    parser.add_argument("--max-instances", type=int, default=0, help="0 means unlimited")
-    parser.add_argument("--max-users", type=int, default=0, help="0 means unlimited")
-    parser.add_argument("--deployment-fingerprint", default="", help="bind license to one SagittaDB deployment")
-    parser.add_argument("--out", default="", help="output path; stdout when omitted")
+    parser = argparse.ArgumentParser(description="签发 SagittaDB Enterprise License")
+    parser.add_argument("--generate-keypair", action="store_true", help="生成一组新的 Ed25519 密钥后退出")
+    parser.add_argument("--license-id", required=False, help="License 标识")
+    parser.add_argument("--customer-id", required=False, help="客户标识")
+    parser.add_argument("--company-name", required=False, help="客户公司名称")
+    parser.add_argument("--edition", default="enterprise", help="版本名称")
+    parser.add_argument("--days", type=int, default=365, help="从现在起的有效天数")
+    parser.add_argument("--not-before", default="", help="ISO 时间；默认当前时间")
+    parser.add_argument("--expires-at", default="", help="ISO 时间；优先于 --days")
+    parser.add_argument("--features", default=",".join(DEFAULT_FEATURES), help="逗号分隔的功能列表")
+    parser.add_argument("--max-instances", type=int, default=0, help="0 表示不限制")
+    parser.add_argument("--max-users", type=int, default=0, help="0 表示不限制")
+    parser.add_argument("--deployment-fingerprint", default="", help="将 License 绑定到单个 SagittaDB 部署")
+    parser.add_argument("--out", default="", help="输出路径；为空时输出到 stdout")
     return parser.parse_args()
 
 

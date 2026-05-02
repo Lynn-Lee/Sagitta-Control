@@ -1,4 +1,4 @@
-"""SQL analysis schemas backed by slow query samples."""
+"""基于慢 SQL 样本的 SQL 分析 Schema。"""
 
 from __future__ import annotations
 

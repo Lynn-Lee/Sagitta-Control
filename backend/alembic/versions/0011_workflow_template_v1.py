@@ -1,4 +1,4 @@
-"""workflow template v1 fields
+"""工单模板 v1 字段
 
 Revision ID: 0011_workflow_template_v1
 Revises: 0010_query_priv_apply_flow

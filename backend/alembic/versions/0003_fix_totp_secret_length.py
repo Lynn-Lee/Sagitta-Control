@@ -1,4 +1,4 @@
-"""Fix totp_secret column length 100->500
+"""修复 totp_secret 字段长度：100 -> 500
 
 Revision ID: 0003
 Revises: 0002

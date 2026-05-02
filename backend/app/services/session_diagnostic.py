@@ -1,4 +1,4 @@
-"""Session diagnostics and history helpers."""
+"""会话诊断与历史辅助函数。"""
 
 from __future__ import annotations
 

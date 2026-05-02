@@ -1,4 +1,4 @@
-"""sql activity collection semantics
+"""SQL 活动采集语义
 
 Revision ID: 0031_sql_activity_collect
 Revises: 0030_observability_perm

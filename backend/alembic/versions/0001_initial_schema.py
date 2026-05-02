@@ -1,4 +1,4 @@
-"""Sprint 1 initial schema
+"""Sprint 1 初始数据库结构
 
 Revision ID: 0001
 Revises:

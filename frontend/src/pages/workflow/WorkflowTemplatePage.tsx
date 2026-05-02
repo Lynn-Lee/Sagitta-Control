@@ -210,7 +210,7 @@ export default function WorkflowTemplatePage() {
         createMut.mutate(payload)
       }
     } catch {
-      // validation error
+      // 表单校验错误
     }
   }
 
@@ -236,7 +236,7 @@ export default function WorkflowTemplatePage() {
         },
       })
     } catch {
-      // handled by mutation onError
+      // 由 mutation 的 onError 统一处理
     }
   }
 

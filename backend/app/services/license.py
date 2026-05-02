@@ -1,4 +1,4 @@
-"""Enterprise license verification and enforcement."""
+"""企业 License 验签与访问控制。"""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class LicenseCheck:
 
 
 class LicenseService:
-    """Validate signed license files and derive runtime access decisions."""
+    """验证签名 License 文件，并推导运行时访问决策。"""
 
     @staticmethod
     def _utcnow() -> datetime:

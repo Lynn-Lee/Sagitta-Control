@@ -313,7 +313,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
     setDiagnosis(null)
     if (withDiagnosis) diagnoseMut.mutate({ fingerprint, instance_id: instanceId })
     if (row && !withDiagnosis) {
-      // Keep the drawer responsive while detail data loads.
+      // 明细数据加载期间先用当前行填充，保持抽屉响应及时。
       setDetailFingerprint(row.sql_fingerprint)
     }
   }

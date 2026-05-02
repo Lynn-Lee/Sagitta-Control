@@ -1,14 +1,14 @@
-# SagittaDB Commercial Release Flow
+# SagittaDB 商业版本发布流程
 
-SagittaDB uses a three-line release model:
+SagittaDB 采用三条线的发布模型：
 
-- `main`: internal source development. It is not a customer production source.
-- `release/<major.minor>`: stable commercial release line for customer images.
-- `hotfix/<major.minor.patch>`: urgent repair branch cut from the matching release line.
+- `main`：内部源码开发线，不作为客户生产版本来源。
+- `release/<major.minor>`：稳定商业交付线，用于构建客户镜像。
+- `hotfix/<major.minor.patch>`：从对应 release 线切出的紧急修复分支。
 
-Customers receive only versioned Docker images and the generated customer deployment package. They do not receive source branches.
+客户只接收带明确版本号的 Docker 镜像和生成好的客户部署包，不接收源码分支。
 
-## Normal Release
+## 常规发布
 
 ```bash
 bash scripts/create-release-branch.sh 1.0
@@ -17,7 +17,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Pushing `v1.0.0` triggers the commercial release workflow. It builds:
+推送 `v1.0.0` 标签后会触发商业发布流水线，并生成：
 
 - `ghcr.io/<org>/<repo>-backend:1.0.0`
 - `ghcr.io/<org>/<repo>-backend:1.0`
@@ -25,49 +25,44 @@ Pushing `v1.0.0` triggers the commercial release workflow. It builds:
 - `ghcr.io/<org>/<repo>-frontend:1.0`
 - `SagittaDB-Enterprise-v1.0.0.zip`
 
-## Main Development Images
+## main 开发镜像
 
-Every push to `main` publishes development images:
+每次推送 `main` 都会发布开发镜像：
 
 - `main-latest`
 - `main-<sha>`
 
-Do not use these tags for customer production deployments.
+这些标签仅供内部验证使用，禁止用于客户生产环境。
 
-## Release Candidate Images
+## Release 候选镜像
 
-Every push to `release/1.0` publishes candidate images:
+每次推送 `release/1.0` 都会发布候选镜像：
 
 - `release-1.0`
 - `release-1.0-<sha>`
 
-Use these only for internal verification or customer pre-release validation.
+这些镜像只用于内部验证或客户预发布验证。
 
-## Hotfix
+## 热修复
 
 ```bash
 bash scripts/start-hotfix.sh 1.0.4
-# fix, test, commit
+# 修复、测试、提交
 bash scripts/finish-hotfix.sh 1.0.4
 git push origin release/1.0
 git push origin main
 git push origin v1.0.4
 ```
 
-The tag push builds the final customer images and deployment package.
+推送版本标签后会构建最终客户镜像和部署包。
 
-## Customer Deployment
+## 客户交付
 
-Give customers the generated `SagittaDB-Enterprise-v<version>.zip` and either a matching offline license file or an online activation code. The package pins exact image versions in `docker-compose.yml`; customers should not use `latest`.
+向客户交付生成的 `SagittaDB-Enterprise-v<version>.zip`，同时提供匹配的离线 License 文件或在线激活码。部署包内的 `docker-compose.yml` 会固定精确镜像版本，客户环境不应使用 `latest`。
 
-Online activation and refresh are documented in `docs/license_operations_v2.md`.
-The license server is maintained in the separate private repository
-`https://github.com/Lynn-Lee/SagittaDB-License-Server` and deployed separately
-from customer SagittaDB images; see `docs/license_server_deploy.md`. Customers
-receive only the SagittaDB deployment package plus an activation code or offline
-license file.
+在线激活和续期流程见 `docs/license_operations_v2.md`。License Server 维护在独立私有仓库 `https://github.com/Lynn-Lee/SagittaDB-License-Server`，与客户侧 SagittaDB 镜像分开部署，部署细节见 `docs/license_server_deploy.md`。客户只接收 SagittaDB 部署包、激活码或离线 License 文件。
 
-Customers upgrade with:
+客户通过以下命令升级：
 
 ```bash
 ./upgrade.sh <new-version>

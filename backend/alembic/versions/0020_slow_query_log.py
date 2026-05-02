@@ -1,4 +1,4 @@
-"""add slow query log
+"""新增慢 SQL 日志
 
 Revision ID: 0020_slow_query_log
 Revises: 0019_session_snapshot

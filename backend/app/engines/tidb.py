@@ -1,7 +1,6 @@
-"""TiDB engine.
+"""TiDB 引擎。
 
-TiDB reuses MySQL protocol connectivity, but keeps TiDB-specific diagnostics
-inside its own engine entrypoint.
+TiDB 复用 MySQL 协议连接，但把 TiDB 专属诊断逻辑保留在独立引擎入口中。
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from app.engines.mysql import MysqlEngine
 
 
 class TidbEngine(MysqlEngine):
-    """TiDB database engine."""
+    """TiDB 数据库引擎。"""
 
     name = "TidbEngine"
     db_type = "tidb"

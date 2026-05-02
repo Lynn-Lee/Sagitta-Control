@@ -1,4 +1,4 @@
-"""SQL optimization v2 service and engine-specific analyzers."""
+"""SQL 优化 v2 服务和引擎专属分析器。"""
 
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ class AnalyzerResult:
 
 
 class BaseSqlAnalyzer:
-    """Base analyzer: static SQL rules plus optional engine explain parsing."""
+    """基础分析器：静态 SQL 规则，以及可选的引擎 explain 解析。"""
 
     engine_type = "generic"
     support_level: SupportLevel = "static_only"
@@ -687,7 +687,7 @@ def _analyzer_for(instance: Instance, engine: Any, db_name: str, sql: str) -> Ba
 
 
 class OptimizeService:
-    """Unified SQL optimization v2 entrypoint."""
+    """SQL 优化 v2 的统一入口。"""
 
     @staticmethod
     async def analyze(db: AsyncSession, user: dict, data: OptimizeAnalyzeRequest) -> OptimizeAnalyzeResponse:

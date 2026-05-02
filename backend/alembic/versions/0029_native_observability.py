@@ -1,4 +1,4 @@
-"""native observability snapshots
+"""原生可观测性快照
 
 Revision ID: 0029_native_observability
 Revises: 0028_archive_execute_perm

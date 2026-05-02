@@ -1,4 +1,4 @@
-"""license record
+"""商业授权记录
 
 Revision ID: 0033_license_record
 Revises: 0032_notification_delivery

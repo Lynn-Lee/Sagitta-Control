@@ -1,4 +1,4 @@
-"""session collect config
+"""会话采集配置
 
 Revision ID: 0022_session_collect_config
 Revises: 0021_slow_query_v2

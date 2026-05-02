@@ -1,4 +1,4 @@
-"""split archive execute permission
+"""拆分数据归档执行权限
 
 Revision ID: 0028_archive_execute_perm
 Revises: 0027_high_risk_sql_perm

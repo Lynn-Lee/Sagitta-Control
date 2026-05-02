@@ -1,4 +1,4 @@
-"""archive jobs
+"""数据归档作业
 
 Revision ID: 0023_archive_jobs
 Revises: 0022_session_collect_config

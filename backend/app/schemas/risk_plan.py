@@ -1,4 +1,4 @@
-"""Risk plan schemas."""
+"""风险预案 Schema。"""
 
 from typing import Literal
 

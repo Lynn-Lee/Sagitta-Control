@@ -1,90 +1,70 @@
-# SagittaDB Commercial License Final Plan
+# SagittaDB 商业 License 最终方案
 
-This plan defines the remaining work needed to treat the license platform as a
-final commercial system rather than a product-side activation loop.
+本文档定义 License 平台成为完整商业系统所需的收尾工作。目标不是只完成产品侧激活闭环，而是形成可运营、可审计、可恢复的授权体系。
 
-## Goal
+## 目标
 
-SagittaDB customers should receive versioned product images plus either an
-online activation code or an offline signed license. Internally, SagittaDB
-operators should be able to create customers, issue and renew licenses, adjust
-limits, suspend or revoke access, audit every operation, and recover the license
-service without customer data loss.
+SagittaDB 客户应接收带版本号的产品镜像，并获得在线激活码或离线签名 License。内部运营人员应能创建客户、签发和续期 License、调整限额、挂起或吊销访问、审计所有操作，并在不丢失客户数据的前提下恢复 License 服务。
 
-## P0 Scope
+## P0 范围
 
-1. Product-side deployment binding
-   - Generate and display a deployment fingerprint.
-   - Send the fingerprint during online activation and refresh.
-   - Reject signed licenses that include a different fingerprint.
-   - Store the fingerprint on `license_record` for support and audit.
+1. 产品侧部署绑定
+   - 生成并展示部署指纹。
+   - 在线激活和刷新时发送部署指纹。
+   - 拒绝包含其他部署指纹的签名 License。
+   - 将部署指纹写入 `license_record`，用于支持和审计。
 
-2. Production license server
-   - Maintain customers, activation codes, licenses, status changes, renewals,
-     and audit logs in PostgreSQL.
-   - Bind activation codes to the first deployment fingerprint unless a
-     fingerprint is preconfigured.
-   - Reject activation or refresh attempts from a different fingerprint.
-   - Support status transitions: `active`, `suspended`, `revoked`.
-   - Expose `/api/v1/licenses/activate` and `/api/v1/licenses/refresh` for
-     customer deployments.
+2. 生产 License Server
+   - 在 PostgreSQL 中维护客户、激活码、License、状态变更、续期和审计日志。
+   - 若未预先配置指纹，激活码首次使用时绑定当前部署指纹。
+   - 拒绝来自其他部署指纹的激活或刷新请求。
+   - 支持 `active`、`suspended`、`revoked` 状态流转。
+   - 面向客户部署暴露 `/api/v1/licenses/activate` 和 `/api/v1/licenses/refresh`。
 
-3. Operator admin
-   - Provide a private web admin for customer, activation, renewal, limit, and
-     status operations.
-   - Require admin authentication and record actor, action, target, old value,
-     new value, IP, and timestamp.
-   - Hide the admin path and keep the private signing key only on the license
-     server.
+3. 运营管理端
+   - 提供私有 Web 管理端，支持客户、激活、续期、限额和状态操作。
+   - 要求管理端认证，并记录操作者、动作、对象、旧值、新值、IP 和时间。
+   - 隐藏管理路径，签名私钥只保存在 License Server 上。
 
-4. Customer delivery verification
-   - Verify online activation, refresh, renewal, suspension, revocation, and
-     recovery.
-   - Verify offline license import, offline fingerprint mismatch rejection, and
-     expired license blocking.
-   - Verify customer deployment packages pin versioned images and do not use
-     `latest`.
+4. 客户交付验证
+   - 验证在线激活、刷新、续期、挂起、吊销和恢复。
+   - 验证离线 License 导入、离线部署指纹不匹配拒绝、过期 License 阻断。
+   - 验证客户部署包固定版本镜像，且不使用 `latest`。
 
-## P1 Scope
+## P1 范围
 
-1. Edition and package templates
-   - Define `trial`, `professional`, and `enterprise` templates.
-   - Map each edition to feature sets and default limits.
+1. 版本与套餐模板
+   - 定义 `trial`、`professional` 和 `enterprise` 模板。
+   - 将每个版本映射到功能集合和默认限额。
 
-2. Usage visibility
-   - Show current usage next to limits on the customer license page.
-   - Show customer activation history and current deployment fingerprint in the
-     internal admin.
+2. 用量可见性
+   - 在客户 License 页面展示当前用量和限额。
+   - 在内部管理端展示客户激活历史和当前部署指纹。
 
-3. Operations hardening
-   - Add backup and restore runbooks for the license server database.
-   - Add monitoring for failed activation, refresh errors, nearing-expiry
-     licenses, and repeated fingerprint mismatch attempts.
-   - Add a customer support checklist for recovering from lost deployment IDs.
+3. 运维加固
+   - 增加 License Server 数据库备份和恢复手册。
+   - 增加激活失败、刷新错误、即将过期 License、重复指纹不匹配尝试等监控。
+   - 增加客户遗失部署 ID 时的支持处理清单。
 
-## P2 Scope
+## P2 范围
 
-1. Activation lifecycle polish
-   - Support planned deployment migration with explicit unbind or rebind
-     approval.
-   - Support one customer with multiple purchased deployments.
+1. 激活生命周期完善
+   - 支持计划内部署迁移，并通过显式审批完成解绑或重新绑定。
+   - 支持同一客户购买多个部署。
 
-2. Commercial reporting
-   - Export customer/license ledgers.
-   - Track expiry windows, active deployments, suspended customers, and revenue
-     metadata if needed by sales operations.
+2. 商业报表
+   - 导出客户与 License 台账。
+   - 按销售运营需要跟踪到期窗口、活跃部署、挂起客户和收入元数据。
 
-## Acceptance Checklist
+## 验收清单
 
-- New customer can be created and issued an activation code.
-- First customer activation binds a deployment fingerprint.
-- Same activation code cannot activate a different deployment.
-- Refresh returns a renewed signed license for an active activation.
-- Suspended or revoked activation blocks protected SagittaDB APIs after refresh.
-- Offline signed license with a wrong fingerprint is rejected locally.
-- Expired license blocks protected SagittaDB APIs.
-- License server private key never appears in customer images, logs, or
-  deployment packages.
-- All operator writes appear in the license server audit log.
-- Customer release package contains version-pinned images, `.env.example`,
-  `upgrade.sh`, and `verify-license.sh`.
+- 可以创建新客户并签发激活码。
+- 客户首次激活会绑定部署指纹。
+- 同一激活码不能激活其他部署。
+- active 激活码刷新后返回续期后的签名 License。
+- suspended 或 revoked 激活码刷新后会阻断受保护的 SagittaDB API。
+- 指纹错误的离线签名 License 会在本地被拒绝。
+- 过期 License 会阻断受保护的 SagittaDB API。
+- License Server 私钥不会出现在客户镜像、日志或部署包中。
+- 所有运营写操作都会进入 License Server 审计日志。
+- 客户发布包包含固定版本镜像、`.env.example`、`upgrade.sh` 和 `verify-license.sh`。

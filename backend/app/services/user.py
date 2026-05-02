@@ -903,7 +903,7 @@ class UserService:
             )
             if row_password:
                 existing.password = hash_password(row_password)
-                # Mark import-reset passwords as "initial" so the user must change them on next login.
+                # 将导入重置的密码标记为“初始密码”，要求用户下次登录时修改。
                 existing.password_changed_at = existing.created_at
             return "updated"
 

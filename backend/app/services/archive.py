@@ -1,4 +1,4 @@
-"""Data archive service with approval-backed background jobs."""
+"""带审批流的后台数据归档服务。"""
 from __future__ import annotations
 
 import asyncio
@@ -117,7 +117,7 @@ def build_count_sql(db_type: str, table_name: str, condition: str) -> str:
 
 
 def validate_archive_condition(db_type: str, table_name: str, condition: str) -> None:
-    """Reject unsafe archive predicates before they reach engine execution."""
+    """在进入引擎执行前拒绝不安全的归档条件。"""
     if db_type == "mongo":
         try:
             parsed = json.loads(condition)

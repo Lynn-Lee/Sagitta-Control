@@ -1,7 +1,7 @@
-"""Submission risk plan service.
+"""提交风险预案服务。
 
-This is intentionally not a second SQL checker. It gives applicants and
-reviewers a short, submission-time plan for risk awareness and recovery prep.
+它刻意不做第二套 SQL 审核器，只在提交时为申请人和审核人生成简短预案，
+用于风险提示和恢复准备。
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ class RiskPlanService:
 
     @staticmethod
     def is_privileged_workflow_sql(db_type: str, sql: str) -> bool:
-        """Return True for high-risk SQL that may be submitted only by privileged users."""
+        """判断 SQL 是否属于仅特权用户可提交的高危语句。"""
         if not RiskPlanService.is_relational(db_type):
             return False
         dialect = SQLGLOT_DIALECTS.get((db_type or "").lower(), "mysql")

@@ -137,7 +137,7 @@ const RoleManagement: React.FC = () => {
     },
   ]
 
-  // Group permissions by prefix for better UX
+  // 按权限前缀分组，便于在界面中浏览
   const permOptions = allPerms.map((p: any) => ({
     label: `${p.codename}（${p.name}）`,
     value: p.codename,

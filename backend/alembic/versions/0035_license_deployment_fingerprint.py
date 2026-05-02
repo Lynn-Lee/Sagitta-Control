@@ -1,4 +1,4 @@
-"""license deployment fingerprint
+"""License 部署指纹
 
 Revision ID: 0035_license_deployment_fingerprint
 Revises: 0034_license_online_activation

@@ -1,20 +1,20 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+本文件为 Codex（Codex.ai/code）在本仓库中工作提供项目约定和上下文。
 
-## Overview
+## 概览
 
 SagittaDB 矢准数据 — 企业级多引擎数据库管控平台（重构自 Archery v1.14.0）。  
 当前代码线：**v1.0-GA 商业化交付线 + v2-lite 授权体系 + License v2 在线激活/部署指纹绑定**。
 
-**Stack**: FastAPI 0.110 + SQLAlchemy 2.0 async + Alembic + Celery 5 + PostgreSQL 16 (backend)  
-React 18 + Vite 5 + TypeScript + Ant Design 5 + TanStack Query v5 + Zustand (frontend)
+**技术栈**：FastAPI 0.110 + SQLAlchemy 2.0 async + Alembic + Celery 5 + PostgreSQL 16（后端）  
+React 18 + Vite 5 + TypeScript + Ant Design 5 + TanStack Query v5 + Zustand（前端）
 
 ---
 
-## Commands
+## 常用命令
 
-### Full Stack (Docker — recommended)
+### 全栈启动（推荐 Docker）
 
 ```bash
 # 根目录
@@ -30,7 +30,7 @@ docker compose exec backend alembic upgrade head
 # Grafana:       http://localhost:3000
 ```
 
-### Backend (standalone — from `backend/`)
+### 后端（独立启动，在 `backend/` 下执行）
 
 ```bash
 pip install -e ".[dev]"
@@ -59,7 +59,7 @@ pytest tests/ -k "keyword"                             # 按关键字过滤
 locust -f tests/perf/locustfile.py --host http://localhost:8000  # 性能测试
 ```
 
-### Frontend (standalone — from `frontend/`)
+### 前端（独立启动，在 `frontend/` 下执行）
 
 ```bash
 npm install
@@ -71,7 +71,7 @@ npm run typecheck
 
 ---
 
-## Architecture
+## 架构
 
 ### 请求完整链路
 
@@ -270,7 +270,7 @@ components/
 - **Token 黑名单**：logout 时写入 Redis，`current_user` 每次请求检查；Redis 不可达时返回 503（fail-close，不放行）
 - **查询注入防御**：引擎层强制参数化查询，禁止字符串拼接，`filter_sql()` 注入 LIMIT
 
-### Tests
+### 测试
 
 ```
 tests/

@@ -23,5 +23,5 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def sanitize_sqlglot_error(message: str) -> str:
-    """Strip ANSI escapes from sqlglot error messages for user-facing display."""
+    """移除 sqlglot 错误消息中的 ANSI 转义，便于前端展示。"""
     return ANSI_ESCAPE_RE.sub("", message)

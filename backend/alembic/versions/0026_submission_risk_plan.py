@@ -1,4 +1,4 @@
-"""add submission risk plan fields
+"""新增提交风险预案字段
 
 Revision ID: 0026_submission_risk_plan
 Revises: 0025_session_duration_fields

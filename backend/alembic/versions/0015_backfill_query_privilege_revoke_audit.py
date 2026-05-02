@@ -1,4 +1,4 @@
-"""backfill query privilege revoke audit fields
+"""回填查询权限撤销审计字段
 
 Revision ID: 0015_priv_revoke_backfill
 Revises: 0014_query_priv_revoke_audit

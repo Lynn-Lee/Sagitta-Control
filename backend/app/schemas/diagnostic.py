@@ -1,4 +1,4 @@
-"""Schemas for session diagnostics."""
+"""会话诊断 Schema。"""
 
 from datetime import datetime
 from typing import Any

@@ -1,4 +1,4 @@
-"""observability permission rework
+"""观测权限重构
 
 Revision ID: 0030_observability_perm
 Revises: 0029_native_observability

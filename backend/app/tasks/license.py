@@ -1,4 +1,4 @@
-"""License maintenance tasks."""
+"""License 维护任务。"""
 
 from __future__ import annotations
 

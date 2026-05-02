@@ -160,7 +160,7 @@ class EngineProtocol(Protocol):
         return ResultSet()
 
     async def kill_connection(self, thread_id: int) -> ResultSet:
-        """Kill 指定会话。"""
+        """终止指定会话。"""
         return ResultSet()
 
     async def get_variables(

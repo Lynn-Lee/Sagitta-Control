@@ -17,7 +17,7 @@ const { Header, Sider, Content } = Layout
 const { Text } = Typography
 const { useBreakpoint } = Grid
 
-// SagittaDB Logo SVG
+// SagittaDB Logo SVG 图标
 const SagittaLogo = ({ size = 28, color = '#165DFF' }: { size?: number; color?: string }) => (
   <svg viewBox="0 0 32 32" fill="none" width={size} height={size}>
     <path d="M16 2L30 10V22L16 30L2 22V10L16 2Z" fill={color} />
@@ -240,7 +240,7 @@ export default function MainLayout() {
     try {
       await authApi.logout()
     } catch {
-      // Best effort: local client state should still be cleared.
+      // 尽力通知后端；无论是否成功，本地登录态都要清理。
     } finally {
       logout()
     }

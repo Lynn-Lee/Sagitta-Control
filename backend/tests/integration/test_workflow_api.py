@@ -114,7 +114,7 @@ class TestWorkflowSubmit:
         assert resp.status_code in (200, 201, 400)
         if resp.status_code in (200, 201):
             body = resp.json()
-            # Router returns {"status": 0, "data": {"id": ...}} wrapper
+            # 路由返回 {"status": 0, "data": {"id": ...}} 包装结构
             inner = body.get("data", body)
             assert "id" in inner or "workflow_id" in inner
 
@@ -137,7 +137,7 @@ class TestWorkflowSubmit:
             pytest.skip(f"创建工单失败({create_resp.status_code})，跳过详情测试")
 
         wf_data = create_resp.json()
-        # Router returns {"status": 0, "data": {"id": ...}} wrapper
+        # 路由返回 {"status": 0, "data": {"id": ...}} 包装结构
         inner = wf_data.get("data", wf_data)
         wf_id = inner.get("id") or inner.get("workflow_id")
         assert wf_id

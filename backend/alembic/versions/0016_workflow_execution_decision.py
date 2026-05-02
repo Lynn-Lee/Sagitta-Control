@@ -1,4 +1,4 @@
-"""add workflow execution decision fields
+"""新增工单执行决策字段
 
 Revision ID: 0016_workflow_execution_decision
 Revises: 0015_priv_revoke_backfill

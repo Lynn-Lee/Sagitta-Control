@@ -1,4 +1,4 @@
-"""Sprint C1: system_config and operation_log tables
+"""Sprint C1：system_config 和 operation_log 表
 
 Revision ID: 0002
 Revises: 0001

@@ -1,4 +1,4 @@
-"""Shared application-cancel policy helpers."""
+"""申请单取消策略的共享辅助函数。"""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from app.models.workflow import AuditStatus
 
 
 class ApplicationCancelPolicy:
-    """Rules for canceling an application before any approval node acts."""
+    """审批节点尚未处理前取消申请单的规则。"""
 
     @staticmethod
     def load_nodes(raw: str | None) -> list[dict[str, Any]]:

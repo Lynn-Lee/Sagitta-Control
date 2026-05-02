@@ -520,7 +520,7 @@ class MysqlEngine:
         limit: int = 100,
         min_duration_ms: int = 1000,
     ) -> ResultSet:
-        """Collect MySQL slow statement digests from performance_schema."""
+        """从 performance_schema 采集 MySQL 慢语句摘要。"""
         min_timer_wait = max(0, int(min_duration_ms)) * 1_000_000_000
         sql = """
             SELECT

@@ -1,4 +1,4 @@
-"""Slow query analysis routes."""
+"""慢 SQL 分析路由。"""
 
 from __future__ import annotations
 

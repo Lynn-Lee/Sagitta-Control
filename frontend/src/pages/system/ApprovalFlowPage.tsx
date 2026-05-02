@@ -109,7 +109,7 @@ export default function ApprovalFlowPage() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      // Reassign order by array index to keep it sequential
+      // 按数组下标重排顺序，保持节点顺序连续
       const nodes = (values.nodes || []).map((n: ApprovalFlowNode, i: number) => ({
         ...n,
         order: i + 1,

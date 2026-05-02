@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Minimal SagittaDB license authority for internal commercial operations.
+"""用于内部商业运营的轻量 SagittaDB 授权中心。
 
-This tool is intended for your private environment only. It keeps a small JSON
-store of activation codes and issued licenses, signs licenses with
-SAGITTADB_LICENSE_PRIVATE_KEY, and exposes activate/refresh endpoints compatible
-with SagittaDB's online license client.
+该工具只适合私有内部环境。它用一个小型 JSON 文件保存激活码和已签发 License，
+使用 SAGITTADB_LICENSE_PRIVATE_KEY 签名，并提供与 SagittaDB 在线授权客户端兼容的
+激活和刷新接口。
 """
 
 from __future__ import annotations

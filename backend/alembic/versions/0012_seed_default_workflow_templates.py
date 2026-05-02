@@ -1,4 +1,4 @@
-"""seed default workflow templates with normalized multiline SQL
+"""初始化默认工单模板，并规范化多行 SQL
 
 Revision ID: 0012_workflow_templates_seed
 Revises: 0011_workflow_template_v1

@@ -96,7 +96,7 @@ class UserGroup(BaseModel):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")
 
-    # relationships
+    # 关联关系
     members: Mapped[list["Users"]] = relationship(  # noqa: F821
         "Users", secondary=user_group_member, back_populates="user_groups"
     )

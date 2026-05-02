@@ -642,7 +642,7 @@ class MonitorService:
 
     @staticmethod
     def evaluate_health(snapshot: dict | None, collect_status: str = "not_configured") -> dict:
-        """Derive an operator-facing health score from the latest native snapshot."""
+        """根据最新原生快照推导面向运维人员的健康评分。"""
         score = 100
         reasons: list[str] = []
         if not snapshot:
@@ -1304,7 +1304,7 @@ class MonitorService:
         previous: MonitorMetricSnapshot | None,
         now: datetime,
     ) -> None:
-        """Prefer interval rates when engines provide monotonically increasing counters."""
+        """当引擎提供单调递增计数器时，优先使用区间速率。"""
         if not previous or not previous.collected_at:
             return
         previous_at = previous.collected_at

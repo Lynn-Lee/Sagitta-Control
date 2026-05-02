@@ -61,7 +61,7 @@ class TestInstanceCRUD:
         )
         assert resp.status_code in (200, 201)
         body = resp.json()
-        # Router returns {"status": 0, "data": {...}} wrapper
+        # 路由返回 {"status": 0, "data": {...}} 包装结构
         data = body.get("data", body)
         assert data["instance_name"] == "test-mysql-ci"
         assert data["db_type"] == "mysql"

@@ -42,7 +42,7 @@ externalDatabase:
   port: 5432
   database: sagittadb
   username: sagitta
-  # password: set via --set or sealed-secret
+  # password：通过 --set 或 sealed-secret 设置
 
 # 生产环境使用 ElastiCache / Cloud Redis
 redis:
@@ -52,7 +52,7 @@ externalRedis:
   host: "sagittadb-prod.xxxxx.0001.apse1.cache.amazonaws.com"
   port: 6379
   db: 0
-  # password: set via --set or sealed-secret
+  # password：通过 --set 或 sealed-secret 设置
 
 ingress:
   annotations:

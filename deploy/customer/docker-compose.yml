@@ -1,5 +1,5 @@
-# SagittaDB Enterprise customer deployment package.
-# This file is rendered by CI for a specific commercial release.
+# SagittaDB Enterprise 客户部署包。
+# 该文件由 CI 按具体商业版本渲染生成。
 
 services:
   postgres:

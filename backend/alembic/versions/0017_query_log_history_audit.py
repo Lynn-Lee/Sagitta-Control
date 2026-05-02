@@ -1,4 +1,4 @@
-"""extend query log for query history audit
+"""扩展 query_log 支持查询历史审计
 
 Revision ID: 0017_query_log_history_audit
 Revises: 0016_workflow_execution_decision

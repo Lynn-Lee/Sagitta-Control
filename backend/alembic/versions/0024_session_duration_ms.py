@@ -1,4 +1,4 @@
-"""add session snapshot duration milliseconds
+"""新增会话快照毫秒级时长字段
 
 Revision ID: 0024_session_duration_ms
 Revises: 0023_archive_jobs

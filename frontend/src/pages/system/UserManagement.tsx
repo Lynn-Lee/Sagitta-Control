@@ -250,7 +250,7 @@ export default function UserManagement() {
       }
       importMut.mutate({ file: importFile, defaultPassword: values.defaultPassword })
     } catch {
-      // validation
+      // 表单校验
     }
   }
   const handleDownloadTemplate = async (exportFormat: 'xlsx' | 'csv') => {

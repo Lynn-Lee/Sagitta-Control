@@ -1,4 +1,4 @@
-"""add password_changed_at for password expiry policy
+"""新增 password_changed_at 支持密码过期策略
 
 Revision ID: 0013_user_password_policy
 Revises: 0012_workflow_templates_seed

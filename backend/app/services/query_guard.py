@@ -1,8 +1,7 @@
-"""Read-only guards for the online query surface.
+"""在线查询入口的只读防护。
 
-The query API is a read-only, no-side-effect execution surface. Different
-engines need different syntax rules, but the router needs one fail-closed
-contract.
+查询 API 是只读、无副作用的执行入口。不同引擎有不同语法规则，
+但路由层需要统一的 fail-close 契约。
 """
 from __future__ import annotations
 

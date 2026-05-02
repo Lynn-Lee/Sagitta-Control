@@ -1,5 +1,5 @@
 # ─── SagittaDB Helm Chart Default Values ─────────────────────────────────────
-# Override in values-staging.yaml / values-prod.yaml
+# 在 values-staging.yaml / values-prod.yaml 中覆盖
 
 nameOverride: ""
 fullnameOverride: ""

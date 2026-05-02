@@ -1,4 +1,4 @@
-"""Slow query log models."""
+"""慢 SQL 日志模型。"""
 
 from datetime import datetime
 from typing import Any
@@ -21,7 +21,7 @@ from app.models.base import BaseModel
 
 
 class SlowQueryLog(BaseModel):
-    """Unified slow SQL record from platform history or native engine collectors."""
+    """来自平台历史或原生引擎采集器的统一慢 SQL 记录。"""
 
     __tablename__ = "slow_query_log"
 
@@ -58,7 +58,7 @@ class SlowQueryLog(BaseModel):
 
 
 class SlowQueryConfig(BaseModel):
-    """Instance-level slow query collection policy and last collection status."""
+    """实例级慢 SQL 采集策略及最近采集状态。"""
 
     __tablename__ = "slow_query_config"
 

@@ -85,7 +85,7 @@ class LdapAuthService:
 
         server = ldap3.Server(server_uri, connect_timeout=10, get_info=ldap3.NONE)
 
-        # Step 1: 用 service account 搜索用户 DN
+        # 第 1 步：用 service account 搜索用户 DN
         try:
             svc_conn = ldap3.Connection(
                 server,
@@ -139,7 +139,7 @@ class LdapAuthService:
 
         svc_conn.unbind()
 
-        # Step 2: 以用户 DN + 密码验证
+        # 第 2 步：以用户 DN + 密码验证
         try:
             user_conn = ldap3.Connection(
                 server,
@@ -154,7 +154,7 @@ class LdapAuthService:
         except ldap_exc.LDAPException as e:
             raise ValueError(f"LDAP 认证失败: {e}") from e
 
-        # Step 3: 自动 provision 本地用户
+        # 第 3 步：自动创建或更新本地用户
         user = await LdapAuthService._provision_user(
             db,
             ldap_username,

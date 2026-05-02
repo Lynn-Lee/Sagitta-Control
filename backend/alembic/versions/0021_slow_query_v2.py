@@ -1,4 +1,4 @@
-"""slow query v2 config
+"""慢 SQL v2 配置
 
 Revision ID: 0021_slow_query_v2
 Revises: 0020_slow_query_log

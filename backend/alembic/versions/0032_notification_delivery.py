@@ -1,4 +1,4 @@
-"""notification delivery identities and log
+"""通知身份与投递日志
 
 Revision ID: 0032_notification_delivery
 Revises: 0031_sql_activity_collect

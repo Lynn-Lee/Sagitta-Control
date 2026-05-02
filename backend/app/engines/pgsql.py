@@ -573,7 +573,7 @@ class PgSQLEngine:
         limit: int = 100,
         min_duration_ms: int = 1000,
     ) -> ResultSet:
-        """Collect PostgreSQL slow statement summaries from pg_stat_statements."""
+        """从 pg_stat_statements 采集 PostgreSQL 慢语句摘要。"""
         columns_rs = await self._raw_query(
             db_name=self._db_name,
             sql="""

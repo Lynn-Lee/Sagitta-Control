@@ -1,4 +1,4 @@
-"""seed high-risk SQL submit permission
+"""初始化高危 SQL 提交权限
 
 Revision ID: 0027_high_risk_sql_perm
 Revises: 0026_submission_risk_plan

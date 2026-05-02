@@ -1,4 +1,4 @@
-"""add session snapshot history
+"""新增会话采样历史
 
 Revision ID: 0019_session_snapshot
 Revises: 0018_qlog_snapshot_backfill

@@ -1,4 +1,4 @@
-"""Slow query analysis service."""
+"""慢 SQL 分析服务。"""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ def row_to_dict(columns: list[str], row: Any) -> dict[str, Any]:
 
 
 def normalize_sql_fingerprint(sql: str) -> tuple[str, str]:
-    """Return sha1 fingerprint and readable normalized SQL."""
+    """返回 sha1 指纹和便于阅读的归一化 SQL。"""
     normalized = sql.strip()
     normalized = re.sub(r"'(?:''|[^'])*'", "?", normalized)
     normalized = re.sub(r'"(?:""|[^"])*"', "?", normalized)

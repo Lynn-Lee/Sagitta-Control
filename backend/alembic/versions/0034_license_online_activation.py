@@ -1,4 +1,4 @@
-"""license online activation metadata
+"""License 在线激活元数据
 
 Revision ID: 0034_license_online_activation
 Revises: 0033_license_record

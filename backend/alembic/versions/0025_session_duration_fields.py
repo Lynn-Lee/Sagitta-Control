@@ -1,4 +1,4 @@
-"""add explicit session duration fields
+"""新增显式会话时长字段
 
 Revision ID: 0025_session_duration_fields
 Revises: 0024_session_duration_ms

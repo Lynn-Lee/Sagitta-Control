@@ -1,4 +1,4 @@
-"""Archive Celery tasks."""
+"""数据归档 Celery 任务。"""
 from __future__ import annotations
 
 import asyncio

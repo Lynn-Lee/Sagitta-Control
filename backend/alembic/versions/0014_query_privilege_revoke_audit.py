@@ -1,4 +1,4 @@
-"""add query privilege revoke audit fields
+"""新增查询权限撤销审计字段
 
 Revision ID: 0014_query_priv_revoke_audit
 Revises: 0013_user_password_policy

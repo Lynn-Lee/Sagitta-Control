@@ -1,4 +1,4 @@
-"""Database session snapshot models."""
+"""数据库会话快照模型。"""
 
 from datetime import datetime
 from typing import Any
@@ -10,7 +10,7 @@ from app.models.base import BaseModel
 
 
 class SessionSnapshot(BaseModel):
-    """Periodic snapshot of database sessions for history view."""
+    """用于历史视图的数据库会话周期快照。"""
 
     __tablename__ = "session_snapshot"
 
@@ -56,7 +56,7 @@ class SessionSnapshot(BaseModel):
 
 
 class SessionCollectConfig(BaseModel):
-    """Instance-level session snapshot collection policy."""
+    """实例级会话快照采集策略。"""
 
     __tablename__ = "session_collect_config"
 

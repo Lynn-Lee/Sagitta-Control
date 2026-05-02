@@ -118,7 +118,7 @@ class QueryPrivService:
 
     @staticmethod
     def user_has_query_bypass(user: dict, instance: Instance) -> bool:
-        """Return whether the user may query this instance without data-scope grants."""
+        """判断用户是否可绕过数据范围授权直接查询该实例。"""
         permissions = set(user.get("permissions", []))
         if user.get("is_superuser") or "query_all_instances" in permissions:
             return True
