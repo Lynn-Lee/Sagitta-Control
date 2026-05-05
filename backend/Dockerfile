@@ -79,6 +79,7 @@ RUN pip install --no-cache-dir \
     "python-dotenv>=1.0.1" \
     "arrow>=1.3.0" \
     "jinja2>=3.1.3" \
+    "defusedxml>=0.7.1" \
     "ldap3>=2.9.1" \
     "openpyxl>=3.1.0"
 
