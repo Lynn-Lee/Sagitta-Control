@@ -32,7 +32,19 @@ docker compose ps
 
 Kubernetes 部署时应先更新 Helm values 中的镜像、Secret、域名、证书、资源限制和持久化配置，再执行 `helm upgrade --install`。
 
-### 2.2 服务清单
+### 2.2 Oracle Instant Client
+
+Oracle 11g 或需要 Thick 模式的环境，应在构建后端镜像前准备 Oracle Instant Client。将解压后的客户端目录放入 `backend/vendor/oracle/`，例如 `backend/vendor/oracle/instantclient_19_27/`。后端 Dockerfile 会在构建时把该目录复制到镜像内的 `/opt/oracle/`，检测到 `instantclient_*` 目录后创建 `/opt/oracle/instantclient` 软链接，并刷新系统动态库缓存。
+
+生产环境连接 Oracle 11.2 时，建议设置：
+
+```bash
+ORACLE_DRIVER_MODE=thick
+```
+
+Linux 容器中通常不需要额外设置 `ORACLE_CLIENT_LIB_DIR`，前提是 Instant Client 已经进入系统动态库搜索路径。如果客户环境不允许把客户端目录放进仓库，可以在自定义后端镜像或宿主机中安装 Instant Client，再通过环境变量和系统库路径暴露给容器。
+
+### 2.3 服务清单
 
 | 服务 | 作用 | 关键风险 |
 |---|---|---|
