@@ -4,6 +4,8 @@
 > 适用版本：SagittaDB v1.0-GA + v2-lite 授权体系  
 > 目标读者：研发工程师、DBA、系统管理员、安全审计员
 
+本文截图来自本地演示环境，采集清单见 `docs/user_manual_screenshot_manifest.md`。
+
 ## 1. 使用前准备
 
 用户需要由系统管理员创建账号并分配角色、用户组和资源范围。若使用 LDAP、钉钉、飞书、企业微信或 CAS 登录，请确认企业身份已完成绑定。
@@ -22,7 +24,7 @@
 适用角色：所有用户  
 入口路径：登录页、右上角个人中心
 
-> 截图占位：登录页 / 用户输入账号密码或选择第三方登录
+![登录页](screenshots/user-manual/01-login.png)
 
 操作步骤：
 
@@ -51,7 +53,7 @@
 适用角色：所有用户  
 入口路径：侧边栏 `Dashboard`
 
-> 截图占位：Dashboard / 查看查询、工单、实例与库统计
+![Dashboard](screenshots/user-manual/02-dashboard.png)
 
 Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
@@ -70,7 +72,17 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：DBA、系统管理员  
 入口路径：侧边栏 `实例管理`
 
-> 截图占位：实例管理列表 / 查看实例、连接状态和操作按钮
+![实例管理列表](screenshots/user-manual/03-instance-list.png)
+
+### 4.0 引擎支持边界
+
+| 支持等级 | 数据库类型 | 用户侧说明 |
+|---|---|---|
+| 正式支持 | MySQL、TiDB、PostgreSQL、MongoDB、Redis、ClickHouse、StarRocks | 可按标准流程创建实例、测试连接并进入数据字典、查询、工单和观测等主链路。 |
+| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris | 已有最小可用能力；MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层，正式接入前需由实施人员在客户同构环境完成验证。 |
+| 待验证 | Cassandra | 页面会显示“待验证”提示；已具备连接、元数据、表 DDL、只读 SELECT 和基础健康指标的最小兼容层，但 DDL/DML 工单执行仍关闭，当前不作为 v1.0-GA 标准交付能力承诺。 |
+
+完整边界见 `docs/engine_support_matrix.md`。如果客户项目需要“待验证”引擎，应单独立项评估。
 
 ### 4.1 新建实例
 
@@ -91,7 +103,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 4.2 注册数据库或 Schema
 
-> 截图占位：数据库注册 / 从实例自动同步数据库或 Schema
+![数据库注册](screenshots/user-manual/04-instance-databases.png)
 
 操作步骤：
 
@@ -113,7 +125,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 5.1 提交 SQL 工单
 
-> 截图占位：SQL 工单提交页 / 填写实例、数据库和 SQL 内容
+![SQL 工单提交页](screenshots/user-manual/05-workflow-submit.png)
 
 操作步骤：
 
@@ -132,7 +144,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 5.2 查看工单列表
 
-> 截图占位：SQL 工单列表 / 我的工单、审批记录、执行记录三个标签页
+![SQL 工单列表](screenshots/user-manual/06-workflow-list.png)
 
 列表视角：
 
@@ -146,7 +158,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：审批人、DBA  
 
-> 截图占位：工单详情页 / 审批通过或驳回操作
+![工单详情页](screenshots/user-manual/07-workflow-detail.png)
 
 操作步骤：
 
@@ -181,7 +193,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `在线查询`
 
-> 截图占位：在线查询工作台 / 左侧表浏览器、中间 SQL 编辑器、底部结果区
+![在线查询工作台](screenshots/user-manual/08-query-workbench.png)
 
 操作步骤：
 
@@ -204,7 +216,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、审批人  
 入口路径：侧边栏 `查询权限`
 
-> 截图占位：查询权限申请页 / 选择实例、数据库、表和有效期
+![查询权限申请页](screenshots/user-manual/09-query-privilege.png)
 
 ### 7.1 提交申请
 
@@ -236,7 +248,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `数据字典`
 
-> 截图占位：数据字典页面 / 查看表字段、约束、索引和 DDL
+![数据字典页面](screenshots/user-manual/10-data-dictionary.png)
 
 操作步骤：
 
@@ -256,7 +268,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：DBA、系统管理员、安全审计员  
 入口路径：侧边栏 `数据脱敏`
 
-> 截图占位：脱敏规则页面 / 新增和管理字段脱敏规则
+![脱敏规则页面](screenshots/user-manual/11-masking-rule.png)
 
 操作步骤：
 
@@ -275,7 +287,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：DBA、运维工程师  
 入口路径：侧边栏 `观测中心`、`SQL 洞察`、`运行诊断`
 
-> 截图占位：运行诊断页面 / 查看在线会话、历史会话和 SQL 活动
+![运行诊断页面](screenshots/user-manual/12-monitor.png)
 
 常用功能：
 
@@ -296,7 +308,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `数据归档`
 
-> 截图占位：数据归档页面 / 提交归档申请并查看作业状态
+![数据归档页面](screenshots/user-manual/13-archive.png)
 
 操作步骤：
 
@@ -320,7 +332,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.1 用户管理
 
-> 截图占位：用户管理页面 / 创建用户、分配角色、维护外部通知身份
+![用户管理页面](screenshots/user-manual/14-user-management.png)
 
 可执行操作：
 
@@ -332,7 +344,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.2 角色管理
 
-> 截图占位：角色管理页面 / 配置角色权限码
+![角色管理页面](screenshots/user-manual/15-role-management.png)
 
 可执行操作：
 
@@ -343,7 +355,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.3 用户组与资源组
 
-> 截图占位：资源组管理页面 / 关联实例和用户组
+![资源组管理页面](screenshots/user-manual/16-resource-group.png)
 
 配置顺序建议：
 
@@ -359,7 +371,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.4 审批流管理
 
-> 截图占位：审批流管理页面 / 配置 users、manager、any_reviewer 节点
+![审批流管理页面](screenshots/user-manual/17-approval-flow.png)
 
 审批人类型：
 
@@ -371,7 +383,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.5 系统配置
 
-> 截图占位：系统配置页面 / 配置认证、通知、AI 和安全项
+![系统配置页面](screenshots/user-manual/18-system-config.png)
 
 系统配置包括：
 
@@ -387,7 +399,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：安全审计员、系统管理员  
 入口路径：侧边栏 `审计日志`
 
-> 截图占位：审计日志页面 / 按用户、操作、时间筛选审计记录
+![审计日志页面](screenshots/user-manual/19-audit-log.png)
 
 可查看内容：
 
@@ -402,7 +414,29 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - 审计日志用于追溯，不建议普通用户开放。
 - 查询历史用于追踪 SQL 执行和导出行为。
 
-## 14. 常见问题
+## 14. 授权管理
+
+适用角色：系统管理员
+
+入口路径：侧边栏 `系统管理` → `授权管理`
+
+![授权管理页面](screenshots/user-manual/20-license.png)
+
+可执行操作：
+
+- 查看当前 License 状态、客户 ID、套餐、到期时间和部署指纹。
+- 在线激活授权码。
+- 刷新在线 License。
+- 导入离线签名 License。
+- 查看功能开关和限额信息。
+
+注意事项：
+
+- 部署指纹用于绑定客户部署，迁移环境前应先确认授权处理流程。
+- 离线 License 仅在签名、公钥、客户 ID 和部署指纹匹配时生效。
+- License 异常时，受保护 API 会被阻断，授权管理页仍可访问。
+
+## 15. 常见问题
 
 | 问题 | 说明 |
 |---|---|
@@ -412,3 +446,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 | 为什么审批按钮不显示？ | 当前用户不是当前审批节点审批人，或工单状态不允许审批。 |
 | 为什么通知没有收到？ | 用户通知身份未维护，或系统通知配置异常。 |
 | 为什么执行失败？ | 查看工单执行日志，通常与 SQL 语法、目标数据库权限、连接或锁等待有关。 |
+
+## 16. 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。用户手册后续只在最终截图和客户验证后交付引擎说明变化时同步更新；License 后续运营增强不再规划。

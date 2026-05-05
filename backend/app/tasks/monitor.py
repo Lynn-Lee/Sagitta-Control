@@ -50,11 +50,6 @@ async def _run_with_task_session(collector: Any, *args: Any, **kwargs: Any) -> d
         await engine.dispose()
 
 
-@celery_app.task(bind=True, queue="default")
-def placeholder_task(self, *args, **kwargs):
-    return {"task": "monitor", "status": "Sprint 实现中"}
-
-
 async def _collect_session_snapshots_with_db(
     db: AsyncSession,
     retention_days: int = DEFAULT_SESSION_RETENTION_DAYS,

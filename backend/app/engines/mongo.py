@@ -12,6 +12,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from bson import json_util
@@ -133,6 +134,35 @@ class MongoEngine:
 
     # ── 查询（核心安全修复）────────────────────────────────────
 
+    @staticmethod
+    def _reject_unsafe_input(sql: str) -> None:
+        # 注入字符检测：分号/管道/反引号均视为非法格式
+        for ch in (";", "|", "`"):
+            if ch in sql:
+                raise ValueError("不支持的 MongoDB 查询格式")
+
+    @staticmethod
+    def _parse_json_args(args_text: str) -> list[Any]:
+        """解析 Mongo Shell 风格调用里的 JSON 参数，不执行任何 JS。"""
+        decoder = json.JSONDecoder()
+        args: list[Any] = []
+        idx = 0
+        text = args_text.strip()
+        while idx < len(text):
+            while idx < len(text) and text[idx].isspace():
+                idx += 1
+            value, end = decoder.raw_decode(text, idx)
+            args.append(value)
+            idx = end
+            while idx < len(text) and text[idx].isspace():
+                idx += 1
+            if idx >= len(text):
+                break
+            if text[idx] != ",":
+                raise ValueError("MongoDB 参数必须使用逗号分隔的 JSON")
+            idx += 1
+        return args
+
     def _parse_mongo_query(self, sql: str) -> dict[str, Any]:
         """
         安全解析 MongoDB 查询语句（JS 风格 → Python dict）。
@@ -145,11 +175,7 @@ class MongoEngine:
         使用正则 + ast.literal_eval 安全解析，不执行任何 shell 命令或 eval。
         """
         sql = sql.strip()
-
-        # 注入字符检测：分号/管道/反引号均视为非法格式
-        for ch in (';', '|', '`'):
-            if ch in sql:
-                raise ValueError("不支持的 MongoDB 查询格式")
+        MongoEngine._reject_unsafe_input(sql)
 
         # 匹配 db.collection.find({...}) 或 db.collection.find({...}, {...})
         find_match = re.match(
@@ -204,6 +230,67 @@ class MongoEngine:
             "  db.collection.aggregate([pipeline])\n"
             "  db.collection.count({query})"
         )
+
+    def _parse_mongo_write(self, sql: str) -> dict[str, Any]:
+        """安全解析 MongoDB 写语句，仅支持显式白名单操作。"""
+        sql = sql.strip()
+        MongoEngine._reject_unsafe_input(sql)
+
+        match = re.match(r"db\.(\w+)\.(\w+)\((.*)\)$", sql, re.DOTALL)
+        if not match:
+            raise ValueError(
+                "不支持的 MongoDB 写操作格式。支持 insertOne/insertMany/updateOne/"
+                "updateMany/deleteOne/deleteMany/replaceOne。"
+            )
+
+        collection, operation, args_text = match.groups()
+        operation = operation.strip()
+        allowed_ops = {
+            "insertOne",
+            "insertMany",
+            "updateOne",
+            "updateMany",
+            "deleteOne",
+            "deleteMany",
+            "replaceOne",
+        }
+        if operation not in allowed_ops:
+            raise ValueError(f"MongoDB 工单不支持 {operation} 操作")
+
+        try:
+            args = self._parse_json_args(args_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"MongoDB 写操作参数必须是合法 JSON：{exc.msg}") from exc
+
+        expected = {
+            "insertOne": 1,
+            "insertMany": 1,
+            "updateOne": 2,
+            "updateMany": 2,
+            "deleteOne": 1,
+            "deleteMany": 1,
+            "replaceOne": 2,
+        }[operation]
+        if len(args) != expected:
+            raise ValueError(f"{operation} 需要 {expected} 个 JSON 参数")
+
+        if operation == "insertOne" and not isinstance(args[0], dict):
+            raise ValueError("insertOne 参数必须是 JSON 对象")
+        if operation == "insertMany" and not isinstance(args[0], list):
+            raise ValueError("insertMany 参数必须是 JSON 数组")
+        if operation.startswith(("update", "delete", "replace")) and not isinstance(args[0], dict):
+            raise ValueError(f"{operation} 的过滤条件必须是 JSON 对象")
+        if operation.startswith("update") and not isinstance(args[1], dict):
+            raise ValueError(f"{operation} 的更新内容必须是 JSON 对象")
+        if operation == "replaceOne" and not isinstance(args[1], dict):
+            raise ValueError("replaceOne 的替换文档必须是 JSON 对象")
+
+        return {
+            "type": "write",
+            "operation": operation,
+            "collection": collection,
+            "args": args,
+        }
 
     def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         result: dict[str, Any] = {"msg": "", "syntax_error": False}
@@ -281,10 +368,10 @@ class MongoEngine:
         return resultset  # 由 services.masking 处理
 
     async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
-        """MongoDB 基础审核：验证语法是否可解析。"""
+        """MongoDB 基础审核：验证写操作语法是否可解析。"""
         review = ReviewSet(full_sql=sql)
         try:
-            self._parse_mongo_query(sql)
+            self._parse_mongo_write(sql)
             item = SqlItem(sql=sql, stagestatus="Audit completed")
             review.append(item)
         except ValueError as e:
@@ -294,13 +381,72 @@ class MongoEngine:
 
     async def execute(self, db_name: str, sql: str, **kwargs: Any) -> ReviewSet:
         """MongoDB 写操作执行（insertOne / updateOne / deleteOne 等）。"""
-        # TODO Sprint 3: 实现 MongoDB 写操作
         review = ReviewSet(full_sql=sql)
-        review.error = "MongoDB 写操作将在 Sprint 3 实现"
+        try:
+            parsed = self._parse_mongo_write(sql)
+            client = await self.get_connection()
+            target_db = db_name or self.instance.db_name or "admin"
+            coll = client[target_db][parsed["collection"]]
+            operation = parsed["operation"]
+            args = parsed["args"]
+
+            if operation == "insertOne":
+                result = await coll.insert_one(args[0])
+                affected_rows = 1 if getattr(result, "inserted_id", None) is not None else 0
+                status = f"Inserted id: {getattr(result, 'inserted_id', '')}"
+            elif operation == "insertMany":
+                result = await coll.insert_many(args[0])
+                inserted_ids = getattr(result, "inserted_ids", [])
+                affected_rows = len(inserted_ids) if isinstance(inserted_ids, Sequence) else 0
+                status = f"Inserted {affected_rows} documents"
+            elif operation == "updateOne":
+                result = await coll.update_one(args[0], args[1])
+                affected_rows = int(getattr(result, "modified_count", 0) or 0)
+                status = (
+                    f"Matched {getattr(result, 'matched_count', 0)}, "
+                    f"modified {affected_rows}"
+                )
+            elif operation == "updateMany":
+                result = await coll.update_many(args[0], args[1])
+                affected_rows = int(getattr(result, "modified_count", 0) or 0)
+                status = (
+                    f"Matched {getattr(result, 'matched_count', 0)}, "
+                    f"modified {affected_rows}"
+                )
+            elif operation == "deleteOne":
+                result = await coll.delete_one(args[0])
+                affected_rows = int(getattr(result, "deleted_count", 0) or 0)
+                status = f"Deleted {affected_rows} documents"
+            elif operation == "deleteMany":
+                result = await coll.delete_many(args[0])
+                affected_rows = int(getattr(result, "deleted_count", 0) or 0)
+                status = f"Deleted {affected_rows} documents"
+            elif operation == "replaceOne":
+                result = await coll.replace_one(args[0], args[1])
+                affected_rows = int(getattr(result, "modified_count", 0) or 0)
+                status = (
+                    f"Matched {getattr(result, 'matched_count', 0)}, "
+                    f"replaced {affected_rows}"
+                )
+            else:
+                raise ValueError(f"MongoDB 工单不支持 {operation} 操作")
+
+            review.append(
+                SqlItem(
+                    sql=sql,
+                    stagestatus=status,
+                    affected_rows=affected_rows,
+                )
+            )
+            review.is_executed = True
+        except Exception as e:
+            review.error = str(e)
+            review.append(SqlItem(sql=sql, errlevel=2, errormessage=str(e)))
         return review
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
-        return await self.execute("", getattr(workflow, "sql_content", ""))
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(workflow.db_name, sql)
 
     async def collect_metrics(self) -> dict[str, Any]:
         try:

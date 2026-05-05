@@ -34,6 +34,8 @@ _DB_TYPE_LABELS = {
     "sqlserver": "MSSQL",
     "clickhouse": "ClickHouse",
     "doris": "Doris",
+    "elasticsearch": "Elasticsearch",
+    "opensearch": "OpenSearch",
 }
 
 
@@ -71,10 +73,12 @@ async def explain_sql(
 
     engine = get_engine(inst)
 
-    if inst.db_type == "pgsql":
+    if hasattr(engine, "explain_query"):
+        rs = await engine.explain_query(data.db_name, data.sql)
+    elif inst.db_type == "pgsql":
         explain_sql = f"EXPLAIN (FORMAT JSON, ANALYZE false, BUFFERS false) {data.sql.rstrip(';')}"
         rs = await engine.query(db_name=data.db_name, sql=explain_sql, limit_num=0)
-    elif inst.db_type in {"mysql", "starrocks"}:
+    elif inst.db_type in {"mysql", "starrocks", "doris"}:
         explain_sql = f"EXPLAIN {data.sql.rstrip(';')}"
         rs = await engine.query(db_name=data.db_name, sql=explain_sql, limit_num=100)
     else:

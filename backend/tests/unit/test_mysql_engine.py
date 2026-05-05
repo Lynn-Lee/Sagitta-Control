@@ -6,10 +6,14 @@ MySQL 引擎单元测试。
   - filter_sql LIMIT 注入
 """
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.engines.models import ReviewSet
 from app.engines.mysql import MysqlEngine
+from app.engines.pgsql import PgSQLEngine
 
 
 class MockInstance:
@@ -39,9 +43,7 @@ class TestMysqlQueryCheck:
         assert "写操作" in result["msg"]
 
     def test_valid_select(self):
-        result = self.engine.query_check(
-            "testdb", "SELECT id, name FROM users WHERE id = 1"
-        )
+        result = self.engine.query_check("testdb", "SELECT id, name FROM users WHERE id = 1")
         assert result["has_star"] is False
         assert result["syntax_error"] is False
 
@@ -130,6 +132,33 @@ class TestMysqlExecuteCheck:
         error_items = [r for r in review.rows if r.errlevel == 2]
         assert len(error_items) == 0
 
+    @pytest.mark.asyncio
+    async def test_goinception_placeholder_warns_when_enabled(self):
+        review = await self.engine._goinception_check(
+            "testdb",
+            "ALTER TABLE users ADD COLUMN age int",
+            ReviewSet(full_sql="ALTER TABLE users ADD COLUMN age int"),
+        )
+
+        warn_items = [r for r in review.rows if r.errlevel == 1]
+        assert len(warn_items) == 1
+        assert "goInception 增强审核尚未接入" in warn_items[0].errormessage
+
+    @pytest.mark.asyncio
+    async def test_execute_workflow_delegates_snapshot_sql(self):
+        self.engine.execute = AsyncMock(return_value=ReviewSet(full_sql="UPDATE users SET status=1"))
+        workflow = SimpleNamespace(
+            db_name="testdb",
+            content=SimpleNamespace(sql_content="UPDATE users SET status=1 WHERE id=1"),
+        )
+
+        review = await self.engine.execute_workflow(workflow)
+
+        assert review.full_sql == "UPDATE users SET status=1"
+        self.engine.execute.assert_awaited_once_with(
+            "testdb", "UPDATE users SET status=1 WHERE id=1"
+        )
+
 
 class TestMysqlEscapeString:
     def setup_method(self):
@@ -146,3 +175,28 @@ class TestMysqlEscapeString:
     def test_normal_string_unchanged(self):
         result = self.engine.escape_string("normal_table_name")
         assert result == "normal_table_name"
+
+
+class MockPgInstance:
+    host = "localhost"
+    port = 5432
+    user = ""
+    password = ""
+    db_name = "postgres"
+    show_db_name_regex = ""
+
+
+class TestPgSQLExecuteWorkflow:
+    @pytest.mark.asyncio
+    async def test_execute_workflow_delegates_snapshot_sql(self):
+        engine = PgSQLEngine(instance=MockPgInstance())
+        engine.execute = AsyncMock(return_value=ReviewSet(full_sql="DELETE FROM users"))
+        workflow = SimpleNamespace(
+            db_name="app",
+            content=SimpleNamespace(sql_content="DELETE FROM users WHERE id=1"),
+        )
+
+        review = await engine.execute_workflow(workflow)
+
+        assert review.full_sql == "DELETE FROM users"
+        engine.execute.assert_awaited_once_with("app", "DELETE FROM users WHERE id=1")

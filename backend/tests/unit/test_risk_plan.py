@@ -121,6 +121,44 @@ def test_query_privilege_table_medium_by_duration_and_limit():
     assert plan.requires_confirmation is False
 
 
+def test_doris_workflow_delete_without_where_is_high_risk():
+    plan = RiskPlanService.build_workflow_plan("doris", "app", "DELETE FROM orders")
+
+    assert plan.level == "high"
+    assert any("WHERE" in item for item in plan.risks)
+
+
+def test_elasticsearch_index_prefix_query_privilege_is_high_risk():
+    plan = RiskPlanService.build_query_privilege_plan(
+        db_type="elasticsearch",
+        scope_type="database",
+        db_name="orders-*",
+        table_name="",
+        valid_date=date.today() + timedelta(days=7),
+        limit_num=1000,
+    )
+
+    assert plan.level == "high"
+    assert plan.requires_manual_remark is True
+    assert "索引前缀" in " ".join(plan.risks)
+    assert "具体索引" in " ".join(plan.suggestions)
+
+
+def test_opensearch_index_query_privilege_short_term_is_low_risk():
+    plan = RiskPlanService.build_query_privilege_plan(
+        db_type="opensearch",
+        scope_type="table",
+        db_name="logs",
+        table_name="logs-2026.05",
+        valid_date=date.today() + timedelta(days=7),
+        limit_num=1000,
+    )
+
+    assert plan.level == "low"
+    assert plan.requires_manual_remark is False
+    assert "索引级" in " ".join(plan.risks)
+
+
 def test_archive_purge_is_high_risk():
     plan = RiskPlanService.build_archive_plan(
         db_type="oracle",

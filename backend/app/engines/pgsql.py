@@ -2,6 +2,7 @@
 PostgreSQL 引擎完整实现（Sprint 2）。
 使用 asyncpg 异步驱动，参数化查询防注入。
 """
+
 from __future__ import annotations
 
 import logging
@@ -15,6 +16,7 @@ import sqlglot.expressions as exp
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
 from app.engines.utils import normalize_engine_host, sanitize_sqlglot_error
+from app.services.sql_audit import SqlAuditService
 
 if TYPE_CHECKING:
     from app.models.instance import Instance
@@ -63,7 +65,9 @@ class PgSQLEngine:
         pool = await self._get_pool(db_name)
         return pool
 
-    async def resolve_table_schemas(self, db_name: str, table_names: list[str]) -> dict[str, list[str]]:
+    async def resolve_table_schemas(
+        self, db_name: str, table_names: list[str]
+    ) -> dict[str, list[str]]:
         normalized_names = sorted({name.strip() for name in table_names if name and name.strip()})
         if not normalized_names:
             return {}
@@ -149,9 +153,7 @@ class PgSQLEngine:
         cols = rs.column_list
         return [dict(zip(cols, row, strict=False)) for row in rs.rows]
 
-    async def get_table_constraints(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         schema = kwargs.get("schema", "public")
         sql = """SELECT
                     con.conname AS constraint_name,
@@ -204,9 +206,7 @@ class PgSQLEngine:
                    con.conname"""
         return await self._raw_query(db_name=db_name, sql=sql, args=[schema, tb_name])
 
-    async def get_table_indexes(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         schema = kwargs.get("schema", "public")
         sql = r"""SELECT
                     indexname AS index_name,
@@ -257,13 +257,15 @@ class PgSQLEngine:
 
     def filter_sql(self, sql: str, limit_num: int) -> str:
         sql_strip = sql.strip().rstrip(";")
-        if limit_num > 0 and sql_strip.lower().startswith("select") and "limit" not in sql_strip.lower():
+        if (
+            limit_num > 0
+            and sql_strip.lower().startswith("select")
+            and "limit" not in sql_strip.lower()
+        ):
             return f"{sql_strip} LIMIT {limit_num}"
         return sql_strip
 
-    async def _raw_query(
-        self, db_name: str, sql: str, args: list[Any]
-    ) -> ResultSet:
+    async def _raw_query(self, db_name: str, sql: str, args: list[Any]) -> ResultSet:
         """内部方法：asyncpg 原生参数化查询（$1, $2 占位符）。"""
         rs = ResultSet()
         start = time.monotonic()
@@ -328,19 +330,20 @@ class PgSQLEngine:
             rs.cost_time = int((time.monotonic() - start) * 1000)
         return rs
 
-    def _convert_params(
-        self, sql: str, parameters: dict[str, Any] | None
-    ) -> tuple[str, list[Any]]:
+    def _convert_params(self, sql: str, parameters: dict[str, Any] | None) -> tuple[str, list[Any]]:
         """将 %(key)s 风格参数转为 asyncpg 的 $1,$2 风格。"""
         if not parameters:
             return sql, []
         import re
+
         keys = []
+
         def replacer(m: re.Match) -> str:
             key = m.group(1)
             if key not in keys:
                 keys.append(key)
             return f"${keys.index(key) + 1}"
+
         converted = re.sub(r"%\((\w+)\)s", replacer, sql)
         args = [parameters[k] for k in keys]
         return converted, args
@@ -351,26 +354,7 @@ class PgSQLEngine:
     # ── 审核与执行 ────────────────────────────────────────────
 
     async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
-        review = ReviewSet(full_sql=sql)
-        try:
-            statements = sqlglot.parse(sql, dialect="postgres")
-            for idx, stmt in enumerate(statements):
-                item = SqlItem(id=idx + 1, sql=str(stmt) if stmt else sql)
-                if stmt is None:
-                    item.errlevel = 2
-                    item.errormessage = "无法解析的 SQL 语句"
-                elif isinstance(stmt, (exp.Update, exp.Delete)):
-                    if not stmt.find(exp.Where):
-                        item.errlevel = 2
-                        item.errormessage = "UPDATE/DELETE 缺少 WHERE 条件"
-                elif isinstance(stmt, (exp.Drop, exp.TruncateTable)):
-                    item.errlevel = 1
-                    item.errormessage = "高风险操作，请确认已备份"
-                item.stagestatus = "Audit completed"
-                review.append(item)
-        except Exception as e:
-            review.error = str(e)
-        return review
+        return SqlAuditService.audit(self.db_type, db_name, sql)
 
     async def execute(self, db_name: str, sql: str, **kwargs: Any) -> ReviewSet:
         review = ReviewSet(full_sql=sql)
@@ -392,7 +376,8 @@ class PgSQLEngine:
         return review
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
-        return ReviewSet(error="Sprint 3 实现")
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(workflow.db_name, sql)
 
     # ── 可选能力 ──────────────────────────────────────────────
 
@@ -431,7 +416,7 @@ class PgSQLEngine:
 
     async def get_variables(self, variables: list[str] | None = None) -> ResultSet:
         if variables:
-            placeholders = ",".join(f"${i+1}" for i in range(len(variables)))
+            placeholders = ",".join(f"${i + 1}" for i in range(len(variables)))
             sql = f"SELECT name, setting FROM pg_settings WHERE name = ANY(ARRAY[{placeholders}])"
             return await self._raw_query(db_name=self._db_name, sql=sql, args=variables)
         return await self._raw_query(
@@ -444,7 +429,9 @@ class PgSQLEngine:
         rs = await self.test_connection()
         if not rs.is_success:
             return {"health": {"up": 0}, "error": rs.error}
-        version_rs = await self._raw_query(db_name=self._db_name, sql="SHOW server_version", args=[])
+        version_rs = await self._raw_query(
+            db_name=self._db_name, sql="SHOW server_version", args=[]
+        )
         activity_rs = await self._raw_query(
             db_name=self._db_name,
             sql="""
@@ -457,7 +444,9 @@ class PgSQLEngine:
             """,
             args=[],
         )
-        max_conn_rs = await self._raw_query(db_name=self._db_name, sql="SHOW max_connections", args=[])
+        max_conn_rs = await self._raw_query(
+            db_name=self._db_name, sql="SHOW max_connections", args=[]
+        )
         stats_rs = await self._raw_query(
             db_name=self._db_name,
             sql="""
@@ -519,7 +508,11 @@ class PgSQLEngine:
         )
         uptime = _to_int(uptime_rs.rows[0][0]) if uptime_rs.rows else None
         query_work = _to_int(stats_rs.rows[0][2]) if stats_rs.rows else None
-        tx = ((_to_int(stats_rs.rows[0][0]) or 0) + (_to_int(stats_rs.rows[0][1]) or 0)) if stats_rs.rows else None
+        tx = (
+            ((_to_int(stats_rs.rows[0][0]) or 0) + (_to_int(stats_rs.rows[0][1]) or 0))
+            if stats_rs.rows
+            else None
+        )
         blks_hit = _to_int(stats_rs.rows[0][4]) if stats_rs.rows else 0
         blks_read = _to_int(stats_rs.rows[0][5]) if stats_rs.rows else 0
         cache_total = (blks_hit or 0) + (blks_read or 0)

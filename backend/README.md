@@ -127,3 +127,7 @@ pytest tests/ -v --cov=app
 # 会话诊断与慢日志单测
 ./.venv/bin/python -m pytest tests/unit/test_session_diagnostic.py tests/unit/test_slowlog_service.py -q
 ```
+
+## 最新剩余计划任务
+
+统一任务清单见 [../docs/remaining_plan.md](../docs/remaining_plan.md)。后端侧重点是全量 CI/安全流水线、客户同构环境 GA 验收、多引擎真实环境验证、License Server 状态流转验证和更深度集成测试矩阵。

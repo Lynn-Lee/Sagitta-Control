@@ -13,3 +13,7 @@
 
 - Linux 容器中通常不需要设置 `ORACLE_CLIENT_LIB_DIR`，只要 Instant Client 已进入系统库搜索路径即可。
 - 如果你不想把客户端目录放进仓库，也可以在自定义镜像或宿主机中安装 Instant Client，然后通过环境变量和系统库路径暴露给容器。
+
+## 最新剩余计划任务
+
+统一任务清单见 [../../../docs/remaining_plan.md](../../../docs/remaining_plan.md)。Oracle 相关剩余任务是客户同构环境下的驱动模式、元数据、查询、工单和版本兼容性验证。

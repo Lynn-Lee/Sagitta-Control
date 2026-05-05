@@ -27,6 +27,34 @@ async def test_optimize_service_returns_unsupported_for_non_sql_engine(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_optimize_service_treats_elasticsearch_as_partial_supported(monkeypatch):
+    instance = SimpleNamespace(id=1, db_type="elasticsearch", db_name="")
+
+    async def fake_resolve_input(db, user, data):
+        return instance, "manual", "", "select * from orders", {}
+
+    class FakeAnalyzer:
+        async def analyze(self):
+            from app.services.optimize import AnalyzerResult
+
+            return AnalyzerResult(support_level="partial")
+
+    monkeypatch.setattr(OptimizeService, "_resolve_input", fake_resolve_input)
+    monkeypatch.setattr("app.services.optimize.get_engine", lambda inst: SimpleNamespace())
+    monkeypatch.setattr("app.services.optimize._analyzer_for", lambda inst, engine, db_name, sql: FakeAnalyzer())
+
+    response = await OptimizeService.analyze(
+        SimpleNamespace(),
+        {"is_superuser": True},
+        OptimizeAnalyzeRequest(instance_id=1, db_name="", sql="select * from orders"),
+    )
+
+    assert response.supported is True
+    assert response.support_level == "partial"
+    assert response.engine == "elasticsearch"
+
+
+@pytest.mark.asyncio
 async def test_optimize_service_assembles_analyzer_response(monkeypatch):
     instance = SimpleNamespace(id=1, db_type="mysql", db_name="app")
 
@@ -81,4 +109,3 @@ async def test_optimize_service_assembles_analyzer_response(monkeypatch):
     assert response.risk_score >= 70
     assert response.metadata.slowlog["duration_ms"] == 12000
     assert response.recommendations[0].title == "检查索引"
-

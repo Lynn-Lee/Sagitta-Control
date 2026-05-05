@@ -7,6 +7,7 @@ MSSQL 引擎最小可用实现。
 - 获取表约束 / 索引
 - 基础只读查询
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +20,7 @@ import sqlglot.expressions as exp
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
 from app.engines.utils import normalize_engine_host, sanitize_sqlglot_error
+from app.services.sql_audit import SqlAuditService
 
 if TYPE_CHECKING:
     from app.models.instance import Instance
@@ -87,7 +89,9 @@ class MssqlEngine:
         return await asyncio.to_thread(self._connect_sync, db_name)
 
     async def test_connection(self) -> ResultSet:
-        return await asyncio.to_thread(self._run_query_sync, "SELECT 1 AS result", None, self._db_name)
+        return await asyncio.to_thread(
+            self._run_query_sync, "SELECT 1 AS result", None, self._db_name
+        )
 
     def escape_string(self, value: str) -> str:
         return value.replace("]", "]]").replace("'", "''")
@@ -268,7 +272,11 @@ class MssqlEngine:
 
     def filter_sql(self, sql: str, limit_num: int) -> str:
         sql_strip = sql.strip().rstrip(";")
-        if limit_num > 0 and sql_strip.lower().startswith("select") and " top " not in sql_strip.lower():
+        if (
+            limit_num > 0
+            and sql_strip.lower().startswith("select")
+            and " top " not in sql_strip.lower()
+        ):
             return f"SELECT TOP ({limit_num}) * FROM ({sql_strip}) AS sagitta_subq"
         return sql_strip
 
@@ -287,32 +295,52 @@ class MssqlEngine:
         explain_sql = f"SET SHOWPLAN_XML ON; {sql.strip().rstrip(';')}; SET SHOWPLAN_XML OFF;"
         return await asyncio.to_thread(self._run_query_sync, explain_sql, None, db_name)
 
+    async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
+        sql = """
+        SELECT
+            s.session_id AS session_id,
+            s.login_name AS username,
+            COALESCE(s.host_name, c.client_net_address, '') AS host,
+            DB_NAME(COALESCE(r.database_id, s.database_id)) AS db_name,
+            COALESCE(r.command, s.status) AS command,
+            DATEDIFF(SECOND, COALESCE(r.start_time, s.last_request_start_time, s.login_time), SYSDATETIME()) AS time_seconds,
+            DATEDIFF(MILLISECOND, COALESCE(r.start_time, s.last_request_start_time, s.login_time), SYSDATETIME()) AS duration_ms,
+            DATEDIFF(MILLISECOND, COALESCE(r.start_time, s.last_request_start_time, s.login_time), SYSDATETIME()) AS state_duration_ms,
+            'dm_exec_sessions' AS duration_source,
+            COALESCE(r.status, s.status) AS state,
+            st.text AS sql_text
+        FROM sys.dm_exec_sessions s
+        LEFT JOIN sys.dm_exec_connections c ON s.session_id = c.session_id
+        LEFT JOIN sys.dm_exec_requests r ON s.session_id = r.session_id
+        OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
+        WHERE s.session_id <> @@SPID
+        """
+        if command_type and command_type != "ALL":
+            sql += " AND COALESCE(r.command, s.status) = %s"
+            params: tuple[Any, ...] | None = (command_type,)
+        else:
+            params = None
+        sql += " ORDER BY duration_ms DESC"
+        rs = await asyncio.to_thread(self._run_query_sync, sql, params, self._db_name)
+        if rs.is_success:
+            rs.rows = [self._row_to_dict(row, rs.column_list) for row in rs.rows]
+        return rs
+
+    async def kill_connection(self, thread_id: int) -> ResultSet:
+        return await asyncio.to_thread(
+            self._run_query_sync,
+            f"KILL {int(thread_id)}",
+            None,
+            self._db_name,
+        )
+
     def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet:
         return resultset
 
     async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
-        review = ReviewSet(full_sql=sql)
-        try:
-            statements = sqlglot.parse(sql, dialect="tsql")
-            for idx, stmt in enumerate(statements):
-                review.append(
-                    SqlItem(
-                        id=idx + 1,
-                        sql=str(stmt),
-                        errlevel=1 if isinstance(stmt, (exp.Drop, exp.TruncateTable)) else 0,
-                        errormessage="高风险操作，请确认已备份"
-                        if isinstance(stmt, (exp.Drop, exp.TruncateTable))
-                        else "None",
-                        stagestatus="Audit completed",
-                    )
-                )
-        except Exception as e:
-            review.error = str(e)
-        return review
+        return SqlAuditService.audit(self.db_type, db_name, sql)
 
     async def execute(self, db_name: str, sql: str, **kw: Any) -> ReviewSet:
-        from app.engines.models import SqlItem
-
         review = ReviewSet(full_sql=sql)
         rs = await asyncio.to_thread(self._run_query_sync, sql, kw.get("parameters"), db_name)
         item = SqlItem(sql=sql)
@@ -330,9 +358,122 @@ class MssqlEngine:
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
         return await self.execute(workflow.db_name, workflow.sql_content)
 
-    async def collect_metrics(self) -> dict:
-        rs = await self.test_connection()
-        return {"health": {"up": 1 if rs.is_success else 0}}
+    async def collect_sql_activity(
+        self,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        sql = """
+        SELECT TOP (%s)
+            'mssql_activity' AS source,
+            'mssql:' + CAST(r.session_id AS VARCHAR(20)) + ':' + COALESCE(CONVERT(VARCHAR(64), r.sql_handle, 2), '') AS source_ref,
+            DB_NAME(r.database_id) AS db_name,
+            SUBSTRING(
+              st.text,
+              (r.statement_start_offset / 2) + 1,
+              CASE
+                WHEN r.statement_end_offset = -1 THEN LEN(CONVERT(NVARCHAR(MAX), st.text))
+                ELSE (r.statement_end_offset - r.statement_start_offset) / 2 + 1
+              END
+            ) AS sql_text,
+            r.total_elapsed_time AS duration_ms,
+            s.login_name AS username,
+            s.host_name AS client_host,
+            r.command AS command,
+            r.status AS state
+        FROM sys.dm_exec_requests r
+        JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
+        CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) st
+        WHERE r.session_id <> @@SPID
+          AND r.total_elapsed_time >= %s
+          AND st.text IS NOT NULL
+        ORDER BY r.total_elapsed_time DESC
+        """
+        rs = await asyncio.to_thread(
+            self._run_query_sync,
+            sql,
+            (int(limit), int(min_duration_ms)),
+            self._db_name,
+        )
+        if rs.is_success:
+            rs.rows = [self._row_to_dict(row, rs.column_list) for row in rs.rows]
+        return rs
+
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        return await self.collect_sql_activity(limit=limit, min_duration_ms=min_duration_ms)
+
+    async def collect_metrics(self) -> dict[str, Any]:
+        health_rs = await self.test_connection()
+        if not health_rs.is_success:
+            return {"health": {"up": 0, "error": health_rs.error}}
+
+        version_rs = await asyncio.to_thread(
+            self._run_query_sync,
+            "SELECT CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(128)) AS version",
+            None,
+            self._db_name,
+        )
+        database_rs = await asyncio.to_thread(
+            self._run_query_sync,
+            """
+            SELECT
+                COUNT(*) AS database_count,
+                SUM(CASE WHEN state_desc = 'ONLINE' THEN 1 ELSE 0 END) AS online_database_count
+            FROM sys.databases
+            """,
+            None,
+            self._db_name,
+        )
+        session_rs = await asyncio.to_thread(
+            self._run_query_sync,
+            """
+            SELECT
+                COUNT(*) AS session_count,
+                SUM(CASE WHEN is_user_process = 1 THEN 1 ELSE 0 END) AS user_session_count
+            FROM sys.dm_exec_sessions
+            """,
+            None,
+            self._db_name,
+        )
+
+        version_row = self._first_row_dict(version_rs)
+        database_row = self._first_row_dict(database_rs)
+        session_row = self._first_row_dict(session_rs)
+        return {
+            "health": {"up": 1},
+            "version": {"value": version_row.get("version", "")},
+            "databases": {
+                "total": database_row.get("database_count"),
+                "online": database_row.get("online_database_count"),
+                "warning": database_rs.error,
+            },
+            "sessions": {
+                "total": session_row.get("session_count"),
+                "user": session_row.get("user_session_count"),
+                "warning": session_rs.error,
+            },
+        }
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health"]
+        return ["health", "version", "databases", "sessions"]
+
+    @staticmethod
+    def _row_to_dict(row: Any, columns: list[str]) -> dict[str, Any]:
+        if isinstance(row, dict):
+            return row
+        if hasattr(row, "_asdict"):
+            return dict(row._asdict())
+        if isinstance(row, (tuple, list)):
+            return dict(zip(columns, row, strict=False))
+        return {"value": row}
+
+    @classmethod
+    def _first_row_dict(cls, rs: ResultSet) -> dict[str, Any]:
+        if not rs.is_success or not rs.rows:
+            return {}
+        return cls._row_to_dict(rs.rows[0], rs.column_list)

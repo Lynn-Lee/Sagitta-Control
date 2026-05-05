@@ -25,8 +25,9 @@ SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数�
 | MySQL / TiDB / StarRocks | 已实现连接、查询、字典、会话与 SQL 活动相关能力。 |
 | PostgreSQL | 已实现连接、查询、字典、慢 SQL、执行计划与容量相关能力。 |
 | Oracle | 已实现连接、Schema 同步、查询与字典；Oracle 11g 需 Thick 模式。 |
-| MongoDB / Redis / ClickHouse | 已实现核心连接、查询和监控能力。 |
-| MSSQL / Cassandra / Elasticsearch / Doris | 已提供引擎适配骨架，正式接入前建议先完成真实环境验证。 |
+| MongoDB / Redis / ClickHouse | 已实现核心连接、查询、数据字典和监控能力；ClickHouse 已接入 SQL 活动采集，MongoDB 支持白名单写操作工单。 |
+| Oracle / MSSQL / Elasticsearch / OpenSearch / Doris | 已有最小可用实现，其中 MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层；正式接入前建议先完成客户同构环境验证。 |
+| Cassandra | 已补齐连接、Keyspace/Table/Column 元数据、表 DDL、主键/聚簇键元数据、只读 SELECT 和基础健康指标；DDL/DML 工单执行仍关闭，正式接入前需单独立项验证。 |
 
 ## 技术架构
 
@@ -141,3 +142,7 @@ npm run build
 当前版本：`v1.0-GA + v2-lite 授权体系`。
 状态：正式版商业化投放准备阶段。
 建议交付方式：先在企业内网或客户测试环境完成实例接入、审批流、权限、通知和备份恢复验证，再进入生产运行。
+
+## 最新剩余计划任务
+
+统一任务清单见 [docs/remaining_plan.md](docs/remaining_plan.md)。当前剩余工作以发布闸门、客户同构环境验收、License Server 生产验证、交付包确认、性能基线、交付自动化和后续引擎路线为主；License 后续商业运营增强不再规划。

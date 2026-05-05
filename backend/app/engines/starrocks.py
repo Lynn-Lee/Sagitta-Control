@@ -1,4 +1,5 @@
 """StarRocks 引擎（3.x/4.x）- FE MySQL 协议连接，StarRocks 语义适配。"""
+
 from __future__ import annotations
 
 import logging
@@ -9,9 +10,10 @@ from typing import Any
 import sqlglot
 import sqlglot.expressions as exp
 
-from app.engines.models import ResultSet, ReviewSet, SqlItem
+from app.engines.models import ResultSet, ReviewSet
 from app.engines.mysql import MysqlEngine
 from app.engines.utils import sanitize_sqlglot_error
+from app.services.sql_audit import SqlAuditService
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +138,7 @@ class StarRocksEngine(MysqlEngine):
                 or "ALL" in grants_text
             )
             caps.variable_write = (
-                "ADMIN" in grants_text
-                or "CLUSTER_ADMIN" in grants_text
-                or "ALL" in grants_text
+                "ADMIN" in grants_text or "CLUSTER_ADMIN" in grants_text or "ALL" in grants_text
             )
         else:
             caps.session_kill = caps.cluster_inspect
@@ -185,9 +185,7 @@ class StarRocksEngine(MysqlEngine):
         db_safe = self.escape_string(db_name)
         return await self.query(db_name=db_name, sql=f"SHOW TABLES FROM `{db_safe}`", limit_num=0)
 
-    async def get_all_columns_by_tb(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, "
             "COLUMN_COMMENT, COLUMN_KEY, EXTRA "
@@ -202,9 +200,7 @@ class StarRocksEngine(MysqlEngine):
             limit_num=0,
         )
 
-    async def describe_table(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def describe_table(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         db_safe = self.escape_string(db_name)
         tb_safe = self.escape_string(tb_name)
         return await self.query(
@@ -213,9 +209,7 @@ class StarRocksEngine(MysqlEngine):
             limit_num=0,
         )
 
-    async def get_tables_metas_data(
-        self, db_name: str, **kwargs: Any
-    ) -> list[dict[str, Any]]:
+    async def get_tables_metas_data(self, db_name: str, **kwargs: Any) -> list[dict[str, Any]]:
         sql = (
             "SELECT TABLE_NAME, TABLE_COMMENT, TABLE_ROWS, DATA_LENGTH, "
             "CREATE_TIME, UPDATE_TIME, ENGINE, TABLE_TYPE "
@@ -231,9 +225,7 @@ class StarRocksEngine(MysqlEngine):
             for row in rs.rows
         ]
 
-    async def get_table_constraints(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         sql = (
             "SELECT COLUMN_KEY AS constraint_type, COLUMN_NAME AS column_names "
             "FROM information_schema.columns "
@@ -250,9 +242,7 @@ class StarRocksEngine(MysqlEngine):
             rs.warning = "StarRocks 仅返回信息模式可见的键约束信息"
         return rs
 
-    async def get_table_indexes(
-        self, db_name: str, tb_name: str, **kwargs: Any
-    ) -> ResultSet:
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
         rs = await self.get_table_constraints(db_name, tb_name, **kwargs)
         if rs.is_success:
             rs.warning = "StarRocks 不提供 MySQL STATISTICS 等价索引视图，当前返回键列信息"
@@ -305,52 +295,7 @@ class StarRocksEngine(MysqlEngine):
         return sql_strip
 
     async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
-        review = ReviewSet(full_sql=sql)
-        try:
-            statements = sqlglot.parse(sql, dialect="mysql")
-        except Exception as e:
-            review.append(SqlItem(id=1, sql=sql, errlevel=2, errormessage=f"SQL 解析失败：{e}"))
-            return review
-
-        for idx, stmt in enumerate(statements):
-            item = SqlItem(id=idx + 1, sql=str(stmt) if stmt is not None else "")
-            if stmt is None:
-                item.errlevel = 2
-                item.errormessage = "无法解析的 SQL 语句"
-                review.append(item)
-                continue
-
-            ddl_types = tuple(
-                expr_type
-                for expr_type in (
-                    exp.Drop,
-                    exp.TruncateTable,
-                    getattr(exp, "Alter", None),
-                    getattr(exp, "AlterTable", None),
-                )
-                if expr_type is not None
-            )
-            if isinstance(stmt, ddl_types):
-                item.errlevel = 1
-                item.errormessage = f"StarRocks 高风险 DDL：{type(stmt).__name__}，请确认已备份或可回滚"
-
-            if isinstance(stmt, (exp.Update, exp.Delete)) and not stmt.find(exp.Where):
-                item.errlevel = 2
-                item.errormessage = "StarRocks UPDATE/DELETE 必须包含 WHERE 条件"
-
-            if isinstance(stmt, exp.Delete) and re.search(r"\blimit\b", item.sql, re.I):
-                item.errlevel = 2
-                item.errormessage = "StarRocks DELETE 不按 MySQL DELETE ... LIMIT 分批执行，请使用明确 WHERE 条件"
-
-            if isinstance(stmt, exp.Select):
-                for _ in stmt.find_all(exp.Star):
-                    item.errlevel = max(item.errlevel, 1)
-                    item.errormessage = "建议避免使用 SELECT *，明确指定列名"
-                    break
-
-            item.stagestatus = "Audit completed" if not item.errlevel else "Audit warning/error"
-            review.append(item)
-        return review
+        return SqlAuditService.audit(self.db_type, db_name, sql)
 
     async def execute(self, db_name: str, sql: str, **kwargs: Any) -> ReviewSet:
         review = await self.execute_check(db_name, sql)
@@ -360,9 +305,7 @@ class StarRocksEngine(MysqlEngine):
 
     # ── 诊断、变量、监控 ─────────────────────────────────────
 
-    async def processlist(
-        self, command_type: str = "Query", **kwargs: Any
-    ) -> ResultSet:
+    async def processlist(self, command_type: str = "Query", **kwargs: Any) -> ResultSet:
         rs = await self.query(db_name="", sql="SHOW PROCESSLIST", limit_num=0)
         if not rs.is_success:
             if self._is_privilege_error(rs.error):
@@ -370,7 +313,8 @@ class StarRocksEngine(MysqlEngine):
             return rs
         if command_type and command_type != "ALL" and rs.rows:
             rs.rows = [
-                row for row in rs.rows
+                row
+                for row in rs.rows
                 if str(self._row_get(row, "Command", "COMMAND", "command")).lower()
                 == command_type.lower()
             ]
@@ -428,9 +372,7 @@ class StarRocksEngine(MysqlEngine):
             self._capabilities.session_kill = True
         return rs
 
-    async def get_variables(
-        self, variables: list[str] | None = None
-    ) -> ResultSet:
+    async def get_variables(self, variables: list[str] | None = None) -> ResultSet:
         if variables:
             placeholders = ", ".join(f"%(v{i})s" for i in range(len(variables)))
             params = {f"v{i}": v for i, v in enumerate(variables)}
@@ -438,9 +380,7 @@ class StarRocksEngine(MysqlEngine):
             return await self.query(db_name="", sql=sql, parameters=params, limit_num=0)
         return await self.query(db_name="", sql="SHOW VARIABLES", limit_num=0)
 
-    async def set_variable(
-        self, variable_name: str, variable_value: str
-    ) -> ResultSet:
+    async def set_variable(self, variable_name: str, variable_value: str) -> ResultSet:
         name = variable_name.strip().lower()
         if name not in _VARIABLE_WRITE_ALLOWLIST:
             return ResultSet(error=f"StarRocks 参数 {variable_name} 不在允许修改列表中")
@@ -473,7 +413,9 @@ class StarRocksEngine(MysqlEngine):
             if rs.is_success:
                 cluster[key] = {"count": len(rs.rows), "rows": rs.rows}
             elif self._is_privilege_error(rs.error):
-                cluster[key] = {"warning": "当前 StarRocks 账号缺少 SYSTEM OPERATE/cluster_admin，已跳过集群节点指标"}
+                cluster[key] = {
+                    "warning": "当前 StarRocks 账号缺少 SYSTEM OPERATE/cluster_admin，已跳过集群节点指标"
+                }
             elif rs.error:
                 cluster[key] = {"warning": rs.error}
         metrics["cluster"] = cluster

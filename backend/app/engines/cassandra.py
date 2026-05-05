@@ -1,32 +1,464 @@
-"""Cassandra 引擎骨架，真实环境验证后补齐完整能力。"""
+"""Cassandra / ScyllaDB 引擎适配。
+
+当前定位为待验证引擎的最小可用兼容层：连接测试、Keyspace/Table/Column
+元数据、只读 SELECT 查询和基础健康指标。DDL/DML 工单执行在完成客户同构
+环境验证前保持关闭。
+"""
+
 from __future__ import annotations
 
+import asyncio
+import re
+import time
 from typing import TYPE_CHECKING, Any
 
-from app.engines.models import ResultSet, ReviewSet
+from app.core.security import decrypt_field
+from app.engines.models import ResultSet, ReviewSet, SqlItem
+from app.engines.utils import normalize_engine_host
 
 if TYPE_CHECKING:
     from app.models.instance import Instance
 
+
+_SYSTEM_KEYSPACES = {
+    "system",
+    "system_auth",
+    "system_distributed",
+    "system_schema",
+    "system_traces",
+    "system_views",
+    "system_virtual_schema",
+}
+_WRITE_PREFIXES = {
+    "alter",
+    "batch",
+    "create",
+    "delete",
+    "drop",
+    "insert",
+    "truncate",
+    "update",
+}
+
+
 class CassandraEngine:
-    name = "SkeletonEngine"
+    name = "CassandraEngine"
     db_type = "cassandra"
+
     def __init__(self, instance: Instance) -> None:
         self.instance = instance
-    async def get_connection(self, db_name=None): raise NotImplementedError("Sprint 2/4")
-    async def test_connection(self) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    def escape_string(self, value: str) -> str: return value
-    async def get_all_databases(self) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    async def get_all_tables(self, db_name: str, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list: return []
-    def query_check(self, db_name: str, sql: str) -> dict: return {"msg": "Cassandra 暂不支持在线查询执行", "syntax_error": True}
-    def filter_sql(self, sql: str, limit_num: int) -> str: return sql
-    async def query(self, db_name: str, sql: str, limit_num: int = 0, parameters: dict | None = None, **kw: Any) -> ResultSet: return ResultSet(error="Sprint 2/4 实现")
-    def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet: return resultset
-    async def execute_check(self, db_name: str, sql: str) -> ReviewSet: return ReviewSet(full_sql=sql, error="Sprint 2/4 实现")
-    async def execute(self, db_name: str, sql: str, **kw: Any) -> ReviewSet: return ReviewSet(full_sql=sql, error="Sprint 2/4 实现")
-    async def execute_workflow(self, workflow: Any) -> ReviewSet: return ReviewSet(error="Sprint 2/4 实现")
-    async def collect_metrics(self) -> dict: return {"health": {"up": 0}}
-    def get_supported_metric_groups(self) -> list: return ["health"]
+        self._hosts = [
+            normalize_engine_host(host.strip())
+            for host in str(instance.host or "").split(",")
+            if host.strip()
+        ] or ["localhost"]
+        self._port = instance.port or 9042
+        self._user = decrypt_field(instance.user)
+        self._password = decrypt_field(instance.password)
+        self._db_name = instance.db_name or None
+
+    def _connect_sync(self, db_name: str | None = None):
+        try:
+            from cassandra.auth import PlainTextAuthProvider
+            from cassandra.cluster import Cluster
+        except ImportError:
+            raise ImportError("cassandra-driver 未安装，请先安装 backend 依赖") from None
+
+        auth_provider = None
+        if self._user or self._password:
+            auth_provider = PlainTextAuthProvider(
+                username=self._user or "",
+                password=self._password or "",
+            )
+        cluster = Cluster(
+            contact_points=self._hosts,
+            port=self._port,
+            auth_provider=auth_provider,
+            connect_timeout=10,
+            control_connection_timeout=10,
+        )
+        return cluster.connect(db_name or self._db_name)
+
+    def _run_query_sync(
+        self,
+        sql: str,
+        parameters: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+        db_name: str | None = None,
+    ) -> ResultSet:
+        rs = ResultSet()
+        session = None
+        cluster = None
+        start = time.monotonic()
+        try:
+            session = self._connect_sync(db_name)
+            cluster = getattr(session, "cluster", None)
+            result = session.execute(sql, parameters or None)
+            rs.rows = [self._row_to_dict(row) for row in result.current_rows]
+            rs.column_list = self._column_names(result, rs.rows)
+            rs.affected_rows = len(rs.rows)
+        except Exception as exc:
+            rs.error = str(exc)
+        finally:
+            rs.cost_time = int((time.monotonic() - start) * 1000)
+            if session is not None:
+                session.shutdown()
+            if cluster is not None:
+                cluster.shutdown()
+        return rs
+
+    async def get_connection(self, db_name: str | None = None):
+        return await asyncio.to_thread(self._connect_sync, db_name)
+
+    async def test_connection(self) -> ResultSet:
+        return await asyncio.to_thread(
+            self._run_query_sync,
+            "SELECT release_version FROM system.local",
+            None,
+            None,
+        )
+
+    def escape_string(self, value: str) -> str:
+        return value.replace("'", "''")
+
+    async def get_all_databases(self) -> ResultSet:
+        def load_keyspaces() -> ResultSet:
+            rs = ResultSet(column_list=["keyspace_name"])
+            session = None
+            cluster = None
+            try:
+                session = self._connect_sync(None)
+                cluster = getattr(session, "cluster", None)
+                keyspaces = sorted((cluster.metadata.keyspaces or {}).keys())
+                rows = [(name,) for name in keyspaces if name not in _SYSTEM_KEYSPACES]
+                rs.rows = rows
+                rs.affected_rows = len(rows)
+            except Exception as exc:
+                rs.error = str(exc)
+            finally:
+                if session is not None:
+                    session.shutdown()
+                if cluster is not None:
+                    cluster.shutdown()
+            return rs
+
+        return await asyncio.to_thread(load_keyspaces)
+
+    async def get_all_tables(self, db_name: str, **kw: Any) -> ResultSet:
+        def load_tables() -> ResultSet:
+            rs = ResultSet(column_list=["table_name"])
+            session = None
+            cluster = None
+            try:
+                session = self._connect_sync(db_name)
+                cluster = getattr(session, "cluster", None)
+                keyspace = (cluster.metadata.keyspaces or {}).get(db_name)
+                if keyspace is None:
+                    rs.error = f"Keyspace 不存在: {db_name}"
+                    return rs
+                rows = [(name,) for name in sorted((keyspace.tables or {}).keys())]
+                rs.rows = rows
+                rs.affected_rows = len(rows)
+            except Exception as exc:
+                rs.error = str(exc)
+            finally:
+                if session is not None:
+                    session.shutdown()
+                if cluster is not None:
+                    cluster.shutdown()
+            return rs
+
+        return await asyncio.to_thread(load_tables)
+
+    async def get_all_columns_by_tb(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
+        def load_columns() -> ResultSet:
+            rs = ResultSet(column_list=["column_name", "column_type", "kind", "position"])
+            session = None
+            cluster = None
+            try:
+                session = self._connect_sync(db_name)
+                cluster = getattr(session, "cluster", None)
+                table = self._table_metadata(cluster, db_name, tb_name)
+                if table is None:
+                    rs.error = f"表不存在: {db_name}.{tb_name}"
+                    return rs
+                rows = []
+                for idx, (name, column) in enumerate((table.columns or {}).items()):
+                    kind = self._column_kind(table, name)
+                    rows.append(
+                        {
+                            "column_name": name,
+                            "column_type": str(getattr(column, "cql_type", None) or column),
+                            "kind": kind,
+                            "position": idx + 1,
+                        }
+                    )
+                rs.rows = rows
+                rs.affected_rows = len(rows)
+            except Exception as exc:
+                rs.error = str(exc)
+            finally:
+                if session is not None:
+                    session.shutdown()
+                if cluster is not None:
+                    cluster.shutdown()
+            return rs
+
+        return await asyncio.to_thread(load_columns)
+
+    async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
+        def load_ddl() -> ResultSet:
+            session = None
+            cluster = None
+            try:
+                session = self._connect_sync(db_name)
+                cluster = getattr(session, "cluster", None)
+                table = self._table_metadata(cluster, db_name, tb_name)
+                if table is None:
+                    return ResultSet(error=f"表不存在: {db_name}.{tb_name}")
+                ddl = table.export_as_string() if hasattr(table, "export_as_string") else str(table)
+                return ResultSet(column_list=["ddl"], rows=[(ddl,)], affected_rows=1)
+            except Exception as exc:
+                return ResultSet(error=str(exc))
+            finally:
+                if session is not None:
+                    session.shutdown()
+                if cluster is not None:
+                    cluster.shutdown()
+
+        return await asyncio.to_thread(load_ddl)
+
+    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list[dict[str, Any]]:
+        rs = await self.get_all_tables(db_name)
+        if not rs.is_success:
+            return []
+        return [{"table_name": self._first_value(row), "table_rows": None} for row in rs.rows]
+
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
+        table_rs = await self._load_table_metadata(db_name, tb_name)
+        if table_rs.error:
+            return table_rs
+        table = table_rs.rows[0]
+        partition_keys = self._column_names_from_metadata(getattr(table, "partition_key", []))
+        clustering_keys = self._column_names_from_metadata(getattr(table, "clustering_key", []))
+        rows: list[dict[str, Any]] = []
+        if partition_keys:
+            rows.append(
+                {
+                    "constraint_name": f"{tb_name}_partition_key",
+                    "constraint_type": "PARTITION KEY",
+                    "column_names": ", ".join(partition_keys),
+                    "referenced_table_name": "",
+                    "referenced_column_names": "",
+                    "check_clause": "",
+                }
+            )
+        if clustering_keys:
+            rows.append(
+                {
+                    "constraint_name": f"{tb_name}_clustering_key",
+                    "constraint_type": "CLUSTERING KEY",
+                    "column_names": ", ".join(clustering_keys),
+                    "referenced_table_name": "",
+                    "referenced_column_names": "",
+                    "check_clause": "",
+                }
+            )
+        return ResultSet(
+            column_list=[
+                "constraint_name",
+                "constraint_type",
+                "column_names",
+                "referenced_table_name",
+                "referenced_column_names",
+                "check_clause",
+            ],
+            rows=rows,
+            affected_rows=len(rows),
+        )
+
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
+        table_rs = await self._load_table_metadata(db_name, tb_name)
+        if table_rs.error:
+            return table_rs
+        table = table_rs.rows[0]
+        partition_keys = self._column_names_from_metadata(getattr(table, "partition_key", []))
+        clustering_keys = self._column_names_from_metadata(getattr(table, "clustering_key", []))
+        rows: list[dict[str, Any]] = []
+        if partition_keys:
+            rows.append(
+                {
+                    "index_name": f"{tb_name}_partition_key",
+                    "index_type": "PARTITION KEY",
+                    "column_names": ", ".join(partition_keys),
+                    "is_composite": "YES" if len(partition_keys) > 1 else "NO",
+                    "index_comment": "Cassandra partition key",
+                }
+            )
+        if clustering_keys:
+            rows.append(
+                {
+                    "index_name": f"{tb_name}_clustering_key",
+                    "index_type": "CLUSTERING KEY",
+                    "column_names": ", ".join(clustering_keys),
+                    "is_composite": "YES" if len(clustering_keys) > 1 else "NO",
+                    "index_comment": "Cassandra clustering key",
+                }
+            )
+        return ResultSet(
+            column_list=[
+                "index_name",
+                "index_type",
+                "column_names",
+                "is_composite",
+                "index_comment",
+            ],
+            rows=rows,
+            affected_rows=len(rows),
+        )
+
+    def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
+        result: dict[str, Any] = {"msg": "", "has_star": False, "syntax_error": False}
+        sql_strip = sql.strip().rstrip(";")
+        if not sql_strip:
+            result["syntax_error"] = True
+            result["msg"] = "CQL 不能为空"
+            return result
+
+        prefix = sql_strip.split(None, 1)[0].lower()
+        result["has_star"] = bool(re.search(r"(?is)\bselect\s+\*", sql_strip))
+        if prefix in _WRITE_PREFIXES:
+            result["msg"] = f"Cassandra 查询接口不允许执行 {prefix.upper()} 操作"
+            return result
+        if prefix != "select":
+            result["syntax_error"] = True
+            result["msg"] = f"Cassandra 查询接口只允许 SELECT，不支持 {prefix.upper()} 语句"
+        return result
+
+    def filter_sql(self, sql: str, limit_num: int) -> str:
+        sql_strip = sql.strip().rstrip(";")
+        if (
+            limit_num > 0
+            and sql_strip.lower().startswith("select")
+            and not re.search(r"\blimit\b", sql_strip, re.I)
+        ):
+            return f"{sql_strip} LIMIT {int(limit_num)}"
+        return sql_strip
+
+    async def query(
+        self,
+        db_name: str,
+        sql: str,
+        limit_num: int = 0,
+        parameters: dict[str, Any] | None = None,
+        **kw: Any,
+    ) -> ResultSet:
+        check = self.query_check(db_name, sql)
+        if check["msg"] and (check["syntax_error"] or "不允许" in check["msg"]):
+            return ResultSet(error=check["msg"])
+        filtered_sql = self.filter_sql(sql, limit_num)
+        return await asyncio.to_thread(self._run_query_sync, filtered_sql, parameters, db_name)
+
+    def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet:
+        return resultset
+
+    async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
+        review = ReviewSet(full_sql=sql)
+        review.append(
+            SqlItem(
+                id=1,
+                sql=sql,
+                errlevel=2,
+                stagestatus="Audit failed",
+                errormessage="Cassandra 工单执行待客户同构环境验证后开放",
+            )
+        )
+        return review
+
+    async def execute(self, db_name: str, sql: str, **kw: Any) -> ReviewSet:
+        return await self.execute_check(db_name, sql)
+
+    async def execute_workflow(self, workflow: Any) -> ReviewSet:
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(getattr(workflow, "db_name", ""), sql)
+
+    async def collect_metrics(self) -> dict[str, Any]:
+        rs = await self.test_connection()
+        version = ""
+        if rs.is_success and rs.rows:
+            version = str(self._first_value(rs.rows[0]) or "")
+        return {
+            "health": {"up": 1 if rs.is_success else 0, "error": rs.error},
+            "version": {"value": version},
+        }
+
+    def get_supported_metric_groups(self) -> list[str]:
+        return ["health", "version"]
+
+    @staticmethod
+    def _row_to_dict(row: Any) -> dict[str, Any]:
+        if isinstance(row, dict):
+            return row
+        if hasattr(row, "_asdict"):
+            return dict(row._asdict())
+        if hasattr(row, "_fields"):
+            return {field: getattr(row, field) for field in row._fields}
+        return {"value": row}
+
+    @staticmethod
+    def _column_names(result: Any, rows: list[dict[str, Any]]) -> list[str]:
+        column_names = getattr(result, "column_names", None)
+        if column_names:
+            return list(column_names)
+        if rows:
+            return list(rows[0].keys())
+        return []
+
+    @staticmethod
+    def _table_metadata(cluster: Any, db_name: str, tb_name: str) -> Any | None:
+        metadata = getattr(cluster, "metadata", None)
+        keyspaces = getattr(metadata, "keyspaces", {}) if metadata is not None else {}
+        keyspace = (keyspaces or {}).get(db_name)
+        if keyspace is None:
+            return None
+        return (keyspace.tables or {}).get(tb_name)
+
+    async def _load_table_metadata(self, db_name: str, tb_name: str) -> ResultSet:
+        def load_table() -> ResultSet:
+            session = None
+            cluster = None
+            try:
+                session = self._connect_sync(db_name)
+                cluster = getattr(session, "cluster", None)
+                table = self._table_metadata(cluster, db_name, tb_name)
+                if table is None:
+                    return ResultSet(error=f"表不存在: {db_name}.{tb_name}")
+                return ResultSet(rows=[table], affected_rows=1)
+            except Exception as exc:
+                return ResultSet(error=str(exc))
+            finally:
+                if session is not None:
+                    session.shutdown()
+                if cluster is not None:
+                    cluster.shutdown()
+
+        return await asyncio.to_thread(load_table)
+
+    @staticmethod
+    def _column_kind(table: Any, name: str) -> str:
+        if name in [getattr(col, "name", col) for col in getattr(table, "partition_key", [])]:
+            return "partition_key"
+        if name in [getattr(col, "name", col) for col in getattr(table, "clustering_key", [])]:
+            return "clustering_key"
+        return "regular"
+
+    @staticmethod
+    def _column_names_from_metadata(columns: Any) -> list[str]:
+        return [str(getattr(column, "name", column)) for column in columns or []]
+
+    @staticmethod
+    def _first_value(row: Any) -> Any:
+        if isinstance(row, dict):
+            return next(iter(row.values()), None)
+        if isinstance(row, (tuple, list)):
+            return row[0] if row else None
+        return row

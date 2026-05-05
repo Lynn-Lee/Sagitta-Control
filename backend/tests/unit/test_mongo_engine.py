@@ -4,6 +4,8 @@ MongoDB 引擎单元测试。
 所有查询通过 pymongo Driver，不调用任何 subprocess。
 """
 import contextlib
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -108,3 +110,104 @@ class TestMongoQueryParser:
         result = self.engine.query_check("testdb", "INVALID QUERY")
         assert result["syntax_error"] is True
         assert result["msg"] != ""
+
+    def test_parse_insert_one_write(self):
+        parsed = self.engine._parse_mongo_write(
+            'db.users.insertOne({"name": "Alice", "active": true})'
+        )
+
+        assert parsed["operation"] == "insertOne"
+        assert parsed["collection"] == "users"
+        assert parsed["args"] == [{"name": "Alice", "active": True}]
+
+    def test_parse_update_many_write(self):
+        parsed = self.engine._parse_mongo_write(
+            'db.users.updateMany({"active": true}, {"$set": {"status": "ok"}})'
+        )
+
+        assert parsed["operation"] == "updateMany"
+        assert parsed["args"][0] == {"active": True}
+        assert parsed["args"][1] == {"$set": {"status": "ok"}}
+
+    @pytest.mark.asyncio
+    async def test_execute_check_rejects_read_query(self):
+        review = await self.engine.execute_check("app", 'db.users.find({"active": true})')
+
+        assert review.error_count == 1
+        assert "不支持" in review.rows[0].errormessage
+
+    @pytest.mark.asyncio
+    async def test_execute_insert_one_uses_driver(self, monkeypatch):
+        coll = SimpleNamespace(
+            insert_one=AsyncMock(return_value=SimpleNamespace(inserted_id="abc123"))
+        )
+        monkeypatch.setattr(self.engine, "get_connection", AsyncMock(return_value=_Client(coll)))
+
+        review = await self.engine.execute("app", 'db.users.insertOne({"name": "Alice"})')
+
+        assert review.is_executed is True
+        assert review.error_count == 0
+        assert review.rows[0].affected_rows == 1
+        coll.insert_one.assert_awaited_once_with({"name": "Alice"})
+
+    @pytest.mark.asyncio
+    async def test_execute_update_many_reports_modified_count(self, monkeypatch):
+        coll = SimpleNamespace(
+            update_many=AsyncMock(
+                return_value=SimpleNamespace(matched_count=5, modified_count=3)
+            )
+        )
+        monkeypatch.setattr(self.engine, "get_connection", AsyncMock(return_value=_Client(coll)))
+
+        review = await self.engine.execute(
+            "app",
+            'db.users.updateMany({"active": true}, {"$set": {"status": "ok"}})',
+        )
+
+        assert review.is_executed is True
+        assert review.rows[0].affected_rows == 3
+        assert "Matched 5" in review.rows[0].stagestatus
+        coll.update_many.assert_awaited_once_with(
+            {"active": True}, {"$set": {"status": "ok"}}
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_delete_one_reports_deleted_count(self, monkeypatch):
+        coll = SimpleNamespace(
+            delete_one=AsyncMock(return_value=SimpleNamespace(deleted_count=1))
+        )
+        monkeypatch.setattr(self.engine, "get_connection", AsyncMock(return_value=_Client(coll)))
+
+        review = await self.engine.execute("app", 'db.users.deleteOne({"id": 1})')
+
+        assert review.is_executed is True
+        assert review.rows[0].affected_rows == 1
+        coll.delete_one.assert_awaited_once_with({"id": 1})
+
+    @pytest.mark.asyncio
+    async def test_execute_workflow_uses_workflow_database(self):
+        self.engine.execute = AsyncMock(return_value=SimpleNamespace(is_executed=True))
+        workflow = SimpleNamespace(
+            db_name="app",
+            content=SimpleNamespace(sql_content='db.users.deleteOne({"id": 1})'),
+        )
+
+        await self.engine.execute_workflow(workflow)
+
+        self.engine.execute.assert_awaited_once_with("app", 'db.users.deleteOne({"id": 1})')
+
+
+class _Database:
+    def __init__(self, collection):
+        self.collection = collection
+
+    def __getitem__(self, name):
+        return self.collection
+
+
+class _Client:
+    def __init__(self, collection):
+        self.collection = collection
+
+    def __getitem__(self, name):
+        return _Database(self.collection)

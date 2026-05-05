@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 ARCHIVE_SUPPORT: dict[str, dict[str, Any]] = {
     "mysql": {"purge": True, "dest": True, "batch_delete": "limit", "verified": True},
     "tidb": {"purge": True, "dest": True, "batch_delete": "limit", "verified": False},
-    "doris": {"purge": False, "dest": False, "batch_delete": "limit", "reason": "Doris 引擎仍待真实环境验证"},
+    "doris": {"purge": True, "dest": False, "batch_delete": "where", "verified": False, "reason": "Doris 暂仅支持 purge 清理模式，dest 迁移模式待客户环境验证"},
     "pgsql": {"purge": True, "dest": True, "batch_delete": "ctid", "verified": True},
     "oracle": {"purge": True, "dest": True, "batch_delete": "rownum", "verified": False},
     "mssql": {"purge": True, "dest": True, "batch_delete": "top", "verified": False},
@@ -101,7 +101,7 @@ def build_batch_delete_sql(db_type: str, table_name: str, condition: str, batch_
         return f"DELETE FROM {t} WHERE ROWID IN (SELECT ROWID FROM {t} WHERE {condition} AND ROWNUM <= {batch_size})"
     if dt == "mssql":
         return f"DELETE TOP({batch_size}) FROM {t} WHERE {condition}"
-    if dt == "starrocks":
+    if dt in ("starrocks", "doris"):
         return f"DELETE FROM {t} WHERE {condition}"
     if dt == "clickhouse":
         return f"ALTER TABLE {t} DELETE WHERE {condition}"
@@ -1001,7 +1001,7 @@ class ArchiveService:
         if inst.db_type == "mongo":
             await ArchiveService._execute_purge_mongo(db, job, engine)
             return
-        if inst.db_type in ("clickhouse", "starrocks"):
+        if inst.db_type in ("clickhouse", "starrocks", "doris"):
             await ArchiveService._execute_single_delete(db, job, engine, inst.db_type)
             return
 

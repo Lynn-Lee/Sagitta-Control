@@ -41,10 +41,12 @@ _DIALECTS = {
     "sqlserver": "tsql",
     "clickhouse": "clickhouse",
     "doris": "mysql",
+    "elasticsearch": "mysql",
+    "opensearch": "mysql",
 }
 
-_UNSUPPORTED_ENGINES = {"redis", "mongo", "mongodb", "elasticsearch", "opensearch", "cassandra"}
-_PARTIAL_ENGINES = {"clickhouse", "doris"}
+_UNSUPPORTED_ENGINES = {"redis", "mongo", "mongodb", "cassandra"}
+_PARTIAL_ENGINES = {"clickhouse", "doris", "elasticsearch", "opensearch"}
 _DB_TYPE_LABELS = {
     "mysql": "MySQL",
     "tidb": "TiDB",
@@ -643,6 +645,8 @@ class PartialExplainAnalyzer(TextPlanAnalyzer):
     support_level: SupportLevel = "partial"
 
     async def explain(self) -> ResultSet:
+        if hasattr(self.engine, "explain_query"):
+            return await self.engine.explain_query(self.db_name, self.sql)
         return await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN {self.sql.rstrip(';')}", limit_num=300)
 
 
@@ -677,6 +681,8 @@ def _analyzer_for(instance: Instance, engine: Any, db_name: str, sql: str) -> Ba
         "sqlserver": MssqlAnalyzer,
         "clickhouse": PartialExplainAnalyzer,
         "doris": PartialExplainAnalyzer,
+        "elasticsearch": PartialExplainAnalyzer,
+        "opensearch": PartialExplainAnalyzer,
     }
     analyzer_cls = mapping.get(db_type, BaseSqlAnalyzer)
     analyzer = analyzer_cls(instance, engine, db_name, sql)

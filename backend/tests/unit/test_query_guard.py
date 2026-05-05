@@ -10,7 +10,9 @@ from app.services.query_guard import get_query_guard
 from app.services.query_priv import QueryPrivService
 
 
-@pytest.mark.parametrize("db_type", ["mysql", "tidb", "pgsql", "oracle", "mssql", "starrocks", "clickhouse"])
+@pytest.mark.parametrize(
+    "db_type", ["mysql", "tidb", "pgsql", "oracle", "mssql", "starrocks", "clickhouse", "doris", "elasticsearch", "opensearch"]
+)
 @pytest.mark.parametrize(
     "sql",
     [
@@ -29,7 +31,25 @@ def test_sql_guards_allow_read_only_statements(db_type, sql):
     assert result.statement_kind
 
 
-@pytest.mark.parametrize("db_type", ["mysql", "pgsql", "oracle", "mssql", "starrocks", "clickhouse"])
+@pytest.mark.parametrize("sql", ["SELECT * FROM users", "SELECT id FROM app.users"])
+def test_cassandra_guard_allows_cql_read_only_statements(sql):
+    result = get_query_guard("cassandra").validate(sql, "analytics")
+
+    assert result.allowed is True
+    assert result.statement_kind
+
+
+@pytest.mark.parametrize("sql", ["DESC users", "DESCRIBE users"])
+def test_cassandra_guard_rejects_shell_describe_commands(sql):
+    result = get_query_guard("cassandra").validate(sql, "analytics")
+
+    assert result.allowed is False
+    assert "只允许 SELECT" in result.reason
+
+
+@pytest.mark.parametrize(
+    "db_type", ["mysql", "pgsql", "oracle", "mssql", "starrocks", "clickhouse", "doris", "elasticsearch", "opensearch", "cassandra"]
+)
 @pytest.mark.parametrize(
     "sql",
     [
@@ -91,12 +111,16 @@ def test_limit_is_only_applied_to_select_like_sql():
     assert guard.apply_limit("DESC users", 100, "desc") == "DESC users"
 
 
-@pytest.mark.parametrize("db_type", ["doris", "cassandra", "elasticsearch", "opensearch"])
-def test_unimplemented_engines_fail_closed(db_type):
-    result = get_query_guard(db_type).validate("SELECT * FROM users", "analytics")
+def test_cassandra_guard_applies_limit_and_extracts_keyspace_table_ref():
+    guard = get_query_guard("cassandra")
 
-    assert result.allowed is False
-    assert "暂不支持在线查询执行" in result.reason
+    result = guard.validate("SELECT id FROM app.users", "analytics")
+
+    assert result.allowed is True
+    assert result.table_refs == [{"schema": "app", "name": "users"}]
+    assert guard.apply_limit("SELECT id FROM app.users", 50, result.statement_kind).endswith(
+        "LIMIT 50"
+    )
 
 
 def test_mongo_guard_rejects_side_effect_aggregate_stages():
@@ -171,7 +195,9 @@ async def test_router_rejects_write_sql_before_permission_check(monkeypatch):
 
     monkeypatch.setattr(query_router, "_load_instance", AsyncMock(return_value=instance))
     monkeypatch.setattr(query_router, "get_engine", MagicMock(return_value=fake_engine))
-    monkeypatch.setattr(QueryPrivService, "check_query_priv", AsyncMock(return_value=(True, "privilege")))
+    monkeypatch.setattr(
+        QueryPrivService, "check_query_priv", AsyncMock(return_value=(True, "privilege"))
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await query_router._run_query_with_permissions(

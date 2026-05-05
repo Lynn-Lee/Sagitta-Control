@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
 from app.engines.utils import normalize_engine_host, sanitize_sqlglot_error
+from app.services.sql_audit import SqlAuditService
 
 if TYPE_CHECKING:
     from app.models.instance import Instance
@@ -320,48 +321,25 @@ class MysqlEngine:
 
     async def _sqlglot_check(self, db_name: str, sql: str, review: ReviewSet) -> ReviewSet:
         """基于 sqlglot 的本地规则引擎审核。"""
-        import sqlglot.expressions as exp
-
-        statements = sqlglot.parse(sql, dialect="mysql")
-        for idx, stmt in enumerate(statements):
-            item = SqlItem(id=idx + 1, sql=str(stmt))
-            if stmt is None:
-                item.errlevel = 2
-                item.errormessage = "无法解析的 SQL 语句"
-                review.append(item)
-                continue
-
-            # 规则 1：DDL 语句检查备份建议
-            if isinstance(stmt, (exp.Drop, exp.TruncateTable)):
-                item.errlevel = 1
-                item.errormessage = f"高风险操作 {type(stmt).__name__}，请确认已备份"
-
-            # 规则 2：DML 必须有 WHERE
-            if isinstance(stmt, (exp.Update, exp.Delete)) and not stmt.find(exp.Where):
-                item.errlevel = 2
-                item.errormessage = "UPDATE/DELETE 语句缺少 WHERE 条件，拒绝执行"
-
-            # 规则 3：SELECT * 警告
-            if isinstance(stmt, exp.Select):
-                for _ in stmt.find_all(exp.Star):
-                    item.errlevel = max(item.errlevel, 1)
-                    item.errormessage = "建议避免使用 SELECT *，明确指定列名"
-                    break
-
-            item.stagestatus = "Audit completed" if not item.errlevel else "Audit warning/error"
-            review.append(item)
-
-        return review
+        return SqlAuditService.audit(self.db_type, db_name, sql)
 
     async def _goinception_check(self, db_name: str, sql: str, review: ReviewSet) -> ReviewSet:
         """
         goInception 可选增强审核。
         注意：连接参数通过独立配置传递，不在 SQL 字符串中携带密码（修复 P0-2）。
         """
-        # TODO Sprint 3: 实现 goInception TCP 协议连接
-        # 使用 aiomysql 连接 goInception 的 4000 端口
-        # inception_sql 使用专用配置连接，不在 SQL 字符串中拼密码
-        logger.debug("goinception_check_placeholder")
+        logger.warning("goinception_check_not_available")
+        review.append(
+            SqlItem(
+                id=len(review.rows) + 1,
+                errlevel=1,
+                stagestatus="goInception skipped",
+                errormessage=(
+                    "goInception 增强审核尚未接入当前版本，本次仅使用 sqlglot 本地基础规则审核。"
+                ),
+                sql="",
+            )
+        )
         return review
 
     # ── 执行 ──────────────────────────────────────────────────
@@ -393,13 +371,13 @@ class MysqlEngine:
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
         """
-        执行工单（逐条执行，记录每条进度）。
-        通过 Celery task 的 update_state 推送进度（Sprint 3 实现）。
+        执行工单中的 SQL。
+
+        Celery 任务负责工单状态流转和通知，引擎层只负责把快照 SQL
+        交给当前引擎的事务执行实现。
         """
-        # TODO Sprint 3: 实现完整的工单执行逻辑
-        review = ReviewSet(full_sql=getattr(workflow, "sql_content", ""))
-        review.error = "execute_workflow 将在 Sprint 3 实现"
-        return review
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(workflow.db_name, sql)
 
     # ── 观测中心 ────────────────────────────────────────────
 

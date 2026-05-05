@@ -26,6 +26,9 @@ npm run lint
 
 # 构建生产版本
 npm run build
+
+# 构建并检查产物体积预算
+npm run build:check
 ```
 
 ## 权限 UI 口径（v2-lite）
@@ -145,3 +148,7 @@ src/
 | Sprint 5 — 观测中心（Recharts 趋势图）| ✅ 完成 |
 | Sprint 6 — 联调测试、品牌升级 | ✅ 完成 |
 | 权限前端收敛 | ✅ 完成（菜单权限码化、页面级 PermissionGuard、查询权限排查展示） |
+
+## 最新剩余计划任务
+
+统一任务清单见 [../docs/remaining_plan.md](../docs/remaining_plan.md)。前端侧剩余重点是最终文档截图校对、自动化截图/冒烟 E2E，以及新增重型依赖时的包体持续跟踪。

@@ -38,7 +38,17 @@ from app.services.monitor import MonitorService
 
 DEFAULT_SLOW_THRESHOLD_MS = 1000
 SUPPORTED_NATIVE_TYPES = {"mysql", "pgsql", "redis"}
-SQL_ACTIVITY_TYPES = {"tidb", "starrocks", "oracle"}
+SQL_ACTIVITY_TYPES = {
+    "tidb",
+    "starrocks",
+    "oracle",
+    "doris",
+    "mssql",
+    "sqlserver",
+    "clickhouse",
+    "elasticsearch",
+    "opensearch",
+}
 RELATIONAL_DB_TYPES = {
     "mysql",
     "pgsql",
@@ -58,7 +68,12 @@ SOURCE_LABELS = {
     "redis_slowlog": "Redis SLOWLOG",
     "tidb_statements": "TiDB SQL 活动",
     "starrocks_queries": "StarRocks SQL 活动",
+    "doris_queries": "Doris SQL 活动",
     "oracle_activity": "Oracle 会话/ASH",
+    "mssql_activity": "MSSQL SQL 活动",
+    "clickhouse_activity": "ClickHouse SQL 活动",
+    "elasticsearch_activity": "Elasticsearch 任务活动",
+    "opensearch_activity": "OpenSearch 任务活动",
     "platform_history": "平台历史",
 }
 SQL_TAG_OPTIONS: dict[str, list[str]] = {
@@ -992,7 +1007,7 @@ class SlowLogService:
             ).hexdigest()
             if item.source != "platform":
                 source_ref = f"{instance.id}:{source_ref}"
-            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "starrocks_queries", "oracle_activity"}:
+            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "starrocks_queries", "doris_queries", "oracle_activity"}:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
             exists = await db.execute(
                 select(SlowQueryLog.id).where(
@@ -1102,7 +1117,13 @@ class SlowLogService:
         source = rows[0].source if rows else {
             "tidb": "tidb_statements",
             "starrocks": "starrocks_queries",
+            "doris": "doris_queries",
             "oracle": "oracle_activity",
+            "mssql": "mssql_activity",
+            "sqlserver": "mssql_activity",
+            "clickhouse": "clickhouse_activity",
+            "elasticsearch": "elasticsearch_activity",
+            "opensearch": "opensearch_activity",
         }.get(db_type, f"{db_type}_sql_activity")
         return saved, source, ""
 

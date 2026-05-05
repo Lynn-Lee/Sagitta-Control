@@ -94,3 +94,7 @@ deploy/
     ├── backup-postgres.sh  # PostgreSQL 备份脚本
     └── restore-postgres.sh # PostgreSQL 恢复脚本
 ```
+
+## 最新剩余计划任务
+
+统一任务清单见 [../docs/remaining_plan.md](../docs/remaining_plan.md)。部署侧剩余重点是客户同构环境预检、升级回滚演练、固定版本交付包确认、License Server 生产验证和安全流水线放行。

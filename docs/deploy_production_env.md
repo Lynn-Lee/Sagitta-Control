@@ -362,3 +362,37 @@ docker compose -f deploy/docker-compose.yml exec backend alembic downgrade -1
 - 能完成查询权限申请、审批和在线查询。
 - 能查看审计日志和查询历史。
 - 备份脚本可执行并生成备份文件。
+- 已按 `docs/engine_support_matrix.md` 确认客户承诺的数据库类型，不把待验证引擎作为标准交付能力。
+- 已按 `docs/customer_initialization_checklist.md` 完成客户环境初始化检查。
+
+可先运行非破坏性预检和验收脚本：
+
+```bash
+deploy/preflight-check.sh
+scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
+  --username <admin> --password '<password>'
+```
+
+如不希望在命令行暴露密码，可改用已签发的 Bearer Token：
+
+```bash
+scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
+  --token '<access_token>'
+```
+
+默认模式不会创建实例、工单、查询权限申请或归档作业。若客户环境已准备验收实例，可附加 `--instance-id <id> --db-name <db>`，脚本会增加 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表检查。
+
+需要真实提交业务对象时，必须显式开启对应开关：
+
+```bash
+scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
+  --username <admin> --password '<password>' \
+  --instance-id <id> --db-name <db> --table-name <table> \
+  --submit-workflow --apply-query-privilege --submit-archive
+```
+
+在线 License 激活/刷新和通知发送同样需要显式参数：`--activate-license --activation-code <code> --customer-id <customer>`、`--refresh-license`、`--notify-user-id <id>`。这些动作会写入业务数据或触发外部通知，执行后需按客户初始化检查表记录验收结果。
+
+## 10. 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。生产部署文档后续只维护部署和验收步骤，剩余研发与交付任务统一在该清单中更新。

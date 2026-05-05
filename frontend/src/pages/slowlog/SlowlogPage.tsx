@@ -37,6 +37,7 @@ const SOURCE_OPTIONS = [
   { label: 'Redis SLOWLOG', value: 'redis_slowlog' },
   { label: 'TiDB SQL 活动', value: 'tidb_statements' },
   { label: 'StarRocks SQL 活动', value: 'starrocks_queries' },
+  { label: 'Doris SQL 活动', value: 'doris_queries' },
   { label: 'Oracle 会话/ASH', value: 'oracle_activity' },
   { label: '会话采样', value: 'session_history' },
 ]
@@ -49,6 +50,7 @@ const SOURCE_COLOR: Record<string, string> = {
   redis_slowlog: 'red',
   tidb_statements: 'cyan',
   starrocks_queries: 'geekblue',
+  doris_queries: 'magenta',
   oracle_activity: 'volcano',
   session_history: 'purple',
 }

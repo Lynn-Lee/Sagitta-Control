@@ -42,6 +42,23 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise HTTPException(422, "时间格式错误，请使用 ISO8601") from None
 
 
+def _row_duration_seconds(row) -> int:
+    if not isinstance(row, dict):
+        return 0
+    for key in ("Time", "TIME", "time_seconds", "duration_seconds"):
+        if key not in row:
+            continue
+        try:
+            return int(float(row.get(key) or 0))
+        except (TypeError, ValueError):
+            continue
+    duration_ms = row.get("duration_ms")
+    try:
+        return int(float(duration_ms or 0) / 1000)
+    except (TypeError, ValueError):
+        return 0
+
+
 @router.get(
     "/configs/",
     response_model=SlowQueryConfigListResponse,
@@ -344,12 +361,12 @@ async def list_slow_queries(
             parameters={"min_seconds": min_seconds, "limit": limit},
             limit_num=limit,
         )
-    elif inst.db_type == "starrocks":
+    elif inst.db_type in {"starrocks", "doris"}:
         rs = await engine.processlist(command_type="ALL")
         if rs.is_success:
             rs.rows = [
                 row for row in rs.rows
-                if int((row.get("Time", row.get("TIME", 0)) if isinstance(row, dict) else 0) or 0) > min_seconds
+                if _row_duration_seconds(row) > min_seconds
             ][:limit]
     else:
         return {"items": [], "total": 0, "msg": f"{inst.db_type} 暂不支持实时 SQL 洞察"}

@@ -104,3 +104,7 @@ python3 tools/license_authority.py export-license \
 4. 从 License 页面执行刷新，确认 `last_online_check_at` 已更新。
 5. 将激活码状态改为 `suspended`，再次刷新，确认 SagittaDB 将 License 标记为无效并阻断核心 API。
 6. 将激活码恢复为 `active` 或创建新激活码，再次激活，确认核心 API 恢复。
+
+## 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。License 相关剩余任务仅保留当前交付闭环的生产验证；套餐模板、用量可见性、监控告警增强、部署迁移生命周期和商业报表不再作为后续研发任务。

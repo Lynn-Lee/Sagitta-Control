@@ -280,3 +280,18 @@ Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `depl
 - 第三方认证和通知密钥未过期。
 - 系统日志无持续重复错误。
 
+发布、升级或客户验收前建议额外执行：
+
+```bash
+deploy/preflight-check.sh
+scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
+  --username <admin> --password '<password>'
+```
+
+也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
+
+安全项逐条复核见 `docs/security_configuration_checklist.md`，升级回滚验收见 `docs/upgrade_rollback_acceptance.md`。
+
+## 11. 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。运维侧后续重点是升级回滚演练、备份恢复验证、性能基线和客户验收记录归档；License 监控增强不再作为后续研发任务。

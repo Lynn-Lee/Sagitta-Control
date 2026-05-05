@@ -14,7 +14,7 @@ import { instanceApi, type InstanceItem } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
-import { formatDbTypeLabel } from '@/utils/dbType'
+import { DB_TYPES, formatDbTypeLabel, getEngineSupport, isExperimentalDbType } from '@/utils/dbType'
 
 const { Text } = Typography
 const { Option } = Select
@@ -26,8 +26,6 @@ const DB_TYPE_COLORS: Record<string, string> = {
   opensearch: 'lime', mssql: 'cyan', cassandra: 'purple', doris: 'magenta',
   tidb: 'red', starrocks: 'gold',
 }
-const DB_TYPES = ['mysql', 'pgsql', 'oracle', 'mongo', 'redis',
-  'clickhouse', 'elasticsearch', 'opensearch', 'mssql', 'cassandra', 'doris', 'tidb', 'starrocks']
 
 // ── 数据库管理子组件 ───────────────────────────────────────
 function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
@@ -343,7 +341,14 @@ export default function InstanceList() {
           <Space style={{ width: '100%', display: 'flex' }}>
             <Form.Item name="db_type" label="数据库类型" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select placeholder="选择类型">
-                {DB_TYPES.map(t => <Option key={t} value={t}><Tag color={DB_TYPE_COLORS[t]}>{formatDbTypeLabel(t)}</Tag></Option>)}
+                {DB_TYPES.map(t => (
+                  <Option key={t} value={t}>
+                    <Space size={6}>
+                      <Tag color={DB_TYPE_COLORS[t]}>{formatDbTypeLabel(t)}</Tag>
+                      {isExperimentalDbType(t) && <Text type="secondary">待验证</Text>}
+                    </Space>
+                  </Option>
+                ))}
               </Select>
             </Form.Item>
             <Form.Item name="type" label="主从类型" initialValue="master" style={{ flex: 1 }}>
@@ -353,6 +358,15 @@ export default function InstanceList() {
               </Select>
             </Form.Item>
           </Space>
+          {selectedDbType && isExperimentalDbType(selectedDbType) && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={`${formatDbTypeLabel(selectedDbType)} 引擎仍处于待真实环境验证状态`}
+              description={getEngineSupport(selectedDbType).note}
+            />
+          )}
           <Space style={{ width: '100%', display: 'flex' }}>
             <Form.Item name="host" label="主机地址" rules={[{ required: true }]} style={{ flex: 2 }}>
               <Input placeholder="hostname 或 IP" />

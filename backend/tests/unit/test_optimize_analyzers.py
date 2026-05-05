@@ -8,6 +8,7 @@ from app.services.optimize import (
     MssqlAnalyzer,
     MysqlAnalyzer,
     OracleAnalyzer,
+    PartialExplainAnalyzer,
     StarRocksAnalyzer,
     TidbAnalyzer,
 )
@@ -123,3 +124,22 @@ async def test_mysql_analyzer_extracts_json_explain_value():
     assert result.metadata.tables == ["users"]
     assert result.metadata.indexes[0]["index_name"] == "idx_users_id"
 
+
+@pytest.mark.asyncio
+async def test_partial_analyzer_prefers_engine_explain_query_for_doris_and_es():
+    class FakeEngine:
+        def __init__(self):
+            self.called = None
+
+        async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+            self.called = (db_name, sql)
+            return ResultSet(column_list=["PLAN"], rows=[["SCAN orders"]])
+
+    engine = FakeEngine()
+    analyzer = PartialExplainAnalyzer(_instance("doris"), engine, "app", "select * from orders")
+
+    result = await analyzer.analyze()
+
+    assert result.support_level == "partial"
+    assert engine.called == ("app", "select * from orders")
+    assert result.raw["rows"] == [["SCAN orders"]]

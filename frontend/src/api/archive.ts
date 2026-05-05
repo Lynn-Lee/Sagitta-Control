@@ -93,8 +93,19 @@ export interface ArchiveExecutePayload {
   external_remark?: string
 }
 
+export interface ArchiveSupportInfo {
+  purge: boolean
+  dest: boolean
+  reason?: string
+  verified?: boolean
+}
+
+export interface ArchiveSupportResponse {
+  support: Record<string, ArchiveSupportInfo>
+}
+
 export const archiveApi = {
-  support: () => apiClient.get('/archive/support/').then(r => r.data),
+  support: () => apiClient.get<ArchiveSupportResponse>('/archive/support/').then(r => r.data),
   estimate: (data: ArchivePayload) =>
     apiClient.post<ArchiveEstimateResponse>('/archive/estimate/', { ...data, dry_run: true }).then(r => r.data),
   submit: (data: ArchivePayload) =>

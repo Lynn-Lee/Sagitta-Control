@@ -28,6 +28,7 @@ from app.core.config import settings
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
 from app.engines.utils import normalize_engine_host, sanitize_sqlglot_error
+from app.services.sql_audit import SqlAuditService
 
 if TYPE_CHECKING:
     from app.models.instance import Instance
@@ -862,22 +863,7 @@ class OracleEngine:
         return resultset
 
     async def execute_check(self, db_name: str, sql: str) -> ReviewSet:
-        review = ReviewSet(full_sql=sql)
-        try:
-            statements = sqlglot.parse(sql, dialect="oracle")
-            for idx, stmt in enumerate(statements):
-                item = SqlItem(id=idx + 1, sql=str(stmt))
-                if stmt is None:
-                    item.errlevel = 2
-                    item.errormessage = "无法解析的 SQL 语句"
-                elif isinstance(stmt, (exp.Drop, exp.TruncateTable)):
-                    item.errlevel = 1
-                    item.errormessage = "高风险操作，请确认已备份"
-                item.stagestatus = "Audit completed"
-                review.append(item)
-        except Exception as e:
-            review.error = str(e)
-        return review
+        return SqlAuditService.audit(self.db_type, db_name, sql)
 
     async def execute(self, db_name: str, sql: str, **kw: Any) -> ReviewSet:
         review = ReviewSet(full_sql=sql)
@@ -1047,7 +1033,10 @@ class OracleEngine:
         if fallback.is_success:
             fallback.warning = f"v$sql SQL 活动采集不可用，已降级为会话视图：{rs.error}"
             mapped_rows = [
-                {str(col).lower(): value for col, value in zip(fallback.column_list, row, strict=False)}
+                {
+                    str(col).lower(): value
+                    for col, value in zip(fallback.column_list, row, strict=False)
+                }
                 if isinstance(row, (tuple, list))
                 else row
                 for row in fallback.rows
@@ -1067,7 +1056,9 @@ class OracleEngine:
             fallback.rows = [
                 {
                     "source": "oracle_activity",
-                    "source_ref": f"oracle:{row.get('session_id', '')}:{row.get('sql_id', '')}" if isinstance(row, dict) else "",
+                    "source_ref": f"oracle:{row.get('session_id', '')}:{row.get('sql_id', '')}"
+                    if isinstance(row, dict)
+                    else "",
                     "db_name": row.get("db_name", "") if isinstance(row, dict) else "",
                     "sql_text": row.get("sql_text", "") if isinstance(row, dict) else "",
                     "duration_ms": row.get("duration_ms", 0) if isinstance(row, dict) else 0,
@@ -1509,7 +1500,12 @@ class OracleEngine:
             )
         ]
         metrics["temp_tablespaces"] = [
-            {"tablespace_name": row[0], "used_bytes": row[1], "total_bytes": row[2], "used_pct": row[3]}
+            {
+                "tablespace_name": row[0],
+                "used_bytes": row[1],
+                "total_bytes": row[2],
+                "used_pct": row[3],
+            }
             for row in fetch_all(
                 "temp_tablespaces",
                 """

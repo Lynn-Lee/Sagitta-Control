@@ -72,3 +72,7 @@ docker compose exec license_postgres pg_dump -U license sagittadb_license > lice
 6. 在不同部署指纹的环境中尝试复用同一激活码，应被拒绝。
 7. 在 License Server 中挂起激活码，再触发 SagittaDB License 刷新，核心 API 应被阻断。
 8. 将激活码恢复为 active 或创建新激活码，再次激活后确认核心 API 恢复。
+
+## 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。License Server 部署侧剩余任务仅保留生产验证、基础备份恢复和运营审计确认；告警增强、部署 ID 遗失支持流程和运营报表不再作为后续研发任务。

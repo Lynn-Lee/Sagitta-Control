@@ -17,6 +17,7 @@ import {
   type ArchiveEstimateResponse,
   type ArchiveJob,
   type ArchivePayload,
+  type ArchiveSupportInfo,
 } from '@/api/archive'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
@@ -83,6 +84,10 @@ export default function ArchivePage() {
     queryKey: ['instances-for-archive'],
     queryFn: () => instanceApi.list({ page_size: 200 }),
   })
+  const { data: supportData } = useQuery({
+    queryKey: ['archive-support'],
+    queryFn: () => archiveApi.support(),
+  })
   const { data: srcDbs } = useQuery({
     queryKey: ['src-dbs-archive', srcInstanceId],
     queryFn: () => instanceApi.listRegisteredDbs(srcInstanceId!),
@@ -116,6 +121,25 @@ export default function ArchivePage() {
     () => new Map<number, any>((instances?.items || []).map((item: any) => [item.id, item])),
     [instances?.items],
   )
+  const sourceInstance = srcInstanceId ? instanceMap.get(srcInstanceId) : undefined
+  const sourceDbType = sourceInstance?.db_type?.toLowerCase?.() || ''
+  const archiveSupport: ArchiveSupportInfo | undefined = sourceDbType ? supportData?.support?.[sourceDbType] : undefined
+  const modeSupported = archiveSupport ? Boolean(archiveSupport[mode]) : true
+  const archiveSupportWarning = archiveSupport
+    ? !modeSupported
+      ? archiveSupport.reason || `${formatDbTypeLabel(sourceDbType)} 不支持 ${mode} 归档模式`
+      : archiveSupport.verified === false
+        ? `${formatDbTypeLabel(sourceDbType)} 归档能力需在客户同构环境验证后交付`
+        : ''
+    : ''
+
+  const chooseSupportedMode = (dbType?: string, currentMode: 'purge' | 'dest' = mode): 'purge' | 'dest' => {
+    const support = dbType ? supportData?.support?.[dbType.toLowerCase()] : undefined
+    if (!support || support[currentMode]) return currentMode
+    if (support.purge) return 'purge'
+    if (support.dest) return 'dest'
+    return currentMode
+  }
 
   const invalidateJobs = () => {
     qc.invalidateQueries({ queryKey: ['archive-jobs'] })
@@ -170,12 +194,20 @@ export default function ArchivePage() {
 
   const handleEstimate = async () => {
     try {
+      if (archiveSupport && !archiveSupport[mode]) {
+        msgApi.warning(archiveSupport.reason || '当前引擎不支持所选归档模式')
+        return
+      }
       estimateMut.mutate(await validatePayload())
     } catch { /* form validation */ }
   }
 
   const handleSubmit = async () => {
     try {
+      if (archiveSupport && !archiveSupport[mode]) {
+        msgApi.warning(archiveSupport.reason || '当前引擎不支持所选归档模式')
+        return
+      }
       const payload = await validatePayload()
       setRiskChecking(true)
       const estimate = estimateResult?.risk_plan ? estimateResult : await archiveApi.estimate(payload)
@@ -487,7 +519,18 @@ export default function ArchivePage() {
                           placeholder="选择源实例"
                           showSearch
                           optionFilterProp="label"
-                          onChange={(value) => { setSrcInstanceId(value); setEstimateResult(null); form.setFieldValue('source_db', undefined) }}
+                          onChange={(value) => {
+                            const nextInstance = instanceMap.get(value)
+                            const nextMode = chooseSupportedMode(nextInstance?.db_type, form.getFieldValue('archive_mode') || 'purge')
+                            setSrcInstanceId(value)
+                            setMode(nextMode)
+                            setEstimateResult(null)
+                            form.setFieldsValue({
+                              source_db: undefined,
+                              archive_mode: nextMode,
+                              dest_instance_id: nextMode === 'purge' ? undefined : form.getFieldValue('dest_instance_id'),
+                            })
+                          }}
                         >
                           {instances?.items?.map((item: any) => (
                             <Option key={item.id} value={item.id} label={item.instance_name}>
@@ -522,8 +565,8 @@ export default function ArchivePage() {
                         <Col xs={24} md={8}>
                           <Form.Item name="archive_mode" label="模式">
                             <Select onChange={(value) => { setMode(value); setEstimateResult(null) }}>
-                              <Option value="purge">purge 删除</Option>
-                              <Option value="dest">dest 迁移</Option>
+                              <Option value="purge" disabled={archiveSupport ? !archiveSupport.purge : false}>purge 删除</Option>
+                              <Option value="dest" disabled={archiveSupport ? !archiveSupport.dest : false}>dest 迁移</Option>
                             </Select>
                           </Form.Item>
                         </Col>
@@ -538,6 +581,14 @@ export default function ArchivePage() {
                           </Form.Item>
                         </Col>
                       </Row>
+                      {archiveSupportWarning && (
+                        <Alert
+                          type={modeSupported ? 'info' : 'warning'}
+                          showIcon
+                          message={archiveSupportWarning}
+                          style={{ marginBottom: 16 }}
+                        />
+                      )}
                       {mode === 'dest' && (
                         <>
                           <Form.Item name="dest_instance_id" label="目标实例" rules={[{ required: mode === 'dest' }]}>

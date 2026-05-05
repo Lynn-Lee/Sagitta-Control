@@ -67,3 +67,7 @@ git push origin v1.0.4
 ```bash
 ./upgrade.sh <new-version>
 ```
+
+## 最新剩余计划任务
+
+统一任务清单见 `docs/remaining_plan.md`。发布前必须完成 P0 发布闸门，尤其是全量 CI/安全流水线、固定版本交付包确认、License Server 生产验证和客户同构环境 GA 验收。

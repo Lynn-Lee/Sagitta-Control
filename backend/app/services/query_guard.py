@@ -3,6 +3,7 @@
 查询 API 是只读、无副作用的执行入口。不同引擎有不同语法规则，
 但路由层需要统一的 fail-close 契约。
 """
+
 from __future__ import annotations
 
 import re
@@ -10,10 +11,43 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import sqlglot
-import sqlglot.expressions as exp
 
 from app.engines.utils import sanitize_sqlglot_error
 from app.services.masking import DIALECT_MAP
+from app.services.sql_analyzer import (
+    READ_PREFIXES,
+    WRITE_PREFIXES,
+)
+from app.services.sql_analyzer import (
+    clean_sql as _clean_sql,
+)
+from app.services.sql_analyzer import (
+    first_word as _first_word,
+)
+from app.services.sql_analyzer import (
+    has_extra_statement as _has_extra_statement,
+)
+from app.services.sql_analyzer import (
+    has_locking_read as _has_locking_read,
+)
+from app.services.sql_analyzer import (
+    has_select_into as _has_select_into,
+)
+from app.services.sql_analyzer import (
+    has_side_effect_function as _has_side_effect_function,
+)
+from app.services.sql_analyzer import (
+    has_write_expression as _has_write_expression,
+)
+from app.services.sql_analyzer import (
+    manual_table_ref as _manual_table_ref,
+)
+from app.services.sql_analyzer import (
+    strip_explain as _strip_explain,
+)
+from app.services.sql_analyzer import (
+    table_refs_from_tree as _table_refs_from_tree,
+)
 
 
 @dataclass
@@ -28,101 +62,12 @@ class QueryGuardResult:
 
 
 class QueryGuard(Protocol):
-    def validate(self, sql: str, db_name: str) -> QueryGuardResult:
-        ...
+    def validate(self, sql: str, db_name: str) -> QueryGuardResult: ...
 
-    def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
-        ...
+    def apply_limit(self, sql: str, limit_num: int, kind: str) -> str: ...
 
 
-READ_PREFIXES = {"select", "with", "show", "desc", "describe", "explain"}
-WRITE_PREFIXES = {
-    "insert", "update", "delete", "create", "alter", "drop", "truncate",
-    "replace", "merge", "call", "exec", "execute", "grant", "revoke",
-    "set", "lock", "unlock", "copy", "do", "kill", "vacuum", "analyze",
-    "optimize", "rename", "begin", "commit", "rollback", "use",
-}
-
-WRITE_EXPR_NAMES = (
-    "Insert", "Update", "Delete", "Create", "Drop", "TruncateTable",
-    "Merge", "Execute", "Command", "Copy", "Alter",
-)
-SIDE_EFFECT_FUNCTIONS = {
-    "get_lock", "release_lock", "set_config", "pg_advisory_lock",
-    "pg_advisory_xact_lock", "pg_terminate_backend", "pg_cancel_backend",
-    "sleep", "benchmark",
-}
-
-UNSUPPORTED_ENGINES = {"doris", "cassandra", "elasticsearch", "opensearch"}
-
-
-def _clean_sql(sql: str) -> str:
-    return sql.strip().rstrip(";").strip()
-
-
-def _first_word(sql: str) -> str:
-    match = re.match(r"^\s*(?:--[^\n]*\n\s*|/\*.*?\*/\s*)*([a-zA-Z_]+)", sql, re.S)
-    return match.group(1).lower() if match else ""
-
-
-def _has_extra_statement(sql: str) -> bool:
-    return ";" in sql.strip().rstrip(";")
-
-
-def _cte_names(tree: exp.Expression) -> set[str]:
-    names: set[str] = set()
-    for cte in tree.find_all(exp.CTE):
-        alias = cte.alias
-        if alias:
-            names.add(alias.lower())
-    return names
-
-
-def _table_refs_from_tree(tree: exp.Expression, db_name: str, db_type: str) -> list[dict[str, Any]]:
-    default_schema = "" if db_type == "pgsql" else db_name
-    cte_names = _cte_names(tree)
-    seen: set[tuple[str, str]] = set()
-    refs: list[dict[str, Any]] = []
-    for tbl in tree.find_all(exp.Table):
-        name = tbl.name
-        if not name or name.lower() in cte_names:
-            continue
-        schema = tbl.db or default_schema
-        key = (schema, name)
-        if key not in seen:
-            seen.add(key)
-            refs.append({"schema": schema, "name": name})
-    return refs
-
-
-def _manual_table_ref(sql: str, db_name: str, db_type: str) -> list[dict[str, Any]]:
-    default_schema = "" if db_type == "pgsql" else db_name
-    patterns = [
-        r"^\s*(?:desc|describe)\s+([`\"\[\]\w.]+)",
-        r"^\s*show\s+create\s+table\s+([`\"\[\]\w.]+)",
-        r"^\s*show\s+(?:full\s+)?columns\s+from\s+([`\"\[\]\w.]+)",
-        r"^\s*show\s+index(?:es)?\s+from\s+([`\"\[\]\w.]+)",
-    ]
-    for pattern in patterns:
-        match = re.match(pattern, sql, re.I)
-        if not match:
-            continue
-        raw = match.group(1).strip("`\"[]")
-        if "." in raw:
-            schema, name = raw.rsplit(".", 1)
-            return [{"schema": schema.strip("`\"[]"), "name": name.strip("`\"[]")}]
-        return [{"schema": default_schema, "name": raw}]
-    return []
-
-
-def _strip_explain(sql: str) -> str:
-    stripped = _clean_sql(sql)
-    return re.sub(
-        r"^\s*explain(?:\s+(?:analyze|costs|extended|formatted|verbose|plan|query\s+plan))*\s+",
-        "",
-        stripped,
-        flags=re.I,
-    ).strip()
+UNSUPPORTED_ENGINES: set[str] = set()
 
 
 class SqlQueryGuard:
@@ -141,11 +86,26 @@ class SqlQueryGuard:
 
         prefix = _first_word(normalized)
         if prefix == "explain" and re.match(r"^\s*explain\b.*\banalyze\b", normalized, re.I):
-            return QueryGuardResult(False, "在线查询不允许 EXPLAIN ANALYZE 执行型解释计划", prefix, normalized_sql=normalized)
+            return QueryGuardResult(
+                False,
+                "在线查询不允许 EXPLAIN ANALYZE 执行型解释计划",
+                prefix,
+                normalized_sql=normalized,
+            )
         if prefix in WRITE_PREFIXES:
-            return QueryGuardResult(False, f"在线查询不允许执行 {prefix.upper()} 操作", prefix, normalized_sql=normalized)
+            return QueryGuardResult(
+                False,
+                f"在线查询不允许执行 {prefix.upper()} 操作",
+                prefix,
+                normalized_sql=normalized,
+            )
         if prefix not in READ_PREFIXES:
-            return QueryGuardResult(False, f"在线查询只允许只读语句，不支持 {prefix.upper() or 'UNKNOWN'}", prefix, normalized_sql=normalized)
+            return QueryGuardResult(
+                False,
+                f"在线查询只允许只读语句，不支持 {prefix.upper() or 'UNKNOWN'}",
+                prefix,
+                normalized_sql=normalized,
+            )
 
         parse_sql = _strip_explain(normalized) if prefix == "explain" else normalized
         kind = "with" if prefix == "with" else prefix
@@ -170,14 +130,22 @@ class SqlQueryGuard:
                 normalized_sql=normalized,
             )
 
-        if self._has_write_expression(tree):
-            return QueryGuardResult(False, "在线查询不允许执行写操作", kind, normalized_sql=normalized)
-        if self._has_select_into(tree):
-            return QueryGuardResult(False, "在线查询不允许 SELECT INTO 写入操作", kind, normalized_sql=normalized)
-        if self._has_locking_read(tree):
-            return QueryGuardResult(False, "在线查询不允许锁定读语句", kind, normalized_sql=normalized)
-        if self._has_side_effect_function(tree):
-            return QueryGuardResult(False, "在线查询不允许调用可能产生副作用的函数", kind, normalized_sql=normalized)
+        if _has_write_expression(tree):
+            return QueryGuardResult(
+                False, "在线查询不允许执行写操作", kind, normalized_sql=normalized
+            )
+        if _has_select_into(tree):
+            return QueryGuardResult(
+                False, "在线查询不允许 SELECT INTO 写入操作", kind, normalized_sql=normalized
+            )
+        if _has_locking_read(tree):
+            return QueryGuardResult(
+                False, "在线查询不允许锁定读语句", kind, normalized_sql=normalized
+            )
+        if _has_side_effect_function(tree):
+            return QueryGuardResult(
+                False, "在线查询不允许调用可能产生副作用的函数", kind, normalized_sql=normalized
+            )
 
         refs = _table_refs_from_tree(tree, db_name, self.db_type)
         return QueryGuardResult(
@@ -187,30 +155,6 @@ class SqlQueryGuard:
             needs_limit=prefix in {"select", "with"},
             normalized_sql=normalized,
         )
-
-    def _has_write_expression(self, tree: exp.Expression) -> bool:
-        for name in WRITE_EXPR_NAMES:
-            expr_type = getattr(exp, name, None)
-            if expr_type is not None and tree.find(expr_type):
-                return True
-        return False
-
-    def _has_select_into(self, tree: exp.Expression) -> bool:
-        return any(bool(node.args.get("into")) for node in tree.find_all(exp.Select))
-
-    def _has_locking_read(self, tree: exp.Expression) -> bool:
-        return any(bool(node.args.get("locks")) for node in tree.find_all(exp.Select))
-
-    def _has_side_effect_function(self, tree: exp.Expression) -> bool:
-        for node in tree.walk():
-            name = ""
-            if isinstance(node, exp.Anonymous):
-                name = str(node.this or "")
-            elif isinstance(node, exp.Func):
-                name = node.sql_name()
-            if name and name.lower() in SIDE_EFFECT_FUNCTIONS:
-                return True
-        return False
 
     def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
         normalized = _clean_sql(sql)
@@ -260,6 +204,91 @@ class ClickHouseQueryGuard(SqlQueryGuard):
         super().__init__(db_type)
 
 
+class DorisQueryGuard(SqlQueryGuard):
+    def __init__(self, db_type: str = "doris") -> None:
+        super().__init__(db_type)
+
+
+class ElasticsearchQueryGuard(SqlQueryGuard):
+    def __init__(self, db_type: str = "elasticsearch") -> None:
+        super().__init__(db_type)
+
+    def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
+        normalized = _clean_sql(sql)
+        if limit_num <= 0 or kind not in {"select", "with"}:
+            return normalized
+        if re.search(r"\blimit\b", normalized, re.I):
+            return normalized
+        return f"{normalized} LIMIT {limit_num}"
+
+
+class CassandraQueryGuard:
+    db_type = "cassandra"
+
+    def validate(self, sql: str, db_name: str) -> QueryGuardResult:
+        normalized = _clean_sql(sql)
+        if not normalized:
+            return QueryGuardResult(False, "CQL 不能为空")
+        if _has_extra_statement(sql):
+            return QueryGuardResult(False, "在线查询不允许执行多语句", normalized_sql=normalized)
+
+        prefix = _first_word(normalized)
+        if prefix in WRITE_PREFIXES:
+            return QueryGuardResult(
+                False,
+                f"在线查询不允许执行 {prefix.upper()} 操作",
+                prefix,
+                normalized_sql=normalized,
+            )
+        if prefix != "select":
+            return QueryGuardResult(
+                False,
+                f"Cassandra 在线查询只允许 SELECT，不支持 {prefix.upper() or 'UNKNOWN'}",
+                prefix,
+                normalized_sql=normalized,
+            )
+        if re.search(r"(?is)\bselect\b.+\binto\b", normalized):
+            return QueryGuardResult(False, "在线查询不允许 SELECT INTO 写入操作", prefix)
+        if re.search(r"(?is)\bfor\s+update\b", normalized):
+            return QueryGuardResult(False, "在线查询不允许锁定读", prefix)
+        table_refs = self._table_refs(normalized, db_name)
+        if not table_refs:
+            return QueryGuardResult(
+                False,
+                "Cassandra SELECT 必须包含 FROM 表引用",
+                prefix,
+                normalized_sql=normalized,
+            )
+        return QueryGuardResult(
+            True,
+            statement_kind=prefix,
+            table_refs=table_refs,
+            normalized_sql=normalized,
+            needs_limit=not re.search(r"\blimit\b", normalized, re.I),
+        )
+
+    def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
+        sql_strip = sql.strip().rstrip(";")
+        if (
+            kind == "select"
+            and limit_num > 0
+            and not re.search(r"\blimit\b", sql_strip, re.I)
+        ):
+            return f"{sql_strip} LIMIT {int(limit_num)}"
+        return sql_strip
+
+    @staticmethod
+    def _table_refs(sql: str, db_name: str) -> list[dict[str, Any]]:
+        refs: list[dict[str, Any]] = []
+        for match in re.finditer(
+            r"(?is)\bfrom\s+([a-zA-Z_][\w]*)(?:\.([a-zA-Z_][\w]*))?",
+            sql,
+        ):
+            schema = match.group(1)
+            table = match.group(2)
+            refs.append({"schema": schema if table else db_name, "name": table or schema})
+        return refs
+
 class MongoQueryGuard:
     FORBIDDEN_AGG_STAGES = {"$out", "$merge", "$function", "$accumulator"}
 
@@ -275,7 +304,12 @@ class MongoQueryGuard:
         if parsed["type"] == "aggregate":
             for stage in parsed.get("pipeline", []):
                 if isinstance(stage, dict) and self.FORBIDDEN_AGG_STAGES & set(stage.keys()):
-                    return QueryGuardResult(False, "在线查询不允许 MongoDB aggregate 写入或执行代码阶段", "aggregate", normalized_sql=sql.strip())
+                    return QueryGuardResult(
+                        False,
+                        "在线查询不允许 MongoDB aggregate 写入或执行代码阶段",
+                        "aggregate",
+                        normalized_sql=sql.strip(),
+                    )
 
         return QueryGuardResult(
             True,
@@ -291,10 +325,35 @@ class MongoQueryGuard:
 
 
 REDIS_READ_COMMANDS = {
-    "get", "mget", "hget", "hgetall", "hkeys", "hvals", "lrange", "smembers",
-    "scard", "zrange", "zrangebyscore", "zcard", "ttl", "pttl", "type",
-    "exists", "strlen", "llen", "sismember", "zscore", "scan", "hscan",
-    "sscan", "zscan", "info", "dbsize", "time", "ping", "object",
+    "get",
+    "mget",
+    "hget",
+    "hgetall",
+    "hkeys",
+    "hvals",
+    "lrange",
+    "smembers",
+    "scard",
+    "zrange",
+    "zrangebyscore",
+    "zcard",
+    "ttl",
+    "pttl",
+    "type",
+    "exists",
+    "strlen",
+    "llen",
+    "sismember",
+    "zscore",
+    "scan",
+    "hscan",
+    "sscan",
+    "zscan",
+    "info",
+    "dbsize",
+    "time",
+    "ping",
+    "object",
 }
 
 
@@ -303,8 +362,15 @@ class RedisCommandGuard:
         parts = sql.strip().split()
         cmd = parts[0].lower() if parts else ""
         if cmd not in REDIS_READ_COMMANDS:
-            return QueryGuardResult(False, f"在线查询不允许 Redis 命令 {cmd.upper() or 'UNKNOWN'}", cmd, normalized_sql=sql.strip())
-        return QueryGuardResult(True, statement_kind=cmd, normalized_sql=sql.strip(), use_driver_limit=True)
+            return QueryGuardResult(
+                False,
+                f"在线查询不允许 Redis 命令 {cmd.upper() or 'UNKNOWN'}",
+                cmd,
+                normalized_sql=sql.strip(),
+            )
+        return QueryGuardResult(
+            True, statement_kind=cmd, normalized_sql=sql.strip(), use_driver_limit=True
+        )
 
     def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
         return sql.strip()
@@ -315,7 +381,9 @@ class UnsupportedQueryGuard:
         self.db_type = db_type
 
     def validate(self, sql: str, db_name: str) -> QueryGuardResult:
-        return QueryGuardResult(False, f"{self.db_type} 暂不支持在线查询执行", normalized_sql=sql.strip())
+        return QueryGuardResult(
+            False, f"{self.db_type} 暂不支持在线查询执行", normalized_sql=sql.strip()
+        )
 
     def apply_limit(self, sql: str, limit_num: int, kind: str) -> str:
         return sql.strip()
@@ -337,6 +405,12 @@ def get_query_guard(db_type: str) -> QueryGuard:
         return MssqlQueryGuard()
     if normalized == "clickhouse":
         return ClickHouseQueryGuard()
+    if normalized == "doris":
+        return DorisQueryGuard()
+    if normalized in {"elasticsearch", "opensearch"}:
+        return ElasticsearchQueryGuard(normalized)
+    if normalized == "cassandra":
+        return CassandraQueryGuard()
     if normalized == "mongo":
         return MongoQueryGuard()
     if normalized == "redis":

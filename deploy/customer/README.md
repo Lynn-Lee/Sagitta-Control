@@ -55,3 +55,7 @@ docker compose up -d
 ## License
 
 登录后在 SagittaDB 系统管理页面导入 License 文件，或输入在线激活码完成授权。共享日志或配置时，请不要把 License 文件一并打包。
+
+## 最新剩余计划任务
+
+统一任务清单见 [../../docs/remaining_plan.md](../../docs/remaining_plan.md)。客户部署包交付前必须完成 P0 发布闸门，确认镜像标签固定、License 私钥未包含在包内，并完成升级回滚与授权验证。

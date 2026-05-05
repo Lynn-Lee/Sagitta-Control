@@ -58,6 +58,7 @@ def test_tag_options_excludes_unsupported_non_sql_engines():
     assert "mysql" in options
     assert "pgsql" in options
     assert "oracle" in options
+    assert "doris" in options
     assert "redis" not in options
     assert "mongo" not in options
 
@@ -383,6 +384,171 @@ async def test_collect_instance_passes_config_threshold_to_engine(monkeypatch):
     assert (count, err) == (1, "")
     engine.collect_slow_queries.assert_awaited_once()
     assert engine.collect_slow_queries.await_args.kwargs["min_duration_ms"] == 1
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_uses_doris_sql_activity_source(monkeypatch):
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=ResultSet(
+                column_list=["source", "source_ref", "db_name", "sql_text", "duration_ms"],
+                rows=[("doris_queries", "query-1", "warehouse", "select * from orders", 2500)],
+            )
+        )
+    )
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
+
+    exists_result = MagicMock()
+    exists_result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=exists_result),
+        add=MagicMock(),
+        commit=AsyncMock(),
+    )
+    instance = SimpleNamespace(id=8, db_type="doris", instance_name="doris-prod", db_name="warehouse")
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
+
+    assert (count, err) == (1, "")
+    engine.collect_sql_activity.assert_awaited_once()
+    assert engine.collect_sql_activity.await_args.kwargs["min_duration_ms"] == 1000
+    assert config.last_collect_sources == ["doris_queries", "platform_history"]
+    assert config.last_collect_message == "Doris SQL 活动 + 平台历史"
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_uses_mssql_sql_activity_source(monkeypatch):
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=ResultSet(
+                column_list=["source", "source_ref", "db_name", "sql_text", "duration_ms"],
+                rows=[("mssql_activity", "mssql:52:0x01", "app", "select * from orders", 1800)],
+            )
+        )
+    )
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
+
+    exists_result = MagicMock()
+    exists_result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=exists_result),
+        add=MagicMock(),
+        commit=AsyncMock(),
+    )
+    instance = SimpleNamespace(id=9, db_type="mssql", instance_name="mssql-prod", db_name="app")
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
+
+    assert (count, err) == (1, "")
+    engine.collect_sql_activity.assert_awaited_once()
+    assert config.last_collect_sources == ["mssql_activity", "platform_history"]
+    assert config.last_collect_message == "MSSQL SQL 活动 + 平台历史"
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_uses_clickhouse_sql_activity_source(monkeypatch):
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=ResultSet(
+                column_list=["source", "source_ref", "db_name", "sql_text", "duration_ms"],
+                rows=[("clickhouse_activity", "clickhouse:q1", "analytics", "select * from events", 1500)],
+            )
+        )
+    )
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
+
+    exists_result = MagicMock()
+    exists_result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=exists_result),
+        add=MagicMock(),
+        commit=AsyncMock(),
+    )
+    instance = SimpleNamespace(id=10, db_type="clickhouse", instance_name="ch-prod", db_name="analytics")
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
+
+    assert (count, err) == (1, "")
+    engine.collect_sql_activity.assert_awaited_once()
+    assert config.last_collect_sources == ["clickhouse_activity", "platform_history"]
+    assert config.last_collect_message == "ClickHouse SQL 活动 + 平台历史"
+
+
+@pytest.mark.asyncio
+async def test_collect_instance_uses_elasticsearch_activity_source(monkeypatch):
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=ResultSet(
+                column_list=["source", "source_ref", "db_name", "sql_text", "duration_ms"],
+                rows=[("elasticsearch_activity", "node-1:101", "", "indices[orders]", 2000)],
+            )
+        )
+    )
+    monkeypatch.setattr("app.services.slowlog.get_engine", lambda _instance: engine)
+    monkeypatch.setattr(SlowLogService, "sync_platform_logs", AsyncMock(return_value=0))
+
+    exists_result = MagicMock()
+    exists_result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=exists_result),
+        add=MagicMock(),
+        commit=AsyncMock(),
+    )
+    instance = SimpleNamespace(id=11, db_type="elasticsearch", instance_name="es-prod", db_name="")
+    config = SimpleNamespace(
+        is_enabled=True,
+        collect_limit=100,
+        threshold_ms=1000,
+        last_collect_at=None,
+        last_collect_status="",
+        last_collect_error="",
+        last_collect_count=0,
+        last_collect_sources=[],
+        last_collect_message="",
+    )
+
+    count, err = await SlowLogService.collect_instance(db, instance, limit=100, config=config)
+
+    assert (count, err) == (1, "")
+    engine.collect_sql_activity.assert_awaited_once()
+    assert config.last_collect_sources == ["elasticsearch_activity"]
+    assert config.last_collect_message == "Elasticsearch 任务活动"
 
 
 @pytest.mark.asyncio
