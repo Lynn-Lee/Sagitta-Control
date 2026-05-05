@@ -5,6 +5,22 @@ import { resolve } from 'path'
 const apiTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8000'
 const wsTarget = process.env.VITE_DEV_WS_TARGET || 'ws://localhost:8000'
 const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true'
+const manualChunkGroups: Record<string, string[]> = {
+  'react-vendor':  ['react', 'react-dom', 'react-router-dom'],
+  'query-vendor':  ['@tanstack/react-query'],
+  'chart-vendor':  ['recharts'],
+  'monaco-vendor': ['@monaco-editor/react'],
+}
+
+function manualChunks(id: string) {
+  if (!id.includes('node_modules')) return undefined
+  for (const [chunkName, packages] of Object.entries(manualChunkGroups)) {
+    if (packages.some(pkg => id.includes(`/node_modules/${pkg}/`))) {
+      return chunkName
+    }
+  }
+  return undefined
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -37,12 +53,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor':  ['react', 'react-dom', 'react-router-dom'],
-          'query-vendor':  ['@tanstack/react-query'],
-          'chart-vendor':  ['recharts'],
-          'monaco-vendor': ['@monaco-editor/react'],
-        },
+        manualChunks,
       },
     },
   },

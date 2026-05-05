@@ -1,5 +1,5 @@
 """
-数据脱敏服务（修复 P0-3）。
+数据脱敏服务。
 
 原始问题：Archery 1.x 使用 goInception 解析 SELECT 列，导致：
   - 非 MySQL 数据库（PgSQL/ClickHouse/MongoDB等）脱敏实际无效
@@ -76,7 +76,7 @@ def extract_table_refs(sql: str, db_name: str, db_type: str = "mysql") -> list[d
     """
     提取 SQL 语句中引用的库名和表名，用于查询权限校验。
     
-    替代原 GoInceptionEngine.query_print() 的功能（修复 P0-3）。
+    替代原 GoInceptionEngine.query_print() 的功能。
     
     Returns:
         [{"schema": "mydb", "name": "users"}, ...]

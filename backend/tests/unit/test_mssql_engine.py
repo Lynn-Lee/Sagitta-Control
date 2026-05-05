@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.engines.models import ResultSet
@@ -20,6 +22,23 @@ class MockInstance:
 
 def _engine() -> MssqlEngine:
     return MssqlEngine(MockInstance())
+
+
+def test_mssql_filter_sql_injects_top_without_wrapping_ordered_select():
+    engine = _engine()
+
+    filtered = engine.filter_sql("SELECT id FROM orders ORDER BY id DESC", 20)
+
+    assert filtered == "SELECT TOP (20) id FROM orders ORDER BY id DESC"
+
+
+def test_mssql_filter_sql_preserves_existing_top_and_distinct():
+    engine = _engine()
+
+    assert engine.filter_sql("SELECT TOP (5) id FROM orders", 20) == "SELECT TOP (5) id FROM orders"
+    assert engine.filter_sql("SELECT DISTINCT id FROM orders", 20) == (
+        "SELECT DISTINCT TOP (20) id FROM orders"
+    )
 
 
 @pytest.mark.asyncio
@@ -125,6 +144,25 @@ async def test_mssql_collect_sql_activity_uses_dmvs_and_normalizes_rows(monkeypa
     assert captured["db_name"] == "master"
     assert rs.rows[0]["source"] == "mssql_activity"
     assert rs.rows[0]["duration_ms"] == 1200
+
+
+@pytest.mark.asyncio
+async def test_mssql_execute_workflow_reads_split_content(monkeypatch):
+    engine = _engine()
+    captured: dict = {}
+
+    async def fake_execute(db_name, sql, **kwargs):
+        captured["db_name"] = db_name
+        captured["sql"] = sql
+        captured["kwargs"] = kwargs
+        return ResultSet()
+
+    monkeypatch.setattr(engine, "execute", fake_execute)
+    workflow = SimpleNamespace(db_name="demo", content=SimpleNamespace(sql_content="UPDATE t SET c = 1"))
+
+    await engine.execute_workflow(workflow)
+
+    assert captured == {"db_name": "demo", "sql": "UPDATE t SET c = 1", "kwargs": {}}
 
 
 @pytest.mark.asyncio

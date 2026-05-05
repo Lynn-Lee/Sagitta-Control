@@ -50,8 +50,8 @@ SagittaDB 是企业级多引擎数据库管控平台，面向数据库变更、�
 
 - 企业版默认 `tenant_id=1`，保留 SaaS 多租户扩展字段，但当前不提供租户计费、自助注册和租户控制台。
 - MSSQL、Oracle、Elasticsearch/OpenSearch、Doris 已有最小可用实现；其中 MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层，正式接入前需要在客户真实环境完成验证。
-- Cassandra 已具备最小兼容层，覆盖连接、Keyspace/Table/Column 元数据、表 DDL、主键/聚簇键元数据、只读 SELECT 和基础健康指标；DDL/DML 工单执行仍关闭，不作为 v1.0-GA 标准交付能力承诺。
-- 引擎支持等级以 `docs/engine_support_matrix.md` 为准，售前、实施和用户手册应保持同一口径。
+- Cassandra/ScyllaDB 支持连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识；DDL/DML/BATCH 工单执行按交付边界关闭。
+- 售前、实施和用户手册必须保持同一引擎支持口径，不得把矩阵外能力作为标准交付承诺。
 - API 文档在开发环境通过 Swagger 暴露，生产环境建议关闭或仅内网访问。
 
 ## 3. 业务流程设计
@@ -278,15 +278,11 @@ SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎�
 
 SagittaDB 对外投放时建议提供以下交付件：
 
+- 根目录 README。
 - 产品设计文档。
-- 部署文档。
-- 运维文档。
-- 用户使用手册（截图采集清单见 `docs/user_manual_screenshot_manifest.md`）。
-- 引擎支持矩阵。
-- 版本发布说明（模板见 `docs/release_notes_template.md`）。
-- 安全配置清单（见 `docs/security_configuration_checklist.md`）。
-- 升级回滚验收表（见 `docs/upgrade_rollback_acceptance.md`）。
-- 客户环境初始化检查表（见 `docs/customer_initialization_checklist.md`）。
+- 用户使用手册。
+- 运维管理手册。
+- 固定版本客户部署包和 License 激活信息。
 
 正式上线前建议完成以下验收：
 
@@ -295,7 +291,3 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 验证 SQL 工单、查询权限、在线查询、数据字典、归档、通知链路。
 - 验证备份恢复和升级回滚。
 - 验证审计日志、查询历史和操作追踪可用。
-
-## 10. 最新剩余计划任务
-
-统一任务清单见 `docs/remaining_plan.md`。PRD 中的功能边界以当前 GA 状态为准，剩余任务主要是发布闸门、真实环境验证、性能基线、交付自动化和后续引擎路线；License 后续商业运营增强不再规划。

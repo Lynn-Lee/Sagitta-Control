@@ -4,7 +4,7 @@
 > 适用版本：SagittaDB v1.0-GA + v2-lite 授权体系  
 > 目标读者：研发工程师、DBA、系统管理员、安全审计员
 
-本文截图来自本地演示环境，采集清单见 `docs/user_manual_screenshot_manifest.md`。
+本文截图来自演示环境，实际页面可能因版本、角色权限和客户配置略有差异。
 
 ## 1. 使用前准备
 
@@ -79,10 +79,10 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 | 支持等级 | 数据库类型 | 用户侧说明 |
 |---|---|---|
 | 正式支持 | MySQL、TiDB、PostgreSQL、MongoDB、Redis、ClickHouse、StarRocks | 可按标准流程创建实例、测试连接并进入数据字典、查询、工单和观测等主链路。 |
-| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris | 已有最小可用能力；MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层，正式接入前需由实施人员在客户同构环境完成验证。 |
-| 待验证 | Cassandra | 页面会显示“待验证”提示；已具备连接、元数据、表 DDL、只读 SELECT 和基础健康指标的最小兼容层，但 DDL/DML 工单执行仍关闭，当前不作为 v1.0-GA 标准交付能力承诺。 |
+| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris、Cassandra/ScyllaDB | 已有最小可用能力；MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层。Cassandra/ScyllaDB 支持连接、元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识，DDL/DML/BATCH 工单执行关闭。正式接入前需由实施人员在客户同构环境完成验证。 |
+| 待验证 | 矩阵外新增引擎 | 页面会显示“待验证”提示；不作为标准交付能力承诺。 |
 
-完整边界见 `docs/engine_support_matrix.md`。如果客户项目需要“待验证”引擎，应单独立项评估。
+如果客户项目需要矩阵外或“待验证”引擎，应单独立项评估，并在客户同构环境完成连接、元数据、查询、安全边界和运维验证。
 
 ### 4.1 新建实例
 
@@ -446,7 +446,3 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 | 为什么审批按钮不显示？ | 当前用户不是当前审批节点审批人，或工单状态不允许审批。 |
 | 为什么通知没有收到？ | 用户通知身份未维护，或系统通知配置异常。 |
 | 为什么执行失败？ | 查看工单执行日志，通常与 SQL 语法、目标数据库权限、连接或锁等待有关。 |
-
-## 16. 最新剩余计划任务
-
-统一任务清单见 `docs/remaining_plan.md`。用户手册后续只在最终截图和客户验证后交付引擎说明变化时同步更新；License 后续运营增强不再规划。

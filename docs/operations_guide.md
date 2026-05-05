@@ -6,9 +6,33 @@
 
 ## 1. 运维范围
 
-本文档说明 SagittaDB 正式运行后的日常维护工作，包括巡检、日志、备份恢复、升级回滚、监控告警、容量管理、故障处理和安全检查。首次安装上线请参考 [生产部署文档](deploy_production_env.md)。
+本文档说明 SagittaDB 正式运行后的部署、初始化、巡检、日志、备份恢复、升级回滚、监控告警、容量管理、故障处理和安全检查。
 
-## 2. 服务清单
+## 2. 部署与服务清单
+
+### 2.1 推荐部署方式
+
+生产环境推荐使用 Docker Compose 或 Kubernetes + Helm。首次部署前应完成：
+
+- 准备 PostgreSQL、Redis、后端、前端、Worker、Beat 和反向代理运行环境。
+- 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
+- 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`。
+- 配置 `LICENSE_PUBLIC_KEY`、`LICENSE_CUSTOMER_ID`、`LICENSE_SERVER_URL` 和稳定的 `LICENSE_DEPLOYMENT_ID`。
+- 仅暴露 HTTPS 前端入口，禁止公网直接暴露 PostgreSQL、Redis、Flower、Prometheus、Grafana 和后端调试入口。
+
+Docker Compose 首次部署示例：
+
+```bash
+cp .env.example .env
+docker compose up -d postgres redis
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+docker compose ps
+```
+
+Kubernetes 部署时应先更新 Helm values 中的镜像、Secret、域名、证书、资源限制和持久化配置，再执行 `helm upgrade --install`。
+
+### 2.2 服务清单
 
 | 服务 | 作用 | 关键风险 |
 |---|---|---|
@@ -201,7 +225,7 @@ Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `depl
 | 通知日志 | 主动通知投递记录。 |
 | 会话快照 | 周期性会话采样。 |
 | SQL 洞察 | SQL 样本、指纹和采集状态。 |
-| 归档批次日志 | 归档执行过程记录。 |
+| 归档批次日志 | 归档执行批次、影响行数和异常明细。 |
 
 ### 8.2 管理建议
 
@@ -290,8 +314,4 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
 
-安全项逐条复核见 `docs/security_configuration_checklist.md`，升级回滚验收见 `docs/upgrade_rollback_acceptance.md`。
-
-## 11. 最新剩余计划任务
-
-统一任务清单见 `docs/remaining_plan.md`。运维侧后续重点是升级回滚演练、备份恢复验证、性能基线和客户验收记录归档；License 监控增强不再作为后续研发任务。
+上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。

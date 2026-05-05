@@ -1,8 +1,8 @@
 """Cassandra / ScyllaDB 引擎适配。
 
-当前定位为待验证引擎的最小可用兼容层：连接测试、Keyspace/Table/Column
-元数据、只读 SELECT 查询和基础健康指标。DDL/DML 工单执行在完成客户同构
-环境验证前保持关闭。
+交付边界：连接测试、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、
+只读 SELECT 查询和基础健康指标。Cassandra/ScyllaDB 的 CQL 写入、DDL 和批量
+变更语义与关系型工单差异较大，当前商业交付线保持工单执行 fail-close。
 """
 
 from __future__ import annotations
@@ -32,12 +32,17 @@ _SYSTEM_KEYSPACES = {
 _WRITE_PREFIXES = {
     "alter",
     "batch",
+    "call",
     "create",
     "delete",
     "drop",
+    "grant",
     "insert",
+    "revoke",
+    "set",
     "truncate",
     "update",
+    "use",
 }
 
 
@@ -304,6 +309,7 @@ class CassandraEngine:
                     "index_comment": "Cassandra clustering key",
                 }
             )
+        rows.extend(self._secondary_index_rows(table))
         return ResultSet(
             column_list=[
                 "index_name",
@@ -323,6 +329,10 @@ class CassandraEngine:
             result["syntax_error"] = True
             result["msg"] = "CQL 不能为空"
             return result
+        if self._has_extra_statement(sql):
+            result["syntax_error"] = True
+            result["msg"] = "Cassandra 查询接口不允许执行多语句"
+            return result
 
         prefix = sql_strip.split(None, 1)[0].lower()
         result["has_star"] = bool(re.search(r"(?is)\bselect\s+\*", sql_strip))
@@ -332,6 +342,18 @@ class CassandraEngine:
         if prefix != "select":
             result["syntax_error"] = True
             result["msg"] = f"Cassandra 查询接口只允许 SELECT，不支持 {prefix.upper()} 语句"
+            return result
+        if re.search(r"(?is)\bselect\b.+\binto\b", sql_strip):
+            result["syntax_error"] = True
+            result["msg"] = "Cassandra 查询接口不允许 SELECT INTO 写入操作"
+            return result
+        if re.search(r"(?is)\bfor\s+update\b", sql_strip):
+            result["syntax_error"] = True
+            result["msg"] = "Cassandra 查询接口不允许锁定读"
+            return result
+        if not re.search(r"(?is)\bfrom\s+[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)?", sql_strip):
+            result["syntax_error"] = True
+            result["msg"] = "Cassandra SELECT 必须包含 FROM 表引用"
         return result
 
     def filter_sql(self, sql: str, limit_num: int) -> str:
@@ -349,7 +371,7 @@ class CassandraEngine:
         db_name: str,
         sql: str,
         limit_num: int = 0,
-        parameters: dict[str, Any] | None = None,
+        parameters: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
         **kw: Any,
     ) -> ResultSet:
         check = self.query_check(db_name, sql)
@@ -369,7 +391,7 @@ class CassandraEngine:
                 sql=sql,
                 errlevel=2,
                 stagestatus="Audit failed",
-                errormessage="Cassandra 工单执行待客户同构环境验证后开放",
+                errormessage="Cassandra 工单执行当前按交付边界关闭，仅开放只读 SELECT 在线查询",
             )
         )
         return review
@@ -382,17 +404,32 @@ class CassandraEngine:
         return await self.execute(getattr(workflow, "db_name", ""), sql)
 
     async def collect_metrics(self) -> dict[str, Any]:
-        rs = await self.test_connection()
-        version = ""
-        if rs.is_success and rs.rows:
-            version = str(self._first_value(rs.rows[0]) or "")
+        rs = await asyncio.to_thread(
+            self._run_query_sync,
+            "SELECT release_version, cluster_name, data_center FROM system.local",
+            None,
+            None,
+        )
+        first_row = rs.rows[0] if rs.is_success and rs.rows else {}
+        version = str(self._dict_value(first_row, "release_version") or self._first_value(first_row) or "")
+        cluster_name = str(self._dict_value(first_row, "cluster_name") or "")
+        data_center = str(self._dict_value(first_row, "data_center") or "")
         return {
             "health": {"up": 1 if rs.is_success else 0, "error": rs.error},
             "version": {"value": version},
+            "cluster": {"name": cluster_name, "data_center": data_center},
         }
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "version"]
+        return ["health", "version", "cluster"]
+
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        check = self.query_check(db_name, sql)
+        if check["msg"]:
+            return ResultSet(error=check["msg"])
+        return ResultSet(
+            warning="Cassandra/ScyllaDB CQL 不提供通用 EXPLAIN；请结合主键、二级索引和 tracing 在客户环境分析",
+        )
 
     @staticmethod
     def _row_to_dict(row: Any) -> dict[str, Any]:
@@ -456,9 +493,73 @@ class CassandraEngine:
         return [str(getattr(column, "name", column)) for column in columns or []]
 
     @staticmethod
+    def _secondary_index_rows(table: Any) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        indexes = getattr(table, "indexes", {}) or {}
+        if isinstance(indexes, dict):
+            iterable = indexes.items()
+        else:
+            iterable = [(getattr(index, "name", f"index_{idx}"), index) for idx, index in enumerate(indexes)]
+        for name, index in iterable:
+            column_names = CassandraEngine._index_column_names(index)
+            rows.append(
+                {
+                    "index_name": str(getattr(index, "name", name)),
+                    "index_type": str(getattr(index, "kind", "") or "SECONDARY INDEX"),
+                    "column_names": ", ".join(column_names),
+                    "is_composite": "YES" if len(column_names) > 1 else "NO",
+                    "index_comment": str(getattr(index, "index_options", "") or ""),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _index_column_names(index: Any) -> list[str]:
+        for attr in ("columns", "column_names", "target"):
+            value = getattr(index, attr, None)
+            if not value:
+                continue
+            if isinstance(value, str):
+                cleaned = value.strip('"')
+                return [cleaned] if cleaned else []
+            return [str(getattr(column, "name", column)).strip('"') for column in value]
+        return []
+
+    @staticmethod
     def _first_value(row: Any) -> Any:
         if isinstance(row, dict):
             return next(iter(row.values()), None)
         if isinstance(row, (tuple, list)):
             return row[0] if row else None
         return row
+
+    @staticmethod
+    def _dict_value(row: Any, key: str) -> Any:
+        if isinstance(row, dict):
+            return row.get(key)
+        return getattr(row, key, None)
+
+    @staticmethod
+    def _has_extra_statement(sql: str) -> bool:
+        text = sql.strip()
+        if not text:
+            return False
+        in_single = False
+        in_double = False
+        escape = False
+        for idx, char in enumerate(text):
+            if escape:
+                escape = False
+                continue
+            if char == "\\":
+                escape = True
+                continue
+            if char == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if char == '"' and not in_single:
+                in_double = not in_double
+                continue
+            if char == ";" and not in_single and not in_double and text[idx + 1 :].strip():
+                return True
+        return False

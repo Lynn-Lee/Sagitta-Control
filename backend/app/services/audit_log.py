@@ -1,5 +1,5 @@
 """
-操作审计日志服务（Pack C1）。
+操作审计日志服务。
 """
 from __future__ import annotations
 

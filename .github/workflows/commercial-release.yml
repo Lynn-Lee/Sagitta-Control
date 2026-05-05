@@ -88,23 +88,16 @@ jobs:
           version="${{ steps.release.outputs.version }}"
           repo_lc="${{ steps.release.outputs.repo_lc }}"
           package_name="${{ steps.release.outputs.package_name }}"
-          out_dir="dist-commercial/${package_name}"
 
-          mkdir -p "${out_dir}"
-          cp deploy/customer/docker-compose.yml "${out_dir}/docker-compose.yml"
-          cp deploy/customer/.env.example "${out_dir}/.env.example"
-          cp deploy/customer/README.md "${out_dir}/README.md"
-          cp deploy/customer/upgrade.sh "${out_dir}/upgrade.sh"
-          cp deploy/nginx.conf "${out_dir}/nginx.conf"
-          chmod +x "${out_dir}/upgrade.sh"
-
-          sed -i "s#__SAGITTADB_VERSION__#${version}#g" "${out_dir}/docker-compose.yml" "${out_dir}/README.md" "${out_dir}/upgrade.sh"
-          sed -i "s#__IMAGE_REPOSITORY__#ghcr.io/${repo_lc}#g" "${out_dir}/docker-compose.yml" "${out_dir}/README.md" "${out_dir}/upgrade.sh"
+          python scripts/render-customer-package.py \
+            --version "${version}" \
+            --image-repository "ghcr.io/${repo_lc}" \
+            --output-dir dist-commercial \
+            --package-name "${package_name}"
 
           (
             cd dist-commercial
-            zip -r "${package_name}.zip" "${package_name}"
-            sha256sum "${package_name}.zip" > "${package_name}.zip.sha256"
+            sha256sum --check "${package_name}.zip.sha256"
           )
 
       - name: Upload customer deployment package

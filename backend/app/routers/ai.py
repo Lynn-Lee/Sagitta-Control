@@ -1,5 +1,5 @@
 """
-AI 路由（Pack D）：Text2SQL 端点。
+AI 路由：Text2SQL 端点。
 业务逻辑全部委托给 services/text2sql.py，此处只处理请求解析和响应映射。
 """
 import logging

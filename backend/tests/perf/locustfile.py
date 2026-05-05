@@ -1,5 +1,5 @@
 """
-SagittaDB 性能测试（Pack G P1）。
+SagittaDB 性能测试。
 
 使用方式：
     # 安装：pip install locust

@@ -3,8 +3,8 @@ MySQL 引擎实现。
 支持：MySQL 5.7+ / MariaDB / OceanBase
 
 安全修复：
-- P0-2：基础审核用 sqlglot，goInception 降级为可选增强（不再在 SQL 中传密码）
-- P0-4：所有查询强制参数化
+- 基础审核使用 sqlglot，goInception 降级为可选增强
+- 所有查询强制参数化
 """
 
 from __future__ import annotations
@@ -326,7 +326,7 @@ class MysqlEngine:
     async def _goinception_check(self, db_name: str, sql: str, review: ReviewSet) -> ReviewSet:
         """
         goInception 可选增强审核。
-        注意：连接参数通过独立配置传递，不在 SQL 字符串中携带密码（修复 P0-2）。
+        注意：连接参数通过独立配置传递，不在 SQL 字符串中携带密码。
         """
         logger.warning("goinception_check_not_available")
         review.append(

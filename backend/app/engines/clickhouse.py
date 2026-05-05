@@ -1,4 +1,4 @@
-"""ClickHouse 引擎（Pack E）- clickhouse-connect HTTP 协议。"""
+"""ClickHouse 引擎，使用 clickhouse-connect HTTP 协议。"""
 
 from __future__ import annotations
 

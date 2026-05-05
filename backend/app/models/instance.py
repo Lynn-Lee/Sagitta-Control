@@ -59,7 +59,7 @@ class Instance(BaseModel):
     数据库实例配置。
     
     密码字段使用 app.core.security.encrypt_field / decrypt_field 加密存储。
-    修复 Archery 1.x 中密码明文存储问题（P0-2）。
+    实例密码采用加密存储。
     """
     __tablename__ = "sql_instance"
 

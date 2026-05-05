@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 import sqlglot
@@ -272,13 +273,17 @@ class MssqlEngine:
 
     def filter_sql(self, sql: str, limit_num: int) -> str:
         sql_strip = sql.strip().rstrip(";")
-        if (
-            limit_num > 0
-            and sql_strip.lower().startswith("select")
-            and " top " not in sql_strip.lower()
-        ):
-            return f"SELECT TOP ({limit_num}) * FROM ({sql_strip}) AS sagitta_subq"
-        return sql_strip
+        if limit_num <= 0:
+            return sql_strip
+        if not sql_strip.lower().startswith("select"):
+            return sql_strip
+        if re.search(r"\b(top\s*\(|offset\s+\d+\s+rows|fetch\s+next\s+\d+\s+rows)\b", sql_strip, re.I):
+            return sql_strip
+        match = re.match(r"(?is)^\s*select\s+(distinct\s+)?", sql_strip)
+        if not match:
+            return sql_strip
+        distinct = match.group(1) or ""
+        return f"SELECT {distinct}TOP ({int(limit_num)}) {sql_strip[match.end():]}"
 
     async def query(
         self,
@@ -356,7 +361,8 @@ class MssqlEngine:
         return review
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
-        return await self.execute(workflow.db_name, workflow.sql_content)
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(workflow.db_name, sql)
 
     async def collect_sql_activity(
         self,

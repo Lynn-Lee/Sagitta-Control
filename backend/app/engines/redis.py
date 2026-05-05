@@ -1,5 +1,5 @@
 """
-Redis 引擎（Pack E）。
+Redis 引擎。
 支持：连接测试、命令执行、INFO 指标采集、KEY 浏览、慢日志查询。
 安全：只允许执行白名单命令，禁止 FLUSHALL/CONFIG/SLAVEOF 等危险命令。
 """

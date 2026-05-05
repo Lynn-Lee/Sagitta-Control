@@ -110,7 +110,7 @@ USER_IMPORT_TEMPLATE_EXAMPLE = {
     "role": "developer",
     "manager_username": "admin",
     "manager_display_name": "超级管理员",
-    "employee_id": "EMP1001",
+    "employee_id": "STAFF1001",
     "department": "研发部",
     "title": "后端工程师",
     "user_groups": "开发组;默认组用户组",
@@ -184,7 +184,7 @@ USER_IMPORT_FIELD_DOCS = [
         "field": "employee_id",
         "required": "否",
         "description": "工号。",
-        "example": "EMP1001",
+        "example": "STAFF1001",
     },
     {
         "field": "department",

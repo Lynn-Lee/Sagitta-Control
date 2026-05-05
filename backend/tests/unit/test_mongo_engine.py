@@ -1,6 +1,6 @@
 """
 MongoDB 引擎单元测试。
-验证 shell=True 命令注入漏洞（P0-1）修复：
+验证 MongoDB 查询解析与安全边界：
 所有查询通过 pymongo Driver，不调用任何 subprocess。
 """
 import contextlib

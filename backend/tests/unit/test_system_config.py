@@ -1,5 +1,5 @@
 """
-系统配置服务单元测试（Pack G）。
+系统配置服务单元测试。
 验证配置读写、加密字段处理、批量更新逻辑。
 """
 from unittest.mock import AsyncMock, MagicMock

@@ -1,5 +1,5 @@
 """
-通知服务单元测试（Pack E/G）。
+通知服务单元测试。
 验证钉钉/飞书/企微三渠道消息发送逻辑（使用 mock HTTP，不依赖真实凭证）。
 """
 from unittest.mock import AsyncMock, MagicMock, patch

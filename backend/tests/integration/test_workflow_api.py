@@ -1,5 +1,5 @@
 """
-SQL 工单接口集成测试（Pack G P0）。
+SQL 工单接口集成测试。
 验证工单提交、列表查询、状态流转 API。
 """
 import pytest

@@ -1,5 +1,5 @@
 """
-数据脱敏规则服务 + 工单模板服务（Pack D）。
+数据脱敏规则服务和工单模板服务。
 """
 from __future__ import annotations
 

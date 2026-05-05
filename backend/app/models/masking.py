@@ -1,5 +1,5 @@
 """
-数据脱敏规则模型（Pack D）。
+数据脱敏规则模型。
 支持 7 种内置规则类型 + 自定义正则，可按实例/数据库/表/列精确匹配。
 """
 from sqlalchemy import Boolean, Index, Integer, String, Text
@@ -50,7 +50,7 @@ class MaskingRule(BaseModel):
 
 class WorkflowTemplate(BaseModel):
     """
-    SQL 工单模板表（Pack D）。
+    SQL 工单模板表。
     用于保存常用 SQL 模板，提交工单时快速套用，减少重复劳动。
     """
     __tablename__ = "workflow_template"

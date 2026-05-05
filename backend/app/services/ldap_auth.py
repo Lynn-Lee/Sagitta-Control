@@ -1,5 +1,5 @@
 """
-LDAP 认证服务（Pack F-P0）。
+LDAP 认证服务。
 
 读取系统配置中的 LDAP 参数，通过 ldap3 完成：
   1. Bind DN 绑定验证服务账号可用性

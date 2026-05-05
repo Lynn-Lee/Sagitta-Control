@@ -1,7 +1,7 @@
 """
 MongoDB 引擎实现。
 
-安全修复 P0-1：
+安全设计：
 原始问题：subprocess.Popen(cmd, shell=True) 将用户输入拼入 shell 命令字符串，
           攻击者可通过 ; 或 | 执行任意系统命令。
 修复方案：使用 pymongo 官方 Python Driver，彻底移除 subprocess 调用。
@@ -315,7 +315,7 @@ class MongoEngine:
         """
         执行 MongoDB 查询。
         
-        使用 pymongo 官方 Driver，完全移除 subprocess/shell 调用（修复 P0-1）。
+        使用 pymongo 官方 Driver，完全移除 subprocess/shell 调用。
         """
         rs = ResultSet()
         start = time.monotonic()

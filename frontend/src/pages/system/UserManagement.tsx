@@ -595,7 +595,7 @@ export default function UserManagement() {
           <Form.Item name="manager_id" label="直属上级">
             <Select allowClear placeholder="选择直属上级" options={managerOptions} showSearch optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="employee_id" label="工号"><Input placeholder="如 EMP001" /></Form.Item>
+          <Form.Item name="employee_id" label="工号"><Input placeholder="如 STAFF001" /></Form.Item>
           <Form.Item name="department" label="部门"><Input placeholder="如 技术部" /></Form.Item>
           <Form.Item name="title" label="职位"><Input placeholder="如 高级工程师" /></Form.Item>
           <Form.Item name="user_group_ids" label="用户组">

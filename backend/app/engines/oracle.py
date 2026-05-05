@@ -844,7 +844,8 @@ class OracleEngine:
 
     def filter_sql(self, sql: str, limit_num: int) -> str:
         sql_strip = sql.strip().rstrip(";")
-        if limit_num > 0 and sql_strip.lower().startswith("select"):
+        has_limit = re.search(r"\b(rownum|fetch\s+first|offset\s+\d+)\b", sql_strip, re.I)
+        if limit_num > 0 and sql_strip.lower().startswith("select") and not has_limit:
             return f"SELECT * FROM ({sql_strip}) WHERE ROWNUM <= {limit_num}"
         return sql_strip
 
@@ -867,7 +868,7 @@ class OracleEngine:
 
     async def execute(self, db_name: str, sql: str, **kw: Any) -> ReviewSet:
         review = ReviewSet(full_sql=sql)
-        rs = await asyncio.to_thread(self._run_query_sync, sql, kw.get("parameters"))
+        rs = await asyncio.to_thread(self._run_statement_sync, sql, kw.get("parameters"))
         item = SqlItem(sql=sql)
         if rs.error:
             item.errlevel = 2
@@ -881,7 +882,8 @@ class OracleEngine:
         return review
 
     async def execute_workflow(self, workflow: Any) -> ReviewSet:
-        return await self.execute(workflow.db_name, workflow.sql_content)
+        sql = workflow.content.sql_content if getattr(workflow, "content", None) else ""
+        return await self.execute(workflow.db_name, sql)
 
     async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
         sql = """

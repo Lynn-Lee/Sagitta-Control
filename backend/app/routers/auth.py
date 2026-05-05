@@ -362,7 +362,7 @@ async def sms_login(data: SmsLoginRequest, db: AsyncSession = Depends(get_db)):
     return _issue_login_tokens(user)
 
 
-# ── 第三方 OAuth2 登录（Pack F）──────────────────────────────
+# ── 第三方 OAuth2 登录──────────────────────────────
 
 
 @router.get("/{provider}/authorize/", summary="获取第三方登录授权 URL")

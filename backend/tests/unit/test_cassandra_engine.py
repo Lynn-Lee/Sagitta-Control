@@ -56,6 +56,14 @@ class FakeCluster:
                             },
                             partition_key=[SimpleNamespace(name="id")],
                             clustering_key=[SimpleNamespace(name="created_at")],
+                            indexes={
+                                "orders_amount_idx": SimpleNamespace(
+                                    name="orders_amount_idx",
+                                    kind="CUSTOM",
+                                    target="amount",
+                                    index_options={"class_name": "StorageAttachedIndex"},
+                                )
+                            },
                             export_as_string=lambda: "CREATE TABLE app.orders (id uuid PRIMARY KEY)",
                         )
                     }
@@ -76,6 +84,22 @@ def test_cassandra_query_check_blocks_write_operation():
     result = _engine().query_check("app", "DELETE FROM orders WHERE id = ?")
 
     assert "不允许" in result["msg"]
+
+
+@pytest.mark.parametrize(
+    "sql, message",
+    [
+        ("SELECT id FROM orders; DROP TABLE orders", "多语句"),
+        ("SELECT id INTO copy FROM orders", "SELECT INTO"),
+        ("SELECT id FROM orders FOR UPDATE", "锁定读"),
+        ("SELECT now()", "FROM 表引用"),
+    ],
+)
+def test_cassandra_query_check_rejects_side_effect_or_ambiguous_select(sql, message):
+    result = _engine().query_check("app", sql)
+
+    assert result["syntax_error"] is True
+    assert message in result["msg"]
 
 
 def test_cassandra_query_check_detects_select_star():
@@ -150,6 +174,8 @@ async def test_cassandra_exposes_key_metadata_as_constraints_and_indexes(monkeyp
     ]
     assert indexes.rows[0]["index_type"] == "PARTITION KEY"
     assert indexes.rows[1]["index_type"] == "CLUSTERING KEY"
+    assert indexes.rows[2]["index_name"] == "orders_amount_idx"
+    assert indexes.rows[2]["column_names"] == "amount"
 
 
 @pytest.mark.asyncio
@@ -172,4 +198,30 @@ async def test_cassandra_execute_is_disabled_until_verified():
     review = await _engine().execute_check("app", "CREATE TABLE orders (id uuid PRIMARY KEY)")
 
     assert review.error_count == 1
-    assert "待客户同构环境验证" in review.rows[0].errormessage
+    assert "交付边界关闭" in review.rows[0].errormessage
+
+
+@pytest.mark.asyncio
+async def test_cassandra_collect_metrics_includes_cluster_identity(monkeypatch):
+    engine = _engine()
+    cluster = FakeCluster()
+    row_type = namedtuple("Local", ["release_version", "cluster_name", "data_center"])
+    session = FakeSession(
+        cluster,
+        FakeResult([row_type("4.1.5", "prod-cassandra", "dc1")], ["release_version", "cluster_name", "data_center"]),
+    )
+    monkeypatch.setattr(engine, "_connect_sync", lambda db_name=None: session)
+
+    metrics = await engine.collect_metrics()
+
+    assert metrics["health"]["up"] == 1
+    assert metrics["version"]["value"] == "4.1.5"
+    assert metrics["cluster"] == {"name": "prod-cassandra", "data_center": "dc1"}
+
+
+@pytest.mark.asyncio
+async def test_cassandra_explain_returns_boundary_warning():
+    rs = await _engine().explain_query("app", "SELECT id FROM orders")
+
+    assert rs.warning
+    assert "EXPLAIN" in rs.warning

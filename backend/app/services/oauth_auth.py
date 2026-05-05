@@ -1,5 +1,5 @@
 """
-第三方 OAuth2 登录服务（Pack F）。
+第三方 OAuth2 登录服务。
 
 支持：钉钉（DingTalk）/ 飞书（Feishu）/ 企业微信（WeCom）/ CAS（通用）。
 
@@ -15,6 +15,7 @@ import urllib.parse
 from datetime import UTC, datetime
 
 import httpx
+from defusedxml import ElementTree as DefusedET
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -303,8 +304,6 @@ async def handle_cas_callback(
     db: AsyncSession, ticket: str, callback_url: str
 ) -> Users:
     """callback_url 须与 authorize 时完全一致（含 state 参数）。"""
-    import xml.etree.ElementTree as ET
-
     cas_server_url = await SystemConfigService.get_value(db, "cas_server_url")
     username_attr = await SystemConfigService.get_value(db, "cas_username_attribute") or "user"
     if not cas_server_url:
@@ -319,7 +318,7 @@ async def handle_cas_callback(
         resp.raise_for_status()
         xml_text = resp.text
 
-    root = ET.fromstring(xml_text)
+    root = DefusedET.fromstring(xml_text)
     ns = {"cas": "http://www.yale.edu/tp/cas"}
 
     success = root.find("cas:authenticationSuccess", ns)

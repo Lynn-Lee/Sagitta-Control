@@ -24,17 +24,16 @@ SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数�
 |---|---|
 | MySQL / TiDB / StarRocks | 已实现连接、查询、字典、会话与 SQL 活动相关能力。 |
 | PostgreSQL | 已实现连接、查询、字典、慢 SQL、执行计划与容量相关能力。 |
-| Oracle | 已实现连接、Schema 同步、查询与字典；Oracle 11g 需 Thick 模式。 |
 | MongoDB / Redis / ClickHouse | 已实现核心连接、查询、数据字典和监控能力；ClickHouse 已接入 SQL 活动采集，MongoDB 支持白名单写操作工单。 |
 | Oracle / MSSQL / Elasticsearch / OpenSearch / Doris | 已有最小可用实现，其中 MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层；正式接入前建议先完成客户同构环境验证。 |
-| Cassandra | 已补齐连接、Keyspace/Table/Column 元数据、表 DDL、主键/聚簇键元数据、只读 SELECT 和基础健康指标；DDL/DML 工单执行仍关闭，正式接入前需单独立项验证。 |
+| Cassandra / ScyllaDB | 支持连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识；DDL/DML/BATCH 工单执行按交付边界关闭。 |
 
 ## 技术架构
 
 | 层级 | 技术栈 |
 |---|---|
 | 后端 | FastAPI 0.110、SQLAlchemy 2.0 async、Alembic、Celery 5、PostgreSQL 16、Redis |
-| 前端 | React 18、Vite 5、TypeScript、Ant Design 5、TanStack Query v5、Zustand |
+| 前端 | React 18、Vite 8、TypeScript、Ant Design 5、TanStack Query v5、Zustand |
 | SQL 解析 | sqlglot，支持多方言 SQL 解析、列提取和治理辅助。 |
 | 异步任务 | Celery 队列：`default`、`execute`、`notify`、`archive`、`monitor`。 |
 | 部署 | Docker Compose、Kubernetes + Helm、Nginx、Prometheus、Grafana。 |
@@ -81,9 +80,8 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 | 文档 | 用途 |
 |---|---|
 | [产品设计文档](docs/sagittadb_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
-| [部署文档](docs/deploy_production_env.md) | 生产环境部署、初始化、升级、回滚和安全加固。 |
-| [运维文档](docs/operations_guide.md) | 日常巡检、日志、备份恢复、监控告警、故障处理和安全检查。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
+| [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
 
 ## 生产环境安全提示
 
@@ -108,7 +106,7 @@ SagittaDB/
 │   └── app/tasks/            # Celery 任务
 ├── frontend/                # React 前端应用
 ├── deploy/                  # 生产 Compose、Nginx、Prometheus、Grafana、Helm、备份脚本
-├── docs/                    # 产品、部署、运维、用户和测试文档
+├── docs/                    # 产品设计、用户使用和运维管理文档
 ├── docker-compose.yml       # 本地开发 / 功能测试 Compose
 └── .env.example             # 环境变量模板
 ```
@@ -137,12 +135,14 @@ npm run lint
 npm run build
 ```
 
-## 版本状态
+## 商业交付
 
 当前版本：`v1.0-GA + v2-lite 授权体系`。
-状态：正式版商业化投放准备阶段。
-建议交付方式：先在企业内网或客户测试环境完成实例接入、审批流、权限、通知和备份恢复验证，再进入生产运行。
+状态：正式版商业交付。
 
-## 最新剩余计划任务
+正式交付建议包含：
 
-统一任务清单见 [docs/remaining_plan.md](docs/remaining_plan.md)。当前剩余工作以发布闸门、客户同构环境验收、License Server 生产验证、交付包确认、性能基线、交付自动化和后续引擎路线为主；License 后续商业运营增强不再规划。
+- 固定版本镜像和客户部署包，不使用 `latest`。
+- `.env.example`、`docker-compose.yml`、`upgrade.sh`、`verify-license.sh` 和 Nginx 配置。
+- 生产环境上线前完成实例接入、审批流、权限、通知、License、备份恢复和升级回滚验证。
+- 内部留存 CI、安全扫描、客户环境验收和 License Server 状态流转记录；这些记录不作为仓库长期公开文档。

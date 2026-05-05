@@ -1,6 +1,6 @@
 """
 SQL 工单相关模型。
-关键改进：WorkflowStatus 统一为整数枚举，消除 Archery 1.x 字符串状态混乱（P1-1）。
+WorkflowStatus 统一为整数枚举，避免历史字符串状态带来的歧义。
 """
 from datetime import datetime
 from enum import IntEnum
@@ -80,7 +80,7 @@ class SqlWorkflow(BaseModel):
     engineer_display: Mapped[str] = mapped_column(String(50), default="", comment="提交人显示名")
     engineer_id: Mapped[int] = mapped_column(Integer, ForeignKey("sql_users.id"), nullable=False)
 
-    # 整数枚举状态（修复 1.x 字符串状态混乱）
+    # 整数枚举状态，避免历史字符串状态歧义
     status: Mapped[int] = mapped_column(
         Integer, default=WorkflowStatus.PENDING_REVIEW, nullable=False, comment="工单状态"
     )

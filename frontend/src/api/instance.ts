@@ -68,7 +68,7 @@ export const instanceApi = {
       params: { db_name: dbName, tb_name: tableName }
     }).then(r => r.data),
 
-  // ── 数据库注册管理（Pack C2）──────────────────────────────
+  // ── 数据库注册管理──────────────────────────────
 
   listRegisteredDbs: (instanceId: number, includeInactive = false) =>
     apiClient.get(`/instances/${instanceId}/db-list/`, {

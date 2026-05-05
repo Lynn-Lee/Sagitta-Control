@@ -1,6 +1,6 @@
 """
 实例管理业务逻辑服务。
-密码字段使用 encrypt_field / decrypt_field 加密存储（修复 1.x 明文存储问题）。
+密码字段使用 encrypt_field / decrypt_field 加密存储。
 """
 
 from __future__ import annotations
@@ -497,7 +497,7 @@ class InstanceService:
             mode=data.mode,
             host=data.host,
             port=data.port,
-            # 密码加密存储（修复 P0-2 相关的密码明文问题）
+            # 密码加密存储（加密存储敏感密码）
             user=encrypt_field(data.user),
             password=encrypt_field(data.password),
             is_ssl=data.is_ssl,

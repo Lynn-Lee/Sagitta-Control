@@ -168,7 +168,7 @@ class QueryPrivilegeApply(BaseModel):
 class QueryLog(BaseModel):
     """
     查询日志（记录每次在线查询）。
-    修复 1.x TODO：user_id / instance_id 改为外键。
+    user_id 和 instance_id 使用外键约束。
     """
 
     __tablename__ = "query_log"

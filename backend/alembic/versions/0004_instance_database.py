@@ -1,4 +1,4 @@
-"""Pack C2：instance_database 表
+"""instance_database 表
 
 Revision ID: 0004
 Revises: 0003

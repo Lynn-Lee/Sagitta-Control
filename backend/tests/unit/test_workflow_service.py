@@ -1,5 +1,5 @@
 """
-工单服务单元测试（Pack G）。
+工单服务单元测试。
 覆盖状态流转、格式化、SQL 校验逻辑（通过 mock 避免真实 DB 依赖）。
 """
 import json
@@ -18,7 +18,7 @@ from app.services.workflow import WorkflowService
 
 
 class TestWorkflowStatus:
-    """验证工单状态枚举值（修复 1.x 字符串状态混乱 P1-1）。"""
+    """验证工单状态使用稳定的整数枚举。"""
 
     def test_pending_review_is_zero(self):
         assert WorkflowStatus.PENDING_REVIEW == 0

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import app.engines.oracle as oracle_module
+from app.engines.models import ResultSet
 from app.engines.oracle import OracleEngine
 
 
@@ -186,3 +187,68 @@ class TestOracleMetadataQueries:
         assert "SEARCH_CONDITION_VC" not in sql
         assert "'' AS check_clause" in sql
         assert captured["params"] == {"owner": "DEMO_SCHEMA", "table_name": "USERS_DEMO"}
+
+
+class TestOracleExecution:
+    def test_filter_sql_does_not_double_limit_existing_rownum_or_fetch(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+
+        assert engine.filter_sql("SELECT * FROM users WHERE ROWNUM <= 5", 20) == (
+            "SELECT * FROM users WHERE ROWNUM <= 5"
+        )
+        assert engine.filter_sql("SELECT * FROM users FETCH FIRST 5 ROWS ONLY", 20) == (
+            "SELECT * FROM users FETCH FIRST 5 ROWS ONLY"
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_uses_statement_runner_so_dml_commits(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        def fake_run_statement_sync(sql, params=None):
+            captured["sql"] = sql
+            captured["params"] = params
+            return ResultSet(affected_rows=3)
+
+        monkeypatch.setattr(engine, "_run_statement_sync", fake_run_statement_sync)
+
+        review = await engine.execute(
+            "APP",
+            "UPDATE users SET status = :status",
+            parameters={"status": "active"},
+        )
+
+        assert captured == {
+            "sql": "UPDATE users SET status = :status",
+            "params": {"status": "active"},
+        }
+        assert review.is_executed is True
+        assert review.rows[0].affected_rows == 3
+
+    @pytest.mark.asyncio
+    async def test_execute_workflow_reads_split_content(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        async def fake_execute(db_name, sql, **kwargs):
+            captured["db_name"] = db_name
+            captured["sql"] = sql
+            captured["kwargs"] = kwargs
+            return ResultSet()
+
+        monkeypatch.setattr(engine, "execute", fake_execute)
+        workflow = SimpleNamespace(
+            db_name="APP",
+            content=SimpleNamespace(sql_content="UPDATE users SET status = 'active'"),
+        )
+
+        await engine.execute_workflow(workflow)
+
+        assert captured == {
+            "db_name": "APP",
+            "sql": "UPDATE users SET status = 'active'",
+            "kwargs": {},
+        }
