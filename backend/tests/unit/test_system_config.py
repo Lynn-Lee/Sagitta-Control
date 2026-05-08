@@ -31,6 +31,9 @@ class TestConfigDefinitions:
         assert "ldap_bind_password" in ldap_keys
         assert "ldap_enabled" in ldap_keys
 
+    def test_branding_config_exists(self):
+        assert CONFIG_DEFINITIONS["platform_name"][1] == "basic"
+        assert CONFIG_DEFINITIONS["platform_logo_url"][1] == "basic"
 
     def test_ai_group_config_exists(self):
         ai_keys = [k for k, v in CONFIG_DEFINITIONS.items() if v[1] == "ai"]
@@ -220,3 +223,23 @@ class TestUpdateBatch:
         # 敏感字段摘要不包含密码值
         sensitive_entry = next((s for s in summary if "密码" in s or "password" in s.lower()), "")
         assert "pass123" not in sensitive_entry
+
+    @pytest.mark.asyncio
+    async def test_rejects_unsafe_logo_url(self):
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+        mock_db.commit = AsyncMock()
+
+        with pytest.raises(ValueError, match="Logo"):
+            await SystemConfigService.update_batch(
+                mock_db, {"platform_logo_url": "javascript:alert(1)"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_overlong_platform_name(self):
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+        mock_db.commit = AsyncMock()
+
+        with pytest.raises(ValueError, match="平台名称"):
+            await SystemConfigService.update_batch(mock_db, {"platform_name": "x" * 81})

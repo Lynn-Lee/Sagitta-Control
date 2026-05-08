@@ -33,6 +33,7 @@ CONFIG_GROUPS = {
 CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     # ── 基础 ──────────────────────────────────────────────────
     "platform_name": ("平台名称", "basic", False, "SagittaDB"),
+    "platform_logo_url": ("平台 Logo URL", "basic", False, ""),
     "platform_url": ("平台访问地址", "basic", False, "http://localhost"),
     "sql_review_limit": ("单次审核SQL最大行数", "basic", False, "1000"),
     "query_default_limit": ("在线查询默认行数限制", "basic", False, "100"),
@@ -96,6 +97,23 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "ai_model": ("AI 模型", "ai", False, "claude-sonnet-4-20250514"),
 }
 
+ALLOWED_LOGO_PREFIXES = ("https://", "http://", "/", "data:image/")
+
+
+def _normalize_config_value(key: str, value: str) -> str:
+    value = value.strip()
+    if key == "platform_name":
+        if not value:
+            return "SagittaDB"
+        if len(value) > 80:
+            raise ValueError("平台名称不能超过 80 个字符")
+    if key == "platform_logo_url" and value:
+        if len(value) > 700_000:
+            raise ValueError("Logo 数据过大，请使用 512KB 以内的图片或图片 URL")
+        if not value.startswith(ALLOWED_LOGO_PREFIXES):
+            raise ValueError("Logo 仅支持 http(s)、站内路径或 data:image 格式")
+    return value
+
 
 class SystemConfigService:
     @staticmethod
@@ -143,6 +161,17 @@ class SystemConfigService:
         }
 
     @staticmethod
+    async def get_branding(db: AsyncSession) -> dict[str, str]:
+        """返回前端公开可读取的品牌信息。"""
+        await SystemConfigService._ensure_defaults(db)
+        platform_name = await SystemConfigService.get_value(db, "platform_name")
+        platform_logo_url = await SystemConfigService.get_value(db, "platform_logo_url")
+        return {
+            "platform_name": platform_name or "SagittaDB",
+            "platform_logo_url": platform_logo_url or "",
+        }
+
+    @staticmethod
     async def get_value(db: AsyncSession, key: str) -> str:
         """获取解密后的配置值（内部使用）。"""
         result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == key))
@@ -167,6 +196,7 @@ class SystemConfigService:
             if key not in CONFIG_DEFINITIONS:
                 continue
             desc, group, is_sensitive, _ = CONFIG_DEFINITIONS[key]
+            value = _normalize_config_value(key, value)
 
             # 敏感字段且值为空或掩码 → 跳过（不覆盖原值）
             if is_sensitive and value in ("", "******"):

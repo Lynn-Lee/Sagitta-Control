@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   Alert, Button, Card, Divider, Form, Input,
-  message, Space, Switch, Tabs, Typography, Grid, Tooltip,
+  message, Space, Switch, Tabs, Typography, Grid, Tooltip, Upload,
 } from 'antd'
-import { ApiOutlined, SaveOutlined } from '@ant-design/icons'
+import { ApiOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
@@ -30,6 +30,13 @@ const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
   <img src={src} alt={alt} width={14} height={14}
     style={{ objectFit: 'contain', verticalAlign: 'middle', marginRight: 5 }} />
 )
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result || ''))
+  reader.onerror = reject
+  reader.readAsDataURL(file)
+})
 
 const GROUP_LABEL: Record<string, React.ReactNode> = {
   basic:    <CompactTabLabel title="基础设置">⚙️ 基础</CompactTabLabel>,
@@ -80,6 +87,58 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
         const isBool = item.key.includes('enabled') || item.key === 'mail_use_ssl'
         const isSensitive = item.is_sensitive
         const isPasswordField = item.key.includes('password') || item.key.includes('secret') || item.key.includes('token') || item.key.includes('webhook')
+
+        if (item.key === 'platform_logo_url') {
+          return (
+            <Form.Item
+              key={item.key}
+              label={item.description}
+              extra="支持图片 URL 或上传 PNG/JPG/SVG。留空时使用默认 Logo。"
+              style={{ marginBottom: 14 }}
+            >
+              <Form.Item name={item.key} noStyle>
+                <Input.TextArea
+                  placeholder="https://example.com/logo.png 或 data:image/png;base64,..."
+                  autoSize={{ minRows: 2, maxRows: 4 }}
+                />
+              </Form.Item>
+              <Space style={{ marginTop: 8, alignItems: 'center' }} wrap>
+                <Upload
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  showUploadList={false}
+                  beforeUpload={async (file) => {
+                    if (!file.type.startsWith('image/')) {
+                      message.error('请选择图片文件')
+                      return Upload.LIST_IGNORE
+                    }
+                    if (file.size > 512 * 1024) {
+                      message.error('Logo 图片建议不超过 512KB')
+                      return Upload.LIST_IGNORE
+                    }
+                    const dataUrl = await readFileAsDataUrl(file)
+                    form.setFieldValue(item.key, dataUrl)
+                    return false
+                  }}
+                >
+                  <Button icon={<UploadOutlined />}>选择图片</Button>
+                </Upload>
+                <Button onClick={() => form.setFieldValue(item.key, '')}>恢复默认 Logo</Button>
+                <Form.Item noStyle shouldUpdate={(prev, next) => prev[item.key] !== next[item.key]}>
+                  {() => {
+                    const logoUrl = form.getFieldValue(item.key)
+                    return logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt="Logo 预览"
+                        style={{ width: 40, height: 40, objectFit: 'contain', border: '1px solid #E5E6EB', borderRadius: 6, padding: 4 }}
+                      />
+                    ) : null
+                  }}
+                </Form.Item>
+              </Space>
+            </Form.Item>
+          )
+        }
 
         return (
           <Form.Item
@@ -241,8 +300,9 @@ export default function SystemConfig() {
     onSuccess: (res) => {
       msgApi.success(`已保存 ${res.count ?? ''} 个配置项`)
       qc.invalidateQueries({ queryKey: ['system-config'] })
+      qc.invalidateQueries({ queryKey: ['public-branding'] })
     },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '保存失败'),
+    onError: (e: any) => msgApi.error(e.response?.data?.detail || e.response?.data?.msg || '保存失败'),
   })
 
   const configs = data?.configs || {}

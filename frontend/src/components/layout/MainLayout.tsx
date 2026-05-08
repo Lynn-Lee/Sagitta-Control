@@ -12,21 +12,12 @@ import {
 import { useAuthStore } from '@/store/auth'
 import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
+import BrandLogo from '@/components/common/BrandLogo'
+import { useBranding } from '@/hooks/useBranding'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
 const { useBreakpoint } = Grid
-
-// SagittaDB Logo SVG 图标
-const SagittaLogo = ({ size = 28, color = '#165DFF' }: { size?: number; color?: string }) => (
-  <svg viewBox="0 0 32 32" fill="none" width={size} height={size}>
-    <path d="M16 2L30 10V22L16 30L2 22V10L16 2Z" fill={color} />
-    <path d="M10 14L16 8L22 14" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    <line x1="16" y1="8" x2="16" y2="24" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-    <path d="M11 19H21" stroke="white" strokeWidth="2" strokeLinecap="round" />
-    <path d="M12 22H20" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
-  </svg>
-)
 
 const SqlWorkflowMenuSvg = () => (
   <svg viewBox="0 0 1024 1024" width="1em" height="1em" fill="currentColor" aria-hidden="true">
@@ -234,6 +225,7 @@ export default function MainLayout() {
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const screens = useBreakpoint()
   const isMobile = !screens.lg
+  const { branding } = useBranding()
 
   const handleLogout = async () => {
     const provider = authProvider
@@ -347,16 +339,20 @@ export default function MainLayout() {
             style={{ color: 'rgba(255,255,255,0.65)', width: 56, height: 56, borderRadius: 0 }}
           />
           <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate(homePath)}>
-            <SagittaLogo size={26} color="#165DFF" />
+            <BrandLogo logoUrl={branding.platform_logo_url} size={26} color="#165DFF" />
             <div style={{ lineHeight: 1 }}>
               <div style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 800,
                 fontSize: 15,
                 color: '#FFFFFF',
-                letterSpacing: '-0.3px',
+                letterSpacing: 0,
+                maxWidth: isMobile ? 132 : 220,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}>
-                SagittaDB
+                {branding.platform_name}
               </div>
               <div style={{
                 fontFamily: "'Noto Sans SC', sans-serif",
@@ -366,7 +362,7 @@ export default function MainLayout() {
                 letterSpacing: '3px',
                 marginTop: 1,
               }}>
-                矢 准 数 据
+                数 据 管 控
               </div>
             </div>
           </Space>

@@ -201,7 +201,9 @@ bash deploy/update-prod.sh --ref <target_ref>
 
 - `docker compose -f deploy/docker-compose.yml ps` 正常。
 - `/health` 正常。
+- `/api/v1/system/branding/` 正常返回平台名称和 Logo 配置。
 - 前端可登录。
+- 登录页版权文案展示为 `Copyright © 2026 Jocelyn. All rights reserved.`。
 - SQL 工单、在线查询和 Celery 任务正常。
 - Alembic 版本为最新。
 

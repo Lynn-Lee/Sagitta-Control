@@ -3,7 +3,7 @@
 import logging
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -814,6 +814,11 @@ async def get_system_config(
     return await SystemConfigService.get_all(db)
 
 
+@router.get("/branding/", summary="获取公开品牌配置")
+async def get_public_branding(db: AsyncSession = Depends(get_db)):
+    return await SystemConfigService.get_branding(db)
+
+
 @router.post("/config/", summary="批量更新系统配置")
 async def update_system_config(
     data: ConfigUpdateRequest,
@@ -821,7 +826,10 @@ async def update_system_config(
     db: AsyncSession = Depends(get_db),
     user=Depends(require_perm("system_config_manage")),
 ):
-    count, change_summary = await SystemConfigService.update_batch(db, data.updates)
+    try:
+        count, change_summary = await SystemConfigService.update_batch(db, data.updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     # 审计日志记录具体变更项（敏感字段只记key，不记值）
     detail = (
         f"更新 {count} 个配置项：" + "；".join(change_summary)

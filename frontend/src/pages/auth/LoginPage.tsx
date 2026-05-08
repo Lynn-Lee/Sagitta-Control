@@ -8,18 +8,8 @@ import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
 import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
-
-// ── SagittaDB Logo ────────────────────────────────────────────
-const SagittaLogo = () => (
-  <svg viewBox="0 0 88 88" fill="none" width={80} height={80}>
-    <path d="M44 8L79 28V60L44 80L9 60V28L44 8Z" fill="#165DFF"/>
-    <path d="M30 38L44 24L58 38" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
-    <line x1="44" y1="24" x2="44" y2="64" stroke="white" strokeWidth="4" strokeLinecap="round"/>
-    <path d="M33 52H55" stroke="white" strokeWidth="3" strokeLinecap="round"/>
-    <path d="M35 58H53" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
-    <circle cx="44" cy="24" r="3.5" fill="white" opacity="0.85"/>
-  </svg>
-)
+import BrandLogo from '@/components/common/BrandLogo'
+import { useBranding } from '@/hooks/useBranding'
 
 // ── 平台图标（官方矢量图） ─────────────────────────────────────
 const PlatformIcon = ({ src, alt }: { src: string; alt: string }) => (
@@ -90,6 +80,7 @@ export default function LoginPage() {
   const [error, setError] = useState(
     searchParams.get('oauth_error') ? decodeURIComponent(searchParams.get('oauth_error')!) : ''
   )
+  const { branding } = useBranding()
 
   const method = searchParams.get('method')
   const isLdap = method === 'ldap'
@@ -333,14 +324,15 @@ export default function LoginPage() {
             filter: 'drop-shadow(0 0 28px rgba(79,70,229,0.55))',
             marginBottom: 16,
           }}>
-            <SagittaLogo />
+            <BrandLogo logoUrl={branding.platform_logo_url} size={80} color="#165DFF" />
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
             fontWeight: 800, fontSize: 30,
-            color: '#FFFFFF', letterSpacing: '-1px', lineHeight: 1,
+            color: '#FFFFFF', letterSpacing: 0, lineHeight: 1.12,
+            overflowWrap: 'anywhere',
           }}>
-            SagittaDB
+            {branding.platform_name}
           </div>
           <div style={{
             fontFamily: "'Noto Sans SC', sans-serif",
@@ -348,7 +340,7 @@ export default function LoginPage() {
             color: '#818CF8',           /* 改为靛紫-200，与背景光晕一致 */
             letterSpacing: '7px', marginTop: 7, textAlign: 'center',
           }}>
-            矢 准 数 据
+            数 据 管 控 平 台
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
@@ -356,7 +348,7 @@ export default function LoginPage() {
             color: 'rgba(255,255,255,0.25)',
             letterSpacing: '1.5px', marginTop: 12,
           }}>
-            SagittaDB · Aim at Data, Control with Precision
+            {branding.platform_name} · Data Governance Platform
           </div>
         </div>
 
@@ -698,8 +690,8 @@ export default function LoginPage() {
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
         lineHeight: 1.8,
       }}>
-        <div>SagittaDB v2.0.0 · Full Engine Compatibility, End-to-End Observability</div>
-        <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
+        <div>{branding.platform_name} v2.0.0 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>Copyright © 2026 Jocelyn. All rights reserved.</div>
       </div>
     </div>
   )
