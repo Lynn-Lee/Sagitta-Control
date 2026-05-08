@@ -267,6 +267,9 @@ class LicenseService:
         record = await LicenseService.ensure_trial(db)
         status, reason = LicenseService.evaluate_record(record)
         now = LicenseService._utcnow()
+        configured_customer_id = settings.LICENSE_CUSTOMER_ID.strip()
+        activation_customer_id = configured_customer_id or record.customer_id
+        fingerprint_customer_id = activation_customer_id if record.source == "trial" else record.customer_id
         days_remaining: int | None = None
         if record.expires_at:
             expires_at = record.expires_at
@@ -291,6 +294,8 @@ class LicenseService:
             "is_trial": record.source == "trial",
             "license_id": record.license_id,
             "customer_id": record.customer_id,
+            "activation_customer_id": activation_customer_id,
+            "configured_customer_id": configured_customer_id,
             "company_name": record.company_name,
             "edition": record.edition,
             "features": record.features or [],
@@ -298,7 +303,8 @@ class LicenseService:
             "activation_id": record.activation_id,
             "remote_status": record.remote_status,
             "deployment_fingerprint": record.deployment_fingerprint
-            or LicenseService.deployment_fingerprint(record.customer_id),
+            or LicenseService.deployment_fingerprint(fingerprint_customer_id),
+            "activation_deployment_fingerprint": LicenseService.deployment_fingerprint(activation_customer_id),
             "last_online_check_at": record.last_online_check_at.isoformat() if record.last_online_check_at else None,
             "issued_at": record.issued_at.isoformat() if record.issued_at else None,
             "not_before": record.not_before.isoformat() if record.not_before else None,

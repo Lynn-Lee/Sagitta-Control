@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Button,
@@ -49,18 +49,22 @@ export default function LicensePage() {
   const [activationCode, setActivationCode] = useState('')
   const [customerId, setCustomerId] = useState('')
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     setLoading(true)
     try {
-      setStatus(await licenseApi.status())
+      const nextStatus = await licenseApi.status()
+      setStatus(nextStatus)
+      if (nextStatus.activation_customer_id && nextStatus.activation_customer_id !== 'trial') {
+        setCustomerId((current) => current || nextStatus.activation_customer_id || '')
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadStatus()
-  }, [])
+  }, [loadStatus])
 
   const alertType = useMemo(() => {
     if (!status) return 'info'
@@ -181,6 +185,7 @@ export default function LicensePage() {
               </Descriptions.Item>
               <Descriptions.Item label="License ID">{status?.license_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="客户 ID">{status?.customer_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="激活客户 ID">{status?.activation_customer_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="客户名称">{status?.company_name || '-'}</Descriptions.Item>
               <Descriptions.Item label="在线激活 ID">{status?.activation_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="远端状态">{status?.remote_status || '-'}</Descriptions.Item>

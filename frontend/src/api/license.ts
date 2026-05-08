@@ -7,6 +7,8 @@ export type LicenseStatus = {
   is_trial: boolean
   license_id: string
   customer_id: string
+  activation_customer_id?: string
+  configured_customer_id?: string
   company_name: string
   edition: string
   features: string[]
@@ -14,6 +16,7 @@ export type LicenseStatus = {
   activation_id?: string
   remote_status?: string
   deployment_fingerprint?: string
+  activation_deployment_fingerprint?: string
   last_online_check_at?: string | null
   issued_at?: string | null
   not_before?: string | null
