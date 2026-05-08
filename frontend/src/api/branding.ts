@@ -14,9 +14,7 @@ export const DEFAULT_BRANDING: Branding = {
 }
 
 export function getBrandingTitle(branding: Branding) {
-  return branding.platform_name === DEFAULT_BRANDING.platform_name
-    ? `${branding.platform_name} - 矢准数据`
-    : branding.platform_name
+  return branding.platform_name || FALLBACK_DOCUMENT_TITLE
 }
 
 export function applyBrandingMeta(branding: Branding) {

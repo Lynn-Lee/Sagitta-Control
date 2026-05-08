@@ -13,9 +13,7 @@
 
         function titleOf(branding) {
           if (!branding || !branding.platform_name) return fallbackTitle
-          return branding.platform_name === 'SagittaDB'
-            ? 'SagittaDB - 矢准数据'
-            : branding.platform_name
+          return branding.platform_name
         }
 
         function applyBranding(branding) {
