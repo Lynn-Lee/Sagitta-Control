@@ -78,6 +78,12 @@ services:
       --concurrency=${CELERY_CONCURRENCY:-8}
       -Q default,execute,notify,archive,monitor
       --loglevel=warning
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME | grep -q OK"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
 
   celery_beat:
     image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
@@ -93,6 +99,12 @@ services:
       redis:
         condition: service_healthy
     command: celery -A app.celery_app beat --loglevel=warning
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep '[c]elery.*beat' >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   frontend:
     image: __IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__
@@ -104,7 +116,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-80}:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3

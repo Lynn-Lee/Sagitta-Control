@@ -1,4 +1,5 @@
 .DS_Store
+._*
 .git/
 .github/
 node_modules/

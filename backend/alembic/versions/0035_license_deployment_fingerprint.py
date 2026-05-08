@@ -9,7 +9,6 @@ import sqlalchemy as sa
 
 from alembic import op
 
-
 revision = "0035_license_deployment_fingerprint"
 down_revision = "0034_license_online_activation"
 branch_labels = None
@@ -17,6 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.alter_column("alembic_version", "version_num", type_=sa.String(length=64), existing_nullable=False)
     op.add_column(
         "license_record",
         sa.Column("deployment_fingerprint", sa.String(length=100), nullable=False, server_default="", comment="部署指纹"),
@@ -28,3 +28,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_license_deployment_fingerprint", table_name="license_record")
     op.drop_column("license_record", "deployment_fingerprint")
+    op.alter_column("alembic_version", "version_num", type_=sa.String(length=32), existing_nullable=False)
