@@ -203,6 +203,7 @@ bash deploy/update-prod.sh --ref <target_ref>
 - `/health` 正常。
 - `/api/v1/system/branding/` 正常返回平台名称和 Logo 配置。
 - 前端可登录。
+- 刷新页面时浏览器页签不应短暂显示旧品牌标题；`index.html` 会先显示中性标题，并在主应用启动前预加载品牌配置。
 - 登录页版权文案展示为 `Copyright © 2026 Jocelyn. All rights reserved.`。
 - SQL 工单、在线查询和 Celery 任务正常。
 - Alembic 版本为最新。

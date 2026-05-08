@@ -4,9 +4,57 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="矢 准 数 据 — 矢向数据，精准管控" />
-    <title>SagittaDB - 矢准数据</title>
-    <!-- SagittaDB Brand Fonts -->
+    <meta name="description" content="数据管控平台" />
+    <title>数据管控平台</title>
+    <script>
+      (function () {
+        var storageKey = 'sagittadb:branding'
+        var fallbackTitle = '数据管控平台'
+
+        function titleOf(branding) {
+          if (!branding || !branding.platform_name) return fallbackTitle
+          return branding.platform_name === 'SagittaDB'
+            ? 'SagittaDB - 矢准数据'
+            : branding.platform_name
+        }
+
+        function applyBranding(branding) {
+          if (!branding) return
+          window.__SAGITTA_BRANDING__ = branding
+          document.title = titleOf(branding)
+          var favicon = document.querySelector('link[rel="icon"]')
+          if (favicon) favicon.href = branding.platform_logo_url || '/favicon.svg'
+        }
+
+        try {
+          var cached = window.localStorage.getItem(storageKey)
+          if (cached) applyBranding(JSON.parse(cached))
+        } catch (err) {}
+
+        window.__SAGITTA_BRANDING_PROMISE__ = fetch('/api/v1/system/branding/', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' }
+        })
+          .then(function (response) {
+            if (!response.ok) throw new Error('branding request failed')
+            return response.json()
+          })
+          .then(function (branding) {
+            applyBranding(branding)
+            try {
+              window.localStorage.setItem(storageKey, JSON.stringify(branding))
+            } catch (err) {}
+            return branding
+          })
+          .catch(function () {
+            return window.__SAGITTA_BRANDING__ || {
+              platform_name: 'SagittaDB',
+              platform_logo_url: ''
+            }
+          })
+      })()
+    </script>
+    <!-- Brand Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet" />

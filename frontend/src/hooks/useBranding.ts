@@ -1,11 +1,22 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { brandingApi, DEFAULT_BRANDING } from '@/api/branding'
+import {
+  applyBrandingMeta,
+  brandingApi,
+  BRANDING_STORAGE_KEY,
+  DEFAULT_BRANDING,
+} from '@/api/branding'
+
+function getPreloadedBranding() {
+  if (typeof window === 'undefined') return undefined
+  return window.__SAGITTA_BRANDING__
+}
 
 export function useBranding() {
   const query = useQuery({
     queryKey: ['public-branding'],
-    queryFn: brandingApi.get,
+    queryFn: () => window.__SAGITTA_BRANDING_PROMISE__ || brandingApi.get(),
+    initialData: getPreloadedBranding,
     staleTime: 5 * 60_000,
   })
 
@@ -15,17 +26,13 @@ export function useBranding() {
   }
 
   useEffect(() => {
-    document.title = branding.platform_name === DEFAULT_BRANDING.platform_name
-      ? `${branding.platform_name} - 矢准数据`
-      : branding.platform_name
-  }, [branding.platform_name])
-
-  useEffect(() => {
-    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    if (favicon) {
-      favicon.href = branding.platform_logo_url || '/favicon.svg'
+    applyBrandingMeta(branding)
+    try {
+      window.localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(branding))
+    } catch {
+      // localStorage 不可用时忽略；运行时品牌仍正常应用。
     }
-  }, [branding.platform_logo_url])
+  }, [branding])
 
   return {
     ...query,
