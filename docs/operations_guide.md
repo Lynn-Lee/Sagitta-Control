@@ -17,8 +17,8 @@
 - 准备 PostgreSQL、Redis、后端、前端、Worker、Beat 和反向代理运行环境。
 - 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
 - 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`。
-- 配置 `LICENSE_PUBLIC_KEY`、`LICENSE_CUSTOMER_ID`、`LICENSE_SERVER_URL` 和稳定的 `LICENSE_DEPLOYMENT_ID`。
-- 仅暴露 HTTPS 前端入口，禁止公网直接暴露 PostgreSQL、Redis、Flower、Prometheus、Grafana 和后端调试入口。
+- 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在客户包模板中预置，私有授权中心或密钥轮换时需替换。
+- 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 
 Docker Compose 首次部署示例：
 
@@ -54,8 +54,8 @@ Linux 容器中通常不需要额外设置 `ORACLE_CLIENT_LIB_DIR`，前提是 I
 | `celery_beat` | 定时任务调度。 | 监控采集、周期任务不触发。 |
 | `postgres` | 平台元数据。 | 平台核心数据丢失或不可写。 |
 | `redis` | Celery broker、Token 黑名单。 | 登录校验 fail-close、任务无法投递。 |
-| `flower` | Celery 任务监控。 | 任务排查能力下降。 |
-| `prometheus` / `grafana` | 外围监控。 | 无法查看平台和基础设施趋势。 |
+
+Flower、Prometheus、Grafana 不包含在客户商业部署包的默认 Compose 服务中。如客户已有统一监控平台，可将平台健康接口、系统日志和数据库指标接入客户现有监控体系；如另行部署这些组件，应按客户安全规范限制访问范围。
 
 ## 3. 日常巡检
 

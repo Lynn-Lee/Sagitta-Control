@@ -24,8 +24,6 @@
 适用角色：所有用户  
 入口路径：登录页、右上角个人中心
 
-![登录页](screenshots/user-manual/01-login.png)
-
 操作步骤：
 
 1. 打开 SagittaDB 访问地址。
@@ -53,8 +51,6 @@
 适用角色：所有用户  
 入口路径：侧边栏 `Dashboard`
 
-![Dashboard](screenshots/user-manual/02-dashboard.png)
-
 Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 - 在线查询概览。
@@ -71,8 +67,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：DBA、系统管理员  
 入口路径：侧边栏 `实例管理`
-
-![实例管理列表](screenshots/user-manual/03-instance-list.png)
 
 ### 4.0 引擎支持边界
 
@@ -103,8 +97,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 4.2 注册数据库或 Schema
 
-![数据库注册](screenshots/user-manual/04-instance-databases.png)
-
 操作步骤：
 
 1. 进入实例详情或数据库管理区域。
@@ -125,8 +117,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 5.1 提交 SQL 工单
 
-![SQL 工单提交页](screenshots/user-manual/05-workflow-submit.png)
-
 操作步骤：
 
 1. 进入 `SQL 工单`，点击提交工单。
@@ -144,8 +134,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 5.2 查看工单列表
 
-![SQL 工单列表](screenshots/user-manual/06-workflow-list.png)
-
 列表视角：
 
 | 标签 | 用途 |
@@ -157,8 +145,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 ### 5.3 审批工单
 
 适用角色：审批人、DBA  
-
-![工单详情页](screenshots/user-manual/07-workflow-detail.png)
 
 操作步骤：
 
@@ -193,8 +179,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `在线查询`
 
-![在线查询工作台](screenshots/user-manual/08-query-workbench.png)
-
 操作步骤：
 
 1. 选择实例和数据库。
@@ -215,8 +199,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：研发工程师、审批人  
 入口路径：侧边栏 `查询权限`
-
-![查询权限申请页](screenshots/user-manual/09-query-privilege.png)
 
 ### 7.1 提交申请
 
@@ -248,8 +230,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `数据字典`
 
-![数据字典页面](screenshots/user-manual/10-data-dictionary.png)
-
 操作步骤：
 
 1. 选择实例和数据库。
@@ -268,8 +248,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：DBA、系统管理员、安全审计员  
 入口路径：侧边栏 `数据脱敏`
 
-![脱敏规则页面](screenshots/user-manual/11-masking-rule.png)
-
 操作步骤：
 
 1. 进入脱敏规则页面。
@@ -286,8 +264,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：DBA、运维工程师  
 入口路径：侧边栏 `观测中心`、`SQL 洞察`、`运行诊断`
-
-![运行诊断页面](screenshots/user-manual/12-monitor.png)
 
 常用功能：
 
@@ -307,8 +283,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：研发工程师、DBA  
 入口路径：侧边栏 `数据归档`
-
-![数据归档页面](screenshots/user-manual/13-archive.png)
 
 操作步骤：
 
@@ -332,8 +306,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.1 用户管理
 
-![用户管理页面](screenshots/user-manual/14-user-management.png)
-
 可执行操作：
 
 - 创建、编辑、禁用用户。
@@ -344,8 +316,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.2 角色管理
 
-![角色管理页面](screenshots/user-manual/15-role-management.png)
-
 可执行操作：
 
 - 查看内置角色。
@@ -354,8 +324,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - 禁用或删除非系统角色。
 
 ### 12.3 用户组与资源组
-
-![资源组管理页面](screenshots/user-manual/16-resource-group.png)
 
 配置顺序建议：
 
@@ -371,8 +339,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 ### 12.4 审批流管理
 
-![审批流管理页面](screenshots/user-manual/17-approval-flow.png)
-
 审批人类型：
 
 | 类型 | 说明 |
@@ -382,8 +348,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 | 任意审批员 | 具备审批权限的用户均可处理。 |
 
 ### 12.5 系统配置
-
-![系统配置页面](screenshots/user-manual/18-system-config.png)
 
 系统配置包括：
 
@@ -398,8 +362,6 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：安全审计员、系统管理员  
 入口路径：侧边栏 `审计日志`
-
-![审计日志页面](screenshots/user-manual/19-audit-log.png)
 
 可查看内容：
 
@@ -420,11 +382,9 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 入口路径：侧边栏 `系统管理` → `授权管理`
 
-![授权管理页面](screenshots/user-manual/20-license.png)
-
 可执行操作：
 
-- 查看当前 License 状态、客户 ID、套餐、到期时间和部署指纹。
+- 查看当前 License 状态、客户 ID、激活客户 ID、套餐、到期时间和部署指纹。
 - 在线激活授权码。
 - 刷新在线 License。
 - 导入离线签名 License。
@@ -432,8 +392,9 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 注意事项：
 
-- 部署指纹用于绑定客户部署，迁移环境前应先确认授权处理流程。
-- 离线 License 仅在签名、公钥、客户 ID 和部署指纹匹配时生效。
+- 部署指纹用于绑定客户部署。试用状态下页面展示的是正式激活客户 ID 对应的指纹，应使用该指纹在授权平台生成激活码。
+- 在线和离线 License 都必须通过 `LICENSE_PUBLIC_KEY` 完成签名校验；未配置公钥时会提示“未配置 License 公钥”。
+- License 仅在签名、公钥、客户 ID 和部署指纹匹配时生效。
 - License 异常时，受保护 API 会被阻断，授权管理页仍可访问。
 
 ## 15. 常见问题
