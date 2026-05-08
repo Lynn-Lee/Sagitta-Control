@@ -269,12 +269,12 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0B1120',          /* 更深的午夜蓝，与各品牌色形成更强对比 */
+      background: '#111A2E',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '32px 16px 24px',
+      padding: '32px 16px 88px',
       fontFamily: "'Inter', 'Noto Sans SC', sans-serif",
       position: 'relative',
       overflow: 'hidden',
@@ -687,15 +687,19 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* 底部版本号 */}
+      {/* 底部信息 */}
       <div style={{
-        position: 'relative',
-        marginTop: 24,
+        position: 'absolute',
+        bottom: 24,
+        left: 16,
+        right: 16,
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11, color: 'rgba(255,255,255,0.13)',
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
+        lineHeight: 1.8,
       }}>
-        SagittaDB v2.0.0 · Full Engine Compatibility, End-to-End Observability
+        <div>SagittaDB v2.0.0 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
       </div>
     </div>
   )
