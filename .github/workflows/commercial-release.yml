@@ -107,3 +107,4 @@ jobs:
           path: |
             dist-commercial/${{ steps.release.outputs.package_name }}.zip
             dist-commercial/${{ steps.release.outputs.package_name }}.zip.sha256
+          retention-days: 7

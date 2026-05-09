@@ -101,10 +101,12 @@ jobs:
 
       - name: Upload coverage report artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: coverage-report
           path: backend/coverage.xml
+          retention-days: 3
 
   # ─── 前端测试 ──────────────────────────────────────────────
   frontend-test:

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   applyBrandingMeta,
@@ -20,10 +20,13 @@ export function useBranding() {
     staleTime: 5 * 60_000,
   })
 
-  const branding = {
-    ...DEFAULT_BRANDING,
-    ...(query.data || {}),
-  }
+  const branding = useMemo(
+    () => ({
+      ...DEFAULT_BRANDING,
+      ...(query.data || {}),
+    }),
+    [query.data],
+  )
 
   useEffect(() => {
     applyBrandingMeta(branding)

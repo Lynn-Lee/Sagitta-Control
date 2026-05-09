@@ -62,10 +62,12 @@ jobs:
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: bandit-report
           path: backend/bandit-report.json
+          retention-days: 3
 
   # ─── 依赖漏洞扫描: pip-audit ────────────────────────────────
   pip-audit:
@@ -126,10 +128,12 @@ jobs:
 
       - name: Upload pip-audit report
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: pip-audit-report
           path: backend/pip-audit-report.json
+          retention-days: 3
 
   # ─── 容器镜像扫描: Trivy ────────────────────────────────────
   trivy:
