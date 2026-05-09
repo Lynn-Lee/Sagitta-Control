@@ -72,6 +72,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-instances", type=int, default=0, help="0 表示不限制")
     parser.add_argument("--max-users", type=int, default=0, help="0 表示不限制")
     parser.add_argument("--deployment-fingerprint", default="", help="将 License 绑定到单个 SagittaDB 部署")
+    parser.add_argument("--challenge-file", default="", help="离线 Challenge JSON；自动填充 customer_id 和 deployment_fingerprint")
+    parser.add_argument("--response-out", default="", help="输出 challenge-response JSON 路径；为空则只输出 License")
     parser.add_argument("--out", default="", help="输出路径；为空时输出到 stdout")
     return parser.parse_args()
 
@@ -90,6 +92,17 @@ def main() -> int:
     if args.generate_keypair:
         generate_keypair()
         return 0
+
+    challenge_doc: dict[str, Any] | None = None
+    if args.challenge_file:
+        challenge_doc = json.loads(Path(args.challenge_file).read_text(encoding="utf-8"))
+        challenge_payload = challenge_doc.get("payload") if isinstance(challenge_doc, dict) else None
+        if not isinstance(challenge_payload, dict):
+            raise SystemExit("challenge file must contain payload")
+        if not args.customer_id:
+            args.customer_id = str(challenge_payload.get("customer_id") or "")
+        if not args.deployment_fingerprint:
+            args.deployment_fingerprint = str(challenge_payload.get("deployment_fingerprint") or "")
 
     missing = [
         name
@@ -126,6 +139,11 @@ def main() -> int:
         payload["deployment_fingerprint"] = args.deployment_fingerprint
     signature = b64url(private_key.sign(canonical_payload(payload)))
     document = {"payload": payload, "signature": signature}
+    if challenge_doc:
+        response_doc = {"challenge": challenge_doc, "license": document}
+        response_output = json.dumps(response_doc, ensure_ascii=False, indent=2, sort_keys=True)
+        if args.response_out:
+            Path(args.response_out).write_text(response_output + "\n", encoding="utf-8")
     output = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True)
     if args.out:
         Path(args.out).write_text(output + "\n", encoding="utf-8")

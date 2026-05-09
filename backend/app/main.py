@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
+from app.core.integrity import verify_startup_integrity
 from app.core.logging import configure_logging
 from app.routers import (
     ai,
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    verify_startup_integrity()
     logger.info("SagittaDB starting env=%s version=2.0.0", settings.APP_ENV)
     yield
     await engine.dispose()

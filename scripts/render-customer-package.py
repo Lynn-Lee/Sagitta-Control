@@ -18,7 +18,11 @@ PACKAGE_FILES = {
     "deploy/customer/.env.example": ".env.example",
     "deploy/customer/upgrade.sh": "upgrade.sh",
     "deploy/customer/verify-license.sh": "verify-license.sh",
+    "deploy/customer/LEGAL-NOTICE.md": "LEGAL-NOTICE.md",
     "deploy/nginx.conf": "nginx.conf",
+}
+PACKAGE_DIRS = {
+    "deploy/helm/sagittadb": "helm/sagittadb",
 }
 
 CUSTOMER_README_TEMPLATE = """# SagittaDB Enterprise v__SAGITTADB_VERSION__
@@ -31,6 +35,7 @@ CUSTOMER_README_TEMPLATE = """# SagittaDB Enterprise v__SAGITTADB_VERSION__
 - 前端：`__IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__`
 
 生产环境不要使用 `latest`，请保留 `docker-compose.yml` 中的明确版本标签。
+使用前请确认合同、订单或授权函约定，并阅读随包 `LEGAL-NOTICE.md`。
 
 ## 首次部署
 
@@ -46,6 +51,19 @@ docker compose ps
 ```
 
 前端服务健康后，访问 `http://<server>/`。
+
+## Kubernetes / Helm 部署
+
+客户包内包含 Helm Chart：
+
+```bash
+helm dependency update helm/sagittadb
+helm upgrade --install sagittadb helm/sagittadb \\
+  -f helm/sagittadb/values-prod.yaml \\
+  --set app.secretKey='<random-secret>' \\
+  --set license.customerId='<customer-id>' \\
+  --set license.deploymentId='<stable-deployment-id>'
+```
 
 ## 升级
 
@@ -67,13 +85,15 @@ docker compose up -d
 
 ## License
 
-登录后可在授权管理页面导入离线 License，或输入在线激活码完成授权。也可以使用 `verify-license.sh` 验证在线激活和刷新流程：
+登录后可在授权管理页面输入在线激活码完成授权，或生成离线 Challenge 后导入商务侧返回的 challenge-response 文件。也可以使用 `verify-license.sh` 验证在线激活、离线 Challenge 生成和刷新流程：
 
 ```bash
 ./verify-license.sh <activation_code> <customer_id>
 ```
 
 SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
+
+生产环境默认不接受未绑定 Challenge 的裸 License JSON。
 
 共享日志或配置时，不要打包 License 文件、私钥、激活码或 `.env` 中的敏感值。
 """
@@ -111,6 +131,8 @@ def copy_package_files(repo_root: Path, package_dir: Path) -> None:
     package_dir.mkdir(parents=True, exist_ok=True)
     for src, dest in PACKAGE_FILES.items():
         shutil.copy2(repo_root / src, package_dir / dest)
+    for src, dest in PACKAGE_DIRS.items():
+        shutil.copytree(repo_root / src, package_dir / dest)
     (package_dir / "README.md").write_text(CUSTOMER_README_TEMPLATE, encoding="utf-8")
 
     for script in ("upgrade.sh", "verify-license.sh"):
@@ -119,13 +141,29 @@ def copy_package_files(repo_root: Path, package_dir: Path) -> None:
 
 
 def render_placeholders(package_dir: Path, version: str, image_repository: str) -> None:
-    for path in package_dir.iterdir():
+    registry, repository = split_image_repository(image_repository)
+    for path in package_dir.rglob("*"):
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8")
         text = text.replace("__SAGITTADB_VERSION__", version)
         text = text.replace("__IMAGE_REPOSITORY__", image_repository)
+        if path.name == "Chart.yaml":
+            text = re.sub(r"^version: .*$", f"version: {version}", text, flags=re.MULTILINE)
+            text = re.sub(r"^appVersion: .*$", f'appVersion: "{version}"', text, flags=re.MULTILINE)
+        if path.name.startswith("values"):
+            text = text.replace("registry: ghcr.io", f"registry: {registry}")
+            text = text.replace("repository: your-org/sagittadb-frontend", f"repository: {repository}-frontend")
+            text = text.replace("repository: your-org/sagittadb", f"repository: {repository}-backend")
+            text = re.sub(r'tag: "1\.0\.0"', f'tag: "{version}"', text)
         path.write_text(text, encoding="utf-8")
+
+
+def split_image_repository(image_repository: str) -> tuple[str, str]:
+    parts = image_repository.split("/", 1)
+    if len(parts) != 2:
+        raise ValueError("--image-repository must include registry/repository, e.g. ghcr.io/acme/sagittadb")
+    return parts[0], parts[1]
 
 
 def validate_package(package_dir: Path, version: str) -> list[str]:
@@ -136,7 +174,7 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
         errors.append(f"客户包文件不匹配：应为 {expected}，实际为 {actual}")
 
     combined_text = ""
-    for path in package_dir.iterdir():
+    for path in package_dir.rglob("*"):
         if path.is_file():
             combined_text += f"\n--- {path.name} ---\n"
             combined_text += path.read_text(encoding="utf-8")

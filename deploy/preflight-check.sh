@@ -148,6 +148,8 @@ check_env_secret REDIS_PASSWORD redis123
 
 license_public_key="$(env_value LICENSE_PUBLIC_KEY || true)"
 license_server_url="$(env_value LICENSE_SERVER_URL || true)"
+integrity_required="$(env_value APP_INTEGRITY_REQUIRED || true)"
+integrity_manifest="$(env_value APP_INTEGRITY_MANIFEST || true)"
 if [[ -z "$license_public_key" ]]; then
   warn "LICENSE_PUBLIC_KEY 未配置，离线/在线正式 License 验签将不可用"
 else
@@ -157,6 +159,16 @@ if [[ -n "$license_server_url" ]]; then
   pass "LICENSE_SERVER_URL 已配置: $license_server_url"
 else
   warn "LICENSE_SERVER_URL 未配置；在线激活/刷新不可用，离线导入仍可使用"
+fi
+if [[ "$integrity_required" == "true" ]]; then
+  pass "APP_INTEGRITY_REQUIRED 已启用"
+  if compose exec -T backend test -f "${integrity_manifest:-/app/COMMERCIAL-MANIFEST.json}" >/dev/null 2>&1; then
+    pass "商业完整性 Manifest 存在"
+  else
+    fail "商业完整性 Manifest 不存在: ${integrity_manifest:-/app/COMMERCIAL-MANIFEST.json}"
+  fi
+else
+  warn "APP_INTEGRITY_REQUIRED 未启用；商业镜像防篡改启动校验未强制执行"
 fi
 
 check_port_not_public 5432 PostgreSQL

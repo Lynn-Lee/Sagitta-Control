@@ -806,6 +806,10 @@ class LicenseActivateRequest(BaseModel):
     customer_id: str = ""
 
 
+class LicenseChallengeRequest(BaseModel):
+    customer_id: str = ""
+
+
 @router.get("/config/", summary="获取系统配置（按分组）")
 async def get_system_config(
     db: AsyncSession = Depends(get_db),
@@ -946,6 +950,25 @@ async def import_license(
         request=request,
     )
     return {"status": 0, "msg": "License 导入成功", "data": status_data}
+
+
+@router.post("/license/challenge", summary="生成离线授权 Challenge")
+async def create_license_challenge(
+    data: LicenseChallengeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_superuser),
+):
+    challenge = LicenseService.create_offline_challenge(data.customer_id)
+    await AuditLogService.write(
+        db,
+        user,
+        action="create_license_challenge",
+        module="system",
+        detail=f"生成离线 License Challenge：{challenge['payload'].get('customer_id') or '-'}",
+        request=request,
+    )
+    return {"status": 0, "msg": "License Challenge 生成成功", "data": challenge}
 
 
 @router.post("/license/activate", summary="在线激活 License")

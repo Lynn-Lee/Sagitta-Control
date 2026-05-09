@@ -1,0 +1,84 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.12-slim-bookworm AS builder
+
+WORKDIR /app
+
+ARG APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+ARG APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG SAGITTADB_VERSION=0.0.0
+ARG NUITKA_MODULES="app/services/license.py app/core/security.py app/core/deps.py app/services/user.py app/services/instance.py"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NUITKA_MODULES="${NUITKA_MODULES}"
+
+RUN set -eux; \
+    sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+    sed -i "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+    apt-get update -o Acquire::Retries=5; \
+    apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+      build-essential \
+      python3-dev \
+      patchelf \
+      libffi-dev \
+      libpq-dev \
+      curl \
+      unzip \
+      procps \
+      ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip config set global.index-url "${PIP_INDEX_URL}" && pip install --no-cache-dir --upgrade pip nuitka
+
+COPY backend/ .
+RUN pip install --no-cache-dir -e .
+COPY scripts/compile-nuitka-core.sh /usr/local/bin/compile-nuitka-core.sh
+COPY tools/sign_manifest.py /usr/local/bin/sign_manifest.py
+RUN chmod +x /usr/local/bin/compile-nuitka-core.sh /usr/local/bin/sign_manifest.py && \
+    /usr/local/bin/compile-nuitka-core.sh
+# BuildKit secret keeps the Manifest signing private key out of the image layers.
+RUN --mount=type=secret,id=manifest_private_key,required=true \
+    MANIFEST_PRIVATE_KEY="$(cat /run/secrets/manifest_private_key)" \
+    python /usr/local/bin/sign_manifest.py \
+      --root /app \
+      --version "${SAGITTADB_VERSION}" \
+      --out /app/COMMERCIAL-MANIFEST.json \
+      app alembic.ini
+
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+ARG SAGITTADB_VERSION=0.0.0
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    APP_ENV=production \
+    DEBUG=false \
+    APP_INTEGRITY_REQUIRED=true \
+    APP_INTEGRITY_MANIFEST=/app/COMMERCIAL-MANIFEST.json \
+    APP_INTEGRITY_ROOT=/app \
+    SAGITTADB_VERSION="${SAGITTADB_VERSION}"
+
+RUN set -eux; \
+    apt-get update -o Acquire::Retries=5; \
+    apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+      libpq5 \
+      curl \
+      procps \
+      ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /app /app
+
+RUN adduser --disabled-password --gecos "" --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

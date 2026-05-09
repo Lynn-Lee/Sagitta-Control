@@ -310,6 +310,15 @@ def add_explicit_mutating_checks(
             results.append(
                 check_request(
                     client,
+                    "生成离线 License Challenge",
+                    "POST",
+                    "/api/v1/system/license/challenge",
+                    {"customer_id": args.customer_id},
+                )
+            )
+            results.append(
+                check_request(
+                    client,
                     "在线激活 License",
                     "POST",
                     "/api/v1/system/license/activate",

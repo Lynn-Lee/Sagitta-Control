@@ -9,7 +9,11 @@ RUN npm install
 COPY . .
 
 # 跳过 tsc 类型检查，直接 vite build（类型错误不阻断构建）
-RUN npx vite build
+RUN npx vite build && \
+    if find dist -type f -name '*.map' | grep -q .; then \
+      echo "sourcemap files are not allowed in commercial frontend builds" >&2; \
+      exit 1; \
+    fi
 
 # ─── 第二阶段：Nginx 静态文件服务 ────────────────────────────
 FROM nginx:1.25-alpine

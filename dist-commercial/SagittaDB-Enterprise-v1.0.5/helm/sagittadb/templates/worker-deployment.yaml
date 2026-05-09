@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sagittadb.fullname" . }}-worker
+  labels:
+    {{- include "sagittadb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.celeryWorker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - app.celery_app
+            - worker
+            - --concurrency={{ .Values.celeryWorker.concurrency }}
+            - -Q
+            - {{ .Values.celeryWorker.queues }}
+            - --loglevel=info
+          envFrom:
+            - configMapRef:
+                name: {{ include "sagittadb.fullname" . }}
+            - secretRef:
+                name: {{ include "sagittadb.fullname" . }}
+          resources:
+            {{- toYaml .Values.celeryWorker.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: downloads
+              mountPath: /app/downloads
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: {{ include "sagittadb.fullname" . }}-downloads
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sagittadb.fullname" . }}-beat
+  labels:
+    {{- include "sagittadb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: beat
+spec:
+  replicas: 1  # Beat must always be a single instance
+  selector:
+    matchLabels:
+      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: beat
+  template:
+    metadata:
+      labels:
+        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: beat
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: beat
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "sagittadb.fullname" . }}
+            - secretRef:
+                name: {{ include "sagittadb.fullname" . }}
+          resources:
+            {{- toYaml .Values.celeryBeat.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

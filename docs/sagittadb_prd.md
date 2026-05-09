@@ -288,15 +288,23 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 产品设计文档。
 - 用户使用手册。
 - 运维管理手册。
-- 固定版本客户部署包和 License 激活信息。
+- 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
 当前商业部署版本为 `1.0.5`。商业授权统一接入 `License-Server-Center`，SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。
+
+商业版增强边界：
+
+- 后端商业镜像通过 Nuitka 编译核心 Python 模块，降低源码暴露面。
+- 前端仅交付生产 build 产物，构建阶段禁止 sourcemap。
+- 离线授权采用 challenge-response：客户生成 Challenge，运营侧按 Challenge 签发绑定部署指纹的响应文件。
+- 商业镜像启动时校验 Ed25519 签名 Manifest 和关键文件摘要；发布侧需保留镜像签名、客户包签名和 sha256 记录。
+- 合同、订单或授权函需明确禁止逆向、篡改、绕过授权和二次分发。
 
 正式上线前建议完成以下验收：
 
 - 至少接入一个生产同构测试实例。
 - 完成用户、角色、用户组、资源组、审批流配置。
 - 验证 SQL 工单、查询权限、在线查询、数据字典、归档、通知链路。
-- 验证授权管理页展示 `授权项目：SagittaDB（sagittadb）`，并完成在线激活、联网刷新和离线 License 导入。
+- 验证授权管理页展示 `授权项目：SagittaDB（sagittadb）`，并完成在线激活、联网刷新和离线 challenge-response 导入。
 - 验证备份恢复和升级回滚。
 - 验证审计日志、查询历史和操作追踪可用。

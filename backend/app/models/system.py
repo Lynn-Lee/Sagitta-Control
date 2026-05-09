@@ -86,7 +86,7 @@ class LicenseRecord(BaseModel):
     __tablename__ = "license_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    source: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/import/online")
+    source: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/import/offline/online")
     status: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/licensed/invalid/expired")
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否当前授权")
     raw_license: Mapped[str] = mapped_column(Text, default="", comment="原始 license JSON")

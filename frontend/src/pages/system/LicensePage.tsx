@@ -46,6 +46,7 @@ export default function LicensePage() {
   const [activating, setActivating] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [licenseText, setLicenseText] = useState('')
+  const [challengeText, setChallengeText] = useState('')
   const [activationCode, setActivationCode] = useState('')
   const [customerId, setCustomerId] = useState('')
 
@@ -128,6 +129,16 @@ export default function LicensePage() {
       message.error(error?.response?.data?.detail || 'License 刷新失败')
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  const handleCreateChallenge = async () => {
+    try {
+      const challenge = await licenseApi.challenge({ customer_id: customerId.trim() || undefined })
+      setChallengeText(JSON.stringify(challenge, null, 2))
+      message.success('离线 Challenge 已生成')
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '离线 Challenge 生成失败')
     }
   }
 
@@ -267,12 +278,24 @@ export default function LicensePage() {
         <Col xs={24}>
           <Card title="导入离线 License">
             <Form layout="vertical">
+              <Form.Item label="离线 Challenge">
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Button onClick={handleCreateChallenge}>生成 Challenge</Button>
+                  {challengeText && (
+                    <TextArea
+                      rows={8}
+                      value={challengeText}
+                      readOnly
+                    />
+                  )}
+                </Space>
+              </Form.Item>
               <Form.Item label="License JSON">
                 <TextArea
                   rows={10}
                   value={licenseText}
                   onChange={(event) => setLicenseText(event.target.value)}
-                  placeholder='{"payload": {...}, "signature": "..."}'
+                  placeholder='{"challenge": {...}, "license": {"payload": {...}, "signature": "..."}}'
                 />
               </Form.Item>
               <Button type="primary" icon={<UploadOutlined />} onClick={handleImport} loading={importing}>

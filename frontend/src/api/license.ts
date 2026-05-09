@@ -28,6 +28,11 @@ export type LicenseStatus = {
   warning_level?: 'warning' | 'critical' | string
 }
 
+export type LicenseChallenge = {
+  payload: Record<string, unknown>
+  signature: string
+}
+
 export const licenseApi = {
   status: () => apiClient.get<LicenseStatus>('/system/license/status').then(r => r.data),
 
@@ -38,4 +43,7 @@ export const licenseApi = {
     apiClient.post('/system/license/activate', data).then(r => r.data),
 
   refresh: () => apiClient.post('/system/license/refresh').then(r => r.data),
+
+  challenge: (data: { customer_id?: string }) =>
+    apiClient.post<{ status: number; msg: string; data: LicenseChallenge }>('/system/license/challenge', data).then(r => r.data.data),
 }

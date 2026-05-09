@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
     LICENSE_TRIAL_DAYS: int = 30
     LICENSE_DEPLOYMENT_ID: str = ""
+    LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: int = 60
+    LICENSE_ALLOW_LEGACY_LICENSE_IMPORT: bool = False
+
+    # ─── 商业版完整性校验 ─────────────────────────────────────
+    APP_INTEGRITY_REQUIRED: bool = False
+    APP_INTEGRITY_MANIFEST: str = "/app/COMMERCIAL-MANIFEST.json"
+    APP_INTEGRITY_ROOT: str = "/app"
+    MANIFEST_PUBLIC_KEY: str = ""
 
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
     TENANT_ID: int = 1

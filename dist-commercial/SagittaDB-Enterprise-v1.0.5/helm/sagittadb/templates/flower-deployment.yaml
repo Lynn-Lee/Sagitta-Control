@@ -1,0 +1,74 @@
+{{- if .Values.flower.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sagittadb.fullname" . }}-flower
+  labels:
+    {{- include "sagittadb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: flower
+  template:
+    metadata:
+      labels:
+        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: flower
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: flower
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
+          ports:
+            - name: flower
+              containerPort: 5555
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "sagittadb.fullname" . }}
+            - secretRef:
+                name: {{ include "sagittadb.fullname" . }}
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: flower
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.flower.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sagittadb.fullname" . }}-flower
+  labels:
+    {{- include "sagittadb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+spec:
+  type: {{ .Values.flower.service.type }}
+  ports:
+    - port: {{ .Values.flower.service.port }}
+      targetPort: flower
+      protocol: TCP
+      name: flower
+  selector:
+    {{- include "sagittadb.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+{{- end }}

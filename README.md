@@ -145,7 +145,11 @@ npm run build
 
 正式交付建议包含：
 
-- 固定版本镜像和客户部署包，不使用 `latest`。
+- 固定版本 Docker/Helm 私有化部署包，不使用 `latest`。
+- 商业后端镜像使用 Nuitka 编译核心 Python 模块，前端只交付 build 产物且构建阶段禁止 sourcemap。
 - `.env.example`、`docker-compose.yml`、`upgrade.sh`、`verify-license.sh` 和 Nginx 配置。
-- 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线导入、备份恢复和升级回滚验证。
+- 商业 License 使用 Ed25519 签名校验；支持在线激活、联网刷新和离线 challenge-response，生产环境默认禁止旧式裸 License 导入。
+- 商业镜像使用 Ed25519 签名完整性 Manifest 启动校验，镜像和客户包发布流程需完成 cosign 镜像签名与交付包签名。
+- 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线 challenge-response、备份恢复和升级回滚验证。
 - 内部留存 CI、安全扫描、客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。
+- 合同条款需明确禁止逆向、篡改、绕过授权和二次分发，作为技术保护之外的法务兜底。

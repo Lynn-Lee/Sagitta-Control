@@ -37,10 +37,16 @@ auth_curl -X POST "$API_BASE/system/license/activate" \
   -d "{\"activation_code\":\"$ACTIVATION_CODE\",\"customer_id\":\"$CUSTOMER_ID\"}"
 echo
 
-echo "3. Refresh online license"
+echo "3. Generate offline challenge"
+auth_curl -X POST "$API_BASE/system/license/challenge" \
+  -H 'Content-Type: application/json' \
+  -d "{\"customer_id\":\"$CUSTOMER_ID\"}"
+echo
+
+echo "4. Refresh online license"
 auth_curl -X POST "$API_BASE/system/license/refresh"
 echo
 
-echo "4. Final license status"
+echo "5. Final license status"
 auth_curl "$API_BASE/system/license/status"
 echo

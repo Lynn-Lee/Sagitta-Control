@@ -18,6 +18,7 @@
 - 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
 - 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`。
 - 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在客户包模板中预置，私有授权中心或密钥轮换时需替换。
+- 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
 - 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 
 Docker Compose 首次部署示例：
@@ -332,3 +333,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
 当前商业部署版本为 `1.0.5`。SagittaDB 授权项目码固定为 `sagittadb`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。
+
+离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
+
+商业发布流水线应使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像和客户部署包进行签名；交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。

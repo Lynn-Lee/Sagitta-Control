@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -179,6 +181,89 @@ class LicenseService:
         return {"project": LICENSE_PROJECT_CODE, "product": LICENSE_PROJECT_CODE}
 
     @staticmethod
+    def _challenge_secret() -> bytes:
+        secret = settings.SECRET_KEY.strip()
+        if not secret:
+            raise HTTPException(status_code=500, detail="未配置离线授权 Challenge 密钥")
+        return secret.encode()
+
+    @staticmethod
+    def _sign_challenge_payload(payload: dict[str, Any]) -> str:
+        # Challenge 只用于证明当前部署生成过本次离线授权请求；
+        # 正式授权仍必须由 Ed25519 License 签名和部署指纹共同约束。
+        signature = hmac.new(
+            LicenseService._challenge_secret(),
+            LicenseService._canonical_payload(payload),
+            hashlib.sha256,
+        ).digest()
+        return base64.urlsafe_b64encode(signature).decode().rstrip("=")
+
+    @staticmethod
+    def create_offline_challenge(customer_id: str = "") -> dict[str, Any]:
+        customer = customer_id.strip() or settings.LICENSE_CUSTOMER_ID.strip()
+        if not customer:
+            raise HTTPException(status_code=400, detail="请输入客户标识")
+        now = LicenseService._utcnow()
+        expires_at = now + timedelta(minutes=settings.LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES)
+        payload = {
+            "project": LICENSE_PROJECT_CODE,
+            "product": LICENSE_PROJECT_CODE,
+            "customer_id": customer,
+            "deployment_fingerprint": LicenseService.deployment_fingerprint(customer),
+            "nonce": secrets.token_urlsafe(24),
+            "issued_at": now.isoformat(),
+            "expires_at": expires_at.isoformat(),
+        }
+        return {
+            "payload": payload,
+            "signature": LicenseService._sign_challenge_payload(payload),
+        }
+
+    @staticmethod
+    def verify_offline_challenge(challenge: dict[str, Any]) -> dict[str, Any]:
+        payload = challenge.get("payload") if isinstance(challenge, dict) else None
+        signature = challenge.get("signature") if isinstance(challenge, dict) else ""
+        if not isinstance(payload, dict) or not isinstance(signature, str) or not signature:
+            raise HTTPException(status_code=400, detail="离线 Challenge 格式无效")
+        expected = LicenseService._sign_challenge_payload(payload)
+        if not hmac.compare_digest(signature, expected):
+            raise HTTPException(status_code=400, detail="离线 Challenge 签名无效")
+        LicenseService._validate_project(payload)
+        customer_id = str(payload.get("customer_id") or "").strip()
+        if not customer_id:
+            raise HTTPException(status_code=400, detail="离线 Challenge 缺少客户标识")
+        expires_at = LicenseService._parse_datetime(str(payload.get("expires_at") or ""))
+        if expires_at and LicenseService._utcnow() > expires_at:
+            raise HTTPException(status_code=400, detail="离线 Challenge 已过期")
+        expected_fingerprint = LicenseService.deployment_fingerprint(customer_id)
+        if str(payload.get("deployment_fingerprint") or "") != expected_fingerprint:
+            raise HTTPException(status_code=400, detail="离线 Challenge 部署指纹不匹配")
+        return payload
+
+    @staticmethod
+    def _normalize_import_document(raw_license: str | dict[str, Any]) -> tuple[str | dict[str, Any], dict[str, Any] | None]:
+        """兼容旧导入格式，并识别商业版 challenge-response 响应文件。"""
+        if isinstance(raw_license, str):
+            try:
+                doc = json.loads(raw_license)
+            except json.JSONDecodeError:
+                return raw_license, None
+        else:
+            doc = raw_license
+        if not isinstance(doc, dict) or "challenge" not in doc or "license" not in doc:
+            return raw_license, None
+        challenge_payload = LicenseService.verify_offline_challenge(doc["challenge"])
+        license_doc = doc["license"]
+        payload, _, _ = LicenseService.verify_license_document(license_doc)
+        customer_id = str(challenge_payload.get("customer_id") or "")
+        if payload.get("customer_id") != customer_id:
+            raise HTTPException(status_code=400, detail="离线 License 客户标识与 Challenge 不匹配")
+        fingerprint = str(challenge_payload.get("deployment_fingerprint") or "")
+        if str(payload.get("deployment_fingerprint") or "") != fingerprint:
+            raise HTTPException(status_code=400, detail="离线 License 未绑定当前 Challenge 部署指纹")
+        return license_doc, challenge_payload
+
+    @staticmethod
     async def _call_license_server(path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = LicenseService._license_server_url() + path
         try:
@@ -339,6 +424,7 @@ class LicenseService:
         activation_id: str = "",
         remote_status: str = "",
         server_url: str = "",
+        challenge_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload, signature, normalized_raw = LicenseService.verify_license_document(raw_license)
         await db.execute(update(LicenseRecord).values(is_current=False))
@@ -366,7 +452,7 @@ class LicenseService:
             expires_at=LicenseService._parse_datetime(payload.get("expires_at")),
             last_online_check_at=LicenseService._utcnow() if source == "online" else None,
             last_check_status="ok",
-            last_check_reason="License 已导入",
+            last_check_reason="License 已通过离线 Challenge 导入" if challenge_payload else "License 已导入",
         )
         db.add(record)
         await db.commit()
@@ -381,7 +467,19 @@ class LicenseService:
 
     @staticmethod
     async def import_license(db: AsyncSession, raw_license: str | dict[str, Any]) -> dict[str, Any]:
-        return await LicenseService._store_license(db, raw_license, source="import")
+        license_doc, challenge_payload = LicenseService._normalize_import_document(raw_license)
+        if (
+            not challenge_payload
+            and settings.APP_ENV == "production"
+            and not settings.LICENSE_ALLOW_LEGACY_LICENSE_IMPORT
+        ):
+            raise HTTPException(status_code=400, detail="生产环境离线授权必须使用 Challenge-Response")
+        return await LicenseService._store_license(
+            db,
+            license_doc,
+            source="offline" if challenge_payload else "import",
+            challenge_payload=challenge_payload,
+        )
 
     @staticmethod
     async def activate(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:

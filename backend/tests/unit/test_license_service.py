@@ -118,6 +118,35 @@ def test_deployment_fingerprint_uses_customer_and_deployment_id(monkeypatch):
     assert first != second
 
 
+def test_offline_challenge_response_success(monkeypatch, keypair, valid_payload):
+    monkeypatch.setattr("app.services.license.settings.SECRET_KEY", "secret-for-challenge")
+    monkeypatch.setattr("app.services.license.settings.LICENSE_DEPLOYMENT_ID", "deploy-a")
+    challenge = LicenseService.create_offline_challenge("acme")
+    valid_payload["deployment_fingerprint"] = challenge["payload"]["deployment_fingerprint"]
+    doc = _license_doc(valid_payload, keypair)
+
+    license_doc, challenge_payload = LicenseService._normalize_import_document(
+        {"challenge": challenge, "license": doc}
+    )
+
+    assert license_doc == doc
+    assert challenge_payload["customer_id"] == "acme"
+
+
+def test_offline_challenge_response_rejects_unbound_license(monkeypatch, keypair, valid_payload):
+    monkeypatch.setattr("app.services.license.settings.SECRET_KEY", "secret-for-challenge")
+    monkeypatch.setattr("app.services.license.settings.LICENSE_DEPLOYMENT_ID", "deploy-a")
+    challenge = LicenseService.create_offline_challenge("acme")
+    valid_payload["deployment_fingerprint"] = "wrong"
+    doc = _license_doc(valid_payload, keypair)
+
+    with pytest.raises(HTTPException) as exc:
+        LicenseService._normalize_import_document({"challenge": challenge, "license": doc})
+
+    assert exc.value.status_code == 400
+    assert "部署指纹" in exc.value.detail
+
+
 def test_evaluate_record_expired_and_not_before():
     now = datetime.now(UTC)
     expired = LicenseRecord(
