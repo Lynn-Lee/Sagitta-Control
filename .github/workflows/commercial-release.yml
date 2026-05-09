@@ -2,22 +2,38 @@ name: Commercial Release
 
 on:
   push:
+    branches:
+      - main
+      - "release/**"
     tags:
       - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version without leading v, for example 1.0.5"
-        required: true
+        description: "Release version without leading v. Empty value creates a dev snapshot version."
+        required: false
         type: string
+      publish_public_repo:
+        description: "Publish the rendered commercial package to Public-Releases."
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
   packages: write
 
+env:
+  PRODUCT_CODE: sagittadb
+  PRODUCT_NAME: SagittaDB Enterprise
+  COMMERCIAL_BASE_VERSION: "1.0.5"
+  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Public-Releases
+  PUBLIC_PRODUCT_DIR: products/sagittadb
+  PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
+
 jobs:
   package:
-    name: Build Customer Deployment Package
+    name: Build and Publish Commercial Package
     runs-on: ubuntu-latest
 
     steps:
@@ -30,16 +46,20 @@ jobs:
           set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
-          else
+            channel="stable"
+          elif [[ -n "${{ inputs.version || '' }}" ]]; then
             version="${{ inputs.version }}"
+            channel="stable"
+          else
+            short_sha="$(git rev-parse --short=7 HEAD)"
+            version="${COMMERCIAL_BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${short_sha}"
+            channel="snapshot"
           fi
-          repo_lc="$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          minor_tag="$(printf '%s' "${version}" | awk -F. '{print $1 "." $2}')"
           package_name="SagittaDB-Enterprise-v${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "minor_tag=${minor_tag}" >> "${GITHUB_OUTPUT}"
-          echo "repo_lc=${repo_lc}" >> "${GITHUB_OUTPUT}"
+          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
           echo "package_name=${package_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_dir=v${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -54,11 +74,15 @@ jobs:
       - name: Build and push commercial backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
+          file: backend/Dockerfile.commercial
           push: true
+          secrets: |
+            manifest_private_key=${{ secrets.MANIFEST_PRIVATE_KEY }}
+          build-args: |
+            SAGITTADB_VERSION=${{ steps.release.outputs.version }}
           tags: |
-            ghcr.io/${{ steps.release.outputs.repo_lc }}-backend:${{ steps.release.outputs.version }}
-            ghcr.io/${{ steps.release.outputs.repo_lc }}-backend:${{ steps.release.outputs.minor_tag }}
+            ${{ env.PUBLIC_IMAGE_REPOSITORY }}-backend:${{ steps.release.outputs.version }}
           labels: |
             org.opencontainers.image.title=SagittaDB Backend
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
@@ -72,8 +96,7 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ghcr.io/${{ steps.release.outputs.repo_lc }}-frontend:${{ steps.release.outputs.version }}
-            ghcr.io/${{ steps.release.outputs.repo_lc }}-frontend:${{ steps.release.outputs.minor_tag }}
+            ${{ env.PUBLIC_IMAGE_REPOSITORY }}-frontend:${{ steps.release.outputs.version }}
           labels: |
             org.opencontainers.image.title=SagittaDB Frontend
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
@@ -86,12 +109,11 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.release.outputs.version }}"
-          repo_lc="${{ steps.release.outputs.repo_lc }}"
           package_name="${{ steps.release.outputs.package_name }}"
 
           python scripts/render-customer-package.py \
             --version "${version}" \
-            --image-repository "ghcr.io/${repo_lc}" \
+            --image-repository "${PUBLIC_IMAGE_REPOSITORY}" \
             --output-dir dist-commercial \
             --package-name "${package_name}"
 
@@ -108,3 +130,136 @@ jobs:
             dist-commercial/${{ steps.release.outputs.package_name }}.zip
             dist-commercial/${{ steps.release.outputs.package_name }}.zip.sha256
           retention-days: 7
+
+      - name: Checkout public release repository
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PUBLIC_RELEASE_REPOSITORY }}
+          token: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          path: public-releases
+
+      - name: Publish package to Public-Releases
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_name="${{ steps.release.outputs.package_name }}"
+          release_dir="${{ steps.release.outputs.release_dir }}"
+          product_dir="public-releases/${PUBLIC_PRODUCT_DIR}"
+
+          mkdir -p "${product_dir}/releases/${release_dir}" "${product_dir}/screenshots"
+          rsync -a --delete \
+            --exclude releases \
+            --exclude screenshots \
+            "dist-commercial/${package_name}/" \
+            "${product_dir}/"
+          cp "dist-commercial/${package_name}.zip" "${product_dir}/releases/${release_dir}/"
+          cp "dist-commercial/${package_name}.zip.sha256" "${product_dir}/releases/${release_dir}/"
+          rsync -a docs/screenshots/user-manual/ "${product_dir}/screenshots/"
+
+          {
+            echo ".DS_Store"
+            echo ".env"
+            echo ".env.*"
+            echo "!.env.example"
+            echo "*.log"
+            echo "*.tmp"
+            echo "node_modules/"
+            echo "dist/"
+            echo "build/"
+            echo "*.map"
+            echo "*PRIVATE_KEY*"
+            echo "*private_key*"
+            echo "*license*.json"
+            echo "*activation*"
+          } > public-releases/.gitignore
+
+          {
+            echo "# Public Releases"
+            echo
+            echo "This repository publishes commercial deployment packages for products maintained by Lynn Lee."
+            echo
+            echo "The repository contains deployment files, documentation, release packages, and checksums. It does not contain product source code, private keys, customer licenses, activation codes, or registry credentials."
+            echo
+            echo "## Products"
+            echo
+            echo "| Product | Latest Published Version | Deployment |"
+            echo "| --- | --- | --- |"
+            echo "| SagittaDB Enterprise | ${{ steps.release.outputs.version }} | [products/sagittadb](products/sagittadb/) |"
+            echo
+            echo "## SagittaDB Enterprise"
+            echo
+            echo "SagittaDB Enterprise is delivered as a public deployment package with fixed-version commercial container images:"
+            echo
+            echo "- \`${PUBLIC_IMAGE_REPOSITORY}-backend:${{ steps.release.outputs.version }}\`"
+            echo "- \`${PUBLIC_IMAGE_REPOSITORY}-frontend:${{ steps.release.outputs.version }}\`"
+            echo
+            echo "Download the package from [products/sagittadb/releases/${release_dir}](products/sagittadb/releases/${release_dir}/), verify the checksum, and follow the included README."
+            echo
+            echo "\`\`\`bash"
+            echo "cd products/sagittadb/releases/${release_dir}"
+            echo "shasum -a 256 -c ${package_name}.zip.sha256"
+            echo "\`\`\`"
+            echo
+            echo "First deployment starts a 30-day full-feature trial. After the trial expires, business APIs are blocked and the license management page remains available."
+          } > public-releases/README.md
+
+      - name: Validate public repository content
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          product_dir="public-releases/${PUBLIC_PRODUCT_DIR}"
+          release_dir="${{ steps.release.outputs.release_dir }}"
+          package_name="${{ steps.release.outputs.package_name }}"
+
+          test -f "${product_dir}/README.md"
+          test -f "${product_dir}/docker-compose.yml"
+          test -f "${product_dir}/.env.example"
+          test -f "${product_dir}/LEGAL-NOTICE.md"
+          test -f "${product_dir}/nginx.conf"
+          test -d "${product_dir}/helm/sagittadb"
+          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip"
+          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sha256"
+
+          (
+            cd "${product_dir}/releases/${release_dir}"
+            sha256sum --check "${package_name}.zip.sha256"
+          )
+
+          if grep -RInE \
+            'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
+            public-releases \
+            --exclude-dir=.git \
+            --exclude='*.zip'; then
+            echo "Public release repository contains forbidden content." >&2
+            exit 1
+          fi
+
+          tmpdir="$(mktemp -d)"
+          unzip -q "${product_dir}/releases/${release_dir}/${package_name}.zip" -d "${tmpdir}"
+          if grep -RInE \
+            'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
+            "${tmpdir}"; then
+            echo "Release package contains forbidden content." >&2
+            exit 1
+          fi
+
+      - name: Commit and push Public-Releases update
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        working-directory: public-releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No Public-Releases changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish SagittaDB Enterprise ${{ steps.release.outputs.version }}"
+          git push

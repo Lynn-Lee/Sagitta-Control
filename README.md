@@ -153,3 +153,5 @@ npm run build
 - 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线 challenge-response、备份恢复和升级回滚验证。
 - 内部留存 CI、安全扫描、客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。
 - 合同条款需明确禁止逆向、篡改、绕过授权和二次分发，作为技术保护之外的法务兜底。
+
+Public 商业交付仓库方案见 [SagittaDB Public Commercial Delivery](docs/public_commercial_delivery.md)。
