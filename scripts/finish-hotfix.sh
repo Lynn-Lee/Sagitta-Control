@@ -6,16 +6,16 @@ version="${1:-}"
 
 usage() {
   cat <<'EOF'
-Usage:
+用法：
   bash scripts/finish-hotfix.sh <major.minor.patch>
 
-This fast-forwards release/<major.minor> from hotfix/<major.minor.patch>,
-then cherry-picks the hotfix commits back to main.
+该脚本会把 hotfix/<major.minor.patch> 快进合并到 release/<major.minor>，
+然后把 hotfix 提交 cherry-pick 回 main。
 EOF
 }
 
 [[ -n "${version}" ]] || { usage; exit 1; }
-[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.0.5"; exit 1; }
+[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "版本号格式应类似 2.0.0"; exit 1; }
 
 minor="$(printf '%s' "${version}" | awk -F. '{print $1 "." $2}')"
 release_branch="release/${minor}"
@@ -23,7 +23,7 @@ hotfix_branch="hotfix/${version}"
 tag="v${version}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Tracked files have local changes. Commit or stash them before finishing ${hotfix_branch}."
+  echo "当前跟踪文件存在本地改动。完成 ${hotfix_branch} 前请先提交或暂存。"
   exit 1
 fi
 
@@ -41,9 +41,9 @@ git merge --ff-only origin/main 2>/dev/null || true
 git cherry-pick "${hotfix_base}..${hotfix_tip}"
 
 cat <<EOF
-Finished ${hotfix_branch}.
+已完成 ${hotfix_branch}。
 
-Review the result, then push:
+请检查结果，然后推送：
   git push origin ${release_branch}
   git push origin main
   git push origin ${tag}

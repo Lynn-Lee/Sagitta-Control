@@ -17,7 +17,7 @@ EOF
 }
 
 [[ -n "${version}" ]] || { usage; exit 1; }
-[[ "${version}" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.0"; exit 1; }
+[[ "${version}" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "版本号格式应类似 2.0"; exit 1; }
 
 branch="release/${version}"
 

@@ -37,7 +37,7 @@ COPY scripts/compile-nuitka-core.sh /usr/local/bin/compile-nuitka-core.sh
 COPY tools/sign_manifest.py /usr/local/bin/sign_manifest.py
 RUN chmod +x /usr/local/bin/compile-nuitka-core.sh /usr/local/bin/sign_manifest.py && \
     /usr/local/bin/compile-nuitka-core.sh
-# BuildKit secret keeps the Manifest signing private key out of the image layers.
+# BuildKit secret 用于避免 Manifest 签名私钥进入镜像层。
 RUN --mount=type=secret,id=manifest_private_key,required=true \
     MANIFEST_PRIVATE_KEY="$(cat /run/secrets/manifest_private_key)" \
     python /usr/local/bin/sign_manifest.py \

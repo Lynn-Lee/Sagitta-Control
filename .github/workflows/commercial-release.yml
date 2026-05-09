@@ -1,4 +1,4 @@
-name: Commercial Release
+name: 商业部署发布
 
 on:
   push:
@@ -10,11 +10,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version without leading v. Empty value creates a dev snapshot version."
+        description: "发布版本号，不带 v；留空时生成开发快照版本。"
         required: false
         type: string
       publish_public_repo:
-        description: "Publish the rendered commercial package to Public-Releases."
+        description: "是否将渲染后的商业部署包发布到 Public-Releases。"
         required: false
         default: true
         type: boolean
@@ -26,20 +26,20 @@ permissions:
 env:
   PRODUCT_CODE: sagittadb
   PRODUCT_NAME: SagittaDB Enterprise
-  COMMERCIAL_BASE_VERSION: "1.0.5"
+  COMMERCIAL_BASE_VERSION: "2.0.0"
   PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Public-Releases
   PUBLIC_PRODUCT_DIR: products/sagittadb
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
 
 jobs:
   package:
-    name: Build and Publish Commercial Package
+    name: 构建并发布商业部署包
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve release metadata
+      - name: 解析发布元数据
         id: release
         shell: bash
         run: |
@@ -61,17 +61,17 @@ jobs:
           echo "package_name=${package_name}" >> "${GITHUB_OUTPUT}"
           echo "release_dir=v${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Log in to GHCR
+      - name: 登录 GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
+      - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push commercial backend image
+      - name: 构建并推送商业后端镜像
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -90,7 +90,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push commercial frontend image
+      - name: 构建并推送商业前端镜像
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -104,7 +104,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Render customer deployment package
+      - name: 渲染客户部署包
         shell: bash
         run: |
           set -euo pipefail
@@ -122,7 +122,7 @@ jobs:
             sha256sum --check "${package_name}.zip.sha256"
           )
 
-      - name: Checkout public release repository
+      - name: 检出公开发布仓库
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
         uses: actions/checkout@v4
         with:
@@ -130,7 +130,7 @@ jobs:
           token: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           path: public-releases
 
-      - name: Publish package to Public-Releases
+      - name: 发布部署包到 Public-Releases
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
         shell: bash
         run: |
@@ -170,34 +170,34 @@ jobs:
           {
             echo "# Public Releases"
             echo
-            echo "This repository publishes commercial deployment packages for products maintained by Lynn Lee."
+            echo "本仓库用于发布 Lynn Lee 维护产品的商业部署包。"
             echo
-            echo "The repository contains deployment files, documentation, release packages, and checksums. It does not contain product source code, private keys, customer licenses, activation codes, or registry credentials."
+            echo "本仓库只包含部署文件、文档、发布包和校验和，不包含产品源码、私钥、客户 License、激活码或镜像仓库凭据。"
             echo
             echo "## Products"
             echo
-            echo "| Product | Latest Published Version | Deployment |"
+            echo "| 产品 | 最新发布版本 | 部署入口 |"
             echo "| --- | --- | --- |"
             echo "| SagittaDB Enterprise | ${{ steps.release.outputs.version }} | [products/sagittadb](products/sagittadb/) |"
             echo
             echo "## SagittaDB Enterprise"
             echo
-            echo "SagittaDB Enterprise is delivered as a public deployment package with fixed-version commercial container images:"
+            echo "SagittaDB Enterprise 通过公开商业部署包交付，并使用固定版本商业容器镜像："
             echo
             echo "- \`${PUBLIC_IMAGE_REPOSITORY}-backend:${{ steps.release.outputs.version }}\`"
             echo "- \`${PUBLIC_IMAGE_REPOSITORY}-frontend:${{ steps.release.outputs.version }}\`"
             echo
-            echo "Download the package from [products/sagittadb/releases/${release_dir}](products/sagittadb/releases/${release_dir}/), verify the checksum, and follow the included README."
+            echo "请从 [products/sagittadb/releases/${release_dir}](products/sagittadb/releases/${release_dir}/) 下载部署包，校验 sha256 后按包内 README 部署。"
             echo
             echo "\`\`\`bash"
             echo "cd products/sagittadb/releases/${release_dir}"
             echo "shasum -a 256 -c ${package_name}.zip.sha256"
             echo "\`\`\`"
             echo
-            echo "First deployment starts a 30-day full-feature trial. After the trial expires, business APIs are blocked and the license management page remains available."
+            echo "首次部署自动进入 30 天全功能试用期。试用到期后业务 API 会被阻断，授权管理页仍可访问。"
           } > public-releases/README.md
 
-      - name: Validate public repository content
+      - name: 校验公开仓库内容
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
         shell: bash
         run: |
@@ -226,7 +226,7 @@ jobs:
             public-releases \
             --exclude-dir=.git \
             --exclude='*.zip'; then
-            echo "Public release repository contains forbidden content." >&2
+            echo "公开发布仓库包含禁止发布的内容。" >&2
             exit 1
           fi
 
@@ -235,11 +235,11 @@ jobs:
           if grep -RInE \
             'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
             "${tmpdir}"; then
-            echo "Release package contains forbidden content." >&2
+            echo "发布包包含禁止发布的内容。" >&2
             exit 1
           fi
 
-      - name: Commit and push Public-Releases update
+      - name: 提交并推送 Public-Releases 更新
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
         working-directory: public-releases
         shell: bash
@@ -249,8 +249,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if git diff --cached --quiet; then
-            echo "No Public-Releases changes to publish."
+            echo "Public-Releases 没有需要发布的变更。"
             exit 0
           fi
-          git commit -m "Publish SagittaDB Enterprise ${{ steps.release.outputs.version }}"
+          git commit -m "发布 SagittaDB Enterprise ${{ steps.release.outputs.version }}"
           git push

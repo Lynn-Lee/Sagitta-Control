@@ -37,7 +37,7 @@ auth_curl -X POST "$API_BASE/system/license/activate" \
   -d "{\"activation_code\":\"$ACTIVATION_CODE\",\"customer_id\":\"$CUSTOMER_ID\"}"
 echo
 
-echo "3. Generate offline challenge"
+echo "3. 生成离线 Challenge"
 auth_curl -X POST "$API_BASE/system/license/challenge" \
   -H 'Content-Type: application/json' \
   -d "{\"customer_id\":\"$CUSTOMER_ID\"}"

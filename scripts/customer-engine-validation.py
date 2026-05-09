@@ -155,7 +155,7 @@ def run_check(
     try:
         status, payload = client.request(method, path, body)
     except Exception as exc:  # noqa: BLE001 - validation should collect all failures
-        results.append(CheckResult(label, name, False, f"request failed: {exc}"))
+        results.append(CheckResult(label, name, False, f"请求失败：{exc}"))
         return None
     if status in expected:
         results.append(CheckResult(label, name, True, f"HTTP {status}"))

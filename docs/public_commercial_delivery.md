@@ -1,17 +1,17 @@
-# SagittaDB Public Commercial Delivery
+# SagittaDB 公开商业交付说明
 
 本文档定义 SagittaDB Enterprise 的公开商业交付方式：公开部署包和商业镜像，源码、签发工具、私钥和内部构建流程继续保留在私有仓库。
 
-## 1. Delivery Model
+## 1. 交付模型
 
 SagittaDB 采用以下边界：
 
-- Public delivery repository：只放产品介绍、部署文件、Helm Chart、安装脚本、法律提示、截图和 Release 下载资产。
-- Public container registry：公开拉取固定版本商业镜像。
-- Private source repository：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
+- 公开交付仓库：只放产品介绍、部署文件、Helm Chart、安装脚本、法律提示、截图和 Release 下载资产。
+- 公开镜像仓库：公开拉取固定版本商业镜像。
+- 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
 
-推荐 public 仓库结构：
+推荐公开仓库结构：
 
 ```text
 products/
@@ -35,7 +35,7 @@ README.md
 
 当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入 public 仓库。
 
-## 2. Public Repository Content
+## 2. 公开仓库内容
 
 `products/sagittadb/README.md` 应作为用户入口，包含：
 
@@ -47,7 +47,7 @@ README.md
 - 商业授权联系方式。
 - Release 下载和 sha256 校验方式。
 
-public 仓库可以包含部署资产和截图，但不得包含：
+公开仓库可以包含部署资产和截图，但不得包含：
 
 - 后端或前端源码目录。
 - `LICENSE_PRIVATE_KEY`、`MANIFEST_PRIVATE_KEY` 或任何私钥材料。
@@ -55,13 +55,13 @@ public 仓库可以包含部署资产和截图，但不得包含：
 - sourcemap、构建缓存、CI 安全扫描原始报告或内部验收记录。
 - `latest` 镜像标签、源码 `build:` 配置或本地源码挂载路径。
 
-## 3. Image Naming
+## 3. 镜像命名
 
-SagittaDB 镜像统一发布到公开 GHCR organization，并只在部署包中引用完整版本号：
+SagittaDB 镜像统一发布到公开 GHCR 组织，并只在部署包中引用完整版本号：
 
 ```text
-ghcr.io/<org>/sagittadb-backend:1.0.5
-ghcr.io/<org>/sagittadb-frontend:1.0.5
+ghcr.io/<org>/sagittadb-backend:2.0.0
+ghcr.io/<org>/sagittadb-frontend:2.0.0
 ```
 
 发布规则：
@@ -72,26 +72,26 @@ ghcr.io/<org>/sagittadb-frontend:1.0.5
 - 前端镜像只包含 build 产物，构建后必须拒绝 `.map` sourcemap。
 - 商业镜像默认启用 Manifest 完整性校验。
 
-## 4. GitHub Release
+## 4. GitHub Release 规则
 
 SagittaDB 在统一 public 仓库中按产品独立发版：
 
 ```text
-Tag: sagittadb/v1.0.5
-Title: SagittaDB Enterprise v1.0.5
+Tag: sagittadb/v2.0.0
+Title: SagittaDB Enterprise v2.0.0
 Assets:
-  SagittaDB-Enterprise-v1.0.5.zip
-  SagittaDB-Enterprise-v1.0.5.zip.sha256
+  SagittaDB-Enterprise-v2.0.0.zip
+  SagittaDB-Enterprise-v2.0.0.zip.sha256
 ```
 
-Release notes 使用 [SagittaDB public release template](release_templates/sagittadb_public_release.md)。
+Release notes 使用 [SagittaDB 公开发布模板](release_templates/sagittadb_public_release.md)。
 
 用户安装命令示例：
 
 ```bash
-wget https://github.com/<org>/<public-repo>/releases/download/sagittadb/v1.0.5/SagittaDB-Enterprise-v1.0.5.zip
-unzip SagittaDB-Enterprise-v1.0.5.zip
-cd SagittaDB-Enterprise-v1.0.5
+wget https://github.com/<org>/<public-repo>/releases/download/sagittadb/v2.0.0/SagittaDB-Enterprise-v2.0.0.zip
+unzip SagittaDB-Enterprise-v2.0.0.zip
+cd SagittaDB-Enterprise-v2.0.0
 
 cp .env.example .env
 vim .env
@@ -103,7 +103,7 @@ docker compose up -d
 docker compose ps
 ```
 
-## 5. License Policy
+## 5. License 策略
 
 SagittaDB 固定授权项目码：
 
@@ -127,7 +127,7 @@ product=sagittadb
 - 试用期内全部受保护功能可用。
 - 试用期结束后，业务 API 返回 `LICENSE_REQUIRED`，登录、健康检查和授权管理入口继续可用。
 
-## 6. Activation Flows
+## 6. 授权流程
 
 在线激活：
 
@@ -168,28 +168,28 @@ payload:
 LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 ```
 
-## 7. Private Release Flow
+## 7. 私有仓库发布流程
 
 私有仓库负责生成 public 交付资产：
 
-1. 确认版本号，例如 `1.0.5`。
-2. 构建并推送 `ghcr.io/<org>/sagittadb-backend:1.0.5`。
-3. 构建并推送 `ghcr.io/<org>/sagittadb-frontend:1.0.5`。
+1. 确认版本号，例如 `2.0.0`。
+2. 构建并推送 `ghcr.io/<org>/sagittadb-backend:2.0.0`。
+3. 构建并推送 `ghcr.io/<org>/sagittadb-frontend:2.0.0`。
 4. 生成并签名商业 Manifest。
 5. 渲染客户部署包。
 6. 生成 zip 和 sha256。
 7. 检查部署包无源码、私钥、token、真实 License、sourcemap 和浮动镜像标签。
 8. 同步部署文件到 public 仓库 `products/sagittadb/`。
-9. 在 public 仓库创建 `sagittadb/v1.0.5` Release。
+9. 在 public 仓库创建 `sagittadb/v2.0.0` Release。
 10. 上传 zip 和 sha256。
 
 自动发布由 `.github/workflows/commercial-release.yml` 执行：
 
-- 推送到 `main` 或 `release/**` 时，生成快照版本，例如 `1.0.5-dev.123.abcdef0`，并同步到 `Public-Releases`。
+- 推送到 `main` 或 `release/**` 时，生成快照版本，例如 `2.0.0-dev.123.abcdef0`，并同步到 `Public-Releases`。
 - 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`。
 - 手动触发 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本。
-- workflow 会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
-- workflow 会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`。
+- 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
+- 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`。
 
 私有仓库需要配置 GitHub Secrets：
 
@@ -203,23 +203,23 @@ PUBLIC_RELEASES_TOKEN
 现有脚本入口：
 
 ```bash
-VERSION=1.0.5 \
+VERSION=2.0.0 \
 IMAGE_REPOSITORY=ghcr.io/<org>/sagittadb \
 MANIFEST_PRIVATE_KEY_FILE=/path/to/manifest_private_key \
 ./scripts/build-commercial-images.sh
 
 python scripts/render-customer-package.py \
-  --version 1.0.5 \
+  --version 2.0.0 \
   --image-repository ghcr.io/<org>/sagittadb \
   --output-dir dist-commercial \
-  --package-name SagittaDB-Enterprise-v1.0.5
+  --package-name SagittaDB-Enterprise-v2.0.0
 ```
 
-## 8. Acceptance Checklist
+## 8. 验收清单
 
-每个 public commercial release 必须满足：
+每个公开商业发布必须满足：
 
-- public Release 可下载 `SagittaDB-Enterprise-vX.Y.Z.zip` 和 `.sha256`。
+- 公开 Release 可下载 `SagittaDB-Enterprise-vX.Y.Z.zip` 和 `.sha256`。
 - GHCR 镜像可匿名拉取。
 - 部署包不需要源码即可启动。
 - `docker-compose.yml` 和 Helm values 使用固定版本镜像。
@@ -228,19 +228,19 @@ python scripts/render-customer-package.py \
 - 在线激活、联网刷新和离线 challenge-response 均可用。
 - License 项目码必须是 `sagittadb`。
 - 篡改商业镜像关键文件时完整性校验失败。
-- public 仓库和 Release 包不包含源码、私钥、token、真实 License、sourcemap 或 `latest` 标签。
+- 公开仓库和 Release 包不包含源码、私钥、token、真实 License、sourcemap 或 `latest` 标签。
 
-## 9. Recommended Defaults
+## 9. 推荐默认值
 
 ```text
 Product Code: sagittadb
 Product Name: SagittaDB
 Edition: enterprise
 Trial Days: 30
-Release Tag: sagittadb/v1.0.5
-Package Name: SagittaDB-Enterprise-v1.0.5.zip
-Backend Image: ghcr.io/<org>/sagittadb-backend:1.0.5
-Frontend Image: ghcr.io/<org>/sagittadb-frontend:1.0.5
+Release Tag: sagittadb/v2.0.0
+Package Name: SagittaDB-Enterprise-v2.0.0.zip
+Backend Image: ghcr.io/<org>/sagittadb-backend:2.0.0
+Frontend Image: ghcr.io/<org>/sagittadb-frontend:2.0.0
 License Server: License-Server-Center
-Expired Behavior: login and license management remain available; business APIs are blocked
+Expired Behavior: 保留登录和授权管理入口，业务 API 阻断
 ```

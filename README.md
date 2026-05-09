@@ -3,7 +3,7 @@
 > 企业级多引擎数据库管控平台
 > 矢向数据，精准管控
 
-SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v1.0-GA + v2-lite 授权体系**。
+SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.0 商业部署版 + v2-lite 授权体系**。
 
 ## 核心能力
 
@@ -137,21 +137,21 @@ npm run build
 
 ## 商业交付
 
-当前版本：`v1.0-GA + v2-lite 授权体系`。
-当前商业部署版本：`1.0.5`。
+当前版本：`v2.0 商业部署版 + v2-lite 授权体系`。
+当前商业部署版本：`2.0.0`。
 状态：正式版商业交付。
 
 商业授权接入统一授权中心 `License-Server-Center`。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。
 
-正式交付建议包含：
+正式交付包含：
 
-- 固定版本 Docker/Helm 私有化部署包，不使用 `latest`。
+- 固定版本 Docker/Helm 公开商业部署包，不使用 `latest`。
 - 商业后端镜像使用 Nuitka 编译核心 Python 模块，前端只交付 build 产物且构建阶段禁止 sourcemap。
 - `.env.example`、`docker-compose.yml`、`upgrade.sh`、`verify-license.sh` 和 Nginx 配置。
 - 商业 License 使用 Ed25519 签名校验；支持在线激活、联网刷新和离线 challenge-response，生产环境默认禁止旧式裸 License 导入。
 - 商业镜像使用 Ed25519 签名完整性 Manifest 启动校验，镜像和客户包发布流程需完成 cosign 镜像签名与交付包签名。
 - 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线 challenge-response、备份恢复和升级回滚验证。
-- 内部留存 CI、安全扫描、客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。
+- 内部留存客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。
 - 合同条款需明确禁止逆向、篡改、绕过授权和二次分发，作为技术保护之外的法务兜底。
 
-Public 商业交付仓库方案见 [SagittaDB Public Commercial Delivery](docs/public_commercial_delivery.md)。
+公开商业交付仓库方案见 [SagittaDB 公开商业交付说明](docs/public_commercial_delivery.md)。

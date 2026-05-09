@@ -34,7 +34,7 @@
           headers: { Accept: 'application/json' }
         })
           .then(function (response) {
-            if (!response.ok) throw new Error('branding request failed')
+            if (!response.ok) throw new Error('品牌配置请求失败')
             return response.json()
           })
           .then(function (branding) {

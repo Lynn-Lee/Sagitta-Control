@@ -40,7 +40,7 @@ mkdir -p "${BACKUP_DIR}"
 
 log "Updating docker-compose.yml image tags to ${TARGET_VERSION}"
 tmp_file="$(mktemp)"
-sed -E "s#(__IMAGE_REPOSITORY__-(backend|frontend):)[0-9]+\.[0-9]+\.[0-9]+#\1${TARGET_VERSION}#g" docker-compose.yml > "${tmp_file}"
+sed -E "s#(__IMAGE_REPOSITORY__-(backend|frontend):)[0-9]+\.[0-9]+\.[0-9]+([-A-Za-z0-9.]+)?#\1${TARGET_VERSION}#g" docker-compose.yml > "${tmp_file}"
 mv "${tmp_file}" docker-compose.yml
 
 log "Pulling SagittaDB Enterprise images"

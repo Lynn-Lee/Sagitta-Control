@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a SagittaDB performance baseline report.
+"""生成 SagittaDB 性能基线报告。
 
-The script accepts Locust CSV output when available and always includes frontend
-asset budget data when frontend/dist exists. It writes a Markdown report that
-can be attached to customer delivery records.
+脚本可读取 Locust CSV 输出；当 frontend/dist 存在时，会同时写入前端包体预算。
+输出的 Markdown 报告可归档到客户交付记录中。
 """
 
 from __future__ import annotations

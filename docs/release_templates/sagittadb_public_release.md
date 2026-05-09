@@ -1,13 +1,13 @@
 # SagittaDB Enterprise vX.Y.Z
 
-## Images
+## 镜像
 
 - `ghcr.io/<org>/sagittadb-backend:X.Y.Z`
 - `ghcr.io/<org>/sagittadb-frontend:X.Y.Z`
 
-## Install
+## 安装
 
-Download `SagittaDB-Enterprise-vX.Y.Z.zip`, verify the checksum, unzip it, then follow the included `README.md`.
+下载 `SagittaDB-Enterprise-vX.Y.Z.zip`，校验 sha256 后解压，并按包内 `README.md` 部署。
 
 ```bash
 sha256sum -c SagittaDB-Enterprise-vX.Y.Z.zip.sha256
@@ -20,12 +20,12 @@ docker compose run --rm backend alembic upgrade head
 docker compose up -d
 ```
 
-## Trial And License
+## 试用与授权
 
-First deployment starts a 30-day full-feature trial. After the trial expires, business APIs are blocked and the license management page remains available.
+首次部署自动进入 30 天全功能试用期。试用到期后，业务 API 会被阻断，授权管理页仍可访问。
 
-For commercial authorization, contact SagittaDB support and provide the deployment fingerprint shown in the license management page.
+获取商业授权时，请联系 SagittaDB 支持团队，并提供授权管理页展示的部署指纹。
 
-## Security Notes
+## 安全说明
 
-This package contains deployment files only. It does not include SagittaDB source code, private keys, customer licenses, activation codes, or registry credentials.
+本部署包只包含部署文件，不包含 SagittaDB 源码、私钥、客户 License、激活码或镜像仓库凭据。

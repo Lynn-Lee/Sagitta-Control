@@ -6,23 +6,23 @@ version="${1:-}"
 
 usage() {
   cat <<'EOF'
-Usage:
+用法：
   bash scripts/start-hotfix.sh <major.minor.patch>
 
-Example:
-  bash scripts/start-hotfix.sh 1.0.5
+示例：
+  bash scripts/start-hotfix.sh 2.0.0
 EOF
 }
 
 [[ -n "${version}" ]] || { usage; exit 1; }
-[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.0.5"; exit 1; }
+[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "版本号格式应类似 2.0.0"; exit 1; }
 
 minor="$(printf '%s' "${version}" | awk -F. '{print $1 "." $2}')"
 release_branch="release/${minor}"
 hotfix_branch="hotfix/${version}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Tracked files have local changes. Commit or stash them before creating ${hotfix_branch}."
+  echo "当前跟踪文件存在本地改动。创建 ${hotfix_branch} 前请先提交或暂存。"
   exit 1
 fi
 
@@ -32,9 +32,9 @@ git merge --ff-only "origin/${release_branch}" 2>/dev/null || true
 git switch -c "${hotfix_branch}"
 
 cat <<EOF
-Created ${hotfix_branch} from ${release_branch}.
+已从 ${release_branch} 创建 ${hotfix_branch}。
 
-After the fix is committed:
+修复提交后执行：
   git tag v${version}
   git push -u origin ${hotfix_branch}
   git push origin v${version}

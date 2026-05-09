@@ -690,7 +690,7 @@ export default function LoginPage() {
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
         lineHeight: 1.8,
       }}>
-        <div>{branding.platform_name} v2.0.0 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>{branding.platform_name} v2.0.0 · 多引擎兼容 · 全链路可观测</div>
         <div>Copyright © 2026 Jocelyn. All rights reserved.</div>
       </div>
     </div>

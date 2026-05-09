@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-TARGET_VERSION="${1:-1.0.5}"
+TARGET_VERSION="${1:-2.0.0}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-http://127.0.0.1:8000/health}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-http://127.0.0.1/health}"
@@ -40,7 +40,7 @@ mkdir -p "${BACKUP_DIR}"
 
 log "Updating docker-compose.yml image tags to ${TARGET_VERSION}"
 tmp_file="$(mktemp)"
-sed -E "s#(ghcr.io/lynn-lee/sagittadb-(backend|frontend):)[0-9]+\.[0-9]+\.[0-9]+#\1${TARGET_VERSION}#g" docker-compose.yml > "${tmp_file}"
+sed -E "s#(ghcr.io/lynn-lee/sagittadb-(backend|frontend):)[0-9]+\.[0-9]+\.[0-9]+([-A-Za-z0-9.]+)?#\1${TARGET_VERSION}#g" docker-compose.yml > "${tmp_file}"
 mv "${tmp_file}" docker-compose.yml
 
 log "Pulling SagittaDB Enterprise images"

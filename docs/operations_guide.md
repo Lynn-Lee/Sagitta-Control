@@ -1,7 +1,7 @@
 # SagittaDB 运维文档
 
-> 文档版本：v1.0  
-> 适用版本：SagittaDB v1.0-GA + v2-lite 授权体系  
+> 文档版本：v2.0
+> 适用版本：SagittaDB v2.0 商业部署版 + v2-lite 授权体系
 > 目标读者：运维工程师、DBA、DevOps、系统管理员
 
 ## 1. 运维范围
@@ -332,7 +332,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `1.0.5`。SagittaDB 授权项目码固定为 `sagittadb`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。
+当前商业部署版本为 `2.0.0`。SagittaDB 授权项目码固定为 `sagittadb`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

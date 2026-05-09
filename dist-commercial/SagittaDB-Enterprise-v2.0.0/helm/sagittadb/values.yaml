@@ -8,7 +8,7 @@ fullnameOverride: ""
 image:
   registry: ghcr.io
   repository: lynn-lee/sagittadb-backend
-  tag: "1.0.5"
+  tag: "2.0.0"
   pullPolicy: IfNotPresent
 
 # ─── 后端（FastAPI）────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ frontend:
   image:
     registry: ghcr.io
     repository: lynn-lee/sagittadb-frontend
-    tag: "1.0.5"
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
   resources:
     requests:

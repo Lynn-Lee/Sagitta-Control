@@ -41,7 +41,7 @@ Options:
 Examples:
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
-  bash deploy/update-prod.sh --ref v1.0.1
+  bash deploy/update-prod.sh --ref v2.0.0
   bash deploy/update-prod.sh --skip-backup --no-cache
 EOF
 }

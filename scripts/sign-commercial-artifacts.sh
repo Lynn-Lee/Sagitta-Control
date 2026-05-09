@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="${VERSION:?VERSION is required, e.g. 1.0.5}"
+VERSION="${VERSION:?VERSION is required, e.g. 2.0.0}"
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagittadb}"
 PACKAGE_ZIP="${PACKAGE_ZIP:-dist-commercial/SagittaDB-Enterprise-v${VERSION}.zip}"
 MANIFEST_OUT="${MANIFEST_OUT:-backend/COMMERCIAL-MANIFEST.json}"
 
-# cosign signs the pushed image digests; the JSON signature below covers the
-# customer deployment package that travels outside the registry.
+# cosign 用于签名已推送镜像的 digest；下面生成的 JSON 签名用于保护
+# 会在镜像仓库之外流转的客户部署包。
 if ! command -v cosign >/dev/null 2>&1; then
   echo "cosign is required for image signing" >&2
   exit 1

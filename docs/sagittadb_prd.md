@@ -1,7 +1,7 @@
 # SagittaDB 矢准数据产品设计文档
 
-> 文档版本：v1.0
-> 适用版本：SagittaDB v1.0-GA + v2-lite 授权体系
+> 文档版本：v2.0
+> 适用版本：SagittaDB v2.0 商业部署版 + v2-lite 授权体系
 > 目标读者：客户决策人、售前、产品经理、实施工程师、DBA、研发负责人、审计负责人
 
 ## 1. 产品定位
@@ -201,7 +201,7 @@ Dashboard 面向不同角色展示权限范围内的统计信息，包括在线�
 
 SQL 工单支持提交、列表、详情、审批、执行、取消、模板复用和 AI Text2SQL。列表按“我的工单、审批记录、执行记录”分视角展示，减少不同角色之间的信息噪声。
 
-SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎公共风险规则，包括无 WHERE 的 UPDATE/DELETE、高风险 DDL、DROP/TRUNCATE、SELECT *、INSERT ... SELECT 和多语句执行顺序提示。goInception 仅作为 MySQL 专用可选扩展位，不作为 v1.0-GA 主线能力承诺。
+SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎公共风险规则，包括无 WHERE 的 UPDATE/DELETE、高风险 DDL、DROP/TRUNCATE、SELECT *、INSERT ... SELECT 和多语句执行顺序提示。goInception 仅作为 MySQL 专用可选扩展位，不作为 v2.0 主线能力承诺。
 
 ### 5.4 在线查询与查询历史
 
@@ -290,7 +290,7 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 运维管理手册。
 - 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
-当前商业部署版本为 `1.0.5`。商业授权统一接入 `License-Server-Center`，SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。
+当前商业部署版本为 `2.0.0`。商业授权统一接入 `License-Server-Center`，SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。
 
 商业版增强边界：
 

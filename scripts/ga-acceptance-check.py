@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""SagittaDB v1.0-GA acceptance smoke check.
+"""SagittaDB 2.0 商业部署版验收冒烟检查。
 
-By default this script only runs non-mutating checks. Mutating business checks
-such as workflow submission, query privilege application, archive job submission,
-license activation, and notification test require explicit flags.
+默认只执行非破坏性检查。提交工单、申请查询权限、提交归档任务、
+激活 License 和通知测试等会改变业务数据的检查，必须显式传入对应参数。
 """
 
 from __future__ import annotations
@@ -82,8 +81,8 @@ def check_request(
     expected = expected or {200}
     try:
         status, payload = client.request(method, path, body)
-    except Exception as exc:  # noqa: BLE001 - acceptance output should keep going
-        return CheckResult(name, False, f"request failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 - 验收脚本应尽量收集后续检查结果
+        return CheckResult(name, False, f"请求失败：{exc}")
 
     if status in expected:
         return CheckResult(name, True, f"HTTP {status}")
@@ -103,8 +102,8 @@ def login(
             "/api/v1/auth/login/",
             {"username": username, "password": password},
         )
-    except Exception as exc:  # noqa: BLE001
-        return None, CheckResult("登录", False, f"request failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 - 登录失败需要返回结构化检查结果
+        return None, CheckResult("登录", False, f"请求失败：{exc}")
 
     if status != 200:
         return None, CheckResult("登录", False, f"HTTP {status}: {payload}")
@@ -368,7 +367,7 @@ def needs_authenticated_checks(args: argparse.Namespace) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="SagittaDB v1.0-GA acceptance smoke check"
+        description="SagittaDB v2.0 acceptance smoke check"
     )
     parser.add_argument(
         "--base-url", default="http://127.0.0.1:8000", help="Backend base URL"

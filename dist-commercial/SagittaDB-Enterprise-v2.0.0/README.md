@@ -1,11 +1,11 @@
-# SagittaDB Enterprise v1.0.5
+# SagittaDB Enterprise v2.0.0
 
 这是 SagittaDB Enterprise 客户部署包。部署包只包含生产部署配置，应用代码通过固定版本 Docker 镜像交付。
 
 ## 镜像
 
-- 后端：`ghcr.io/lynn-lee/sagittadb-backend:1.0.5`
-- 前端：`ghcr.io/lynn-lee/sagittadb-frontend:1.0.5`
+- 后端：`ghcr.io/lynn-lee/sagittadb-backend:2.0.0`
+- 前端：`ghcr.io/lynn-lee/sagittadb-frontend:2.0.0`
 
 生产环境不要使用 `latest`，请保留 `docker-compose.yml` 中的明确版本标签。
 使用前请确认合同、订单或授权函约定，并阅读随包 `LEGAL-NOTICE.md`。
@@ -41,7 +41,7 @@ helm upgrade --install sagittadb helm/sagittadb \
 ## 升级
 
 ```bash
-./upgrade.sh 1.0.5
+./upgrade.sh 2.0.0
 ```
 
 升级脚本会更新镜像标签、拉取镜像、备份 PostgreSQL、执行 Alembic 迁移并检查前后端健康状态。
@@ -51,8 +51,8 @@ helm upgrade --install sagittadb helm/sagittadb \
 如果服务器无法访问镜像仓库，请导入 SagittaDB 支持团队提供的镜像包：
 
 ```bash
-docker load < sagittadb-backend-1.0.5.tar
-docker load < sagittadb-frontend-1.0.5.tar
+docker load < sagittadb-backend-2.0.0.tar
+docker load < sagittadb-frontend-2.0.0.tar
 docker compose up -d
 ```
 
