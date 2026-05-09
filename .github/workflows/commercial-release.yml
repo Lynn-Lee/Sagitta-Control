@@ -122,15 +122,6 @@ jobs:
             sha256sum --check "${package_name}.zip.sha256"
           )
 
-      - name: Upload customer deployment package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.release.outputs.package_name }}
-          path: |
-            dist-commercial/${{ steps.release.outputs.package_name }}.zip
-            dist-commercial/${{ steps.release.outputs.package_name }}.zip.sha256
-          retention-days: 7
-
       - name: Checkout public release repository
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
         uses: actions/checkout@v4
