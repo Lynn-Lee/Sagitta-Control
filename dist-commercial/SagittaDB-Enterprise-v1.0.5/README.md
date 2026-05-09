@@ -9,13 +9,13 @@
 
 生产环境不要使用 `latest`，请保留 `docker-compose.yml` 中的明确版本标签。
 使用前请确认合同、订单或授权函约定，并阅读随包 `LEGAL-NOTICE.md`。
+首次部署会自动进入 30 天全功能试用期；试用到期后业务功能将暂停，仅保留登录和授权管理入口。
 
 ## 首次部署
 
 ```bash
 cp .env.example .env
 # 编辑 .env，替换所有 CHANGE_ME 值。
-docker login ghcr.io
 docker compose pull
 docker compose up -d postgres redis
 docker compose run --rm backend alembic upgrade head
@@ -67,5 +67,7 @@ docker compose up -d
 SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
 
 生产环境默认不接受未绑定 Challenge 的裸 License JSON。
+
+试用期结束或需要正式生产授权时，请联系 SagittaDB 商业支持，并提供授权管理页展示的部署指纹。
 
 共享日志或配置时，不要打包 License 文件、私钥、激活码或 `.env` 中的敏感值。
