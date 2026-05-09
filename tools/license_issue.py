@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """签发 SagittaDB Enterprise License 文件。
 
-私钥必须通过 SAGITTADB_LICENSE_PRIVATE_KEY 提供，禁止提交到仓库或复制到客户镜像。
+私钥必须通过 LICENSE_PRIVATE_KEY 提供，禁止提交到仓库或复制到客户镜像。
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
+LICENSE_PROJECT_CODE = "sagittadb"
 
 
 def b64url(data: bytes) -> str:
@@ -30,13 +31,13 @@ def canonical_payload(payload: dict[str, Any]) -> bytes:
 
 
 def load_private_key() -> Ed25519PrivateKey:
-    value = os.environ.get("SAGITTADB_LICENSE_PRIVATE_KEY", "").strip()
+    value = os.environ.get("LICENSE_PRIVATE_KEY", "").strip()
     if not value:
-        raise SystemExit("SAGITTADB_LICENSE_PRIVATE_KEY is required")
+        raise SystemExit("LICENSE_PRIVATE_KEY is required")
     if "BEGIN PRIVATE KEY" in value:
         loaded = serialization.load_pem_private_key(value.encode(), password=None)
         if not isinstance(loaded, Ed25519PrivateKey):
-            raise SystemExit("SAGITTADB_LICENSE_PRIVATE_KEY is not an Ed25519 private key")
+            raise SystemExit("LICENSE_PRIVATE_KEY is not an Ed25519 private key")
         return loaded
     padded = value + "=" * (-len(value) % 4)
     return Ed25519PrivateKey.from_private_bytes(base64.urlsafe_b64decode(padded.encode()))
@@ -53,7 +54,7 @@ def generate_keypair() -> None:
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw,
     )
-    print("SAGITTADB_LICENSE_PRIVATE_KEY=" + b64url(private_raw))
+    print("LICENSE_PRIVATE_KEY=" + b64url(private_raw))
     print("LICENSE_PUBLIC_KEY=" + b64url(public_raw))
 
 
@@ -110,6 +111,8 @@ def main() -> int:
 
     payload = {
         "license_id": args.license_id,
+        "project": LICENSE_PROJECT_CODE,
+        "product": LICENSE_PROJECT_CODE,
         "customer_id": args.customer_id,
         "company_name": args.company_name,
         "edition": args.edition,

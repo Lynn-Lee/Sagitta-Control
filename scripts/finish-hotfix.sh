@@ -15,7 +15,7 @@ EOF
 }
 
 [[ -n "${version}" ]] || { usage; exit 1; }
-[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.0.4"; exit 1; }
+[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.0.5"; exit 1; }
 
 minor="$(printf '%s' "${version}" | awk -F. '{print $1 "." $2}')"
 release_branch="release/${minor}"

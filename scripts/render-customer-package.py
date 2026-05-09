@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import re
 import shutil
 import stat
@@ -74,12 +73,13 @@ docker compose up -d
 ./verify-license.sh <activation_code> <customer_id>
 ```
 
+SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
+
 共享日志或配置时，不要打包 License 文件、私钥、激活码或 `.env` 中的敏感值。
 """
 
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-    re.compile(r"SAGITTADB_LICENSE_PRIVATE_KEY"),
     re.compile(r"LICENSE_PRIVATE_KEY"),
     re.compile(r"private_key\s*=", re.IGNORECASE),
 ]

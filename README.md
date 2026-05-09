@@ -138,11 +138,14 @@ npm run build
 ## 商业交付
 
 当前版本：`v1.0-GA + v2-lite 授权体系`。
+当前商业部署版本：`1.0.5`。
 状态：正式版商业交付。
+
+商业授权接入统一授权中心 `License-Server-Center`。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。
 
 正式交付建议包含：
 
 - 固定版本镜像和客户部署包，不使用 `latest`。
 - `.env.example`、`docker-compose.yml`、`upgrade.sh`、`verify-license.sh` 和 Nginx 配置。
-- 生产环境上线前完成实例接入、审批流、权限、通知、License、备份恢复和升级回滚验证。
-- 内部留存 CI、安全扫描、客户环境验收和 License Server 状态流转记录；这些记录不作为仓库长期公开文档。
+- 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线导入、备份恢复和升级回滚验证。
+- 内部留存 CI、安全扫描、客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。

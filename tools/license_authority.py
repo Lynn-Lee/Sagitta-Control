@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""用于内部商业运营的轻量 SagittaDB 授权中心。
+"""用于内部商业运营的轻量 SagittaDB 授权中心兼容工具。
 
 该工具只适合私有内部环境。它用一个小型 JSON 文件保存激活码和已签发 License，
-使用 SAGITTADB_LICENSE_PRIVATE_KEY 签名，并提供与 SagittaDB 在线授权客户端兼容的
-激活和刷新接口。
+使用 LICENSE_PRIVATE_KEY 签名，并提供与 SagittaDB 在线授权客户端兼容的激活和刷新接口。
+正式商业运营以统一授权中心 License-Server-Center 为准。
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
 DEFAULT_DB = "license_authority.json"
+LICENSE_PROJECT_CODE = "sagittadb"
 
 
 def b64url(data: bytes) -> str:
@@ -44,13 +45,13 @@ def parse_dt(value: str) -> datetime:
 
 
 def load_private_key() -> Ed25519PrivateKey:
-    value = os.environ.get("SAGITTADB_LICENSE_PRIVATE_KEY", "").strip()
+    value = os.environ.get("LICENSE_PRIVATE_KEY", "").strip()
     if not value:
-        raise SystemExit("SAGITTADB_LICENSE_PRIVATE_KEY is required")
+        raise SystemExit("LICENSE_PRIVATE_KEY is required")
     if "BEGIN PRIVATE KEY" in value:
         loaded = serialization.load_pem_private_key(value.encode(), password=None)
         if not isinstance(loaded, Ed25519PrivateKey):
-            raise SystemExit("SAGITTADB_LICENSE_PRIVATE_KEY is not an Ed25519 private key")
+            raise SystemExit("LICENSE_PRIVATE_KEY is not an Ed25519 private key")
         return loaded
     padded = value + "=" * (-len(value) % 4)
     return Ed25519PrivateKey.from_private_bytes(base64.urlsafe_b64decode(padded.encode()))
@@ -67,7 +68,7 @@ def generate_keypair() -> None:
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw,
     )
-    print("SAGITTADB_LICENSE_PRIVATE_KEY=" + b64url(private_raw))
+    print("LICENSE_PRIVATE_KEY=" + b64url(private_raw))
     print("LICENSE_PUBLIC_KEY=" + b64url(public_raw))
 
 
@@ -134,6 +135,8 @@ def build_payload(activation: dict[str, Any], license_id: str) -> dict[str, Any]
     expires_at = parse_dt(activation["expires_at"])
     payload = {
         "license_id": license_id,
+        "project": LICENSE_PROJECT_CODE,
+        "product": LICENSE_PROJECT_CODE,
         "customer_id": activation["customer_id"],
         "company_name": activation["company_name"],
         "edition": activation.get("edition", "enterprise"),
@@ -159,14 +162,16 @@ def create_app(db_path: Path) -> Any:
         activation_code: str
         customer_id: str
         deployment_fingerprint: str = ""
-        product: str = "sagittadb"
+        project: str = LICENSE_PROJECT_CODE
+        product: str = LICENSE_PROJECT_CODE
 
     class RefreshRequest(BaseModel):
         activation_id: str = ""
         license_id: str = ""
         customer_id: str
         deployment_fingerprint: str = ""
-        product: str = "sagittadb"
+        project: str = LICENSE_PROJECT_CODE
+        product: str = LICENSE_PROJECT_CODE
 
     class StatusRequest(BaseModel):
         activation_code: str
@@ -179,7 +184,7 @@ def create_app(db_path: Path) -> Any:
         features: list[str] | None = None
         limits: dict[str, int] | None = None
 
-    app = FastAPI(title="SagittaDB License Authority", version="0.1.0")
+    app = FastAPI(title="SagittaDB License-Server-Center Compatibility Authority", version="0.1.0")
 
     def verify_token(authorization: str | None) -> None:
         expected = os.environ.get("SAGITTADB_LICENSE_AUTHORITY_TOKEN", "").strip()
@@ -187,6 +192,11 @@ def create_app(db_path: Path) -> Any:
             return
         if authorization != f"Bearer {expected}":
             raise HTTPException(status_code=401, detail="invalid authority token")
+
+    def verify_project(project: str, product: str) -> None:
+        requested = (project or product or "").strip().lower()
+        if requested and requested != LICENSE_PROJECT_CODE:
+            raise HTTPException(status_code=403, detail="授权项目不匹配")
 
     def issue_for_activation(store: dict[str, Any], code: str, activation: dict[str, Any]) -> dict[str, Any]:
         private_key = load_private_key()
@@ -237,6 +247,7 @@ def create_app(db_path: Path) -> Any:
     @app.post("/api/v1/licenses/activate")
     async def activate(data: ActivateRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
         verify_token(authorization)
+        verify_project(data.project, data.product)
         store = load_store(db_path)
         activation = store["activations"].get(data.activation_code)
         if not activation:
@@ -263,6 +274,7 @@ def create_app(db_path: Path) -> Any:
     @app.post("/api/v1/licenses/refresh")
     async def refresh(data: RefreshRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
         verify_token(authorization)
+        verify_project(data.project, data.product)
         store = load_store(db_path)
         license_record = store["licenses"].get(data.license_id)
         if license_record:
@@ -488,7 +500,7 @@ def command_serve(args: argparse.Namespace) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="SagittaDB internal license authority")
+    parser = argparse.ArgumentParser(description="SagittaDB License-Server-Center compatibility authority")
     parser.add_argument("--generate-keypair", action="store_true", help="print a new Ed25519 keypair and exit")
     subparsers = parser.add_subparsers(dest="command")
 
