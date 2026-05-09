@@ -5,6 +5,8 @@ export type LicenseStatus = {
   reason: string
   source: string
   is_trial: boolean
+  project_code?: string
+  project_name?: string
   license_id: string
   customer_id: string
   activation_customer_id?: string

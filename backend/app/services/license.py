@@ -23,6 +23,7 @@ from app.models.user import Users
 
 LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", "instance"}
 LICENSE_PROJECT_CODE = "sagittadb"
+LICENSE_PROJECT_NAME = "SagittaDB"
 TRIAL_FEATURES = sorted(LICENSE_FEATURES)
 LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
     ("/api/v1/workflow", "workflow"),
@@ -304,6 +305,8 @@ class LicenseService:
             "reason": reason,
             "source": record.source,
             "is_trial": record.source == "trial",
+            "project_code": LICENSE_PROJECT_CODE,
+            "project_name": LICENSE_PROJECT_NAME,
             "license_id": record.license_id,
             "customer_id": record.customer_id,
             "activation_customer_id": activation_customer_id,

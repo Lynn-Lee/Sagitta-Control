@@ -183,6 +183,10 @@ export default function LicensePage() {
                   {status ? statusLabel[status.status] || status.status : '-'}
                 </Tag>
               </Descriptions.Item>
+              <Descriptions.Item label="授权项目">
+                {status?.project_name || 'SagittaDB'}
+                <Text type="secondary">（{status?.project_code || 'sagittadb'}）</Text>
+              </Descriptions.Item>
               <Descriptions.Item label="License ID">{status?.license_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="客户 ID">{status?.customer_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="激活客户 ID">{status?.activation_customer_id || '-'}</Descriptions.Item>
