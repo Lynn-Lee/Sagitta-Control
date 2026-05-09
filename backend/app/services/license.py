@@ -22,6 +22,7 @@ from app.models.system import LicenseRecord
 from app.models.user import Users
 
 LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", "instance"}
+LICENSE_PROJECT_CODE = "sagittadb"
 TRIAL_FEATURES = sorted(LICENSE_FEATURES)
 LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
     ("/api/v1/workflow", "workflow"),
@@ -148,6 +149,12 @@ class LicenseService:
             raise HTTPException(status_code=400, detail="License 客户标识不匹配")
 
     @staticmethod
+    def _validate_project(payload: dict[str, Any]) -> None:
+        project = str(payload.get("project") or payload.get("product") or "").strip().lower()
+        if project and project != LICENSE_PROJECT_CODE:
+            raise HTTPException(status_code=400, detail="License 授权项目不匹配")
+
+    @staticmethod
     def _license_server_url() -> str:
         url = settings.LICENSE_SERVER_URL.strip().rstrip("/")
         if not url:
@@ -165,6 +172,10 @@ class LicenseService:
         customer = customer_id or settings.LICENSE_CUSTOMER_ID.strip() or "trial"
         material = f"sagittadb:{customer}:{deployment_id}".encode()
         return hashlib.sha256(material).hexdigest()
+
+    @staticmethod
+    def _license_server_project_payload() -> dict[str, str]:
+        return {"project": LICENSE_PROJECT_CODE, "product": LICENSE_PROJECT_CODE}
 
     @staticmethod
     async def _call_license_server(path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -194,6 +205,7 @@ class LicenseService:
         payload, signature, normalized_raw = LicenseService._parse_license_document(raw_license)
         LicenseService._validate_payload_shape(payload)
         LicenseService._validate_customer(payload)
+        LicenseService._validate_project(payload)
         public_key = LicenseService._load_public_key()
         try:
             public_key.verify(
@@ -382,7 +394,7 @@ class LicenseService:
                 "activation_code": activation_code,
                 "customer_id": customer_id,
                 "deployment_fingerprint": LicenseService.deployment_fingerprint(customer_id),
-                "product": "sagittadb",
+                **LicenseService._license_server_project_payload(),
             },
         )
         license_doc = server_data.get("license")
@@ -410,7 +422,7 @@ class LicenseService:
                 "license_id": current.license_id,
                 "customer_id": current.customer_id,
                 "deployment_fingerprint": LicenseService.deployment_fingerprint(current.customer_id),
-                "product": "sagittadb",
+                **LicenseService._license_server_project_payload(),
             },
         )
         remote_status = str(server_data.get("status") or "active")

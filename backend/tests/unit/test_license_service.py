@@ -43,6 +43,8 @@ def valid_payload():
         "license_id": "lic-001",
         "customer_id": "acme",
         "company_name": "Acme Corp",
+        "project": "sagittadb",
+        "product": "sagittadb",
         "edition": "enterprise",
         "issued_at": now.isoformat(),
         "not_before": now.isoformat(),
@@ -76,6 +78,23 @@ def test_verify_license_document_rejects_customer_mismatch(keypair, valid_payloa
         LicenseService.verify_license_document(doc)
     assert exc.value.status_code == 400
     assert "客户标识不匹配" in exc.value.detail
+
+
+def test_verify_license_document_rejects_project_mismatch(keypair, valid_payload):
+    valid_payload["project"] = "schemaforge"
+    doc = _license_doc(valid_payload, keypair)
+    with pytest.raises(HTTPException) as exc:
+        LicenseService.verify_license_document(doc)
+    assert exc.value.status_code == 400
+    assert "授权项目不匹配" in exc.value.detail
+
+
+def test_verify_license_document_accepts_legacy_payload_without_project(keypair, valid_payload):
+    valid_payload.pop("project")
+    valid_payload.pop("product")
+    doc = _license_doc(valid_payload, keypair)
+    payload, _, _ = LicenseService.verify_license_document(doc)
+    assert payload["license_id"] == "lic-001"
 
 
 def test_verify_license_document_rejects_deployment_fingerprint_mismatch(
@@ -158,7 +177,10 @@ async def test_activate_imports_online_license(monkeypatch, keypair, valid_paylo
 
     assert result["status"] == "licensed"
     call_server.assert_awaited_once()
-    assert call_server.await_args.args[1]["deployment_fingerprint"]
+    request_payload = call_server.await_args.args[1]
+    assert request_payload["deployment_fingerprint"]
+    assert request_payload["project"] == "sagittadb"
+    assert request_payload["product"] == "sagittadb"
     store_license.assert_awaited_once()
     assert store_license.await_args.kwargs["source"] == "online"
     assert store_license.await_args.kwargs["activation_id"] == "act-001"
@@ -185,6 +207,9 @@ async def test_refresh_marks_revoked_license_invalid(monkeypatch):
     result = await LicenseService.refresh(db)
 
     assert result["status"] == "invalid"
+    request_payload = LicenseService._call_license_server.await_args.args[1]
+    assert request_payload["project"] == "sagittadb"
+    assert request_payload["product"] == "sagittadb"
     assert record.status == "invalid"
     assert record.remote_status == "revoked"
     assert record.last_check_status == "invalid"
