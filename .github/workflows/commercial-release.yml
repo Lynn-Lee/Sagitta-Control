@@ -150,52 +150,24 @@ jobs:
           cp "dist-commercial/${package_name}.zip.sha256" "${product_dir}/releases/${release_dir}/"
           rsync -a docs/screenshots/user-manual/ "${product_dir}/screenshots/"
 
-          {
-            echo ".DS_Store"
-            echo ".env"
-            echo ".env.*"
-            echo "!.env.example"
-            echo "*.log"
-            echo "*.tmp"
-            echo "node_modules/"
-            echo "dist/"
-            echo "build/"
-            echo "*.map"
-            echo "*PRIVATE_KEY*"
-            echo "*private_key*"
-            echo "*license*.json"
-            echo "*activation*"
-          } > public-releases/.gitignore
-
-          {
-            echo "# Public Releases"
-            echo
-            echo "本仓库用于发布 Lynn Lee 维护产品的商业部署包。"
-            echo
-            echo "本仓库只包含部署文件、文档、发布包和校验和，不包含产品源码、私钥、客户 License、激活码或镜像仓库凭据。"
-            echo
-            echo "## Products"
-            echo
-            echo "| 产品 | 最新发布版本 | 部署入口 |"
-            echo "| --- | --- | --- |"
-            echo "| SagittaDB Enterprise | ${{ steps.release.outputs.version }} | [products/sagittadb](products/sagittadb/) |"
-            echo
-            echo "## SagittaDB Enterprise"
-            echo
-            echo "SagittaDB Enterprise 通过公开商业部署包交付，并使用固定版本商业容器镜像："
-            echo
-            echo "- \`${PUBLIC_IMAGE_REPOSITORY}-backend:${{ steps.release.outputs.version }}\`"
-            echo "- \`${PUBLIC_IMAGE_REPOSITORY}-frontend:${{ steps.release.outputs.version }}\`"
-            echo
-            echo "请从 [products/sagittadb/releases/${release_dir}](products/sagittadb/releases/${release_dir}/) 下载部署包，校验 sha256 后按包内 README 部署。"
-            echo
-            echo "\`\`\`bash"
-            echo "cd products/sagittadb/releases/${release_dir}"
-            echo "shasum -a 256 -c ${package_name}.zip.sha256"
-            echo "\`\`\`"
-            echo
-            echo "首次部署自动进入 30 天全功能试用期。试用到期后业务 API 会被阻断，授权管理页仍可访问。"
-          } > public-releases/README.md
+          if [[ ! -f public-releases/.gitignore ]]; then
+            {
+              echo ".DS_Store"
+              echo ".env"
+              echo ".env.*"
+              echo "!.env.example"
+              echo "*.log"
+              echo "*.tmp"
+              echo "node_modules/"
+              echo "dist/"
+              echo "build/"
+              echo "*.map"
+              echo "*PRIVATE_KEY*"
+              echo "*private_key*"
+              echo "*license*.json"
+              echo "*activation*"
+            } > public-releases/.gitignore
+          fi
 
       - name: 校验公开仓库内容
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
@@ -206,6 +178,12 @@ jobs:
           product_dir="public-releases/${PUBLIC_PRODUCT_DIR}"
           release_dir="${{ steps.release.outputs.release_dir }}"
           package_name="${{ steps.release.outputs.package_name }}"
+
+          test -f public-releases/README.md
+          grep -q "DataFusionX" public-releases/README.md
+          grep -q "SagittaDB" public-releases/README.md
+          grep -q "SchemaForge" public-releases/README.md
+          grep -q "StreamForge" public-releases/README.md
 
           test -f "${product_dir}/README.md"
           test -f "${product_dir}/docker-compose.yml"

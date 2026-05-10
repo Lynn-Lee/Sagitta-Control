@@ -6,7 +6,7 @@
 
 SagittaDB 采用以下边界：
 
-- 公开交付仓库：只放产品介绍、部署文件、Helm Chart、安装脚本、法律提示、截图和 Release 下载资产。
+- 公开交付仓库：根 `README.md` 是 DataFusionX、SagittaDB、SchemaForge、StreamForge 共享的商业发布门户；SagittaDB 发布流程只更新 `products/sagittadb/` 下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
 - 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
@@ -32,6 +32,8 @@ shared/
   docs/
 README.md
 ```
+
+公开仓库根 `README.md` 由 `Public-Releases` 仓库维护，不由 SagittaDB 的发布 workflow 生成或覆盖。
 
 当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入 public 仓库。
 
@@ -189,7 +191,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 - 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`。
 - 手动触发 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本。
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
-- 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`。
+- 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`；根 README 保持四产品门户，不由 SagittaDB 发布覆盖。
 
 私有仓库需要配置 GitHub Secrets：
 
