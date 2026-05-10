@@ -32,6 +32,11 @@ services:
   backend:
     image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
     restart: always
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file: .env
     environment:
       APP_ENV: production
@@ -48,6 +53,8 @@ services:
     volumes:
       - downloads:/app/downloads
       - licenses:/app/licenses
+    tmpfs:
+      - /tmp
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -60,6 +67,11 @@ services:
   celery_worker:
     image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
     restart: always
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file: .env
     environment:
       APP_ENV: production
@@ -73,6 +85,8 @@ services:
     volumes:
       - downloads:/app/downloads
       - licenses:/app/licenses
+    tmpfs:
+      - /tmp
     command: >
       celery -A app.celery_app worker
       --concurrency=${CELERY_CONCURRENCY:-8}
@@ -88,6 +102,11 @@ services:
   celery_beat:
     image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
     restart: always
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file: .env
     environment:
       APP_ENV: production
@@ -98,7 +117,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.celery_app beat --loglevel=warning
+    tmpfs:
+      - /tmp
+    command: celery -A app.celery_app beat --loglevel=warning --schedule=/tmp/celerybeat-schedule
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep '[c]elery.*beat' >/dev/null"]
       interval: 30s
@@ -109,10 +130,21 @@ services:
   frontend:
     image: __IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__
     restart: always
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - backend
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
     ports:
       - "${FRONTEND_PORT:-80}:80"
     healthcheck:

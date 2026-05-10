@@ -1,12 +1,12 @@
 {{/*
-Expand the name of the chart.
+展开 Chart 名称。
 */}}
 {{- define "sagittadb.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
+生成默认完整应用名称。
 */}}
 {{- define "sagittadb.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -22,14 +22,14 @@ Create a default fully qualified app name.
 {{- end }}
 
 {{/*
-Create chart label.
+生成 Chart 标签。
 */}}
 {{- define "sagittadb.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Common labels
+通用标签
 */}}
 {{- define "sagittadb.labels" -}}
 helm.sh/chart: {{ include "sagittadb.chart" . }}
@@ -38,7 +38,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Selector labels
+选择器标签
 */}}
 {{- define "sagittadb.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "sagittadb.name" . }}
@@ -46,7 +46,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-PostgreSQL connection host
+PostgreSQL 连接主机
 */}}
 {{- define "sagittadb.postgresHost" -}}
 {{- if .Values.postgresql.enabled }}
@@ -57,7 +57,7 @@ PostgreSQL connection host
 {{- end }}
 
 {{/*
-Redis connection host
+Redis 连接主机
 */}}
 {{- define "sagittadb.redisHost" -}}
 {{- if .Values.redis.enabled }}

@@ -35,7 +35,7 @@ README.md
 
 公开仓库根 `README.md` 由 `Public-Releases` 仓库维护，不由 SagittaDB 的发布 workflow 生成或覆盖。
 
-当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入 public 仓库。
+当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入公开仓库。
 
 ## 2. 公开仓库内容
 
@@ -70,9 +70,12 @@ ghcr.io/<org>/sagittadb-frontend:2.0.0
 
 - 镜像允许匿名公开拉取。
 - 不发布 `latest`，也不在客户部署包中使用浮动标签。
-- 后端商业镜像使用 `backend/Dockerfile.commercial`，核心 Python 模块由 Nuitka 编译。
-- 前端镜像只包含 build 产物，构建后必须拒绝 `.map` sourcemap。
-- 商业镜像默认启用 Manifest 完整性校验。
+- 后端商业镜像使用 `backend/Dockerfile.commercial`，默认将 `app/**/*.py` 中除 `__init__.py` 外的应用模块全部由 Nuitka 编译成扩展模块。
+- 商业后端镜像构建阶段必须执行源码残留门禁，`/app/app` 下不得存在非白名单 `.py`、`.pyc` 或 `.pyo`。
+- 商业根上下文构建必须通过 `.dockerignore` 门禁，禁止将虚拟环境、测试目录、前端依赖、`dist-commercial`、私钥、License 文件或激活材料送入 Docker build context。
+- 前端镜像只包含 build 产物，构建后必须拒绝 `.map` sourcemap 和 `sourceMappingURL` 引用，并使用生产压缩/混淆配置。
+- 商业镜像默认启用 Manifest 完整性校验；商业构建标识 `SAGITTADB_COMMERCIAL_BUILD=true` 时，即使客户把 `APP_INTEGRITY_REQUIRED` 设为 false，启动也必须校验 Manifest。
+- 客户部署模板默认启用容器只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载，降低本地运行态篡改面；前端 Nginx 仅保留绑定 80 端口所需的 `NET_BIND_SERVICE`。
 
 ## 4. GitHub Release 规则
 
@@ -86,7 +89,7 @@ Assets:
   SagittaDB-Enterprise-v2.0.0.zip.sha256
 ```
 
-Release notes 使用 [SagittaDB 公开发布模板](release_templates/sagittadb_public_release.md)。
+Release 发布说明使用 [SagittaDB 公开发布模板](release_templates/sagittadb_public_release.md)。
 
 用户安装命令示例：
 
@@ -128,6 +131,8 @@ product=sagittadb
 - 默认 `LICENSE_TRIAL_DAYS=30`。
 - 试用期内全部受保护功能可用。
 - 试用期结束后，业务 API 返回 `LICENSE_REQUIRED`，登录、健康检查和授权管理入口继续可用。
+- 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，每次成功激活或刷新都会更新本地联网校验时间；超过宽限期未成功回源时，在线授权状态转为无效，业务 API 暂停。
+- 长期离线客户必须使用 challenge-response 离线授权，离线授权仍按签发 License 的 `expires_at` 和部署指纹校验。
 
 ## 6. 授权流程
 
@@ -172,7 +177,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 
 ## 7. 私有仓库发布流程
 
-私有仓库负责生成 public 交付资产：
+私有仓库负责生成公开交付资产：
 
 1. 确认版本号，例如 `2.0.0`。
 2. 构建并推送 `ghcr.io/<org>/sagittadb-backend:2.0.0`。
@@ -181,9 +186,12 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 5. 渲染客户部署包。
 6. 生成 zip 和 sha256。
 7. 检查部署包无源码、私钥、token、真实 License、sourcemap 和浮动镜像标签。
-8. 同步部署文件到 public 仓库 `products/sagittadb/`。
-9. 在 public 仓库创建 `sagittadb/v2.0.0` Release。
-10. 上传 zip 和 sha256。
+8. 检查商业后端镜像无应用源码残留：除 `__init__.py` 外，`/app/app` 下不得存在 `.py`、`.pyc` 或 `.pyo`。
+9. 检查商业构建上下文 `.dockerignore`，确认 `.venv`、测试目录、依赖缓存、`dist-commercial`、私钥和 License 文件不会进入 Docker context。
+10. 生成前后端镜像 CycloneDX SBOM，签名前后端镜像、SBOM 和客户部署包。
+11. 同步部署文件到公开仓库 `products/sagittadb/`。
+12. 在公开仓库创建 `sagittadb/v2.0.0` Release。
+13. 上传 zip、sha256、签名文件和 SBOM。
 
 自动发布由 `.github/workflows/commercial-release.yml` 执行：
 
@@ -200,7 +208,7 @@ MANIFEST_PRIVATE_KEY
 PUBLIC_RELEASES_TOKEN
 ```
 
-`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Public-Releases` 的 GitHub token，建议只授予该 public 仓库的 contents read/write 权限。
+`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Public-Releases` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
 
 现有脚本入口：
 
@@ -226,11 +234,16 @@ python scripts/render-customer-package.py \
 - 部署包不需要源码即可启动。
 - `docker-compose.yml` 和 Helm values 使用固定版本镜像。
 - 首次部署自动进入 30 天全功能试用。
+- 在线授权超过联网校验宽限期后会 fail closed。
 - 试用到期后业务功能阻断，授权管理入口仍可访问。
 - 在线激活、联网刷新和离线 challenge-response 均可用。
 - License 项目码必须是 `sagittadb`。
 - 篡改商业镜像关键文件时完整性校验失败。
-- 公开仓库和 Release 包不包含源码、私钥、token、真实 License、sourcemap 或 `latest` 标签。
+- 商业后端镜像不包含非白名单 Python 源码或字节码缓存。
+- 商业前端镜像不包含 `.map` 文件或 `sourceMappingURL` 引用。
+- 商业 Docker build context 不包含本地虚拟环境、依赖缓存、测试目录、历史发布包、私钥、License 文件或激活材料。
+- Release 目录包含客户包签名、前后端镜像 SBOM 和 SBOM 校验/签名文件。
+- 公开仓库和 Release 包不包含源码、私钥、token、真实 License、sourcemap、本地 `build:` 配置或 `latest` 标签。
 
 ## 9. 推荐默认值
 

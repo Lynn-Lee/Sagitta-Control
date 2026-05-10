@@ -72,7 +72,7 @@ class Users(BaseModel):
         comment="最近一次密码修改时间"
     )
 
-    # ── relationships ────────────────────────────────────────────
+    # ── 关联关系 ────────────────────────────────────────────
     user_groups: Mapped[list["UserGroup"]] = relationship(  # noqa: F821
         "UserGroup", secondary="user_group_member", back_populates="members"
     )

@@ -348,16 +348,27 @@ class LicenseService:
         now = LicenseService._utcnow()
         not_before = record.not_before
         expires_at = record.expires_at
+        last_online_check_at = record.last_online_check_at
         if not_before and not_before.tzinfo is None:
             not_before = not_before.replace(tzinfo=UTC)
         if expires_at and expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=UTC)
+        if last_online_check_at and last_online_check_at.tzinfo is None:
+            last_online_check_at = last_online_check_at.replace(tzinfo=UTC)
         if not_before and now < not_before:
             return "invalid", "License 尚未生效"
         if expires_at and now > expires_at:
             return "expired", "License 已过期"
         if record.status == "invalid":
             return "invalid", record.last_check_reason or "License 无效"
+        if record.source == "online" and settings.LICENSE_ONLINE_GRACE_DAYS > 0:
+            grace_anchor = last_online_check_at or record.issued_at
+            if grace_anchor and grace_anchor.tzinfo is None:
+                grace_anchor = grace_anchor.replace(tzinfo=UTC)
+            if not grace_anchor:
+                return "invalid", "在线 License 尚未完成联网校验"
+            if now - grace_anchor > timedelta(days=settings.LICENSE_ONLINE_GRACE_DAYS):
+                return "invalid", "在线 License 超过联网校验宽限期，请刷新授权"
         return ("trial", "试用期内") if record.source == "trial" else ("licensed", "License 有效")
 
     @staticmethod

@@ -15,30 +15,30 @@ DEFAULT_BACKUP_RETAIN_DAYS="7"
 
 usage() {
   cat <<'EOF'
-Usage:
+用法：
   bash deploy/update-prod.sh [options]
 
-Default flow:
-  1. Check local tracked files are clean
-  2. Fetch origin and fast-forward local main to origin/main, or checkout --ref
-  3. Run pre-deploy PostgreSQL backup through the postgres container
-  4. Build production images
-  5. Ensure postgres/redis are running
-  6. Run alembic migration
-  7. Recreate application services
-  8. Wait for health checks and show service status
+默认流程：
+  1. 检查本地已跟踪文件是否干净
+  2. 拉取 origin 并把本地 main 快进到 origin/main，或切换到 --ref 指定版本
+  3. 通过 postgres 容器执行部署前 PostgreSQL 备份
+  4. 构建生产镜像
+  5. 确保 postgres/redis 正在运行
+  6. 执行 alembic 迁移
+  7. 重建应用服务
+  8. 等待健康检查并展示服务状态
 
-Options:
-  --ref <git-ref>          Deploy a specific tag/branch/commit. Defaults to origin/main.
-  --skip-backup            Skip the pre-deploy database backup.
-  --skip-migrate           Skip alembic upgrade head.
-  --no-cache               Build Docker images with --no-cache.
-  --prune                  Prune dangling Docker images after a successful deploy.
-  --backend-health <url>   Backend health URL. Default: http://127.0.0.1:8000/health
-  --frontend-health <url>  Frontend health URL. Default: http://127.0.0.1/health
-  -h, --help               Show this help message.
+选项：
+  --ref <git-ref>          部署指定 tag、branch 或 commit，默认 origin/main。
+  --skip-backup            跳过部署前数据库备份。
+  --skip-migrate           跳过 alembic upgrade head。
+  --no-cache               使用 --no-cache 构建 Docker 镜像。
+  --prune                  部署成功后清理悬空 Docker 镜像。
+  --backend-health <url>   后端健康检查 URL，默认 http://127.0.0.1:8000/health
+  --frontend-health <url>  前端健康检查 URL，默认 http://127.0.0.1/health
+  -h, --help               显示帮助信息。
 
-Examples:
+示例：
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
   bash deploy/update-prod.sh --ref v2.0.0
@@ -51,12 +51,12 @@ log() {
 }
 
 die() {
-  log "ERROR: $*"
+  log "错误：$*"
   exit 1
 }
 
 require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+  command -v "$1" >/dev/null 2>&1 || die "缺少必需命令：$1"
 }
 
 compose() {
@@ -65,7 +65,7 @@ compose() {
 
 ensure_clean_tracked_tree() {
   if ! git diff --quiet || ! git diff --cached --quiet; then
-    die "Tracked files have local changes. Commit, stash, or restore them before deploy."
+    die "已跟踪文件存在本地改动，请先提交、暂存或恢复后再部署。"
   fi
 }
 
@@ -75,10 +75,10 @@ wait_for_url() {
   local attempts="${3:-30}"
   local sleep_seconds="${4:-3}"
 
-  log "Waiting for ${name}: ${url}"
+  log "等待 ${name} 健康检查：${url}"
   for ((i = 1; i <= attempts; i++)); do
     if curl -fsS --max-time 5 "${url}" >/dev/null; then
-      log "${name} is healthy"
+      log "${name} 已健康"
       return 0
     fi
     sleep "${sleep_seconds}"
@@ -87,12 +87,12 @@ wait_for_url() {
 }
 
 show_recent_logs() {
-  log "Recent logs for troubleshooting"
+  log "输出最近日志用于排障"
   compose logs --tail=120 backend frontend celery_worker || true
 }
 
 checkout_default_ref() {
-  log "Checking out ${DEFAULT_RELEASE_BRANCH} and fast-forwarding to origin/${DEFAULT_RELEASE_BRANCH}"
+  log "切换到 ${DEFAULT_RELEASE_BRANCH} 并快进到 origin/${DEFAULT_RELEASE_BRANCH}"
   if git show-ref --verify --quiet "refs/heads/${DEFAULT_RELEASE_BRANCH}"; then
     git checkout "${DEFAULT_RELEASE_BRANCH}"
     git merge --ff-only "origin/${DEFAULT_RELEASE_BRANCH}"
@@ -114,14 +114,14 @@ run_container_backup() {
 
   mkdir -p "${backup_dir}"
 
-  log "Running container PostgreSQL backup: ${filepath}"
+  log "通过容器执行 PostgreSQL 备份：${filepath}"
   compose exec -T postgres sh -ec \
     'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagittadb}" --no-owner --no-acl --format=plain' \
     | gzip > "${filepath}"
 
-  log "Backup completed: ${filepath} ($(du -sh "${filepath}" | cut -f1))"
+  log "备份完成：${filepath} ($(du -sh "${filepath}" | cut -f1))"
 
-  log "Removing backups older than ${retain_days} days from ${backup_dir}"
+  log "从 ${backup_dir} 清理超过 ${retain_days} 天的备份"
   find "${backup_dir}" -name "sagittadb_*.sql.gz" -mtime "+${retain_days}" -delete
 }
 
@@ -136,7 +136,7 @@ FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-${DEFAULT_FRONTEND_HEALTH_URL}}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref)
-      [[ $# -ge 2 ]] || die "--ref requires a value"
+      [[ $# -ge 2 ]] || die "--ref 需要提供值"
       REF="$2"
       shift 2
       ;;
@@ -157,12 +157,12 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --backend-health)
-      [[ $# -ge 2 ]] || die "--backend-health requires a value"
+      [[ $# -ge 2 ]] || die "--backend-health 需要提供值"
       BACKEND_HEALTH_URL="$2"
       shift 2
       ;;
     --frontend-health)
-      [[ $# -ge 2 ]] || die "--frontend-health requires a value"
+      [[ $# -ge 2 ]] || die "--frontend-health 需要提供值"
       FRONTEND_HEALTH_URL="$2"
       shift 2
       ;;
@@ -171,12 +171,12 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      die "Unknown argument: $1"
+      die "未知参数：$1"
       ;;
   esac
 done
 
-trap 'log "Deployment failed at line ${LINENO}"; show_recent_logs' ERR
+trap 'log "部署在第 ${LINENO} 行失败"; show_recent_logs' ERR
 
 require_cmd git
 require_cmd docker
@@ -184,33 +184,33 @@ require_cmd curl
 
 cd "${ROOT_DIR}"
 
-[[ -f "${COMPOSE_FILE}" ]] || die "Compose file not found: ${COMPOSE_FILE}"
-[[ -f "${ENV_FILE}" ]] || die ".env not found: ${ENV_FILE}. Create it from .env.example before deploy."
+[[ -f "${COMPOSE_FILE}" ]] || die "未找到 Compose 文件：${COMPOSE_FILE}"
+[[ -f "${ENV_FILE}" ]] || die "未找到 .env：${ENV_FILE}，请在部署前从 .env.example 创建。"
 
 ensure_clean_tracked_tree
 
 old_revision="$(git rev-parse --short HEAD)"
-log "Current revision: ${old_revision}"
+log "当前版本：${old_revision}"
 
-log "Fetching latest Git refs"
+log "拉取最新 Git 引用"
 git fetch --tags origin
 
 if [[ -n "${REF}" ]]; then
-  log "Checking out target ref: ${REF}"
+  log "切换到目标 ref：${REF}"
   git checkout "${REF}"
 else
   checkout_default_ref
 fi
 
 new_revision="$(git rev-parse --short HEAD)"
-log "Target revision: ${new_revision}"
+log "目标版本：${new_revision}"
 
 if [[ ${SKIP_BACKUP} -eq 0 ]]; then
-  log "Ensuring base services are running before backup: ${BASE_SERVICES[*]}"
+  log "备份前确保基础服务正在运行：${BASE_SERVICES[*]}"
   compose up -d "${BASE_SERVICES[@]}"
   run_container_backup
 else
-  log "Skipping database backup as requested"
+  log "按要求跳过数据库备份"
 fi
 
 build_args=()
@@ -218,31 +218,31 @@ if [[ ${NO_CACHE} -eq 1 ]]; then
   build_args+=(--no-cache)
 fi
 
-log "Building production images: ${APP_SERVICES[*]}"
+log "构建生产镜像：${APP_SERVICES[*]}"
 compose build "${build_args[@]}" "${APP_SERVICES[@]}"
 
-log "Ensuring base services are running: ${BASE_SERVICES[*]}"
+log "确保基础服务正在运行：${BASE_SERVICES[*]}"
 compose up -d "${BASE_SERVICES[@]}"
 
 if [[ ${SKIP_MIGRATE} -eq 0 ]]; then
-  log "Running database migrations"
+  log "执行数据库迁移"
   compose run --rm backend alembic upgrade head
 else
-  log "Skipping database migrations as requested"
+  log "按要求跳过数据库迁移"
 fi
 
-log "Recreating updated application services: ${APP_SERVICES[*]}"
+log "重建已更新的应用服务：${APP_SERVICES[*]}"
 compose up -d --no-deps "${APP_SERVICES[@]}"
 
 wait_for_url "backend" "${BACKEND_HEALTH_URL}" 40 3
 wait_for_url "frontend" "${FRONTEND_HEALTH_URL}" 30 3
 
-log "Current service status"
+log "当前服务状态"
 compose ps
 
 if [[ ${PRUNE} -eq 1 ]]; then
-  log "Pruning dangling Docker images"
+  log "清理悬空 Docker 镜像"
   docker image prune -f
 fi
 
-log "Deployment finished: ${old_revision} -> ${new_revision}"
+log "部署完成：${old_revision} -> ${new_revision}"

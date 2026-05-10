@@ -36,6 +36,9 @@ spec:
                 name: {{ include "sagittadb.fullname" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: backend
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -69,17 +72,21 @@ spec:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          {{ if .Values.persistence.enabled }}
             - name: downloads
               mountPath: /app/downloads
-          {{- end }}
-      {{- if .Values.persistence.enabled }}
+          {{ end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+      {{ if .Values.persistence.enabled }}
         - name: downloads
           persistentVolumeClaim:
             claimName: {{ include "sagittadb.fullname" . }}-downloads
-      {{- end }}
+      {{ end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

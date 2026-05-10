@@ -5,6 +5,7 @@ VERSION="${VERSION:?VERSION is required, e.g. 2.0.0}"
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagittadb}"
 PACKAGE_ZIP="${PACKAGE_ZIP:-dist-commercial/SagittaDB-Enterprise-v${VERSION}.zip}"
 MANIFEST_OUT="${MANIFEST_OUT:-backend/COMMERCIAL-MANIFEST.json}"
+SBOM_DIR="${SBOM_DIR:-dist-commercial/sbom}"
 
 # cosign 用于签名已推送镜像的 digest；下面生成的 JSON 签名用于保护
 # 会在镜像仓库之外流转的客户部署包。
@@ -22,6 +23,20 @@ python tools/sign_manifest.py \
 cosign sign --yes "${IMAGE_REPOSITORY}-backend:${VERSION}"
 cosign sign --yes "${IMAGE_REPOSITORY}-frontend:${VERSION}"
 
+if [[ -d "${SBOM_DIR}" ]]; then
+  shopt -s nullglob
+  for sbom in "${SBOM_DIR}"/*.cyclonedx.json; do
+    cosign sign-blob --yes --bundle "${sbom}.bundle" "${sbom}"
+    component="$(basename "${sbom}")"
+    case "${component}" in
+      sagittadb-backend-*) image="${IMAGE_REPOSITORY}-backend:${VERSION}" ;;
+      sagittadb-frontend-*) image="${IMAGE_REPOSITORY}-frontend:${VERSION}" ;;
+      *) continue ;;
+    esac
+    cosign attest --yes --type cyclonedx --predicate "${sbom}" "${image}"
+  done
+fi
+
 python - <<'PY' "${PACKAGE_ZIP}"
 import base64
 import hashlib
@@ -31,14 +46,22 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 zip_path = Path(sys.argv[1])
 key = os.environ.get("MANIFEST_PRIVATE_KEY") or os.environ.get("LICENSE_PRIVATE_KEY", "")
 if not key.strip():
     raise SystemExit("MANIFEST_PRIVATE_KEY is required")
-padded = key.strip() + "=" * (-len(key.strip()) % 4)
-private_key = Ed25519PrivateKey.from_private_bytes(base64.urlsafe_b64decode(padded.encode()))
+key = key.strip()
+if "BEGIN PRIVATE KEY" in key:
+    loaded = serialization.load_pem_private_key(key.encode(), password=None)
+    if not isinstance(loaded, Ed25519PrivateKey):
+        raise SystemExit("MANIFEST_PRIVATE_KEY is not an Ed25519 private key")
+    private_key = loaded
+else:
+    padded = key + "=" * (-len(key) % 4)
+    private_key = Ed25519PrivateKey.from_private_bytes(base64.urlsafe_b64decode(padded.encode()))
 payload = {
     "product": "sagittadb",
     "artifact": zip_path.name,

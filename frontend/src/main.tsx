@@ -87,7 +87,7 @@ const antTheme = {
   },
   components: {
     Layout: {
-      headerBg:      '#0F172A',   // Tech Charcoal
+      headerBg:      '#0F172A',   // 技术炭黑
       headerColor:   '#FFFFFF',
       headerHeight:  56,
       siderBg:       '#FFFFFF',

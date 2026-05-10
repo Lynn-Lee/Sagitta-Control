@@ -41,9 +41,9 @@ celery_app.conf.update(
         "monitor":  {"exchange": "monitor",  "routing_key": "monitor"},   # 监控采集
     },
     task_default_queue="default",
-    # Worker 并发
+    # Worker 并发数
     worker_prefetch_multiplier=1,  # execute 队列逐条处理，防止堆积
-    # Beat 定时任务（Sprint 5 添加监控采集调度）
+    # Beat 定时任务（Sprint 5 增加监控采集调度）
     beat_schedule={
         "dispatch-scheduled-workflows-every-minute": {
             "task": "dispatch_scheduled_workflows",

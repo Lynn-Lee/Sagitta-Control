@@ -166,6 +166,30 @@ def test_evaluate_record_expired_and_not_before():
     assert LicenseService.evaluate_record(future)[0] == "invalid"
 
 
+def test_evaluate_online_record_requires_recent_server_check(monkeypatch):
+    now = datetime.now(UTC)
+    monkeypatch.setattr("app.services.license.settings.LICENSE_ONLINE_GRACE_DAYS", 7)
+    stale = LicenseRecord(
+        source="online",
+        status="licensed",
+        issued_at=now - timedelta(days=30),
+        not_before=now - timedelta(days=30),
+        expires_at=now + timedelta(days=30),
+        last_online_check_at=now - timedelta(days=8),
+    )
+    assert LicenseService.evaluate_record(stale)[0] == "invalid"
+
+    fresh = LicenseRecord(
+        source="online",
+        status="licensed",
+        issued_at=now - timedelta(days=30),
+        not_before=now - timedelta(days=30),
+        expires_at=now + timedelta(days=30),
+        last_online_check_at=now - timedelta(days=1),
+    )
+    assert LicenseService.evaluate_record(fresh)[0] == "licensed"
+
+
 @pytest.mark.asyncio
 async def test_check_access_rejects_expired_license(monkeypatch):
     async def fake_status(_db):

@@ -18,7 +18,9 @@
 - 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
 - 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`。
 - 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在客户包模板中预置，私有授权中心或密钥轮换时需替换。
-- 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
+- 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，要求至少每 7 天成功联网刷新一次；长期离线场景应使用 challenge-response 离线授权。
+- 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；商业构建标识会强制执行校验，即使客户误改 `APP_INTEGRITY_REQUIRED=false` 也不能关闭；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
+- 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口所需的 `NET_BIND_SERVICE`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
 - 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 
 Docker Compose 首次部署示例：
@@ -336,4 +338,4 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 
-商业发布流水线应使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像和客户部署包进行签名；交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。
+商业发布流水线应先使用 `scripts/validate-commercial-build-context.sh` 检查根级 `.dockerignore`，再使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/validate-commercial-images.sh` 检查真实镜像文件系统，使用 `scripts/generate-commercial-sbom.sh` 生成 CycloneDX SBOM，并使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像、SBOM 和客户部署包进行签名；交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。后端商业镜像构建必须通过源码残留门禁：`/app/app` 下除 `__init__.py` 外不得存在 `.py`、`.pyc` 或 `.pyo`；前端商业镜像不得包含 `.map` 或 `sourceMappingURL`。

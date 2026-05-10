@@ -37,6 +37,7 @@ CUSTOMER_README_TEMPLATE = """# SagittaDB Enterprise v__SAGITTADB_VERSION__
 生产环境不要使用 `latest`，请保留 `docker-compose.yml` 中的明确版本标签。
 使用前请确认合同、订单或授权函约定，并阅读随包 `LEGAL-NOTICE.md`。
 首次部署会自动进入 30 天全功能试用期；试用到期后业务功能将暂停，仅保留登录和授权管理入口。
+在线授权默认需要至少每 7 天成功联网刷新一次；如客户长期离线，请使用离线 challenge-response 授权。
 
 ## 首次部署
 
@@ -83,7 +84,7 @@ docker load < sagittadb-frontend-__SAGITTADB_VERSION__.tar
 docker compose up -d
 ```
 
-## License
+## License 授权
 
 登录后可在授权管理页面输入在线激活码完成授权，或生成离线 Challenge 后导入商务侧返回的 challenge-response 文件。也可以使用 `verify-license.sh` 验证在线激活、离线 Challenge 生成和刷新流程：
 
@@ -94,6 +95,7 @@ docker compose up -d
 SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
 
 生产环境默认不接受未绑定 Challenge 的裸 License JSON。
+在线激活授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，超过宽限期未成功回源刷新时业务功能会暂停，直到授权刷新成功。
 
 试用期结束或需要正式生产授权时，请联系 SagittaDB 商业支持，并提供授权管理页展示的部署指纹。
 
@@ -103,8 +105,18 @@ SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激�
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"LICENSE_PRIVATE_KEY"),
+    re.compile(r"MANIFEST_PRIVATE_KEY"),
     re.compile(r"LICENSE_SERVER_TOKEN"),
     re.compile(r"private_key\s*=", re.IGNORECASE),
+]
+
+FORBIDDEN_PATH_PATTERNS = [
+    re.compile(r"(^|/)backend(/|$)"),
+    re.compile(r"(^|/)frontend(/|$)"),
+    re.compile(r"(^|/)tools(/|$)"),
+    re.compile(r"(^|/)scripts/build-commercial-images\.sh$"),
+    re.compile(r"(^|/)scripts/compile-nuitka-core\.sh$"),
+    re.compile(r"(^|/)scripts/sign-commercial-artifacts\.sh$"),
 ]
 
 
@@ -165,7 +177,7 @@ def render_placeholders(package_dir: Path, version: str, image_repository: str) 
 def split_image_repository(image_repository: str) -> tuple[str, str]:
     parts = image_repository.split("/", 1)
     if len(parts) != 2:
-        raise ValueError("--image-repository must include registry/repository, e.g. ghcr.io/acme/sagittadb")
+        raise ValueError("--image-repository 必须包含 registry/repository，例如 ghcr.io/acme/sagittadb")
     return parts[0], parts[1]
 
 
@@ -188,6 +200,12 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
     if re.search(r":latest\b", combined_text):
         errors.append("客户包禁止引用 :latest 镜像")
 
+    if re.search(r"\bbuild\s*:", combined_text):
+        errors.append("客户包禁止包含本地源码 build 配置")
+
+    if "sourceMappingURL" in combined_text:
+        errors.append("客户包禁止包含 sourceMappingURL 引用")
+
     if not re.search(rf"-backend:{re.escape(version)}\b", combined_text):
         errors.append("后端镜像未使用指定固定版本")
 
@@ -197,6 +215,15 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
     for pattern in SECRET_PATTERNS:
         if pattern.search(combined_text):
             errors.append(f"客户包疑似包含 License 私钥材料：{pattern.pattern}")
+
+    for path in package_dir.rglob("*"):
+        relative = path.relative_to(package_dir).as_posix()
+        if path.is_file() and path.suffix in {".py", ".pyc", ".pyo", ".map", ".ts", ".tsx"}:
+            errors.append(f"客户包禁止包含源码或 sourcemap 文件：{relative}")
+        for pattern in FORBIDDEN_PATH_PATTERNS:
+            if pattern.search(relative):
+                errors.append(f"客户包禁止包含内部源码/构建路径：{relative}")
+                break
 
     return errors
 

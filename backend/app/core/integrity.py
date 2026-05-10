@@ -61,9 +61,10 @@ def verify_startup_integrity() -> None:
     启动时必须存在签名 Manifest，且 Manifest 内列出的文件摘要全部匹配。
     """
 
+    integrity_required = settings.APP_INTEGRITY_REQUIRED or settings.SAGITTADB_COMMERCIAL_BUILD
     manifest_path = Path(settings.APP_INTEGRITY_MANIFEST)
     if not manifest_path.exists():
-        if settings.APP_INTEGRITY_REQUIRED:
+        if integrity_required:
             raise IntegrityError(f"完整性 Manifest 不存在：{manifest_path}")
         logger.info("integrity_manifest_missing_skip path=%s", manifest_path)
         return

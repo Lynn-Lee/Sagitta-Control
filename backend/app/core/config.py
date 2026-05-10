@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     LICENSE_SERVER_URL: str = ""
     LICENSE_SERVER_TOKEN: str = ""
     LICENSE_AUTO_REFRESH_ENABLED: bool = True
+    LICENSE_ONLINE_GRACE_DAYS: int = 7
     LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
     LICENSE_TRIAL_DAYS: int = 30
     LICENSE_DEPLOYMENT_ID: str = ""
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
     APP_INTEGRITY_MANIFEST: str = "/app/COMMERCIAL-MANIFEST.json"
     APP_INTEGRITY_ROOT: str = "/app"
     MANIFEST_PUBLIC_KEY: str = ""
+    SAGITTADB_COMMERCIAL_BUILD: bool = False
 
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
     TENANT_ID: int = 1

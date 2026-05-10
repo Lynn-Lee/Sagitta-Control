@@ -137,6 +137,7 @@ license:
   customerId: ""
   serverUrl: "https://sagitta.loveai.asia"
   autoRefreshEnabled: true
+  onlineGraceDays: 7
   renewalNotifyDays: "30,7"
   trialDays: 30
   deploymentId: "CHANGE_ME_STABLE_RANDOM_DEPLOYMENT_ID"
@@ -216,7 +217,7 @@ podSecurityContext:
 
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop: [ALL]
 

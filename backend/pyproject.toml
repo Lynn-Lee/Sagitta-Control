@@ -15,8 +15,8 @@ dependencies = [
     # ORM & 数据库
     "sqlalchemy~=2.0",
     "alembic~=1.13",
-    "asyncpg~=0.29.0",       # PostgreSQL async driver
-    "psycopg2-binary~=2.9",  # PostgreSQL sync driver (Alembic)
+    "asyncpg~=0.29.0",       # PostgreSQL 异步驱动
+    "psycopg2-binary~=2.9",  # PostgreSQL 同步驱动（Alembic）
     # 数据验证
     "pydantic~=2.6",
     "pydantic-settings~=2.2",
@@ -78,7 +78,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
-    "httpx>=0.27.0",              # TestClient
+    "httpx>=0.27.0",              # TestClient 依赖
     "factory-boy>=3.3.0",
     "mypy>=1.8.0",
     "ruff>=0.3.0",

@@ -22,6 +22,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 env:
   PRODUCT_CODE: sagittadb
@@ -71,7 +72,12 @@ jobs:
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: 校验商业构建上下文
+        shell: bash
+        run: scripts/validate-commercial-build-context.sh
+
       - name: 构建并推送商业后端镜像
+        id: backend-image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -91,6 +97,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 构建并推送商业前端镜像
+        id: frontend-image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -103,6 +110,31 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: 安装 Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: 安装 Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: 校验商业镜像内容
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}" \
+          IMAGE_REPOSITORY="${PUBLIC_IMAGE_REPOSITORY}" \
+          scripts/validate-commercial-images.sh
+
+      - name: 生成镜像 SBOM
+        shell: bash
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}" \
+          IMAGE_REPOSITORY="${PUBLIC_IMAGE_REPOSITORY}" \
+          SBOM_OUTPUT_DIR="dist-commercial/sbom" \
+          scripts/generate-commercial-sbom.sh
 
       - name: 渲染客户部署包
         shell: bash
@@ -121,6 +153,19 @@ jobs:
             cd dist-commercial
             sha256sum --check "${package_name}.zip.sha256"
           )
+
+      - name: 签名商业发布产物
+        shell: bash
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+          MANIFEST_PRIVATE_KEY: ${{ secrets.MANIFEST_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}" \
+          IMAGE_REPOSITORY="${PUBLIC_IMAGE_REPOSITORY}" \
+          PACKAGE_ZIP="dist-commercial/${{ steps.release.outputs.package_name }}.zip" \
+          SBOM_DIR="dist-commercial/sbom" \
+          scripts/sign-commercial-artifacts.sh
 
       - name: 检出公开发布仓库
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
@@ -148,6 +193,8 @@ jobs:
             "${product_dir}/"
           cp "dist-commercial/${package_name}.zip" "${product_dir}/releases/${release_dir}/"
           cp "dist-commercial/${package_name}.zip.sha256" "${product_dir}/releases/${release_dir}/"
+          cp "dist-commercial/${package_name}.zip.sig.json" "${product_dir}/releases/${release_dir}/"
+          cp dist-commercial/sbom/* "${product_dir}/releases/${release_dir}/"
           rsync -a docs/screenshots/user-manual/ "${product_dir}/screenshots/"
 
           if [[ ! -f public-releases/.gitignore ]]; then
@@ -193,10 +240,15 @@ jobs:
           test -d "${product_dir}/helm/sagittadb"
           test -f "${product_dir}/releases/${release_dir}/${package_name}.zip"
           test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sha256"
+          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
+          test -f "${product_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${product_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
 
           (
             cd "${product_dir}/releases/${release_dir}"
             sha256sum --check "${package_name}.zip.sha256"
+            sha256sum --check "sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
+            sha256sum --check "sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
           )
 
           if grep -RInE \

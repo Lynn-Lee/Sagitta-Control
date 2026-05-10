@@ -7,10 +7,10 @@ base_ref="${2:-main}"
 
 usage() {
   cat <<'EOF'
-Usage:
+用法：
   bash scripts/create-release-branch.sh <major.minor> [base-ref]
 
-Examples:
+示例：
   bash scripts/create-release-branch.sh 1.0
   bash scripts/create-release-branch.sh 1.1 main
 EOF
@@ -22,7 +22,7 @@ EOF
 branch="release/${version}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Tracked files have local changes. Commit or stash them before creating ${branch}."
+  echo "已跟踪文件存在本地改动，请先提交或暂存后再创建 ${branch}。"
   exit 1
 fi
 
@@ -32,9 +32,9 @@ git merge --ff-only "origin/${base_ref}" 2>/dev/null || true
 git switch -c "${branch}"
 
 cat <<EOF
-Created ${branch}.
+已创建 ${branch}。
 
-Next:
+下一步：
   git push -u origin ${branch}
   git tag v${version}.0
   git push origin v${version}.0
