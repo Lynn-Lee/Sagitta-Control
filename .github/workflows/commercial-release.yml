@@ -201,7 +201,7 @@ jobs:
 
           if grep -RInE \
             'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
-            public-releases \
+            "${product_dir}" \
             --exclude-dir=.git \
             --exclude='*.zip'; then
             echo "公开发布仓库包含禁止发布的内容。" >&2
