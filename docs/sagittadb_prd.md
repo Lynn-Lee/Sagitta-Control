@@ -234,6 +234,7 @@ SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎�
 - `platform_name`：平台显示名称，用于登录页、顶部导航和浏览器标题。
 - `platform_logo_url`：平台 Logo 地址或图片 data URL，用于登录页、顶部导航和 favicon；未配置时使用默认 SagittaDB Logo。
 - 前端通过公开接口 `/api/v1/system/branding/` 读取品牌信息，未登录用户也可获取登录页展示所需的非敏感配置。
+- 顶部导航和侧边栏 Logo 下方的默认中文副标为 `矢准数据`。
 - 默认登录页展示引文版品牌语：`SagittaDB · Aim at Data, Control with Precision`，底部版权署名为 `Lynn-Lee`。
 
 ## 6. 数据安全设计

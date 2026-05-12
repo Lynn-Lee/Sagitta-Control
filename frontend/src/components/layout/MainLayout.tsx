@@ -362,7 +362,7 @@ export default function MainLayout() {
                 letterSpacing: '3px',
                 marginTop: 1,
               }}>
-                数 据 管 控
+                矢准数据
               </div>
             </div>
           </Space>
