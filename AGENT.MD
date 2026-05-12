@@ -72,6 +72,12 @@ COMPOSE_PROJECT_NAME=sagittadb-enterprise-v200 bash deploy/update-prod.sh --ref 
 ```
 
 - 源码测试环境不得强制启用商业镜像完整性 Manifest；如果从商业部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
+- 因源码 Compose 文件位于 `deploy/docker-compose.yml`，Docker Compose 做变量插值时需要能在 `deploy/` 目录读取 `.env`；ECS 源码环境必须保留以下软链接，避免 PostgreSQL、Redis 等基础服务误用默认密码：
+
+```bash
+ln -sfn ../.env deploy/.env
+```
+
 - 更新前后应记录当前分支、提交 SHA、服务重建结果和健康检查结果。至少验证：
 
 ```bash
