@@ -68,7 +68,7 @@ ssh -i ~/.ssh/zovjudan.pem ecs-user@47.102.146.147 -p 2222
 - 为复用当前测试环境容器和持久化卷，源码部署时使用现有 Compose project：
 
 ```bash
-COMPOSE_PROJECT_NAME=sagittadb-enterprise-v200 bash deploy/update-prod.sh --ref origin/main
+COMPOSE_PROJECT_NAME=sagittadb-enterprise-v200 bash deploy/update-prod.sh
 ```
 
 - 源码测试环境不得强制启用商业镜像完整性 Manifest；如果从商业部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
