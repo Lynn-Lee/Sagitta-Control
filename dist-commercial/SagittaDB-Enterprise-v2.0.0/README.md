@@ -67,7 +67,7 @@ docker compose up -d
 
 SagittaDB Enterprise 使用统一授权中心 License-Server-Center，客户包默认授权服务地址为 `https://license.loveai.asia`。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
 
-在线激活前，在授权管理页输入客户 ID，页面会生成“正式激活客户 ID”和“正式激活部署指纹”。请将该正式激活部署指纹录入用户授权中心，再生成并交付激活码。
+在线激活前，在授权管理页输入客户 ID，页面会生成“正式激活客户 ID”和“正式激活部署指纹”。请将该正式激活部署指纹录入用户授权中心，再生成并交付激活码。复制指纹时，HTTPS 环境优先使用浏览器剪贴板能力；HTTP 试用部署会自动使用兼容复制方式。
 
 生产环境默认不接受未绑定 Challenge 的裸 License JSON。
 在线激活授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，超过宽限期未成功回源刷新时业务功能会暂停，直到授权刷新成功。

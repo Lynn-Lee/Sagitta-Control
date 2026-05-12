@@ -403,6 +403,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 - 授权项目固定显示为 `SagittaDB（sagittadb）`。在线激活和联网刷新时，系统会自动向 License-Server-Center 提交项目码 `sagittadb`，无需人工输入。
 - 部署指纹用于绑定客户部署。在线激活区域输入客户 ID 后，页面会按该客户 ID 计算“正式激活部署指纹”；应使用该指纹在用户授权中心生成正式激活码。
+- 复制部署指纹时，HTTPS 环境优先调用浏览器剪贴板能力；HTTP 试用部署会自动使用兼容复制方式，复制失败时页面仍会保留完整指纹供手动选择。
 - 在线和离线 License 都必须通过 `LICENSE_PUBLIC_KEY` 完成 Ed25519 签名校验；未配置公钥时会提示“未配置 License 公钥”。
 - 生产环境默认不接受未绑定 Challenge 的裸 License JSON。离线授权需先生成 Challenge，再导入包含 `challenge` 与 `license` 的响应文件。
 - License 仅在签名、公钥、客户 ID、授权项目和部署指纹匹配时生效。

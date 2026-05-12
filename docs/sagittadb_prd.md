@@ -291,7 +291,7 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 运维管理手册。
 - 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
-当前商业部署版本为 `2.0.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码。
+当前商业部署版本为 `2.0.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
 
 商业版增强边界：
 
