@@ -154,7 +154,7 @@ services:
       - postgres
     command: celery -A app.celery_app beat --loglevel=warning
     healthcheck:
-      test: ["CMD-SHELL", "ps | grep '[c]elery.*beat' >/dev/null"]
+      test: ["CMD-SHELL", "ps aux | grep '[c]elery.*beat' >/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
