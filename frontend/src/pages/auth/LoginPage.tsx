@@ -340,7 +340,7 @@ export default function LoginPage() {
             color: '#818CF8',           /* 改为靛紫-200，与背景光晕一致 */
             letterSpacing: '7px', marginTop: 7, textAlign: 'center',
           }}>
-            数 据 管 控 平 台
+            矢 准 数 据
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
@@ -348,7 +348,7 @@ export default function LoginPage() {
             color: 'rgba(255,255,255,0.25)',
             letterSpacing: '1.5px', marginTop: 12,
           }}>
-            {branding.platform_name} · Data Governance Platform
+            {branding.platform_name} · Aim at Data, Control with Precision
           </div>
         </div>
 
@@ -690,8 +690,8 @@ export default function LoginPage() {
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
         lineHeight: 1.8,
       }}>
-        <div>{branding.platform_name} v2.0.0 · 多引擎兼容 · 全链路可观测</div>
-        <div>Copyright © 2026 Jocelyn. All rights reserved.</div>
+        <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
+        <div>{branding.platform_name} v2.0.0 · Full Engine Compatibility, End-to-End Observability</div>
       </div>
     </div>
   )

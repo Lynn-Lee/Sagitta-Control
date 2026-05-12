@@ -33,8 +33,24 @@ export type LicenseChallenge = {
   signature: string
 }
 
+export type LicenseFingerprintPreview = {
+  project?: string
+  product?: string
+  project_code?: string
+  project_name?: string
+  customer_id: string
+  deployment_fingerprint: string
+}
+
 export const licenseApi = {
   status: () => apiClient.get<LicenseStatus>('/system/license/status').then(r => r.data),
+
+  deploymentFingerprint: (customerId?: string) =>
+    apiClient
+      .get<LicenseFingerprintPreview>(
+        `/system/license/deployment-fingerprint${customerId ? `?customer_id=${encodeURIComponent(customerId)}` : ''}`,
+      )
+      .then(r => r.data),
 
   import: (license: string | Record<string, unknown>) =>
     apiClient.post('/system/license/import', { license }).then(r => r.data),

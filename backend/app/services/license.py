@@ -181,6 +181,19 @@ class LicenseService:
         return {"project": LICENSE_PROJECT_CODE, "product": LICENSE_PROJECT_CODE}
 
     @staticmethod
+    def activation_fingerprint(customer_id: str = "") -> dict[str, str]:
+        resolved_customer_id = (customer_id or settings.LICENSE_CUSTOMER_ID).strip()
+        if not resolved_customer_id:
+            raise HTTPException(status_code=400, detail="请输入客户标识")
+        return {
+            **LicenseService._license_server_project_payload(),
+            "project_code": LICENSE_PROJECT_CODE,
+            "project_name": LICENSE_PROJECT_NAME,
+            "customer_id": resolved_customer_id,
+            "deployment_fingerprint": LicenseService.deployment_fingerprint(resolved_customer_id),
+        }
+
+    @staticmethod
     def _challenge_secret() -> bytes:
         secret = settings.SECRET_KEY.strip()
         if not secret:

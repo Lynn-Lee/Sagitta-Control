@@ -46,6 +46,7 @@ README.md
 - Kubernetes / Helm 部署入口。
 - 30 天试用说明。
 - 在线激活和离线 challenge-response 简述。
+- 输入客户 ID 生成正式激活部署指纹的授权操作说明。
 - 商业授权联系方式。
 - Release 下载和 sha256 校验方式。
 
@@ -75,7 +76,7 @@ ghcr.io/<org>/sagittadb-frontend:2.0.0
 - 商业根上下文构建必须通过 `.dockerignore` 门禁，禁止将虚拟环境、测试目录、前端依赖、`dist-commercial`、私钥、License 文件或激活材料送入 Docker build context。
 - 前端镜像只包含 build 产物，构建后必须拒绝 `.map` sourcemap 和 `sourceMappingURL` 引用，并使用生产压缩/混淆配置。
 - 商业镜像默认启用 Manifest 完整性校验；商业构建标识 `SAGITTADB_COMMERCIAL_BUILD=true` 时，即使客户把 `APP_INTEGRITY_REQUIRED` 设为 false，启动也必须校验 Manifest。
-- 客户部署模板默认启用容器只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载，降低本地运行态篡改面；前端 Nginx 仅保留绑定 80 端口所需的 `NET_BIND_SERVICE`。
+- 客户部署模板默认启用容器只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载，降低本地运行态篡改面；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。
 
 ## 4. GitHub Release 规则
 
@@ -139,6 +140,13 @@ product=sagittadb
 在线激活：
 
 ```text
+GET /api/v1/system/license/deployment-fingerprint?customer_id=<customer_id>
+response:
+  project=sagittadb
+  product=sagittadb
+  customer_id
+  deployment_fingerprint
+
 POST /api/v1/licenses/activate
 payload:
   activation_code
@@ -147,6 +155,8 @@ payload:
   project=sagittadb
   product=sagittadb
 ```
+
+授权管理页在在线激活区域输入客户 ID 后，会调用部署指纹预览接口生成正式激活部署指纹。运营侧应在用户授权中心录入该指纹，再生成并交付激活码。
 
 联网刷新：
 

@@ -14,8 +14,8 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ReloadOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
-import { licenseApi, type LicenseStatus } from '@/api/license'
+import { CopyOutlined, ReloadOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
+import { licenseApi, type LicenseFingerprintPreview, type LicenseStatus } from '@/api/license'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -49,6 +49,9 @@ export default function LicensePage() {
   const [challengeText, setChallengeText] = useState('')
   const [activationCode, setActivationCode] = useState('')
   const [customerId, setCustomerId] = useState('')
+  const [fingerprintPreview, setFingerprintPreview] = useState<LicenseFingerprintPreview | null>(null)
+  const [fingerprintLoading, setFingerprintLoading] = useState(false)
+  const [fingerprintError, setFingerprintError] = useState('')
 
   const loadStatus = useCallback(async () => {
     setLoading(true)
@@ -67,12 +70,60 @@ export default function LicensePage() {
     loadStatus()
   }, [loadStatus])
 
+  useEffect(() => {
+    const nextCustomerId = customerId.trim()
+    if (!nextCustomerId) {
+      setFingerprintPreview(null)
+      setFingerprintError('')
+      setFingerprintLoading(false)
+      return
+    }
+
+    let active = true
+    const timer = window.setTimeout(async () => {
+      setFingerprintLoading(true)
+      setFingerprintError('')
+      try {
+        const preview = await licenseApi.deploymentFingerprint(nextCustomerId)
+        if (active) {
+          setFingerprintPreview(preview)
+        }
+      } catch (error: any) {
+        if (active) {
+          setFingerprintPreview(null)
+          setFingerprintError(error?.response?.data?.detail || '部署指纹生成失败')
+        }
+      } finally {
+        if (active) {
+          setFingerprintLoading(false)
+        }
+      }
+    }, 300)
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [customerId])
+
   const alertType = useMemo(() => {
     if (!status) return 'info'
     if (status.status === 'licensed') return 'success'
     if (status.status === 'trial') return 'warning'
     return 'error'
   }, [status])
+
+  const activationFingerprint = fingerprintPreview?.deployment_fingerprint || ''
+
+  const handleCopyActivationFingerprint = async () => {
+    if (!activationFingerprint) return
+    try {
+      await navigator.clipboard.writeText(activationFingerprint)
+      message.success('正式激活部署指纹已复制')
+    } catch {
+      message.error('复制失败，请手动复制')
+    }
+  }
 
   const handleImport = async () => {
     if (!licenseText.trim()) {
@@ -204,7 +255,12 @@ export default function LicensePage() {
               <Descriptions.Item label="客户名称">{status?.company_name || '-'}</Descriptions.Item>
               <Descriptions.Item label="在线激活 ID">{status?.activation_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="远端状态">{status?.remote_status || '-'}</Descriptions.Item>
-              <Descriptions.Item label="部署指纹">{status?.deployment_fingerprint || '-'}</Descriptions.Item>
+              <Descriptions.Item label="当前授权部署指纹">
+                {status?.deployment_fingerprint ? <Text copyable>{status.deployment_fingerprint}</Text> : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="当前激活部署指纹">
+                {status?.activation_deployment_fingerprint ? <Text copyable>{status.activation_deployment_fingerprint}</Text> : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="最后联网校验">{formatDate(status?.last_online_check_at)}</Descriptions.Item>
               <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
               <Descriptions.Item label="生效时间">{formatDate(status?.not_before)}</Descriptions.Item>
@@ -268,6 +324,29 @@ export default function LicensePage() {
                         联网刷新
                       </Button>
                     </Space>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={6}>
+                  <Form.Item label="正式激活客户 ID">
+                    <Input value={fingerprintPreview?.customer_id || ''} readOnly placeholder={customerId.trim() ? '正在计算' : '-'} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={18}>
+                  <Form.Item label="正式激活部署指纹" validateStatus={fingerprintError ? 'error' : undefined} help={fingerprintError || undefined}>
+                    <Input
+                      value={activationFingerprint}
+                      readOnly
+                      placeholder={customerId.trim() ? (fingerprintLoading ? '正在计算' : '请输入有效客户 ID') : '输入客户 ID 后自动生成'}
+                      addonAfter={(
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<CopyOutlined />}
+                          disabled={!activationFingerprint}
+                          onClick={handleCopyActivationFingerprint}
+                        />
+                      )}
+                    />
                   </Form.Item>
                 </Col>
               </Row>

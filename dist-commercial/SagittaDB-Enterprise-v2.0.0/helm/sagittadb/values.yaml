@@ -135,7 +135,7 @@ app:
 license:
   publicKey: "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"
   customerId: ""
-  serverUrl: "https://sagitta.loveai.asia"
+  serverUrl: "https://license.loveai.asia"
   autoRefreshEnabled: true
   onlineGraceDays: 7
   renewalNotifyDays: "30,7"

@@ -20,7 +20,7 @@
 - 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在客户包模板中预置，私有授权中心或密钥轮换时需替换。
 - 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，要求至少每 7 天成功联网刷新一次；长期离线场景应使用 challenge-response 离线授权。
 - 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；商业构建标识会强制执行校验，即使客户误改 `APP_INTEGRITY_REQUIRED=false` 也不能关闭；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
-- 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口所需的 `NET_BIND_SERVICE`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
+- 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
 - 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 
 Docker Compose 首次部署示例：
@@ -207,7 +207,7 @@ bash deploy/update-prod.sh --ref <target_ref>
 - `/api/v1/system/branding/` 正常返回平台名称和 Logo 配置。
 - 前端可登录。
 - 刷新页面时浏览器页签不应短暂显示旧品牌标题；`index.html` 会先显示中性标题，并在主应用启动前预加载品牌配置。
-- 登录页版权文案展示为 `Copyright © 2026 Jocelyn. All rights reserved.`。
+- 登录页版权文案展示为 `Copyright © 2026 Lynn-Lee. All rights reserved.`。
 - SQL 工单、在线查询和 Celery 任务正常。
 - Alembic 版本为最新。
 
@@ -334,7 +334,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `2.0.0`。SagittaDB 授权项目码固定为 `sagittadb`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。
+当前商业部署版本为 `2.0.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

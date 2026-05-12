@@ -364,7 +364,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - `平台名称` 会显示在登录页、顶部导航和浏览器标题中。
 - `平台 Logo URL` 支持图片 URL，也支持上传 PNG/JPG/SVG/WebP 后自动保存为 data URL；留空时使用默认 Logo。
 - 保存后刷新页面即可看到登录页、顶部导航、浏览器标题和 favicon 的品牌变化。前端会在应用启动前预加载品牌配置，避免浏览器刷新时短暂显示默认旧标题。
-- 登录页底部版权文案显示为 `Copyright © 2026 Jocelyn. All rights reserved.`。
+- 登录页底部版权文案显示为 `Copyright © 2026 Lynn-Lee. All rights reserved.`。
 
 ## 13. 审计日志
 
@@ -394,6 +394,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 - 查看当前 License 状态、授权项目、客户 ID、激活客户 ID、套餐、到期时间和部署指纹。
 - 在线激活授权码。
+- 输入客户 ID 后预览并复制正式激活部署指纹，用于在用户授权中心生成对应激活码。
 - 刷新在线 License。
 - 生成离线 Challenge，并导入商务/运营侧返回的 challenge-response License。
 - 查看功能开关和限额信息。
@@ -401,7 +402,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 注意事项：
 
 - 授权项目固定显示为 `SagittaDB（sagittadb）`。在线激活和联网刷新时，系统会自动向 License-Server-Center 提交项目码 `sagittadb`，无需人工输入。
-- 部署指纹用于绑定客户部署。试用状态下页面展示的是正式激活客户 ID 对应的指纹，应使用该指纹在授权平台生成激活码。
+- 部署指纹用于绑定客户部署。在线激活区域输入客户 ID 后，页面会按该客户 ID 计算“正式激活部署指纹”；应使用该指纹在用户授权中心生成正式激活码。
 - 在线和离线 License 都必须通过 `LICENSE_PUBLIC_KEY` 完成 Ed25519 签名校验；未配置公钥时会提示“未配置 License 公钥”。
 - 生产环境默认不接受未绑定 Challenge 的裸 License JSON。离线授权需先生成 Challenge，再导入包含 `challenge` 与 `license` 的响应文件。
 - License 仅在签名、公钥、客户 ID、授权项目和部署指纹匹配时生效。

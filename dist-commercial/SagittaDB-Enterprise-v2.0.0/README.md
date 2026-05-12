@@ -65,11 +65,13 @@ docker compose up -d
 ./verify-license.sh <activation_code> <customer_id>
 ```
 
-SagittaDB Enterprise 使用统一授权中心 License-Server-Center。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
+SagittaDB Enterprise 使用统一授权中心 License-Server-Center，客户包默认授权服务地址为 `https://license.loveai.asia`。在线激活和联网刷新会由后端自动提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
+
+在线激活前，在授权管理页输入客户 ID，页面会生成“正式激活客户 ID”和“正式激活部署指纹”。请将该正式激活部署指纹录入用户授权中心，再生成并交付激活码。
 
 生产环境默认不接受未绑定 Challenge 的裸 License JSON。
 在线激活授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，超过宽限期未成功回源刷新时业务功能会暂停，直到授权刷新成功。
 
-试用期结束或需要正式生产授权时，请联系 SagittaDB 商业支持，并提供授权管理页展示的部署指纹。
+试用期结束或需要正式生产授权时，请联系 SagittaDB 商业支持，并提供授权管理页展示的正式激活部署指纹。
 
 共享日志或配置时，不要打包 License 文件、私钥、激活码或 `.env` 中的敏感值。

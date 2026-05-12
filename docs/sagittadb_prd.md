@@ -234,6 +234,7 @@ SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎�
 - `platform_name`：平台显示名称，用于登录页、顶部导航和浏览器标题。
 - `platform_logo_url`：平台 Logo 地址或图片 data URL，用于登录页、顶部导航和 favicon；未配置时使用默认 SagittaDB Logo。
 - 前端通过公开接口 `/api/v1/system/branding/` 读取品牌信息，未登录用户也可获取登录页展示所需的非敏感配置。
+- 默认登录页展示引文版品牌语：`SagittaDB · Aim at Data, Control with Precision`，底部版权署名为 `Lynn-Lee`。
 
 ## 6. 数据安全设计
 
@@ -290,7 +291,7 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 运维管理手册。
 - 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
-当前商业部署版本为 `2.0.0`。商业授权统一接入 `License-Server-Center`，SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。
+当前商业部署版本为 `2.0.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码。
 
 商业版增强边界：
 
@@ -307,6 +308,6 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 至少接入一个生产同构测试实例。
 - 完成用户、角色、用户组、资源组、审批流配置。
 - 验证 SQL 工单、查询权限、在线查询、数据字典、归档、通知链路。
-- 验证授权管理页展示 `授权项目：SagittaDB（sagittadb）`，并完成在线激活、联网刷新和离线 challenge-response 导入。
+- 验证授权管理页展示 `授权项目：SagittaDB（sagittadb）`，客户 ID 可生成正式激活部署指纹，并完成在线激活、联网刷新和离线 challenge-response 导入。
 - 验证备份恢复和升级回滚。
 - 验证审计日志、查询历史和操作追踪可用。
