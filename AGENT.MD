@@ -57,18 +57,12 @@ ssh -i ~/.ssh/zovjudan.pem ecs-user@47.102.146.147 -p 2222
 /opt/sagittadb/source
 ```
 
-- 云 ECS 本地 Git 镜像仓库目录固定为：
+- 云 ECS 测试环境直接从 GitHub 源码仓库 clone/fetch。若私有仓库需要 token，只能通过临时 `GIT_ASKPASS`、临时环境变量或一次性输入使用；不得把 token 写入 git remote、`.env`、脚本、文档或 shell profile。
+- 旧商业部署测试环境已经废弃；需要重建测试环境时，可以清理旧商业 compose project、商业部署包目录和旧数据卷，再使用源码重新部署。
+- 源码测试环境 Compose project 固定为：
 
 ```bash
-/opt/sagittadb/git/SagittaDB.git
-```
-
-- 如果 ECS 无法直接从 GitHub 拉取私有仓库，应在本地推送 GitHub 成功后，再通过 SSH 将同一提交推送到 ECS 本地 Git 镜像仓库，然后在 `/opt/sagittadb/source` 中快进更新。
-- 源码测试环境更新时应保留线上 `.env`、数据库 volume 和 Redis volume，不得删除或重建持久化数据，除非用户明确要求清空测试环境。
-- 为复用当前测试环境容器和持久化卷，源码部署时使用现有 Compose project：
-
-```bash
-COMPOSE_PROJECT_NAME=sagittadb-enterprise-v200 bash deploy/update-prod.sh
+COMPOSE_PROJECT_NAME=sagittadb-source-test
 ```
 
 - 源码测试环境不得强制启用商业镜像完整性 Manifest；如果从商业部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
@@ -76,6 +70,12 @@ COMPOSE_PROJECT_NAME=sagittadb-enterprise-v200 bash deploy/update-prod.sh
 
 ```bash
 ln -sfn ../.env deploy/.env
+```
+
+- 标准源码部署命令：
+
+```bash
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
 ```
 
 - 更新前后应记录当前分支、提交 SHA、服务重建结果和健康检查结果。至少验证：
