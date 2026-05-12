@@ -203,13 +203,15 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 12. 在公开仓库创建 `sagittadb/v2.0.0` Release。
 13. 上传 zip、sha256、签名文件和 SBOM。
 
-自动发布由 `.github/workflows/commercial-release.yml` 执行：
+源码 CI 和商业发布机制与 DataFusionX 保持一致：
 
-- 推送到 `main` 或 `release/**` 时，生成快照版本，例如 `2.0.0-dev.123.abcdef0`，并同步到 `Public-Releases`。
-- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`。
-- 手动触发 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本。
+- 推送到 `main` 时，只触发 `.github/workflows/ci.yml` 和 `.github/workflows/release-version-record.yml`，用于源码构建校验和版本记录，不构建或发布商业包。
+- 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.0.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步 `Public-Releases`。
+- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Public-Releases`。
+- 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到 `Public-Releases`，只有显式勾选发布时才同步公开发布仓库。
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
 - 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`；根 README 保持四产品门户，不由 SagittaDB 发布覆盖。
+- 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 
 私有仓库需要配置 GitHub Secrets：
 

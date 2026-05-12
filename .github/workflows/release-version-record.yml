@@ -1,0 +1,61 @@
+name: Release Version Record
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    name: 记录版本
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 生成版本元数据
+        id: version
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="v2.0.0-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          mkdir -p release-record
+          cat > release-record/release-version.json <<JSON
+          {
+            "version": "${VERSION}",
+            "commit": "${GITHUB_SHA}",
+            "branch": "${GITHUB_REF_NAME}",
+            "runNumber": ${GITHUB_RUN_NUMBER},
+            "runId": ${GITHUB_RUN_ID},
+            "repository": "${GITHUB_REPOSITORY}"
+          }
+          JSON
+          {
+            echo "version=${VERSION}"
+            echo "short_sha=${SHORT_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 写入任务摘要
+        run: |
+          {
+            echo "## SagittaDB 发布版本记录"
+            echo ""
+            echo "- 版本：\`${{ steps.version.outputs.version }}\`"
+            echo "- 提交：\`${{ github.sha }}\`"
+            echo "- 分支：\`${{ github.ref_name }}\`"
+            echo "- CI 运行编号：\`${{ github.run_id }}\`"
+            echo ""
+            echo "默认不上传制品，避免占用 GitHub Actions 存储配额。"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat release-record/release-version.json
+
+      - name: 上传发布版本记录
+        if: ${{ vars.ENABLE_RELEASE_VERSION_ARTIFACT == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-version-${{ steps.version.outputs.short_sha }}
+          path: release-record/release-version.json
+          retention-days: 7

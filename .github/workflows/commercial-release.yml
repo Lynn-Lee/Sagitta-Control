@@ -3,7 +3,6 @@ name: 商业部署发布
 on:
   push:
     branches:
-      - main
       - "release/**"
     tags:
       - "v*.*.*"
@@ -14,9 +13,9 @@ on:
         required: false
         type: string
       publish_public_repo:
-        description: "是否将渲染后的商业部署包发布到 Public-Releases。"
+        description: "是否将渲染后的商业部署包发布到 Public-Releases。正式 tag 始终发布。"
         required: false
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -32,13 +31,19 @@ env:
   PUBLIC_PRODUCT_DIR: products/sagittadb
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
 
+concurrency:
+  group: commercial-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   package:
     name: 构建并发布商业部署包
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@v4
 
       - name: 解析发布元数据
         id: release
@@ -51,6 +56,12 @@ jobs:
           elif [[ -n "${{ inputs.version || '' }}" ]]; then
             version="${{ inputs.version }}"
             channel="stable"
+          elif [[ "${GITHUB_REF_NAME}" == release/* ]]; then
+            short_sha="$(git rev-parse --short=7 HEAD)"
+            base_version="${GITHUB_REF_NAME#release/}"
+            base_version="${base_version//\//-}"
+            version="${base_version}-rc.${GITHUB_RUN_NUMBER}.${short_sha}"
+            channel="rc"
           else
             short_sha="$(git rev-parse --short=7 HEAD)"
             version="${COMMERCIAL_BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${short_sha}"
@@ -167,8 +178,19 @@ jobs:
           SBOM_DIR="dist-commercial/sbom" \
           scripts/sign-commercial-artifacts.sh
 
+      - name: 上传商业部署包
+        if: ${{ vars.ENABLE_COMMERCIAL_RELEASE_ARTIFACT == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sagittadb-commercial-deployment
+          path: |
+            dist-commercial/*.zip
+            dist-commercial/*.zip.sha256
+            dist-commercial/*.zip.sig.json
+          if-no-files-found: error
+
       - name: 检出公开发布仓库
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PUBLIC_RELEASE_REPOSITORY }}
@@ -176,7 +198,7 @@ jobs:
           path: public-releases
 
       - name: 发布部署包到 Public-Releases
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -217,7 +239,7 @@ jobs:
           fi
 
       - name: 校验公开仓库内容
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -270,7 +292,7 @@ jobs:
           fi
 
       - name: 提交并推送 Public-Releases 更新
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_public_repo }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         working-directory: public-releases
         shell: bash
         run: |

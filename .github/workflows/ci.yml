@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  frontend:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建前端
+        run: npm run build
+
+  backend:
+    name: 后端构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Compose 环境变量
+        run: cp .env.example .env
+
+      - name: 校验 Docker Compose
+        run: docker compose -f deploy/docker-compose.yml config --quiet
+
+      - name: 构建后端镜像
+        run: docker compose -f deploy/docker-compose.yml build backend
