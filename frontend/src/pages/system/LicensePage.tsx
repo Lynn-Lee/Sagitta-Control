@@ -39,6 +39,34 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleString()
 }
 
+async function copyTextToClipboard(value: string) {
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value)
+      return true
+    } catch {
+      // Fall back for HTTP deployments where Clipboard API is often blocked.
+    }
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  textarea.setSelectionRange(0, value.length)
+  try {
+    return document.execCommand('copy')
+  } finally {
+    document.body.removeChild(textarea)
+  }
+}
+
 export default function LicensePage() {
   const [status, setStatus] = useState<LicenseStatus | null>(null)
   const [loading, setLoading] = useState(false)
@@ -115,12 +143,12 @@ export default function LicensePage() {
 
   const activationFingerprint = fingerprintPreview?.deployment_fingerprint || ''
 
-  const handleCopyActivationFingerprint = async () => {
-    if (!activationFingerprint) return
-    try {
-      await navigator.clipboard.writeText(activationFingerprint)
-      message.success('正式激活部署指纹已复制')
-    } catch {
+  const handleCopyText = async (value: string, successText: string) => {
+    if (!value) return
+    const copied = await copyTextToClipboard(value)
+    if (copied) {
+      message.success(successText)
+    } else {
       message.error('复制失败，请手动复制')
     }
   }
@@ -256,10 +284,30 @@ export default function LicensePage() {
               <Descriptions.Item label="在线激活 ID">{status?.activation_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="远端状态">{status?.remote_status || '-'}</Descriptions.Item>
               <Descriptions.Item label="当前授权部署指纹">
-                {status?.deployment_fingerprint ? <Text copyable>{status.deployment_fingerprint}</Text> : '-'}
+                {status?.deployment_fingerprint ? (
+                  <Space size={4}>
+                    <Text style={{ wordBreak: 'break-all' }}>{status.deployment_fingerprint}</Text>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyText(status.deployment_fingerprint || '', '当前授权部署指纹已复制')}
+                    />
+                  </Space>
+                ) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="当前激活部署指纹">
-                {status?.activation_deployment_fingerprint ? <Text copyable>{status.activation_deployment_fingerprint}</Text> : '-'}
+                {status?.activation_deployment_fingerprint ? (
+                  <Space size={4}>
+                    <Text style={{ wordBreak: 'break-all' }}>{status.activation_deployment_fingerprint}</Text>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyText(status.activation_deployment_fingerprint || '', '当前激活部署指纹已复制')}
+                    />
+                  </Space>
+                ) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="最后联网校验">{formatDate(status?.last_online_check_at)}</Descriptions.Item>
               <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
@@ -343,7 +391,7 @@ export default function LicensePage() {
                           size="small"
                           icon={<CopyOutlined />}
                           disabled={!activationFingerprint}
-                          onClick={handleCopyActivationFingerprint}
+                          onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}
                         />
                       )}
                     />
