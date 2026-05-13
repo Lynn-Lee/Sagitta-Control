@@ -92,8 +92,8 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
   })
 
   const content = (
-    <Row gutter={compact ? [16, 16] : [20, 20]} justify={compact ? 'center' : undefined}>
-        <Col xs={24} lg={compact ? 11 : 12} style={{ minWidth: 0 }}>
+    <Row gutter={compact ? [24, 16] : [20, 20]}>
+        <Col xs={24} lg={12} style={{ minWidth: 0 }}>
           <SectionCard title={<Space><UserOutlined />基本信息</Space>} marginBottom={0}>
             <Space direction="vertical" size={14} style={{ width: '100%' }}>
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
@@ -147,7 +147,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
           </SectionCard>
         </Col>
 
-        <Col xs={24} lg={compact ? 11 : 12} style={{ minWidth: 0 }}>
+        <Col xs={24} lg={12} style={{ minWidth: 0 }}>
           <SectionCard title={<Space><SafetyCertificateOutlined />二步验证（2FA）</Space>} marginBottom={0}>
             {user?.totp_enabled ? (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -258,7 +258,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
     <>
       {msgCtx}
       {compact ? (
-        <div style={{ maxWidth: 900, margin: '0 auto', paddingInline: 8 }}>
+        <div style={{ width: '100%' }}>
           {content}
         </div>
       ) : content}
