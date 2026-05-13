@@ -104,7 +104,12 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
     {
       title: '操作', width: 80,
       render: (_: any, r: any) => (
-        <Popconfirm title={`确认删除 "${r.db_name}"？`} onConfirm={() => deleteMut.mutate(r.id)}>
+        <Popconfirm
+          title={`确认删除 "${r.db_name}"？`}
+          okText="确定"
+          cancelText="取消"
+          onConfirm={() => deleteMut.mutate(r.id)}
+        >
           <Button size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       ),
@@ -154,6 +159,8 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         maskClosable={false}
         onOk={() => { if (newDbName.trim()) addMut.mutate() }}
         onCancel={() => { setAddModalOpen(false); setNewDbName(''); setNewRemark('') }}
+        okText="确定"
+        cancelText="取消"
         confirmLoading={addMut.isPending}>
         <Space direction="vertical" style={{ width: '100%', marginTop: 16 }}>
           <div>
@@ -292,7 +299,12 @@ export default function InstanceList() {
             <Button size="small" icon={<DatabaseOutlined />} onClick={() => openDbManage(r)} />
           </Tooltip>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Popconfirm title="确认删除此实例？" onConfirm={() => deleteMut.mutate(r.id)}>
+          <Popconfirm
+            title="确认删除此实例？"
+            okText="确定"
+            cancelText="取消"
+            onConfirm={() => deleteMut.mutate(r.id)}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -332,14 +344,16 @@ export default function InstanceList() {
       <Modal title={editRecord ? '编辑实例' : '新建实例'} open={modalOpen}
         maskClosable={false}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
+        okText={editRecord ? '保存' : '创建'}
+        cancelText="取消"
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="instance_name" label="实例名称" rules={[{ required: true }]}>
+          <Form.Item name="instance_name" label="实例名称" rules={[{ required: true, message: '请输入实例名称' }]}>
             <Input placeholder="唯一标识，如 prod-mysql-01" disabled={!!editRecord} />
           </Form.Item>
           <Space style={{ width: '100%', display: 'flex' }}>
-            <Form.Item name="db_type" label="数据库类型" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item name="db_type" label="数据库类型" rules={[{ required: true, message: '请选择数据库类型' }]} style={{ flex: 1 }}>
               <Select placeholder="选择类型">
                 {DB_TYPES.map(t => (
                   <Option key={t} value={t}>
@@ -368,15 +382,15 @@ export default function InstanceList() {
             />
           )}
           <Space style={{ width: '100%', display: 'flex' }}>
-            <Form.Item name="host" label="主机地址" rules={[{ required: true }]} style={{ flex: 2 }}>
+            <Form.Item name="host" label="主机地址" rules={[{ required: true, message: '请输入主机地址' }]} style={{ flex: 2 }}>
               <Input placeholder="hostname 或 IP" />
             </Form.Item>
-            <Form.Item name="port" label="端口" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item name="port" label="端口" rules={[{ required: true, message: '请输入端口' }]} style={{ flex: 1 }}>
               <InputNumber style={{ width: '100%' }} min={1} max={65535} />
             </Form.Item>
           </Space>
           <Space style={{ width: '100%', display: 'flex' }}>
-            <Form.Item name="user" label="用户名" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item name="user" label="用户名" rules={[{ required: true, message: '请输入用户名' }]} style={{ flex: 1 }}>
               <Input autoComplete="off" />
             </Form.Item>
             <Form.Item name="password" label="密码" style={{ flex: 1 }}>

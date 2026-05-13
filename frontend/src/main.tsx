@@ -12,6 +12,10 @@ import '@/styles/globals.css'
 
 dayjs.locale('zh-cn')
 
+const zhCNValidateMessages = zhCN.Form?.defaultValidateMessages ?? {
+  required: '请输入${label}',
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -182,10 +186,18 @@ const antTheme = {
   },
 }
 
+ConfigProvider.config({
+  holderRender: (children) => (
+    <ConfigProvider theme={antTheme} locale={zhCN} form={{ validateMessages: zhCNValidateMessages }}>
+      {children}
+    </ConfigProvider>
+  ),
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ConfigProvider theme={antTheme} locale={zhCN}>
+      <ConfigProvider theme={antTheme} locale={zhCN} form={{ validateMessages: zhCNValidateMessages }}>
         <BrowserRouter>
           <App />
         </BrowserRouter>
