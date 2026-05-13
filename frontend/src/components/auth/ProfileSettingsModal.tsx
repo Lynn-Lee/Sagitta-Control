@@ -14,11 +14,11 @@ export default function ProfileSettingsModal({ open, onClose }: ProfileSettingsM
       maskClosable={false}
       onCancel={onClose}
       footer={null}
-      width={1000}
+      width={960}
       destroyOnClose
-      styles={{ body: { maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' } }}
+      styles={{ body: { maxHeight: 'calc(100vh - 180px)', overflowY: 'auto', overflowX: 'hidden' } }}
     >
-      <ProfileSettingsContent />
+      <ProfileSettingsContent compact />
     </Modal>
   )
 }
