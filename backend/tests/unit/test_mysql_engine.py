@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.engines.models import ReviewSet
+from app.engines.models import ResultSet, ReviewSet
 from app.engines.mysql import MysqlEngine
 from app.engines.pgsql import PgSQLEngine
 
@@ -175,6 +175,59 @@ class TestMysqlEscapeString:
     def test_normal_string_unchanged(self):
         result = self.engine.escape_string("normal_table_name")
         assert result == "normal_table_name"
+
+
+class TestMysqlMonitorMetrics:
+    def test_current_activity_counts_use_processlist_current_state(self):
+        rs = ResultSet(
+            rows=[
+                {
+                    "command": "Query",
+                    "active_duration_ms": 1500,
+                    "state": "Sending data",
+                    "sql_text": "select * from orders",
+                },
+                {
+                    "command": "Query",
+                    "active_duration_ms": 800,
+                    "state": "Sending data",
+                    "sql_text": "select * from users",
+                },
+                {
+                    "command": "Sleep",
+                    "active_duration_ms": None,
+                    "state": "",
+                    "sql_text": "",
+                },
+                {
+                    "command": "Query",
+                    "active_duration_ms": 3000,
+                    "state": "updating",
+                    "trx_state": "LOCK WAIT",
+                    "sql_text": "update orders set status = 1",
+                },
+                {
+                    "command": "Query",
+                    "duration_ms": 6000,
+                    "state": "Waiting for table metadata lock",
+                    "sql_text": "alter table orders add column note varchar(64)",
+                },
+            ]
+        )
+
+        slow_queries, lock_waits = MysqlEngine._current_activity_counts(rs, 1000)
+
+        assert slow_queries == 3
+        assert lock_waits == 2
+
+    def test_current_activity_counts_return_none_when_processlist_failed(self):
+        slow_queries, lock_waits = MysqlEngine._current_activity_counts(
+            ResultSet(error="permission denied"),
+            1000,
+        )
+
+        assert slow_queries is None
+        assert lock_waits is None
 
 
 class MockPgInstance:

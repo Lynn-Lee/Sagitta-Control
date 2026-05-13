@@ -35,6 +35,13 @@ def _to_int(value: Any) -> int | None:
         return None
 
 
+def _to_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class MysqlEngine:
     """MySQL 数据库引擎。"""
 
@@ -416,6 +423,13 @@ class MysqlEngine:
         )
         current_connections = _to_int(status.get("Threads_connected"))
         max_connections = _to_int(variables.get("max_connections"))
+        long_query_time_seconds = _to_float(variables.get("long_query_time"))
+        slow_query_threshold_ms = int(
+            round((long_query_time_seconds if long_query_time_seconds is not None else 10) * 1000)
+        )
+        current_slow_queries, current_lock_waits = self._current_activity_counts(
+            process_rs, slow_query_threshold_ms
+        )
         questions = _to_int(status.get("Questions"))
         uptime = _to_int(status.get("Uptime"))
         qps = round(questions / uptime, 2) if questions is not None and uptime else None
@@ -462,8 +476,10 @@ class MysqlEngine:
             "stats": {
                 "qps": qps,
                 "tps": tps,
-                "slow_queries": _to_int(status.get("Slow_queries")),
-                "Innodb_row_lock_waits": _to_int(status.get("Innodb_row_lock_waits")),
+                "slow_queries": current_slow_queries,
+                "slow_queries_total": _to_int(status.get("Slow_queries")),
+                "lock_waits": current_lock_waits,
+                "Innodb_row_lock_waits_total": _to_int(status.get("Innodb_row_lock_waits")),
                 "deadlocks": _to_int(status.get("Innodb_deadlocks")),
                 "errors": (_to_int(status.get("Connection_errors_internal")) or 0)
                 + (_to_int(status.get("Connection_errors_max_connections")) or 0),
@@ -486,8 +502,53 @@ class MysqlEngine:
                 "transactions": commits + rollbacks,
             },
             "variables": {"max_connections": max_connections},
+            "thresholds": {"slow_query_ms": slow_query_threshold_ms},
             "replication": replication,
         }
+
+    @staticmethod
+    def _row_get(row: Any, *names: str) -> Any:
+        if isinstance(row, dict):
+            lowered = {str(k).lower(): v for k, v in row.items()}
+            for name in names:
+                value = lowered.get(name.lower())
+                if value not in (None, ""):
+                    return value
+        return None
+
+    @classmethod
+    def _current_activity_counts(
+        cls,
+        process_rs: ResultSet,
+        slow_query_threshold_ms: int,
+    ) -> tuple[int | None, int | None]:
+        if not process_rs.is_success:
+            return None, None
+
+        slow_queries = 0
+        lock_waits = 0
+        for row in process_rs.rows:
+            command = str(cls._row_get(row, "command", "COMMAND") or "").lower()
+            sql_text = cls._row_get(row, "sql_text", "INFO", "Info")
+            active_ms = _to_int(
+                cls._row_get(row, "active_duration_ms", "duration_ms", "state_duration_ms")
+            )
+            if (
+                command == "query"
+                and sql_text
+                and active_ms is not None
+                and active_ms >= slow_query_threshold_ms
+            ):
+                slow_queries += 1
+
+            trx_state = str(cls._row_get(row, "trx_state") or "").lower()
+            state = str(cls._row_get(row, "state", "STATE") or "").lower()
+            if trx_state == "lock wait" or (
+                "lock" in state and ("wait" in state or "locked" in state)
+            ):
+                lock_waits += 1
+
+        return slow_queries, lock_waits
 
     def get_supported_metric_groups(self) -> list[str]:
         return ["health", "performance", "replication", "innodb"]
@@ -592,6 +653,7 @@ class MysqlEngine:
             if include_innodb_trx
             else "CAST(NULL AS SIGNED)"
         )
+        trx_state_expr = "trx.TRX_STATE" if include_innodb_trx else "CAST(NULL AS CHAR)"
         duration_sources = ["processlist_time"]
         if include_performance_schema:
             duration_sources.append("performance_schema")
@@ -624,6 +686,7 @@ class MysqlEngine:
               {transaction_age_expr} AS transaction_age_ms,
               {duration_source_expr} AS duration_source,
               p.STATE AS state,
+              {trx_state_expr} AS trx_state,
               {sql_text_expr} AS sql_text
             FROM information_schema.PROCESSLIST p
             {joins}

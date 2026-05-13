@@ -120,6 +120,79 @@ def test_apply_delta_rates_prefers_interval_counters():
     assert normalized["tps"] == 1
 
 
+def test_mysql_trend_slow_queries_uses_delta_from_legacy_cumulative_counter():
+    previous = SimpleNamespace(extra_metrics={"stats": {"slow_queries": 121800}})
+    row = SimpleNamespace(slow_queries=121866, extra_metrics={"stats": {"slow_queries": 121866}})
+
+    value, next_total = MonitorService._mysql_trend_slow_queries(
+        row,
+        MonitorService._mysql_slow_query_total(previous),
+    )
+
+    assert value == 66
+    assert next_total == 121866
+
+
+def test_mysql_trend_slow_queries_uses_total_counter_from_new_snapshots():
+    row = SimpleNamespace(
+        slow_queries=2,
+        extra_metrics={"stats": {"slow_queries": 2, "slow_queries_total": 122006, "lock_waits": 1}},
+    )
+
+    value, next_total = MonitorService._mysql_trend_slow_queries(row, 122000)
+
+    assert value == 6
+    assert next_total == 122006
+
+
+def test_mysql_trend_slow_queries_falls_back_to_current_snapshot_value():
+    row = SimpleNamespace(
+        slow_queries=3,
+        extra_metrics={"stats": {"slow_queries": 3, "lock_waits": 1}},
+    )
+
+    value, next_total = MonitorService._mysql_trend_slow_queries(row, None)
+
+    assert value == 3
+    assert next_total is None
+
+
+@pytest.mark.asyncio
+async def test_get_top_sql_uses_activity_collector_for_starrocks(monkeypatch):
+    instance = SimpleNamespace(id=28, db_type="starrocks")
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=SimpleNamespace(
+                is_success=True,
+                error="",
+                column_list=[],
+                rows=[
+                    {
+                        "source_ref": "starrocks:10",
+                        "db_name": "warehouse",
+                        "sql_text": "select * from orders",
+                        "duration_ms": 3000,
+                    }
+                ],
+            )
+        ),
+        collect_slow_queries=AsyncMock(),
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: instance))
+    )
+    monkeypatch.setattr(MonitorService, "check_privilege", AsyncMock(return_value=True))
+    monkeypatch.setattr(MonitorService, "get_latest_snapshot", AsyncMock(return_value=None))
+    monkeypatch.setattr("app.engines.registry.get_engine", lambda _instance: engine)
+
+    result = await MonitorService.get_top_sql(db, 28, {"is_superuser": True}, limit=5)
+
+    engine.collect_sql_activity.assert_awaited_once_with(limit=5)
+    engine.collect_slow_queries.assert_not_awaited()
+    assert result["error"] == ""
+    assert result["items"][0]["source_ref"] == "starrocks:10"
+
+
 @pytest.mark.asyncio
 async def test_unified_collect_config_list_uses_accessible_instances(monkeypatch):
     instances = [SimpleNamespace(id=1), SimpleNamespace(id=2)]

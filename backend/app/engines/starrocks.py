@@ -364,6 +364,15 @@ class StarRocksEngine(MysqlEngine):
             affected_rows=len(rows),
         )
 
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        """StarRocks 没有 MySQL performance_schema，慢 SQL 采集降级为当前 SQL 活动。"""
+        return await self.collect_sql_activity(limit=limit, min_duration_ms=min_duration_ms)
+
     async def kill_connection(self, thread_id: int) -> ResultSet:
         rs = await self.query(db_name="", sql=f"KILL {int(thread_id)}", limit_num=0)
         if rs.error and self._is_privilege_error(rs.error):

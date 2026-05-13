@@ -39,6 +39,17 @@ logger = logging.getLogger(__name__)
 
 
 class MonitorService:
+    ACTIVITY_TOP_SQL_TYPES = {
+        "tidb",
+        "starrocks",
+        "doris",
+        "oracle",
+        "mssql",
+        "sqlserver",
+        "clickhouse",
+        "elasticsearch",
+        "opensearch",
+    }
     SYSTEM_DATABASES = {
         "information_schema",
         "performance_schema",
@@ -688,7 +699,7 @@ class MonitorService:
         slow_queries = int(snapshot.get("slow_queries") or 0)
         if slow_queries > 0:
             score -= min(12, 4 + slow_queries // 10)
-            reasons.append(f"慢查询累计 {slow_queries}")
+            reasons.append(f"当前慢查询 {slow_queries}")
 
         lag = snapshot.get("replication_lag_seconds")
         if lag is not None and float(lag) > 0:
@@ -792,7 +803,30 @@ class MonitorService:
     ) -> list[dict]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
+        instance = (
+            await db.execute(select(Instance).where(Instance.id == instance_id))
+        ).scalar_one_or_none()
+        if not instance:
+            raise NotFoundException(f"实例 ID={instance_id} 不存在")
         since = datetime.now(UTC) - timedelta(hours=hours)
+        previous_total: int | None = None
+        if instance.db_type == "mysql":
+            previous = (
+                (
+                    await db.execute(
+                        select(MonitorMetricSnapshot)
+                        .where(
+                            MonitorMetricSnapshot.instance_id == instance_id,
+                            MonitorMetricSnapshot.collected_at < since,
+                        )
+                        .order_by(MonitorMetricSnapshot.collected_at.desc())
+                        .limit(1)
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            previous_total = MonitorService._mysql_slow_query_total(previous)
         rows = (
             (
                 await db.execute(
@@ -807,17 +841,56 @@ class MonitorService:
             .scalars()
             .all()
         )
-        return [
-            {
-                "collected_at": row.collected_at.isoformat(),
-                "current_connections": row.current_connections,
-                "qps": row.qps,
-                "tps": row.tps,
-                "slow_queries": row.slow_queries,
-                "total_size_bytes": row.total_size_bytes,
-            }
-            for row in rows
-        ]
+        items: list[dict] = []
+        for row in rows:
+            slow_queries = row.slow_queries
+            if instance.db_type == "mysql":
+                slow_queries, previous_total = MonitorService._mysql_trend_slow_queries(
+                    row, previous_total
+                )
+            items.append(
+                {
+                    "collected_at": row.collected_at.isoformat(),
+                    "current_connections": row.current_connections,
+                    "qps": row.qps,
+                    "tps": row.tps,
+                    "slow_queries": slow_queries,
+                    "total_size_bytes": row.total_size_bytes,
+                }
+            )
+        return items
+
+    @staticmethod
+    def _mysql_slow_query_total(snapshot: Any | None) -> int | None:
+        if snapshot is None:
+            return None
+        extra = getattr(snapshot, "extra_metrics", None) or {}
+        stats = extra.get("stats") if isinstance(extra, dict) else {}
+        if not isinstance(stats, dict):
+            return None
+        lowered = {str(k).lower(): v for k, v in stats.items()}
+        total = MonitorService._coerce_float(lowered.get("slow_queries_total"))
+        if total is not None:
+            return int(total)
+
+        # 兼容旧采集快照：旧版 stats.slow_queries 存的是 MySQL Slow_queries 累计值；
+        # 新版 stats.slow_queries 是当前态，且会同时带 slow_queries_total。
+        if "lock_waits" in lowered or "innodb_row_lock_waits_total" in lowered:
+            return None
+        legacy_total = MonitorService._coerce_float(lowered.get("slow_queries"))
+        return int(legacy_total) if legacy_total is not None else None
+
+    @staticmethod
+    def _mysql_trend_slow_queries(
+        snapshot: MonitorMetricSnapshot,
+        previous_total: int | None,
+    ) -> tuple[int | None, int | None]:
+        current_total = MonitorService._mysql_slow_query_total(snapshot)
+        if current_total is None:
+            return snapshot.slow_queries, previous_total
+        if previous_total is None or current_total < previous_total:
+            return 0, current_total
+        return current_total - previous_total, current_total
 
     @staticmethod
     async def get_database_capacity(db: AsyncSession, instance_id: int, user: dict) -> list[dict]:
@@ -1080,7 +1153,15 @@ class MonitorService:
         error = ""
         if not items:
             engine = get_engine(inst)
-            if hasattr(engine, "collect_slow_queries"):
+            if (
+                inst.db_type.lower() in MonitorService.ACTIVITY_TOP_SQL_TYPES
+                and hasattr(engine, "collect_sql_activity")
+            ):
+                rs = await engine.collect_sql_activity(limit=limit)
+                error = rs.error
+                if rs.is_success:
+                    items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
+            elif hasattr(engine, "collect_slow_queries"):
                 rs = await engine.collect_slow_queries(limit=limit)
                 error = rs.error
                 if rs.is_success:

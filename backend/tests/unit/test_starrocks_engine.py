@@ -141,3 +141,48 @@ class TestStarRocksCapabilities:
         assert caps.cluster_inspect is True
         assert caps.session_kill is True
         assert caps.variable_write is True
+
+
+class TestStarRocksSqlActivity:
+    @pytest.mark.asyncio
+    async def test_collect_slow_queries_uses_processlist_not_mysql_performance_schema(self):
+        engine = FakeStarRocksEngine({
+            "show processlist": ResultSet(
+                rows=[
+                    {
+                        "Id": 10,
+                        "User": "app",
+                        "Host": "10.0.0.1",
+                        "Db": "warehouse",
+                        "Command": "Query",
+                        "Time": 3,
+                        "State": "Running",
+                        "Info": "select * from orders",
+                    },
+                    {
+                        "Id": 11,
+                        "Command": "Sleep",
+                        "Time": 20,
+                        "Info": "",
+                    },
+                ],
+                column_list=["Id", "User", "Host", "Db", "Command", "Time", "State", "Info"],
+            )
+        })
+
+        rs = await engine.collect_slow_queries(limit=10, min_duration_ms=1000)
+
+        assert rs.is_success
+        assert rs.rows == [
+            {
+                "source": "starrocks_queries",
+                "source_ref": "starrocks:10",
+                "db_name": "warehouse",
+                "sql_text": "select * from orders",
+                "duration_ms": 3000,
+                "username": "app",
+                "client_host": "10.0.0.1",
+                "command": "Query",
+                "state": "Running",
+            }
+        ]

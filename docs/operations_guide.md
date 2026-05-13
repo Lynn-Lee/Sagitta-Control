@@ -227,10 +227,14 @@ bash deploy/update-prod.sh --ref <target_ref>
 | 后端 | `/health`、接口错误率、响应时间。 |
 | Celery | 队列积压、任务失败、Worker 存活。 |
 | PostgreSQL | 连接数、磁盘空间、数据库大小、慢查询。 |
+| MySQL | 当前连接、QPS/TPS、当前慢查询会话、当前锁等待会话、容量和复制延迟。 |
+| StarRocks | 当前连接、SQL 活动、容量采样和集群节点状态；Top SQL 使用会话活动视图，不依赖 MySQL `performance_schema`。 |
 | Redis | 存活、内存、连接数、持久化状态。 |
 | 业务 | 工单执行失败、通知失败、归档失败、采集失败。 |
 
 Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `deploy/grafana/provisioning/`。
+
+观测中心的 MySQL 慢查询和锁等待风险应按当前态理解。概览卡片中的慢查询统计当前执行时长超过 `long_query_time` 的会话，锁等待统计当前等待锁或被阻塞的会话；性能趋势里的 `本次慢查询` 是两次快照之间的新增慢查询次数。历史累计值仅保留在原始扩展指标中用于排查，不直接作为当前风险曲线。
 
 ## 8. 容量管理
 

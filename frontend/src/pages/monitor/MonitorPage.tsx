@@ -941,8 +941,8 @@ export default function MonitorPage() {
                             <MetricCard title="活跃会话" value={latest?.active_sessions} />
                             <MetricCard title="TPS" value={latest?.tps} />
                             <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
-                            <MetricCard title="慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
-                            <MetricCard title="锁等待" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
+                            <MetricCard title="当前慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
+                            <MetricCard title="锁等待会话" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
                           </div>
                           <Alert type={health.risk_level === 'critical' ? 'error' : health.risk_level === 'warning' ? 'warning' : 'info'} showIcon message="风险摘要" description={(health.risk_reasons || []).join('；') || '暂无明显风险'} />
                           <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
@@ -978,7 +978,7 @@ export default function MonitorPage() {
                                   <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
                                   <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
                                   <Line type="monotone" dataKey="tps" name="TPS" stroke="#13c2c2" dot={false} />
-                                  <Line type="monotone" dataKey="slow_queries" name="慢查询" stroke="#fa8c16" dot={false} />
+                                  <Line type="monotone" dataKey="slow_queries" name="本次慢查询" stroke="#fa8c16" dot={false} />
                                   <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
                                 </LineChart>
                               </ResponsiveContainer>
