@@ -234,6 +234,59 @@ class RedisEngine:
             ]
         return rs
 
+    async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
+        """Use Redis CLIENT LIST as the session view."""
+        rs = ResultSet()
+        try:
+            r = await self._get_client()
+            clients = await r.client_list()
+            await r.aclose()
+            rs.column_list = [
+                "session_id",
+                "username",
+                "host",
+                "program",
+                "db_name",
+                "command",
+                "state",
+                "time_seconds",
+                "connection_age_ms",
+                "state_duration_ms",
+                "duration_ms",
+                "duration_source",
+                "event",
+            ]
+            rows = []
+            for client in clients:
+                age_seconds = int(client.get("age") or 0)
+                idle_seconds = int(client.get("idle") or 0)
+                command = str(client.get("cmd") or "")
+                if command_type and command_type.upper() not in {"", "ALL"}:
+                    if command.lower() != command_type.lower():
+                        continue
+                rows.append(
+                    (
+                        str(client.get("id") or ""),
+                        str(client.get("user") or ""),
+                        str(client.get("addr") or ""),
+                        str(client.get("name") or client.get("lib-name") or ""),
+                        str(client.get("db") or ""),
+                        command,
+                        str(client.get("flags") or ""),
+                        idle_seconds,
+                        age_seconds * 1000,
+                        idle_seconds * 1000,
+                        idle_seconds * 1000,
+                        "redis_client_list",
+                        str(client.get("sub") or ""),
+                    )
+                )
+            rs.rows = rows
+            rs.affected_rows = len(rows)
+        except Exception as e:
+            rs.error = str(e)
+        return rs
+
     async def collect_metrics(self) -> dict:
         try:
             r = await self._get_client()

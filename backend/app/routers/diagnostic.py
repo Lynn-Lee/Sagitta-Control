@@ -69,7 +69,15 @@ async def get_processlist(
 ):
     inst = await _get_instance(db, instance_id)
     engine = get_engine(inst)
-    rs = await engine.processlist(command_type=command_type)
+    processlist = getattr(engine, "processlist", None)
+    if not callable(processlist):
+        return {
+            "items": [],
+            "column_list": [],
+            "rows": [],
+            "total": 0,
+        }
+    rs = await processlist(command_type=command_type)
     if rs.error:
         raise HTTPException(400, f"获取会话列表失败：{rs.error}")
     items = SessionDiagnosticService.normalize_result(inst, rs)

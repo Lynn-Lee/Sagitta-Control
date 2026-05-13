@@ -60,14 +60,14 @@ celery_app.conf.update(
             "schedule": 10.0,
             "options": {"queue": "monitor"},
         },
-        "collect-slow-queries-every-five-minutes": {
+        "collect-slow-queries-every-thirty-seconds": {
             "task": "collect_slow_queries",
-            "schedule": crontab(minute="*/5"),
+            "schedule": 30.0,
             "options": {"queue": "monitor"},
         },
-        "collect-native-monitoring-every-minute": {
+        "collect-native-monitoring-every-thirty-seconds": {
             "task": "collect_native_monitoring",
-            "schedule": 60.0,
+            "schedule": 30.0,
             "options": {"queue": "monitor"},
         },
         "refresh-online-license-daily": {

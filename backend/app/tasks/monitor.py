@@ -86,7 +86,20 @@ async def _collect_session_snapshots_with_db(
                 )
                 continue
             engine = get_engine(inst)
-            rs = await engine.processlist(command_type="ALL")
+            processlist = getattr(engine, "processlist", None)
+            if not callable(processlist):
+                cfg.last_collect_status = "skipped"
+                cfg.last_collect_error = f"{inst.db_type} 暂不支持会话采集"
+                cfg.last_collect_count = 0
+                cfg.last_collect_at = now
+                skipped += 1
+                deleted += await SessionDiagnosticService.cleanup_old_snapshots(
+                    db,
+                    retention_days=cfg.retention_days,
+                    instance_id=inst.id,
+                )
+                continue
+            rs = await processlist(command_type="ALL")
             count = await SessionDiagnosticService.save_snapshot(db, inst, rs, collected_at=now)
             if rs.error:
                 cfg.last_collect_status = "failed"

@@ -140,9 +140,10 @@ class TestPgsqlDataDictSql:
 
         assert "to_regclass('pg_stat_statements')" in calls[0]["sql"]
         assert "round((mean_time)::numeric)::bigint AS duration_ms" in calls[1]["sql"]
-        assert "WHERE mean_time >= $2" in calls[1]["sql"]
+        assert "WHERE (mean_time)::numeric >= $2::numeric" in calls[1]["sql"]
+        assert "LIMIT $1::int" in calls[1]["sql"]
         assert "mean_exec_time" not in calls[1]["sql"]
-        assert calls[1]["args"] == [25, 250]
+        assert calls[1]["args"] == [25, 250.0]
 
 
 class TestOracleDataDictSql:

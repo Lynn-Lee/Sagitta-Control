@@ -606,14 +606,14 @@ class PgSQLEngine:
               rows AS rows_sent,
               calls
             FROM pg_stat_statements
-            WHERE {duration_expr} >= $2
+            WHERE ({duration_expr})::numeric >= $2::numeric
             ORDER BY {duration_expr} DESC
-            LIMIT $1
+            LIMIT $1::int
         """
         return await self._raw_query(
             db_name=self._db_name,
             sql=sql,
-            args=[int(limit), max(0, int(min_duration_ms))],
+            args=[int(limit), float(max(0, int(min_duration_ms)))],
         )
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:

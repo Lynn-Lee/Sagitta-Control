@@ -7,6 +7,7 @@ from app.engines.models import ResultSet
 from app.engines.mysql import MysqlEngine
 from app.engines.oracle import OracleEngine
 from app.engines.pgsql import PgSQLEngine
+from app.engines.redis import RedisEngine
 from app.engines.tidb import TidbEngine
 from app.routers.diagnostic import _parse_oracle_dt
 from app.services.session_diagnostic import is_collect_due, normalize_session_row
@@ -211,6 +212,45 @@ async def test_pgsql_processlist_uses_state_change_for_duration(monkeypatch):
     assert "now()-backend_start" in calls[0]
     assert "now()-state_change" in calls[0]
     assert "now()-query_start" in calls[0]
+
+
+@pytest.mark.asyncio
+async def test_redis_processlist_uses_client_list(monkeypatch):
+    monkeypatch.setattr("app.engines.redis.decrypt_field", lambda value: value)
+
+    class FakeRedis:
+        async def client_list(self):
+            return [
+                {
+                    "id": "7",
+                    "addr": "10.0.0.8:51432",
+                    "name": "worker",
+                    "age": 15,
+                    "idle": 3,
+                    "db": 0,
+                    "cmd": "get",
+                    "flags": "N",
+                    "user": "default",
+                }
+            ]
+
+        async def aclose(self):
+            return None
+
+    async def fake_client(self, db_name=None):
+        return FakeRedis()
+
+    monkeypatch.setattr(RedisEngine, "_get_client", fake_client)
+    engine = RedisEngine(_Instance(db_type="redis", port=6379, db_name="0"))
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert rs.column_list[:4] == ["session_id", "username", "host", "program"]
+    assert rs.rows[0][0] == "7"
+    assert rs.rows[0][2] == "10.0.0.8:51432"
+    assert rs.rows[0][9] == 3000
+    assert rs.rows[0][11] == "redis_client_list"
 
 
 def test_session_collect_due_uses_instance_interval():
