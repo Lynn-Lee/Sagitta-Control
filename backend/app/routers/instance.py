@@ -59,6 +59,7 @@ async def list_instances(
     db_type: str | None = None,
     search: str | None = None,
     resource_group_id: int | None = None,
+    include_inactive: bool = False,
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(current_user),
 ):
@@ -69,6 +70,7 @@ async def list_instances(
         db_type=db_type,
         search=search,
         resource_group_id=resource_group_id,
+        include_inactive=include_inactive,
         user=user,
     )
     return {

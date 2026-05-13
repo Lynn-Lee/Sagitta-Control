@@ -131,6 +131,41 @@ class TestInstanceCRUD:
         assert del_resp.status_code in (200, 204)
 
     @pytest.mark.asyncio
+    async def test_list_can_include_inactive_instances(self, client: AsyncClient):
+        headers = await _get_admin_headers(client)
+        instance_name = "test-inactive-visible-ci"
+        create_resp = await client.post(
+            "/api/v1/instances/",
+            json={**_MYSQL_INSTANCE, "instance_name": instance_name},
+            headers=headers,
+        )
+        assert create_resp.status_code in (200, 201)
+        instance_id = create_resp.json().get("data", create_resp.json())["id"]
+
+        del_resp = await client.delete(
+            f"/api/v1/instances/{instance_id}/",
+            headers=headers,
+        )
+        assert del_resp.status_code in (200, 204)
+
+        default_resp = await client.get(
+            f"/api/v1/instances/?search={instance_name}",
+            headers=headers,
+        )
+        assert default_resp.status_code == 200
+        assert default_resp.json()["total"] == 0
+
+        all_resp = await client.get(
+            f"/api/v1/instances/?search={instance_name}&include_inactive=true",
+            headers=headers,
+        )
+        assert all_resp.status_code == 200
+        body = all_resp.json()
+        assert body["total"] == 1
+        assert body["items"][0]["instance_name"] == instance_name
+        assert body["items"][0]["is_active"] is False
+
+    @pytest.mark.asyncio
     async def test_password_not_exposed_in_response(self, client: AsyncClient):
         """实例密码不应在响应体中明文返回。"""
         headers = await _get_admin_headers(client)

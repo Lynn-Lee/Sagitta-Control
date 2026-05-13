@@ -429,6 +429,7 @@ class InstanceService:
         db_type: str | None = None,
         search: str | None = None,
         resource_group_id: int | None = None,
+        include_inactive: bool = False,
         user: dict | None = None,
     ) -> tuple[int, list[Instance]]:
         query = (
@@ -437,8 +438,9 @@ class InstanceService:
                 selectinload(Instance.instance_tags),
                 selectinload(Instance.resource_groups),
             )
-            .where(Instance.is_active)
         )
+        if not include_inactive:
+            query = query.where(Instance.is_active)
         if db_type:
             query = query.where(Instance.db_type == db_type.lower())
         if search:

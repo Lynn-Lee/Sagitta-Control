@@ -90,10 +90,64 @@ async def test_mysql_processlist_outputs_state_duration(monkeypatch):
 
     await engine.processlist(command_type="ALL")
 
-    assert "TIME AS time_seconds" in calls[0]
-    assert "TIME * 1000 AS state_duration_ms" in calls[0]
-    assert "TIME * 1000 AS duration_ms" in calls[0]
-    assert "COMMAND != 'Sleep'" not in calls[0]
+    assert "p.TIME AS time_seconds" in calls[0]
+    assert "p.TIME * 1000 AS state_duration_ms" in calls[0]
+    assert "p.TIME * 1000 AS duration_ms" in calls[0]
+    assert "CAST(NULL AS SIGNED) AS connection_age_ms" in calls[0]
+    assert "performance_schema.threads" in calls[0]
+    assert "performance_schema.events_statements_current" in calls[0]
+    assert "information_schema.INNODB_TRX" in calls[0]
+    assert "es.TIMER_WAIT" in calls[0]
+    assert "TIMESTAMPDIFF(MICROSECOND, trx.TRX_STARTED, NOW(6)) DIV 1000" in calls[0]
+    assert "p.COMMAND != 'Sleep'" not in calls[0]
+
+
+@pytest.mark.asyncio
+async def test_mysql_processlist_degrades_when_innodb_trx_unavailable(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        if "information_schema.INNODB_TRX" in sql:
+            return ResultSet(error="access denied for INNODB_TRX")
+        return ResultSet(column_list=["session_id"], rows=[{"session_id": 1}])
+
+    monkeypatch.setattr(MysqlEngine, "query", fake_query)
+    engine = MysqlEngine(_Instance(db_type="mysql"))
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert len(calls) == 2
+    assert "information_schema.INNODB_TRX" in calls[0]
+    assert "information_schema.INNODB_TRX" not in calls[1]
+    assert "performance_schema.events_statements_current" in calls[1]
+    assert "已降级采集" in rs.warning
+
+
+@pytest.mark.asyncio
+async def test_mysql_processlist_degrades_to_basic_processlist(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        if "performance_schema" in sql or "information_schema.INNODB_TRX" in sql:
+            return ResultSet(error="permission denied")
+        return ResultSet(column_list=["session_id"], rows=[{"session_id": 1}])
+
+    monkeypatch.setattr(MysqlEngine, "query", fake_query)
+    engine = MysqlEngine(_Instance(db_type="mysql"))
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert len(calls) == 4
+    assert "performance_schema" not in calls[-1]
+    assert "information_schema.INNODB_TRX" not in calls[-1]
+    assert "CAST(NULL AS SIGNED) AS transaction_age_ms" in calls[-1]
+    assert "'processlist_time' AS duration_source" in calls[-1]
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
+import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -19,7 +19,11 @@ type HistorySource = 'platform' | 'ash' | 'awr'
 
 const renderDate = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
 const defaultHistoryRange = () => [dayjs().subtract(24, 'hour'), dayjs()] as [Dayjs, Dayjs]
-const durationValue = (value?: number | null) => Number.isFinite(Number(value)) ? Number(value) : null
+const durationValue = (value?: number | string | null) => {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
 const stateDurationMs = (row: SessionItem) => {
   const stateMs = durationValue(row.state_duration_ms)
   if (stateMs !== null) return stateMs
@@ -29,6 +33,26 @@ const stateDurationMs = (row: SessionItem) => {
 const renderDuration = (value?: number | null) => {
   const numeric = durationValue(value)
   return numeric === null ? '-' : numeric.toLocaleString()
+}
+const renderCommandTag = (value?: string | null) => {
+  if (!value) return '-'
+  return (
+    <Tooltip title={value}>
+      <Tag
+        style={{
+          display: 'inline-block',
+          maxWidth: '100%',
+          marginInlineEnd: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          verticalAlign: 'middle',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {value}
+      </Tag>
+    </Tooltip>
+  )
 }
 const isIdleSession = (row: SessionItem) => {
   const command = row.command?.toLowerCase() || ''
@@ -144,7 +168,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     { title: '来源', dataIndex: 'host', width: 170, ellipsis: true },
     { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
-    { title: '命令', dataIndex: 'command', width: 100, render: (v) => v ? <Tag>{v}</Tag> : '-' },
+    { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
     { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
     {
       title: '连接时长(ms)',

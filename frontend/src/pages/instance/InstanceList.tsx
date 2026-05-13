@@ -204,7 +204,11 @@ export default function InstanceList() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['instances', search],
-    queryFn: () => instanceApi.list({ search: search || undefined, page_size: 100 }),
+    queryFn: () => instanceApi.list({
+      search: search || undefined,
+      page_size: 100,
+      include_inactive: true,
+    }),
   })
 
   const createMut = useMutation({
@@ -215,11 +219,12 @@ export default function InstanceList() {
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => instanceApi.update(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['instances'] }); setModalOpen(false); msgApi.success('已更新') },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '更新失败'),
   })
   const deleteMut = useMutation({
     mutationFn: instanceApi.delete,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['instances'] }); msgApi.success('实例已删除') },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '删除失败'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['instances'] }); msgApi.success('实例已停用') },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '停用失败'),
   })
 
   const handleTest = async (id: number) => {
@@ -272,7 +277,16 @@ export default function InstanceList() {
     },
     {
       title: '状态', dataIndex: 'is_active', width: 80,
-      render: (v: boolean) => v ? <Tag color="success">正常</Tag> : <Tag>停用</Tag>,
+      render: (v: boolean, r: InstanceItem) => (
+        <Switch
+          size="small"
+          checked={v}
+          checkedChildren="正常"
+          unCheckedChildren="停用"
+          loading={updateMut.isPending}
+          onChange={(checked) => updateMut.mutate({ id: r.id, data: { is_active: checked } })}
+        />
+      ),
     },
     {
       title: '连通性', key: 'test', width: 110,
@@ -296,16 +310,16 @@ export default function InstanceList() {
       render: (_: any, r: InstanceItem) => (
         <Space size={4}>
           <Tooltip title="管理数据库">
-            <Button size="small" icon={<DatabaseOutlined />} onClick={() => openDbManage(r)} />
+            <Button size="small" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)} />
           </Tooltip>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
           <Popconfirm
-            title="确认删除此实例？"
+            title="确认停用此实例？"
             okText="确定"
             cancelText="取消"
             onConfirm={() => deleteMut.mutate(r.id)}
           >
-            <Button size="small" danger icon={<DeleteOutlined />} />
+            <Button size="small" danger icon={<DeleteOutlined />} disabled={!r.is_active} />
           </Popconfirm>
         </Space>
       ),

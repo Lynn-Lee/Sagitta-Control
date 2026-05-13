@@ -532,25 +532,104 @@ class MysqlEngine:
         return True  # MySQL 支持 Binlog 备份
 
     async def processlist(self, command_type: str = "Query", **kwargs: Any) -> ResultSet:
-        sql = (
-            "SELECT "
-            "ID AS session_id, "
-            "USER AS username, "
-            "HOST AS host, "
-            "DB AS db_name, "
-            "COMMAND AS command, "
-            "TIME AS time_seconds, "
-            "TIME * 1000 AS state_duration_ms, "
-            "TIME * 1000 AS duration_ms, "
-            "'processlist_time' AS duration_source, "
-            "STATE AS state, "
-            "INFO AS sql_text "
-            "FROM information_schema.PROCESSLIST "
-            "WHERE 1 = 1"
+        """读取 MySQL 在线会话，并尽量补齐活动语句与事务时长。
+
+        MySQL 原生 PROCESSLIST 不暴露连接登录时间，因此 connection_age_ms 只在
+        后续数据源明确提供时填充；当前保持 NULL，避免用 idle/state time 冒充连接年龄。
+        """
+        attempts = [
+            ("performance_schema + innodb_trx", True, True),
+            ("performance_schema", True, False),
+            ("innodb_trx", False, True),
+            ("processlist", False, False),
+        ]
+        errors: list[str] = []
+        last_rs = ResultSet()
+        for label, include_performance_schema, include_innodb_trx in attempts:
+            sql = self._processlist_sql(
+                command_type=command_type,
+                include_performance_schema=include_performance_schema,
+                include_innodb_trx=include_innodb_trx,
+            )
+            rs = await self.query(db_name="", sql=sql, limit_num=0)
+            if rs.is_success:
+                if errors:
+                    rs.warning = "会话增强指标部分不可用，已降级采集：" + "；".join(errors)
+                return rs
+            errors.append(f"{label}: {rs.error}")
+            last_rs = rs
+        return last_rs
+
+    def _processlist_sql(
+        self,
+        *,
+        command_type: str = "Query",
+        include_performance_schema: bool = True,
+        include_innodb_trx: bool = True,
+    ) -> str:
+        active_duration_expr = (
+            """
+            CASE
+              WHEN p.COMMAND = 'Sleep' THEN NULL
+              WHEN es.TIMER_WAIT IS NOT NULL THEN ROUND(es.TIMER_WAIT / 1000000000)
+              WHEN p.INFO IS NOT NULL THEN p.TIME * 1000
+              ELSE NULL
+            END
+            """
+            if include_performance_schema
+            else """
+            CASE
+              WHEN p.COMMAND = 'Sleep' THEN NULL
+              WHEN p.INFO IS NOT NULL THEN p.TIME * 1000
+              ELSE NULL
+            END
+            """
         )
+        sql_text_expr = "COALESCE(es.SQL_TEXT, p.INFO)" if include_performance_schema else "p.INFO"
+        transaction_age_expr = (
+            "CASE WHEN trx.TRX_STARTED IS NULL THEN NULL "
+            "ELSE TIMESTAMPDIFF(MICROSECOND, trx.TRX_STARTED, NOW(6)) DIV 1000 END"
+            if include_innodb_trx
+            else "CAST(NULL AS SIGNED)"
+        )
+        duration_sources = ["processlist_time"]
+        if include_performance_schema:
+            duration_sources.append("performance_schema")
+        if include_innodb_trx:
+            duration_sources.append("innodb_trx")
+        duration_source_expr = "'" + "+".join(duration_sources) + "'"
+        joins = ""
+        if include_performance_schema:
+            joins += (
+                "LEFT JOIN performance_schema.threads th ON th.PROCESSLIST_ID = p.ID "
+                "LEFT JOIN performance_schema.events_statements_current es ON es.THREAD_ID = th.THREAD_ID "
+            )
+        if include_innodb_trx:
+            joins += "LEFT JOIN information_schema.INNODB_TRX trx ON trx.TRX_MYSQL_THREAD_ID = p.ID "
+        command_filter = ""
         if command_type and command_type != "ALL":
-            sql += f" AND COMMAND = '{self.escape_string(command_type)}'"
-        return await self.query(db_name="", sql=sql, limit_num=0)
+            command_filter = f" AND p.COMMAND = '{self.escape_string(command_type)}'"
+        return f"""
+            SELECT
+              p.ID AS session_id,
+              p.USER AS username,
+              p.HOST AS host,
+              p.DB AS db_name,
+              p.COMMAND AS command,
+              p.TIME AS time_seconds,
+              p.TIME * 1000 AS state_duration_ms,
+              p.TIME * 1000 AS duration_ms,
+              CAST(NULL AS SIGNED) AS connection_age_ms,
+              {active_duration_expr} AS active_duration_ms,
+              {transaction_age_expr} AS transaction_age_ms,
+              {duration_source_expr} AS duration_source,
+              p.STATE AS state,
+              {sql_text_expr} AS sql_text
+            FROM information_schema.PROCESSLIST p
+            {joins}
+            WHERE 1 = 1
+            {command_filter}
+        """
 
     async def kill_connection(self, thread_id: int) -> ResultSet:
         return await self.query(db_name="", sql=f"KILL {int(thread_id)}", limit_num=0)

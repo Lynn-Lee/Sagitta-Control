@@ -36,7 +36,7 @@ export interface InstanceListResponse {
 }
 
 export const instanceApi = {
-  list: (params?: { search?: string; db_type?: string; page?: number; page_size?: number }) =>
+  list: (params?: { search?: string; db_type?: string; page?: number; page_size?: number; include_inactive?: boolean }) =>
     apiClient.get<InstanceListResponse>('/instances/', { params }).then(r => r.data),
 
   get: (id: number) =>
