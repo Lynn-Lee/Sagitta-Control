@@ -35,6 +35,9 @@ export const authApi = {
   changePassword: (old_password: string, new_password: string) =>
     apiClient.post('/auth/password/change/', { old_password, new_password }).then(r => r.data),
 
+  updateProfile: (data: { display_name: string; email?: string }) =>
+    apiClient.patch('/auth/me/', data).then(r => r.data),
+
   forceChangePassword: (password_change_token: string, new_password: string) =>
     apiClient.post('/auth/password/change-required/', {
       password_change_token,

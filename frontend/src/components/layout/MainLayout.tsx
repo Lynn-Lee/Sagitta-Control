@@ -9,8 +9,10 @@ import {
   BugOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined, HistoryOutlined,
 } from '@ant-design/icons'
-import { useAuthStore } from '@/store/auth'
 import { authApi } from '@/api/auth'
+import ChangePasswordModal from '@/components/auth/ChangePasswordModal'
+import ProfileSettingsModal from '@/components/auth/ProfileSettingsModal'
+import { useAuthStore } from '@/store/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
 import BrandLogo from '@/components/common/BrandLogo'
 import { useBranding } from '@/hooks/useBranding'
@@ -219,6 +221,8 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [menuOpenKeys, setMenuOpenKeys] = useState<string[]>([])
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout, authProvider } = useAuthStore()
@@ -246,8 +250,8 @@ export default function MainLayout() {
   }
 
   const userMenuItems: MenuProps['items'] = [
-    { key: 'profile', icon: <UserOutlined />, label: '个人设置', onClick: () => navigate('/profile') },
-    { key: 'change-pw', icon: <KeyOutlined />, label: '修改密码', onClick: () => navigate('/profile') },
+    { key: 'profile', icon: <UserOutlined />, label: '个人设置', onClick: () => setProfileModalOpen(true) },
+    { key: 'change-pw', icon: <KeyOutlined />, label: '修改密码', onClick: () => setChangePasswordModalOpen(true) },
     { type: 'divider' },
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true, onClick: handleLogout },
   ]
@@ -489,9 +493,9 @@ export default function MainLayout() {
               closable
               style={{ marginBottom: 16, borderRadius: 10 }}
               message="密码即将到期"
-              description={`当前密码将在 ${user.days_until_password_expiry ?? 0} 天后到期，请尽快前往“个人设置”修改密码，避免影响登录。`}
+              description={`当前密码将在 ${user.days_until_password_expiry ?? 0} 天后到期，请尽快修改密码，避免影响登录。`}
               action={
-                <Button size="small" type="primary" onClick={() => navigate('/profile')}>
+                <Button size="small" type="primary" onClick={() => setChangePasswordModalOpen(true)}>
                   立即修改
                 </Button>
               }
@@ -502,6 +506,8 @@ export default function MainLayout() {
           </div>
         </Content>
       </Layout>
+      <ProfileSettingsModal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
+      <ChangePasswordModal open={changePasswordModalOpen} onClose={() => setChangePasswordModalOpen(false)} />
     </Layout>
   )
 }

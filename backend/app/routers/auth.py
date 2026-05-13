@@ -43,6 +43,7 @@ from app.schemas.auth import (
     SmsLoginRequest,
     TokenResponse,
     TwoFAVerifyRequest,
+    UpdateProfileRequest,
 )
 from app.services import oauth_auth
 from app.services.ldap_auth import LdapAuthService
@@ -51,6 +52,31 @@ from app.services.user import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _serialize_current_user(db_user, user: dict) -> dict:
+    return {
+        "id": db_user.id,
+        "username": db_user.username,
+        "display_name": db_user.display_name,
+        "email": db_user.email,
+        "is_superuser": db_user.is_superuser,
+        "is_active": db_user.is_active,
+        "auth_type": db_user.auth_type,
+        "totp_enabled": db_user.totp_enabled,
+        "permissions": user.get("permissions", []),
+        "role": db_user.role.name if db_user.role else None,
+        "role_id": db_user.role_id,
+        "manager_id": db_user.manager_id,
+        "employee_id": db_user.employee_id,
+        "department": db_user.department,
+        "title": db_user.title,
+        "resource_groups": user.get("resource_groups", []),
+        "user_groups": user.get("user_groups", []),
+        "tenant_id": db_user.tenant_id,
+        "password_expiring_soon": is_password_expiring_soon(db_user.password_changed_at),
+        "days_until_password_expiry": get_password_days_until_expiry(db_user.password_changed_at),
+    }
 
 
 def _build_auth_payload(user) -> dict[str, int | str]:
@@ -271,28 +297,27 @@ async def get_me(user=Depends(current_user), db: AsyncSession = Depends(get_db))
     if not db_user:
         raise HTTPException(404, "用户不存在")
     # v2：current_user 中的 permissions 已合并角色权限和直接权限
-    return {
-        "id": db_user.id,
-        "username": db_user.username,
-        "display_name": db_user.display_name,
-        "email": db_user.email,
-        "is_superuser": db_user.is_superuser,
-        "is_active": db_user.is_active,
-        "auth_type": db_user.auth_type,
-        "totp_enabled": db_user.totp_enabled,
-        "permissions": user.get("permissions", []),
-        "role": db_user.role.name if db_user.role else None,
-        "role_id": db_user.role_id,
-        "manager_id": db_user.manager_id,
-        "employee_id": db_user.employee_id,
-        "department": db_user.department,
-        "title": db_user.title,
-        "resource_groups": user.get("resource_groups", []),
-        "user_groups": user.get("user_groups", []),
-        "tenant_id": db_user.tenant_id,
-        "password_expiring_soon": is_password_expiring_soon(db_user.password_changed_at),
-        "days_until_password_expiry": get_password_days_until_expiry(db_user.password_changed_at),
-    }
+    return _serialize_current_user(db_user, user)
+
+
+@router.patch("/me/", summary="更新当前用户信息")
+async def update_me(
+    data: UpdateProfileRequest,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    db_user = await UserService.get_by_id(db, user["id"])
+    if not db_user:
+        raise HTTPException(404, "用户不存在")
+
+    if data.display_name is not None:
+        db_user.display_name = data.display_name.strip() or db_user.username
+    if data.email is not None:
+        db_user.email = data.email.strip()
+
+    await db.commit()
+    db_user = await UserService.get_by_id(db, user["id"])
+    return _serialize_current_user(db_user, user)
 
 
 @router.post("/password/change/", summary="修改密码")

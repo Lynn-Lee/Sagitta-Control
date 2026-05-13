@@ -312,6 +312,19 @@ class TestMe:
         assert "tenant_id" in data
 
     @pytest.mark.asyncio
+    async def test_update_me_updates_profile_fields(self, client: AsyncClient):
+        access, _ = await _init_and_login(client)
+        resp = await client.patch(
+            "/api/v1/auth/me/",
+            json={"display_name": "平台管理员", "email": "admin@sagittadb.local"},
+            headers={"Authorization": f"Bearer {access}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["display_name"] == "平台管理员"
+        assert data["email"] == "admin@sagittadb.local"
+
+    @pytest.mark.asyncio
     async def test_me_with_malformed_token_returns_401(self, client: AsyncClient):
         resp = await client.get(
             "/api/v1/auth/me/",

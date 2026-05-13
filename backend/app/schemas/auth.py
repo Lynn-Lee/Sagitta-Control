@@ -46,6 +46,11 @@ class ChangePasswordRequest(BaseModel):
         return validate_password_strength(v)
 
 
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=50)
+    email: str | None = Field(default=None, max_length=100)
+
+
 class ForceChangePasswordRequest(BaseModel):
     password_change_token: str
     new_password: str
