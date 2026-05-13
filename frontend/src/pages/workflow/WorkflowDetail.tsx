@@ -108,6 +108,7 @@ export default function WorkflowDetail() {
     Modal.confirm({
       title: '确认放行高风险申请？',
       width: 640,
+      maskClosable: false,
       okText: '确认通过',
       okButtonProps: { danger: true },
       cancelText: '返回检查',
@@ -253,6 +254,7 @@ export default function WorkflowDetail() {
       <Modal
         title="执行处理"
         open={executeModalOpen}
+        maskClosable={false}
         onCancel={() => { setExecuteModalOpen(false); executeForm.resetFields() }}
         onOk={submitExecuteDecision}
         confirmLoading={executeMut.isPending}

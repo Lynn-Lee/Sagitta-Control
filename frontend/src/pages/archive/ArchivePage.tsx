@@ -686,6 +686,7 @@ export default function ArchivePage() {
       <Drawer
         title={selectedJob ? `归档任务 #${displayJobNo(selectedJob)}` : '归档任务'}
         open={drawerOpen}
+        maskClosable={false}
         onClose={() => setDrawerOpen(false)}
         width={860}
       >
@@ -829,6 +830,7 @@ export default function ArchivePage() {
       <Modal
         title={executeTarget ? `执行处理 #${displayJobNo(executeTarget)}` : '执行处理'}
         open={executeModalOpen}
+        maskClosable={false}
         onCancel={() => { setExecuteModalOpen(false); setExecuteTarget(null); executeForm.resetFields() }}
         onOk={submitExecuteDecision}
         confirmLoading={actionMut.isPending}

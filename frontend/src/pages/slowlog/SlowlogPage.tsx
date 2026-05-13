@@ -897,6 +897,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
         title="SQL 详情"
         width={isMobile ? '100%' : 720}
         open={!!sqlDetail}
+        maskClosable={false}
         onClose={() => { setSqlDetail(null); setDiagnosis(null) }}
       >
         {sqlDetail && (
@@ -965,6 +966,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
         title="指纹详情"
         width={isMobile ? '100%' : 860}
         open={!!detailFingerprint}
+        maskClosable={false}
         onClose={() => { setDetailFingerprint(null); setDiagnosis(null) }}
       >
         {detailQuery.data && (
@@ -1044,6 +1046,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
         title="SQL 诊断"
         width={isMobile ? '100%' : 860}
         open={!!diagnosis && !sqlDetail && !detailFingerprint}
+        maskClosable={false}
         onClose={() => setDiagnosis(null)}
       >
         <Space direction="vertical" size={16} style={{ width: '100%' }}>

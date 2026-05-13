@@ -228,6 +228,7 @@ export default function LoginPage() {
       forcePwForm.resetFields()
       Modal.success({
         title: '密码修改成功',
+        maskClosable: false,
         content: resp.msg || '请使用新密码重新登录',
       })
     } catch (e: any) {

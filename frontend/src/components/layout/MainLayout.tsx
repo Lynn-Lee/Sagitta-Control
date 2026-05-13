@@ -470,6 +470,7 @@ export default function MainLayout() {
             title="导航"
             placement="left"
             open={mobileNavOpen}
+            maskClosable={false}
             onClose={() => setMobileNavOpen(false)}
             width={280}
             styles={{ body: { padding: 0 } }}

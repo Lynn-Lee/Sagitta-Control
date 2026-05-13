@@ -305,6 +305,7 @@ export default function WorkflowSubmit() {
         Modal.confirm({
           title: '确认提交高风险 SQL 工单？',
           width: 640,
+          maskClosable: false,
           okText: '确认提交',
           okButtonProps: { danger: true },
           cancelText: '返回修改',

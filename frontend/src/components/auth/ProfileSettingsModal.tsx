@@ -11,6 +11,7 @@ export default function ProfileSettingsModal({ open, onClose }: ProfileSettingsM
     <Modal
       title="个人设置"
       open={open}
+      maskClosable={false}
       onCancel={onClose}
       footer={null}
       width={1000}

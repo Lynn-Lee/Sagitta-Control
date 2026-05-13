@@ -421,6 +421,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       <Drawer
         title="SQL 详情"
         open={!!sqlDetail}
+        maskClosable={false}
         onClose={() => setSqlDetail(null)}
         width={720}
       >

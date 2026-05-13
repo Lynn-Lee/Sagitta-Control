@@ -51,11 +51,13 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
       <Modal
         title="修改密码"
         open={open}
+        maskClosable={false}
         onCancel={() => {
           form.resetFields()
           onClose()
         }}
         okText="修改密码"
+        cancelText="取消"
         onOk={() => form.submit()}
         confirmLoading={changePasswordMut.isPending}
         destroyOnClose

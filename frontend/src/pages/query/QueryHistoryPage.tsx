@@ -285,6 +285,7 @@ export default function QueryHistoryPage() {
         title="SQL 明细"
         open={!!sqlDetail}
         width={820}
+        maskClosable={false}
         onCancel={() => setSqlDetail(null)}
         footer={[
           <Button key="copy" icon={<CopyOutlined />} onClick={async () => {

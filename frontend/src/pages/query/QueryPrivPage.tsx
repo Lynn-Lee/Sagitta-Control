@@ -215,6 +215,7 @@ export default function QueryPrivPage() {
         Modal.confirm({
           title: '确认提交高风险查询权限申请？',
           width: 640,
+          maskClosable: false,
           okText: '确认提交',
           okButtonProps: { danger: true },
           cancelText: '返回修改',
@@ -278,6 +279,7 @@ export default function QueryPrivPage() {
       okText: '撤销',
       okButtonProps: { danger: true },
       cancelText: '取消',
+      maskClosable: false,
       onOk: () => revokeMut.mutateAsync({ priv_id: record.id, reason }),
     })
   }
@@ -461,6 +463,7 @@ export default function QueryPrivPage() {
               content: '取消后该申请不会继续流转审批。',
               okText: '确认取消',
               cancelText: '返回',
+              maskClosable: false,
               onOk: () => cancelApplyMut.mutateAsync(r.id),
             })
           }}

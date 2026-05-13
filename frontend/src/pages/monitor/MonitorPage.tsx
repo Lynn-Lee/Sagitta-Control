@@ -594,6 +594,7 @@ export default function MonitorPage() {
       okText: '关闭配置/采集',
       okButtonProps: { danger: true },
       cancelText: '取消',
+      maskClosable: false,
       onOk: () => disableAllConfig.mutateAsync(),
     })
   }
@@ -610,6 +611,7 @@ export default function MonitorPage() {
       content: `将按当前可见实例逐个手动触发一次采集，共 ${instances.length} 个实例。该操作不会改变实例的定时采集开关。`,
       okText: '开始采集',
       cancelText: '取消',
+      maskClosable: false,
       onOk: () => collectAll.mutateAsync(),
     })
   }
