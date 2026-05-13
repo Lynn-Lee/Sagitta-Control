@@ -30,6 +30,8 @@
 
 每次完成项目新的功能代码后，必须完成以下收尾动作，除非用户明确要求暂停或只做局部分析：
 
+- 每次代码更新后更新文档，提交到 git 上，同时更新云 ECS 上的测试环境到最新源码。
+
 1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagittadb_prd.md`、`docs/user_manual.md`、`docs/operations_guide.md`、`docs/public_commercial_delivery.md` 和本文件。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。
 3. 查看 `git status --short` 和 diff，确认只包含本次任务需要的代码与文档。
