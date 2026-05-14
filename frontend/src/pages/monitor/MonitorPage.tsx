@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MenuProps } from 'antd'
-import { Alert, Button, Card, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
-import { AlertOutlined, ApiOutlined, BarChartOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
+import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import dayjs, { type Dayjs } from 'dayjs'
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
@@ -15,8 +16,10 @@ import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text, Title } = Typography
 const { Option } = Select
+const { RangePicker } = DatePicker
 const { useBreakpoint } = Grid
 const TOP_SQL_WINDOW_OPTIONS = [5, 15, 30, 60, 180, 360, 720, 1440]
+const TOP_SQL_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
 interface MonitorSnapshot {
   collected_at?: string | null
@@ -185,6 +188,22 @@ function formatWindowMinutes(value: number) {
   return `${value} 分钟`
 }
 
+function topSqlHeader(title: string, unit?: string) {
+  return (
+    <span style={{ whiteSpace: 'nowrap' }}>
+      {title}
+      {unit ? <Text type="secondary" style={{ fontSize: 12 }}> ({unit})</Text> : null}
+    </span>
+  )
+}
+
+function compactSqlText(value?: string | null, maxLength = 140) {
+  const sql = (value || '').replace(/\s+/g, ' ').trim()
+  if (!sql) return '-'
+  if (sql.length <= maxLength) return sql
+  return `${sql.slice(0, maxLength)}....`
+}
+
 function StatusTag({ status }: { status?: string }) {
   const value = status || 'not_configured'
   const label: Record<string, string> = {
@@ -243,6 +262,7 @@ export default function MonitorPage() {
   const [collectStatusFilter, setCollectStatusFilter] = useState<string | undefined>()
   const [trendHours, setTrendHours] = useState(24)
   const [topSqlWindowMinutes, setTopSqlWindowMinutes] = useState(30)
+  const [topSqlCustomRange, setTopSqlCustomRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [alertRulesText, setAlertRulesText] = useState('{}')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
@@ -282,6 +302,8 @@ export default function MonitorPage() {
   }), [allInstances, dbTypeFilter, riskFilter, collectStatusFilter])
   const activeId = selectedId || instances[0]?.instance_id || null
   const active = instances.find(i => i.instance_id === activeId) || null
+  const topSqlDateStart = topSqlCustomRange?.[0]?.format(TOP_SQL_TIME_FORMAT)
+  const topSqlDateEnd = topSqlCustomRange?.[1]?.format(TOP_SQL_TIME_FORMAT)
 
   const { data: detail } = useQuery({
     queryKey: ['native-monitor-detail', activeId],
@@ -299,10 +321,20 @@ export default function MonitorPage() {
     enabled: !!activeId,
   })
   const { data: topSqlData } = useQuery({
-    queryKey: ['native-monitor-top-sql', activeId, topSqlWindowMinutes],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`, { params: { window_minutes: topSqlWindowMinutes } }).then(r => r.data),
+    queryKey: ['native-monitor-top-sql', activeId, topSqlWindowMinutes, topSqlDateStart, topSqlDateEnd],
+    queryFn: () => {
+      const params: Record<string, any> = { window_minutes: topSqlWindowMinutes }
+      if (topSqlDateStart && topSqlDateEnd) {
+        params.date_start = topSqlDateStart
+        params.date_end = topSqlDateEnd
+      }
+      return apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`, { params }).then(r => r.data)
+    },
     enabled: !!activeId && canViewSql,
   })
+  const topSqlRangeLabel = topSqlDateStart && topSqlDateEnd
+    ? `${topSqlCustomRange?.[0]?.format('MM-DD HH:mm')} 至 ${topSqlCustomRange?.[1]?.format('MM-DD HH:mm')}`
+    : `最近 ${formatWindowMinutes(topSqlData?.window_minutes || topSqlWindowMinutes)}`
   const { data: waitsData } = useQuery({
     queryKey: ['native-monitor-waits', activeId],
     queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/waits/`).then(r => r.data),
@@ -775,19 +807,62 @@ export default function MonitorPage() {
     { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
   ]
 
+  const copyTopSql = async (sql: string) => {
+    try {
+      await navigator.clipboard.writeText(sql)
+      msgApi.success('SQL 已复制')
+    } catch {
+      msgApi.error('复制失败')
+    }
+  }
+
   const topSqlColumns = [
-    { title: 'SQL/SQL_ID', width: 180, render: (_: any, row: any) => row.sql_id || row.source_ref || row.digest || '-' },
-    { title: 'Schema', width: 140, render: (_: any, row: any) => row.schema_name || row.db_name || '-' },
-    { title: '执行次数', width: 110, render: (_: any, row: any) => formatMetric(row.executions ?? row.count_star) },
-    { title: '总耗时(ms)', width: 120, render: (_: any, row: any) => formatMetric(row.elapsed_time_ms ?? row.duration_ms) },
-    { title: '平均耗时(ms)', width: 130, render: (_: any, row: any) => formatMetric(row.avg_elapsed_ms ?? row.avg_duration_ms) },
-    { title: 'Cop均耗(ms)', width: 120, render: (_: any, row: any) => formatMetric(row.avg_cop_time_ms) },
-    { title: '平均请求数', width: 120, render: (_: any, row: any) => formatMetric(row.avg_request_count) },
-    { title: '平均扫描Keys', width: 140, render: (_: any, row: any) => formatMetric(row.avg_processed_keys) },
-    { title: '总耗时占比', width: 120, render: (_: any, row: any) => formatMetric(row.ela_pct, '%') },
-    { title: 'Cop占比', width: 110, render: (_: any, row: any) => formatMetric(row.coptm_pct, '%') },
-    { title: '扫描Keys占比', width: 130, render: (_: any, row: any) => formatMetric(row.pkey_pct, '%') },
-    { title: 'SQL 文本', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text || row.DIGEST_TEXT }}>{row.sql_text || row.DIGEST_TEXT || '-'}</Text> },
+    {
+      title: topSqlHeader('SQL ID'),
+      width: 280,
+      render: (_: any, row: any) => {
+        const value = row.sql_id || row.source_ref || row.digest || '-'
+        return <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 250 }}>{value}</Text>
+      },
+    },
+    { title: topSqlHeader('Schema'), width: 110, render: (_: any, row: any) => row.schema_name || row.db_name || '-' },
+    { title: topSqlHeader('执行次数'), width: 110, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.executions ?? row.count_star) },
+    { title: topSqlHeader('总耗时', 'ms'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.elapsed_time_ms ?? row.duration_ms) },
+    { title: topSqlHeader('平均耗时', 'ms'), width: 140, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_elapsed_ms ?? row.avg_duration_ms) },
+    { title: topSqlHeader('Cop 平均耗时', 'ms'), width: 160, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_cop_time_ms) },
+    { title: topSqlHeader('平均请求数'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_request_count) },
+    { title: topSqlHeader('平均扫描 Keys'), width: 150, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_processed_keys) },
+    { title: topSqlHeader('总耗时占比'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.ela_pct, '%') },
+    { title: topSqlHeader('Cop 占比'), width: 120, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.coptm_pct, '%') },
+    { title: topSqlHeader('扫描 Keys 占比'), width: 150, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.pkey_pct, '%') },
+    {
+      title: topSqlHeader('SQL 文本'),
+      width: 620,
+      render: (_: any, row: any) => {
+        const sql = row.sql_text || row.DIGEST_TEXT || ''
+        if (!sql) return <Text type="secondary">-</Text>
+        return (
+          <Space size={6} style={{ maxWidth: 600 }}>
+            <AntTooltip
+              placement="topLeft"
+              title={<pre style={{ margin: 0, maxWidth: 720, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{sql}</pre>}
+            >
+              <Text style={{ display: 'inline-block', maxWidth: 540 }}>
+                {compactSqlText(sql)}
+              </Text>
+            </AntTooltip>
+            <AntTooltip title="复制完整 SQL">
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={() => copyTopSql(sql)}
+              />
+            </AntTooltip>
+          </Space>
+        )
+      },
+    },
   ]
 
   const waitColumns = [
@@ -1072,20 +1147,42 @@ export default function MonitorPage() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row' }}>
                             <div>
                               <Title level={5} style={{ margin: 0 }}>Top SQL</Title>
-                              <Text type="secondary">最近 {formatWindowMinutes(topSqlData?.window_minutes || topSqlWindowMinutes)}</Text>
+                              <Text type="secondary">{topSqlRangeLabel}</Text>
                             </div>
                             <Space wrap>
-                              <Text type="secondary">时间范围</Text>
+                              <Text type="secondary">快捷范围</Text>
                               <Select
                                 value={topSqlWindowMinutes}
                                 style={{ width: 140 }}
-                                onChange={setTopSqlWindowMinutes}
+                                onChange={(value) => {
+                                  setTopSqlWindowMinutes(value)
+                                  setTopSqlCustomRange(null)
+                                }}
                                 options={TOP_SQL_WINDOW_OPTIONS.map(value => ({ value, label: formatWindowMinutes(value) }))}
+                              />
+                              <RangePicker
+                                showTime
+                                value={topSqlCustomRange}
+                                format={TOP_SQL_TIME_FORMAT}
+                                style={{ width: isMobile ? '100%' : 380 }}
+                                placeholder={['开始时间', '结束时间']}
+                                onChange={(dates) => {
+                                  if (dates?.[0] && dates?.[1]) {
+                                    setTopSqlCustomRange([dates[0], dates[1]])
+                                  } else {
+                                    setTopSqlCustomRange(null)
+                                  }
+                                }}
+                                presets={[
+                                  { label: '最近 30 分钟', value: [dayjs().subtract(30, 'minute'), dayjs()] },
+                                  { label: '最近 1 小时', value: [dayjs().subtract(1, 'hour'), dayjs()] },
+                                  { label: '最近 6 小时', value: [dayjs().subtract(6, 'hour'), dayjs()] },
+                                ]}
                               />
                             </Space>
                           </div>
                           {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
-                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 1780 }} pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 2340 }} tableLayout="fixed" pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
                           <SqlInsightPanel embedded instanceId={activeId} />
                         </Space>
                       ) : <TableEmptyState title="暂无 SQL 洞察权限" />,

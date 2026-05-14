@@ -5,6 +5,7 @@ TiDB 复用 MySQL 协议连接，但把 TiDB 专属诊断逻辑保留在独立�
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from app.engines.models import ResultSet
@@ -44,6 +45,58 @@ class TidbEngine(MysqlEngine):
         missing = raw.setdefault("missing_groups", {})
         if isinstance(missing, dict):
             missing[group] = error
+
+    @staticmethod
+    def _coerce_datetime(value: Any) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+        return None
+
+    @classmethod
+    def _top_sql_time_filter(
+        cls,
+        column_name: str,
+        *,
+        window_minutes: int,
+        start_time: Any | None,
+        end_time: Any | None,
+    ) -> tuple[str, int, str, str]:
+        start = cls._coerce_datetime(start_time)
+        end = cls._coerce_datetime(end_time)
+        if start and end:
+            if start.tzinfo:
+                start = start.replace(tzinfo=None)
+            if end.tzinfo:
+                end = end.replace(tzinfo=None)
+        if start and end and start < end:
+            start_sql = start.strftime("%Y-%m-%d %H:%M:%S.%f")
+            end_sql = end.strftime("%Y-%m-%d %H:%M:%S.%f")
+            minutes = max(1, int((end - start).total_seconds() // 60) or 1)
+            return (
+                f"{column_name} >= '{start_sql}' AND {column_name} <= '{end_sql}'",
+                minutes,
+                start_sql,
+                end_sql,
+            )
+        bounded_window = cls._bounded_int(
+            window_minutes,
+            default=30,
+            minimum=1,
+            maximum=1440,
+        )
+        return (
+            f"{column_name} >= NOW() - INTERVAL {bounded_window} MINUTE",
+            bounded_window,
+            "",
+            "",
+        )
 
     async def processlist(
         self, command_type: str = "Query", **kwargs: Any
@@ -183,12 +236,16 @@ class TidbEngine(MysqlEngine):
         self,
         limit: int = 20,
         window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         """采集 TiDB Top SQL，优先 statement summary，降级到 slow query。"""
         summary_rs = await self._collect_statement_summary_top_sql(
             limit=limit,
             window_minutes=window_minutes,
             min_duration_ms=0,
+            start_time=start_time,
+            end_time=end_time,
         )
         if summary_rs.is_success and summary_rs.rows:
             return summary_rs
@@ -197,6 +254,8 @@ class TidbEngine(MysqlEngine):
             limit=limit,
             window_minutes=window_minutes,
             min_duration_ms=0,
+            start_time=start_time,
+            end_time=end_time,
         )
         if slow_rs.is_success:
             if summary_rs.error:
@@ -417,13 +476,15 @@ class TidbEngine(MysqlEngine):
         limit: int,
         window_minutes: int,
         min_duration_ms: int,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         limit = self._bounded_int(limit, default=20, minimum=1, maximum=500)
-        window_minutes = self._bounded_int(
-            window_minutes,
-            default=30,
-            minimum=1,
-            maximum=1440,
+        time_filter, effective_window_minutes, range_start, range_end = self._top_sql_time_filter(
+            "SUMMARY_BEGIN_TIME",
+            window_minutes=window_minutes,
+            start_time=start_time,
+            end_time=end_time,
         )
         min_duration_ms = self._bounded_int(
             min_duration_ms,
@@ -450,7 +511,7 @@ class TidbEngine(MysqlEngine):
                 AVG_TOTAL_KEYS,
                 AVG_RESULT_ROWS
               FROM information_schema.CLUSTER_STATEMENTS_SUMMARY
-              WHERE SUMMARY_BEGIN_TIME >= NOW() - INTERVAL {window_minutes} MINUTE
+              WHERE {time_filter}
                 AND DIGEST IS NOT NULL
               UNION ALL
               SELECT
@@ -470,7 +531,7 @@ class TidbEngine(MysqlEngine):
                 AVG_TOTAL_KEYS,
                 AVG_RESULT_ROWS
               FROM information_schema.CLUSTER_STATEMENTS_SUMMARY_HISTORY
-              WHERE SUMMARY_BEGIN_TIME >= NOW() - INTERVAL {window_minutes} MINUTE
+              WHERE {time_filter}
                 AND DIGEST IS NOT NULL
             ),
             sqlstat AS (
@@ -530,7 +591,9 @@ class TidbEngine(MysqlEngine):
               ROUND(100 * COALESCE(sqlstat.processed_keys, 0) / NULLIF(totals.total_processed_keys, 0), 0) AS pkey_pct,
               ROUND(100 * COALESCE(sqlstat.total_keys, 0) / NULLIF(totals.total_total_keys, 0), 0) AS ttkey_pct,
               ROUND(100 * COALESCE(sqlstat.result_rows, 0) / NULLIF(totals.total_result_rows, 0), 0) AS result_row_pct,
-              {window_minutes} AS window_minutes
+              {effective_window_minutes} AS window_minutes,
+              '{range_start}' AS date_start,
+              '{range_end}' AS date_end
             FROM sqlstat
             CROSS JOIN totals
             WHERE sqlstat.executions > 0
@@ -547,13 +610,15 @@ class TidbEngine(MysqlEngine):
         limit: int,
         window_minutes: int,
         min_duration_ms: int,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         limit = self._bounded_int(limit, default=20, minimum=1, maximum=500)
-        window_minutes = self._bounded_int(
-            window_minutes,
-            default=30,
-            minimum=1,
-            maximum=1440,
+        time_filter, effective_window_minutes, range_start, range_end = self._top_sql_time_filter(
+            "TIME",
+            window_minutes=window_minutes,
+            start_time=start_time,
+            end_time=end_time,
         )
         min_duration_ms = self._bounded_int(
             min_duration_ms,
@@ -579,7 +644,7 @@ class TidbEngine(MysqlEngine):
                 SUM(Total_keys) AS total_keys,
                 SUM(Result_rows) AS result_rows
               FROM information_schema.CLUSTER_SLOW_QUERY
-              WHERE TIME >= NOW() - INTERVAL {window_minutes} MINUTE
+              WHERE {time_filter}
                 AND Query_time >= {min_duration_seconds}
                 AND Query IS NOT NULL
                 AND LOWER(Query) NOT LIKE 'analyze%'
@@ -624,7 +689,9 @@ class TidbEngine(MysqlEngine):
               ROUND(100 * COALESCE(sqlstat.processed_keys, 0) / NULLIF(totals.total_processed_keys, 0), 0) AS pkey_pct,
               ROUND(100 * COALESCE(sqlstat.total_keys, 0) / NULLIF(totals.total_total_keys, 0), 0) AS ttkey_pct,
               ROUND(100 * COALESCE(sqlstat.result_rows, 0) / NULLIF(totals.total_result_rows, 0), 0) AS result_row_pct,
-              {window_minutes} AS window_minutes
+              {effective_window_minutes} AS window_minutes,
+              '{range_start}' AS date_start,
+              '{range_end}' AS date_end
             FROM sqlstat
             CROSS JOIN totals
             WHERE sqlstat.executions > 0

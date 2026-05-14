@@ -309,6 +309,41 @@ async def test_tidb_collect_top_sql_falls_back_to_slow_query(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_tidb_collect_top_sql_accepts_custom_time_range(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        return ResultSet(
+            column_list=["source", "sql_text", "window_minutes", "date_start", "date_end"],
+            rows=[
+                {
+                    "source": "tidb_statements",
+                    "sql_text": "select * from t",
+                    "window_minutes": 45,
+                    "date_start": "2026-05-14 10:00:00.000000",
+                    "date_end": "2026-05-14 10:45:00.000000",
+                }
+            ],
+        )
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.collect_top_sql(
+        limit=5,
+        start_time="2026-05-14 10:00:00",
+        end_time="2026-05-14 10:45:00",
+    )
+
+    assert rs.is_success
+    assert "SUMMARY_BEGIN_TIME >= '2026-05-14 10:00:00.000000'" in calls[0]
+    assert "SUMMARY_BEGIN_TIME <= '2026-05-14 10:45:00.000000'" in calls[0]
+    assert "45 AS window_minutes" in calls[0]
+
+
+@pytest.mark.asyncio
 async def test_tidb_collect_top_sql_reports_permission_fallback_errors(monkeypatch):
     monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
 

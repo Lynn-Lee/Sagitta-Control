@@ -183,6 +183,11 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     ] as ColumnsType<SessionItem> : []),
     { title: '用户', dataIndex: 'username', width: 120, ellipsis: true },
     { title: '来源', dataIndex: 'host', width: 170, ellipsis: true },
+    ...(isTidb ? [
+      { title: 'TiDB 内存', dataIndex: 'mem_bytes', width: 110, render: renderBytes },
+      { title: 'TiDB 磁盘', dataIndex: 'disk_bytes', width: 110, render: renderBytes },
+      { title: 'TxnStart', dataIndex: 'txn_start', width: 170, ellipsis: true },
+    ] as ColumnsType<SessionItem> : []),
     { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
     { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
@@ -209,11 +214,6 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       render: renderDuration,
     },
     { title: '事务时长(ms)', dataIndex: 'transaction_age_ms', width: 130, render: renderDuration },
-    ...(isTidb ? [
-      { title: 'TiDB 内存', dataIndex: 'mem_bytes', width: 110, render: renderBytes },
-      { title: 'TiDB 磁盘', dataIndex: 'disk_bytes', width: 110, render: renderBytes },
-      { title: 'TxnStart', dataIndex: 'txn_start', width: 170, ellipsis: true },
-    ] as ColumnsType<SessionItem> : []),
     { title: 'SQL ID', dataIndex: 'sql_id', width: 130, ellipsis: true },
     {
       title: 'SQL',

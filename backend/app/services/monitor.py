@@ -1143,6 +1143,8 @@ class MonitorService:
         user: dict,
         limit: int = 20,
         window_minutes: int = 30,
+        date_start: datetime | None = None,
+        date_end: datetime | None = None,
     ) -> dict:
         from app.engines.registry import get_engine
 
@@ -1152,6 +1154,9 @@ class MonitorService:
         if not inst:
             raise NotFoundException(f"实例 ID={instance_id} 不存在")
         window_minutes = max(1, min(int(window_minutes or 30), 1440))
+        custom_range = date_start is not None and date_end is not None and date_start < date_end
+        if custom_range:
+            window_minutes = max(1, int((date_end - date_start).total_seconds() // 60) or 1)
         latest = await MonitorService.get_latest_snapshot(db, instance_id)
         extra = (latest or {}).get("extra_metrics") or {}
         is_tidb = inst.db_type.lower() == "tidb"
@@ -1161,7 +1166,15 @@ class MonitorService:
             engine = get_engine(inst)
             collect_top_sql = getattr(engine, "collect_top_sql", None)
             if callable(collect_top_sql):
-                rs = await collect_top_sql(limit=limit, window_minutes=window_minutes)
+                if custom_range:
+                    rs = await collect_top_sql(
+                        limit=limit,
+                        window_minutes=window_minutes,
+                        start_time=date_start,
+                        end_time=date_end,
+                    )
+                else:
+                    rs = await collect_top_sql(limit=limit, window_minutes=window_minutes)
                 error = rs.error
                 if rs.is_success:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
@@ -1186,6 +1199,8 @@ class MonitorService:
             "items": items[:limit],
             "error": error,
             "window_minutes": window_minutes,
+            "date_start": date_start.isoformat() if custom_range else None,
+            "date_end": date_end.isoformat() if custom_range else None,
             "missing_groups": (latest or {}).get("missing_groups") or {},
         }
 

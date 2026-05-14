@@ -29,6 +29,15 @@ router = APIRouter()
 sd_router = APIRouter()
 
 
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(422, "时间格式错误，请使用 ISO8601") from None
+
+
 # ── Dashboard 统计 ────────────────────────────────────────────
 
 
@@ -253,10 +262,26 @@ async def native_top_sql(
     instance_id: int,
     limit: int = QParam(20, ge=1, le=100),
     window_minutes: int = QParam(30, ge=1, le=1440),
+    date_start: str | None = QParam(None, description="自定义开始时间 ISO8601"),
+    date_end: str | None = QParam(None, description="自定义结束时间 ISO8601"),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await MonitorService.get_top_sql(db, instance_id, user, limit, window_minutes)
+    start = _parse_dt(date_start)
+    end = _parse_dt(date_end)
+    if (start and not end) or (end and not start):
+        raise HTTPException(422, "自定义时间范围需要同时提供开始和结束时间")
+    if start and end and start >= end:
+        raise HTTPException(422, "开始时间必须早于结束时间")
+    return await MonitorService.get_top_sql(
+        db,
+        instance_id,
+        user,
+        limit,
+        window_minutes,
+        date_start=start,
+        date_end=end,
+    )
 
 
 @router.get("/native/instances/{instance_id}/waits/", summary="等待事件与阻塞摘要")
