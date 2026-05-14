@@ -434,6 +434,45 @@ async def test_save_engine_rows_deduplicates_repeated_source_refs_before_insert(
 
 
 @pytest.mark.asyncio
+async def test_save_engine_rows_keeps_oracle_sql_monitor_exec_identity():
+    captured: dict[str, object] = {}
+
+    async def fake_execute(stmt):
+        compiled = stmt.compile(dialect=postgresql.dialect())
+        captured["params"] = compiled.params
+        return SimpleNamespace(rowcount=1)
+
+    db = SimpleNamespace(execute=AsyncMock(side_effect=fake_execute), commit=AsyncMock())
+    instance = SimpleNamespace(id=7, db_type="oracle", instance_name="Oracle-RAC", db_name="APP")
+    occurred_at = datetime(2026, 5, 14, 10, 0, tzinfo=UTC)
+
+    saved = await SlowLogService.save_engine_rows(
+        db,
+        instance,
+        [
+            SlowQueryEngineRow(
+                source="oracle_sql_monitor",
+                source_ref="oracle:sql_monitor:1:abc123:456:20260514100000",
+                db_name="APP",
+                sql_text="select * from orders",
+                duration_ms=2200,
+                rows_examined=100,
+                rows_sent=5,
+                raw={"sql_exec_id": "456", "plan_hash_value": "987"},
+                occurred_at=occurred_at,
+            )
+        ],
+    )
+
+    assert saved == 1
+    source_ref_keys = [key for key in captured["params"] if key.startswith("source_ref_m")]
+    assert captured["params"][source_ref_keys[0]] == (
+        "7:oracle:sql_monitor:1:abc123:456:20260514100000:202605141000"
+    )
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_collect_instance_uses_doris_sql_activity_source(monkeypatch):
     engine = SimpleNamespace(
         collect_sql_activity=AsyncMock(

@@ -18,6 +18,7 @@ export interface SlowQueryLogItem {
   occurred_at: string
   analysis_tags: string[]
   collect_error: string
+  raw?: Record<string, unknown>
 }
 
 export interface SlowQueryLogListResponse {

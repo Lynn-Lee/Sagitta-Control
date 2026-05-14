@@ -194,6 +194,60 @@ async def test_get_top_sql_uses_activity_collector_for_starrocks(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_top_sql_passes_oracle_window_to_activity_collector(monkeypatch):
+    instance = SimpleNamespace(id=32, db_type="oracle")
+    engine = SimpleNamespace(
+        collect_sql_activity=AsyncMock(
+            return_value=SimpleNamespace(
+                is_success=True,
+                error="",
+                warning="AWR unavailable, used cursor cache",
+                column_list=[],
+                rows=[
+                    {
+                        "source": "oracle_cursor_cache",
+                        "source_ref": "oracle:cursor_cache:1:abc:123",
+                        "sql_text": "select * from orders",
+                    }
+                ],
+            )
+        )
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: instance))
+    )
+    date_start = datetime(2026, 5, 14, 10, 0, tzinfo=UTC)
+    date_end = datetime(2026, 5, 14, 10, 30, tzinfo=UTC)
+    monkeypatch.setattr(MonitorService, "check_privilege", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        MonitorService,
+        "get_latest_snapshot",
+        AsyncMock(return_value={"extra_metrics": {"top_sql": [{"source": "cached"}]}}),
+    )
+    monkeypatch.setattr("app.engines.registry.get_engine", lambda _instance: engine)
+
+    result = await MonitorService.get_top_sql(
+        db,
+        32,
+        {"is_superuser": True},
+        limit=5,
+        window_minutes=15,
+        date_start=date_start,
+        date_end=date_end,
+    )
+
+    engine.collect_sql_activity.assert_awaited_once_with(
+        limit=5,
+        min_duration_ms=0,
+        window_minutes=30,
+        start_time=date_start,
+        end_time=date_end,
+    )
+    assert result["error"] == "AWR unavailable, used cursor cache"
+    assert result["items"][0]["source"] == "oracle_cursor_cache"
+
+
+@pytest.mark.asyncio
 async def test_get_top_sql_uses_tidb_top_sql_collector(monkeypatch):
     instance = SimpleNamespace(id=29, db_type="tidb")
     engine = SimpleNamespace(

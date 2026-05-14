@@ -324,6 +324,9 @@ class StarRocksEngine(MysqlEngine):
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         rs = await self.processlist(command_type="ALL")
         if not rs.is_success:

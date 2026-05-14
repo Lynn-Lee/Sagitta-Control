@@ -936,10 +936,10 @@ async def get_license_status(
 @router.get("/license/deployment-fingerprint", summary="预览正式激活部署指纹")
 async def get_license_deployment_fingerprint(
     customer_id: str = Query("", max_length=128),
-    customerId: str = Query("", max_length=128),
+    customer_id_legacy: str = Query("", max_length=128, alias="customerId"),
     _user=Depends(current_superuser),
 ):
-    return LicenseService.activation_fingerprint(customer_id or customerId)
+    return LicenseService.activation_fingerprint(customer_id or customer_id_legacy)
 
 
 @router.post("/license/import", summary="导入离线 License")

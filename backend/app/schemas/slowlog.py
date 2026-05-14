@@ -24,6 +24,7 @@ class SlowQueryLogItem(BaseModel):
     username: str = ""
     client_host: str = ""
     occurred_at: datetime
+    raw: dict[str, Any] = Field(default_factory=dict)
     analysis_tags: list[str] = Field(default_factory=list)
     collect_error: str = ""
 

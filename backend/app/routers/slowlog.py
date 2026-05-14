@@ -371,6 +371,11 @@ async def list_slow_queries(
                 row for row in rs.rows
                 if _row_duration_seconds(row) > min_seconds
             ][:limit]
+    elif inst.db_type == "oracle" and hasattr(engine, "collect_sql_activity"):
+        rs = await engine.collect_sql_activity(
+            limit=limit,
+            min_duration_ms=min_seconds * 1000,
+        )
     else:
         return {"items": [], "total": 0, "msg": f"{inst.db_type} 暂不支持实时 SQL 洞察"}
 
@@ -380,6 +385,7 @@ async def list_slow_queries(
     return {
         "items": [dict(zip(cols, r, strict=False)) if isinstance(r, tuple) else r for r in rs.rows],
         "total": len(rs.rows),
+        "warning": getattr(rs, "warning", ""),
     }
 
 

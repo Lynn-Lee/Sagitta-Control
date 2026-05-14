@@ -198,6 +198,9 @@ class EngineProtocol(Protocol):
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         """采集通用 SQL 执行活动。"""
         return ResultSet(warning=f"{self.db_type} 暂不支持 SQL 活动采集")

@@ -23,6 +23,20 @@ export interface SessionItem {
   sql_text: string
   event: string
   blocking_session: string
+  inst_id?: string
+  process_id?: string
+  module?: string
+  action?: string
+  client_identifier?: string
+  wait_class?: string
+  seconds_in_wait?: number | null
+  blocking_instance?: string
+  pga_used_mem?: number | null
+  pga_alloc_mem?: number | null
+  logon_time?: string
+  sql_child_number?: string
+  prev_sql_id?: string
+  plan_hash_value?: string
   tidb_instance?: string
   digest?: string
   mem_bytes?: number | null

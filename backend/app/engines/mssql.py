@@ -368,6 +368,9 @@ class MssqlEngine:
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         sql = """
         SELECT TOP (%s)

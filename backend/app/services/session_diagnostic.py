@@ -40,6 +40,20 @@ _ONLINE_COLUMNS = [
     "sql_text",
     "event",
     "blocking_session",
+    "inst_id",
+    "process_id",
+    "module",
+    "action",
+    "client_identifier",
+    "wait_class",
+    "seconds_in_wait",
+    "blocking_instance",
+    "pga_used_mem",
+    "pga_alloc_mem",
+    "logon_time",
+    "sql_child_number",
+    "prev_sql_id",
+    "plan_hash_value",
     "tidb_instance",
     "digest",
     "mem_bytes",
@@ -175,6 +189,20 @@ def normalize_session_row(
     item.sql_text = _string(_pick(raw, "sql_text", "sql_fulltext", "query", "info"))
     item.event = _string(_pick(raw, "event"))
     item.blocking_session = _string(_pick(raw, "blocking_session"))
+    item.inst_id = _string(_pick(raw, "inst_id", "instance_number"))
+    item.process_id = _string(_pick(raw, "process_id", "pid", "spid"))
+    item.module = _string(_pick(raw, "module"))
+    item.action = _string(_pick(raw, "action"))
+    item.client_identifier = _string(_pick(raw, "client_identifier"))
+    item.wait_class = _string(_pick(raw, "wait_class"))
+    item.seconds_in_wait = _optional_int(raw, "seconds_in_wait")
+    item.blocking_instance = _string(_pick(raw, "blocking_instance"))
+    item.pga_used_mem = _optional_int(raw, "pga_used_mem")
+    item.pga_alloc_mem = _optional_int(raw, "pga_alloc_mem")
+    item.logon_time = _string(_pick(raw, "logon_time"))
+    item.sql_child_number = _string(_pick(raw, "sql_child_number", "child_number"))
+    item.prev_sql_id = _string(_pick(raw, "prev_sql_id"))
+    item.plan_hash_value = _string(_pick(raw, "plan_hash_value", "sql_plan_hash_value"))
     item.tidb_instance = _string(_pick(raw, "tidb_instance", "instance"))
     item.mem_bytes = _optional_int(raw, "mem_bytes", "mem")
     item.disk_bytes = _optional_int(raw, "disk_bytes", "disk")
@@ -498,6 +526,20 @@ class SessionDiagnosticService:
             item.digest = _string(_pick(raw, "digest"))
             if not item.sql_id and item.digest:
                 item.sql_id = item.digest
+            item.inst_id = _string(_pick(raw, "inst_id", "instance_number"))
+            item.process_id = _string(_pick(raw, "process_id", "pid", "spid"))
+            item.module = _string(_pick(raw, "module"))
+            item.action = _string(_pick(raw, "action"))
+            item.client_identifier = _string(_pick(raw, "client_identifier"))
+            item.wait_class = _string(_pick(raw, "wait_class"))
+            item.seconds_in_wait = _optional_int(raw, "seconds_in_wait")
+            item.blocking_instance = _string(_pick(raw, "blocking_instance"))
+            item.pga_used_mem = _optional_int(raw, "pga_used_mem")
+            item.pga_alloc_mem = _optional_int(raw, "pga_alloc_mem")
+            item.logon_time = _string(_pick(raw, "logon_time"))
+            item.sql_child_number = _string(_pick(raw, "sql_child_number", "child_number"))
+            item.prev_sql_id = _string(_pick(raw, "prev_sql_id"))
+            item.plan_hash_value = _string(_pick(raw, "plan_hash_value", "sql_plan_hash_value"))
             item.mem_bytes = _optional_int(raw, "mem_bytes", "mem")
             item.disk_bytes = _optional_int(raw, "disk_bytes", "disk")
             item.txn_start = _string(_pick(raw, "txn_start", "txnstart"))

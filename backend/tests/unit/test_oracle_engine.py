@@ -252,3 +252,130 @@ class TestOracleExecution:
             "sql": "UPDATE users SET status = 'active'",
             "kwargs": {},
         }
+
+
+class TestOracleMonitoring:
+    @pytest.mark.asyncio
+    async def test_processlist_prefers_gv_session_process_sql(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        def fake_run_query_sync(sql, params=None):
+            captured["sql"] = sql
+            captured["params"] = params
+            return ResultSet(
+                column_list=["session_id", "process_id"],
+                rows=[(101, "12345")],
+                affected_rows=1,
+            )
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        rs = await engine.processlist()
+
+        assert rs.is_success
+        assert "FROM gv$session s" in str(captured["sql"])
+        assert "gv$process p" in str(captured["sql"])
+        assert "gv$sql q" in str(captured["sql"])
+        assert "q.plan_hash_value AS plan_hash_value" in str(captured["sql"])
+        assert "s.sql_plan_hash_value" not in str(captured["sql"])
+
+    @pytest.mark.asyncio
+    async def test_processlist_falls_back_to_v_session(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        calls: list[str] = []
+
+        def fake_run_query_sync(sql, params=None):
+            calls.append(str(sql))
+            if "FROM gv$session s" in str(sql):
+                return ResultSet(error="ORA-00942: table or view does not exist")
+            return ResultSet(column_list=["session_id"], rows=[(102,)], affected_rows=1)
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        rs = await engine.processlist()
+
+        assert rs.is_success
+        assert "GV$ 会话视图不可用" in rs.warning
+        assert "FROM v$session s" in calls[1]
+        assert "q.plan_hash_value AS plan_hash_value" in calls[1]
+
+    @pytest.mark.asyncio
+    async def test_collect_sql_activity_uses_sql_monitor_first(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {}
+
+        def fake_run_query_sync(sql, params=None):
+            captured["sql"] = sql
+            captured["params"] = params
+            return ResultSet(
+                column_list=["source", "source_ref", "sql_text", "duration_ms"],
+                rows=[("oracle_sql_monitor", "oracle:sql_monitor:1:abc:9:20260514100000", "select 1", 1200)],
+                affected_rows=1,
+            )
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        rs = await engine.collect_sql_activity(limit=5, min_duration_ms=100, window_minutes=60)
+
+        assert rs.is_success
+        assert rs.rows[0][0] == "oracle_sql_monitor"
+        assert "FROM gv$sql_monitor m" in str(captured["sql"])
+        assert captured["params"]["limit"] == 5
+        assert captured["params"]["window_minutes"] == 60
+
+    @pytest.mark.asyncio
+    async def test_collect_sql_activity_falls_back_to_awr_then_cursor_cache(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        calls: list[str] = []
+
+        def fake_run_query_sync(sql, params=None):
+            text = str(sql)
+            calls.append(text)
+            if "gv$sql_monitor" in text:
+                return ResultSet(error="ORA-00942: no monitor")
+            if "dba_hist_sqlstat" in text:
+                return ResultSet(column_list=["source"], rows=[], affected_rows=0)
+            return ResultSet(
+                column_list=["source", "source_ref", "sql_text", "duration_ms"],
+                rows=[("oracle_cursor_cache", "oracle:cursor_cache:1:def:123:202605141001", "select 2", 800)],
+                affected_rows=1,
+            )
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        rs = await engine.collect_sql_activity(limit=5, min_duration_ms=0)
+
+        assert rs.is_success
+        assert rs.rows[0][0] == "oracle_cursor_cache"
+        assert "GV$SQL_MONITOR 不可用" in rs.warning
+        assert any("dba_hist_sqlstat" in sql for sql in calls)
+        assert any("FROM gv$sql" in sql for sql in calls)
+
+    @pytest.mark.asyncio
+    async def test_collect_sql_activity_last_resort_uses_session_activity(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+
+        def fake_run_query_sync(sql, params=None):
+            return ResultSet(error="ORA-00942: no privilege")
+
+        async def fake_processlist(command_type="ALL"):
+            return ResultSet(
+                column_list=["session_id", "sql_id", "sql_text", "duration_ms", "username", "host"],
+                rows=[(201, "abc", "select 3", 1500, "APP", "client")],
+                affected_rows=1,
+            )
+
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+        monkeypatch.setattr(engine, "processlist", fake_processlist)
+
+        rs = await engine.collect_sql_activity(limit=5, min_duration_ms=1000)
+
+        assert rs.is_success
+        assert rs.rows[0]["source"] == "oracle_activity"
+        assert "已降级为当前会话 SQL 活动" in rs.warning

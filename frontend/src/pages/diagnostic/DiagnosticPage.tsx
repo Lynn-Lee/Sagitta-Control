@@ -177,6 +177,10 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
   const sessionColumns: ColumnsType<SessionItem> = [
     { title: '会话ID', dataIndex: 'session_id', width: 110, fixed: 'left' },
     { title: 'Serial', dataIndex: 'serial', width: 90 },
+    ...(isOracle ? [
+      { title: 'RAC', dataIndex: 'inst_id', width: 80, ellipsis: true },
+      { title: 'OS PID', dataIndex: 'process_id', width: 100, ellipsis: true },
+    ] as ColumnsType<SessionItem> : []),
     ...(isTidb ? [
       { title: 'TiDB 节点', dataIndex: 'tidb_instance', width: 190, ellipsis: true },
       { title: '资源组', dataIndex: 'resource_group', width: 110, ellipsis: true },
@@ -189,6 +193,10 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       { title: 'TxnStart', dataIndex: 'txn_start', width: 170, ellipsis: true },
     ] as ColumnsType<SessionItem> : []),
     { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
+    ...(isOracle ? [
+      { title: '模块', dataIndex: 'module', width: 130, ellipsis: true },
+      { title: 'Action', dataIndex: 'action', width: 130, ellipsis: true },
+    ] as ColumnsType<SessionItem> : []),
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
     { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
     { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
@@ -225,6 +233,12 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
         : <Text type="secondary">-</Text>,
     },
     { title: '等待事件', dataIndex: 'event', width: 180, ellipsis: true },
+    ...(isOracle ? [
+      { title: '等待类别', dataIndex: 'wait_class', width: 120, ellipsis: true },
+      { title: '等待秒数', dataIndex: 'seconds_in_wait', width: 100, render: renderDuration },
+      { title: '阻塞实例', dataIndex: 'blocking_instance', width: 100, ellipsis: true },
+      { title: 'PGA Used', dataIndex: 'pga_used_mem', width: 110, render: renderBytes },
+    ] as ColumnsType<SessionItem> : []),
     { title: '阻塞会话', dataIndex: 'blocking_session', width: 110 },
     {
       title: '操作',
@@ -256,8 +270,8 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     { title: '来源', dataIndex: 'source', width: 110, render: (v) => <Tag>{v}</Tag> },
     { title: '错误', dataIndex: 'collect_error', width: 220, ellipsis: true },
   ]
-  const sessionTableScrollX = isTidb ? 2800 : 2100
-  const historyTableScrollX = isTidb ? 3150 : 2450
+  const sessionTableScrollX = isTidb ? 2800 : isOracle ? 3150 : 2100
+  const historyTableScrollX = isTidb ? 3150 : isOracle ? 3500 : 2450
 
   const applyHistoryFilters = (values: any) => {
     const range = values.range as [Dayjs, Dayjs] | undefined

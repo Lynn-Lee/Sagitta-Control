@@ -291,6 +291,9 @@ class ClickHouseEngine:
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         rs = await self.processlist()
         if not rs.is_success:

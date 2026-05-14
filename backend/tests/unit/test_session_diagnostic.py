@@ -507,7 +507,7 @@ def test_normalize_oracle_session_row_requires_serial():
 
 
 @pytest.mark.asyncio
-async def test_oracle_processlist_uses_v_session_and_vsql(monkeypatch):
+async def test_oracle_processlist_prefers_gv_session_process_and_sql(monkeypatch):
     monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
     calls: list[str] = []
 
@@ -521,8 +521,17 @@ async def test_oracle_processlist_uses_v_session_and_vsql(monkeypatch):
     rs = await engine.processlist()
 
     assert rs.is_success
-    assert "FROM v$session s" in calls[0]
-    assert "LEFT JOIN v$sql q" in calls[0]
+    assert "FROM gv$session s" in calls[0]
+    assert "LEFT JOIN gv$process p" in calls[0]
+    assert "LEFT JOIN gv$sql q" in calls[0]
+    assert "LEFT JOIN gv$transaction t" in calls[0]
+    assert "s.inst_id AS inst_id" in calls[0]
+    assert "p.spid AS process_id" in calls[0]
+    assert "q.plan_hash_value AS plan_hash_value" in calls[0]
+    assert "s.sql_plan_hash_value" not in calls[0]
+    assert "s.wait_class AS wait_class" in calls[0]
+    assert "s.blocking_instance AS blocking_instance" in calls[0]
+    assert "p.pga_used_mem AS pga_used_mem" in calls[0]
     assert "SYSDATE - s.logon_time" in calls[0]
     assert "s.last_call_et * 1000 AS state_duration_ms" in calls[0]
     assert "SYSDATE - s.sql_exec_start" in calls[0]

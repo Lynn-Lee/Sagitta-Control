@@ -1,7 +1,7 @@
 # SagittaDB 运维文档
 
-> 文档版本：v2.0
-> 适用版本：SagittaDB v2.0 商业部署版 + v2-lite 授权体系
+> 文档版本：v2.1
+> 适用版本：SagittaDB v2.1 商业部署版 + v2-lite 授权体系
 > 目标读者：运维工程师、DBA、DevOps、系统管理员
 
 ## 1. 运维范围
@@ -228,6 +228,7 @@ bash deploy/update-prod.sh --ref <target_ref>
 | Celery | 队列积压、任务失败、Worker 存活。 |
 | PostgreSQL | 连接数、磁盘空间、数据库大小、慢查询。 |
 | MySQL | 当前连接、QPS/TPS、当前慢查询会话、当前锁等待会话、容量和复制延迟。 |
+| Oracle | RAC 实例会话、OS 进程、module/action、等待事件、阻塞会话、长事务、长操作、SQL Monitor/AWR/游标缓存 Top SQL；无 SQL Monitor/AWR 权限时自动降级并展示 warning。 |
 | StarRocks | 当前连接、SQL 活动、容量采样和集群节点状态；Top SQL 使用会话活动视图，不依赖 MySQL `performance_schema`。 |
 | Redis | 存活、内存、连接数、持久化状态。 |
 | 业务 | 工单执行失败、通知失败、归档失败、采集失败。 |
@@ -235,6 +236,8 @@ bash deploy/update-prod.sh --ref <target_ref>
 Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `deploy/grafana/provisioning/`。
 
 观测中心的 MySQL 慢查询和锁等待风险应按当前态理解。概览卡片中的慢查询统计当前执行时长超过 `long_query_time` 的会话，锁等待统计当前等待锁或被阻塞的会话；性能趋势里的 `本次慢查询` 是两次快照之间的新增慢查询次数。历史累计值仅保留在原始扩展指标中用于排查，不直接作为当前风险曲线。
+
+Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。会话页优先读取 `GV$SESSION`、`GV$PROCESS`、`GV$SQL` 和 `GV$TRANSACTION`，兼容 RAC 与 11g；SQL 洞察优先读取 `GV$SQL_MONITOR`，再降级到 `DBA_HIST_SQLSTAT`、`GV$SQL` 和当前会话 SQL。客户账号没有 AWR、SQL Monitor 或部分动态性能视图权限时，页面会保留已采集数据并展示缺失权限 warning。所有 Oracle 采集均为只读查询，不会执行会话 kill、trace dump、SQL profile、baseline、patch 等变更类诊断操作。
 
 ## 8. 容量管理
 
@@ -338,7 +341,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `2.0.1`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.1.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

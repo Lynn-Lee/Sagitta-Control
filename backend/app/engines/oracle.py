@@ -17,6 +17,7 @@ import platform
 import re
 import time
 import uuid
+from datetime import datetime
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
@@ -108,6 +109,12 @@ def _normalize_oracle_connect_error(exc: Exception) -> str:
             "Oracle 11.2 及更早版本需安装 Instant Client，并将 ORACLE_DRIVER_MODE=thick。"
         )
     return message
+
+
+def _oracle_datetime_param(value: Any | None) -> Any | None:
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.astimezone().replace(tzinfo=None)
+    return value
 
 
 class OracleEngine:
@@ -888,11 +895,16 @@ class OracleEngine:
     async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
         sql = """
         SELECT
+            s.inst_id AS inst_id,
             s.sid AS session_id,
             s.serial# AS serial,
+            p.spid AS process_id,
             s.username AS username,
             s.machine AS host,
             s.program AS program,
+            s.module AS module,
+            s.action AS action,
+            s.client_identifier AS client_identifier,
             s.schemaname AS db_name,
             s.status AS state,
             CASE s.command
@@ -922,15 +934,29 @@ class OracleEngine:
             s.last_call_et * 1000 AS duration_ms,
             'v$session' AS duration_source,
             s.sql_id AS sql_id,
+            s.prev_sql_id AS prev_sql_id,
+            s.sql_child_number AS sql_child_number,
+            q.plan_hash_value AS plan_hash_value,
             DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
             s.event AS event,
-            s.blocking_session AS blocking_session
-        FROM v$session s
-        LEFT JOIN v$sql q
+            s.wait_class AS wait_class,
+            s.seconds_in_wait AS seconds_in_wait,
+            s.blocking_instance AS blocking_instance,
+            s.blocking_session AS blocking_session,
+            p.pga_used_mem AS pga_used_mem,
+            p.pga_alloc_mem AS pga_alloc_mem,
+            TO_CHAR(s.logon_time, 'YYYY-MM-DD HH24:MI:SS') AS logon_time
+        FROM gv$session s
+        LEFT JOIN gv$process p
+          ON s.paddr = p.addr
+         AND s.inst_id = p.inst_id
+        LEFT JOIN gv$sql q
           ON s.sql_id = q.sql_id
          AND s.sql_child_number = q.child_number
-        LEFT JOIN v$transaction t
+         AND s.inst_id = q.inst_id
+        LEFT JOIN gv$transaction t
           ON s.taddr = t.addr
+         AND s.inst_id = t.inst_id
         WHERE s.type = 'USER'
           AND s.audsid != USERENV('SESSIONID')
         ORDER BY s.last_call_et DESC
@@ -939,14 +965,19 @@ class OracleEngine:
         if rs.is_success:
             return rs
 
-        logger.info("oracle_processlist_vsql_fallback: %s", rs.error)
+        logger.info("oracle_processlist_gv_fallback: %s", rs.error)
         fallback_sql = """
         SELECT
+            CAST(NULL AS NUMBER) AS inst_id,
             s.sid AS session_id,
             s.serial# AS serial,
+            CAST(NULL AS VARCHAR2(64)) AS process_id,
             s.username AS username,
             s.machine AS host,
             s.program AS program,
+            s.module AS module,
+            s.action AS action,
+            s.client_identifier AS client_identifier,
             s.schemaname AS db_name,
             s.status AS state,
             CASE s.command
@@ -972,68 +1003,266 @@ class OracleEngine:
             s.last_call_et * 1000 AS duration_ms,
             'v$session' AS duration_source,
             s.sql_id AS sql_id,
+            s.prev_sql_id AS prev_sql_id,
+            s.sql_child_number AS sql_child_number,
+            q.plan_hash_value AS plan_hash_value,
+            DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
+            s.event AS event,
+            s.wait_class AS wait_class,
+            s.seconds_in_wait AS seconds_in_wait,
+            CAST(NULL AS NUMBER) AS blocking_instance,
+            s.blocking_session AS blocking_session,
+            CAST(NULL AS NUMBER) AS pga_used_mem,
+            CAST(NULL AS NUMBER) AS pga_alloc_mem,
+            TO_CHAR(s.logon_time, 'YYYY-MM-DD HH24:MI:SS') AS logon_time
+        FROM v$session s
+        LEFT JOIN v$sql q
+          ON s.sql_id = q.sql_id
+         AND s.sql_child_number = q.child_number
+        WHERE s.type = 'USER'
+          AND s.audsid != USERENV('SESSIONID')
+        ORDER BY s.last_call_et DESC
+        """
+        fallback_rs = await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
+        if fallback_rs.is_success:
+            fallback_rs.warning = f"GV$ 会话视图不可用，已降级为 V$SESSION：{rs.error}"
+            return fallback_rs
+
+        logger.info("oracle_processlist_vsql_fallback: %s", fallback_rs.error)
+        minimal_sql = """
+        SELECT
+            CAST(NULL AS NUMBER) AS inst_id,
+            s.sid AS session_id,
+            s.serial# AS serial,
+            CAST(NULL AS VARCHAR2(64)) AS process_id,
+            s.username AS username,
+            s.machine AS host,
+            s.program AS program,
+            s.module AS module,
+            s.action AS action,
+            s.client_identifier AS client_identifier,
+            s.schemaname AS db_name,
+            s.status AS state,
+            CASE s.command
+              WHEN 0 THEN ''
+              WHEN 2 THEN 'INSERT'
+              WHEN 3 THEN 'SELECT'
+              WHEN 6 THEN 'UPDATE'
+              WHEN 7 THEN 'DELETE'
+              WHEN 44 THEN 'COMMIT'
+              WHEN 45 THEN 'ROLLBACK'
+              WHEN 47 THEN 'PL/SQL EXECUTE'
+              ELSE TO_CHAR(s.command)
+            END AS command,
+            s.last_call_et AS time_seconds,
+            ROUND((SYSDATE - s.logon_time) * 86400000) AS connection_age_ms,
+            s.last_call_et * 1000 AS state_duration_ms,
+            CASE
+              WHEN s.sql_exec_start IS NOT NULL
+              THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
+              ELSE NULL
+            END AS active_duration_ms,
+            CAST(NULL AS NUMBER) AS transaction_age_ms,
+            s.last_call_et * 1000 AS duration_ms,
+            'v$session' AS duration_source,
+            s.sql_id AS sql_id,
+            s.prev_sql_id AS prev_sql_id,
+            s.sql_child_number AS sql_child_number,
+            CAST(NULL AS NUMBER) AS plan_hash_value,
             CAST(NULL AS VARCHAR2(4000)) AS sql_text,
             s.event AS event,
-            s.blocking_session AS blocking_session
+            s.wait_class AS wait_class,
+            s.seconds_in_wait AS seconds_in_wait,
+            CAST(NULL AS NUMBER) AS blocking_instance,
+            s.blocking_session AS blocking_session,
+            CAST(NULL AS NUMBER) AS pga_used_mem,
+            CAST(NULL AS NUMBER) AS pga_alloc_mem,
+            TO_CHAR(s.logon_time, 'YYYY-MM-DD HH24:MI:SS') AS logon_time
         FROM v$session s
         WHERE s.type = 'USER'
           AND s.audsid != USERENV('SESSIONID')
         ORDER BY s.last_call_et DESC
         """
-        return await asyncio.to_thread(self._run_query_sync, fallback_sql, None)
+        minimal_rs = await asyncio.to_thread(self._run_query_sync, minimal_sql, None)
+        if minimal_rs.is_success:
+            minimal_rs.warning = (
+                "GV$ 或 V$SQL 会话详情不可用，已降级为 V$SESSION 基础字段："
+                f"{rs.error}; {fallback_rs.error}"
+            )
+        return minimal_rs
 
     async def collect_sql_activity(
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
-        sql = """
+        limit = max(1, min(int(limit or 100), 500))
+        min_duration_ms = max(0, int(min_duration_ms or 0))
+        window_minutes = max(1, min(int(window_minutes or 30), 1440))
+        params = {
+            "limit": limit,
+            "min_duration_ms": min_duration_ms,
+            "window_minutes": window_minutes,
+            "date_start": _oracle_datetime_param(start_time),
+            "date_end": _oracle_datetime_param(end_time),
+        }
+        warnings: list[str] = []
+
+        sql_monitor_sql = """
         SELECT *
         FROM (
             SELECT
-                'oracle_activity' AS source,
-                'oracle:' || s.sid || ':' || NVL(s.sql_id, '') AS source_ref,
-                s.schemaname AS db_name,
-                DBMS_LOB.SUBSTR(q.sql_fulltext, 4000, 1) AS sql_text,
-                CASE
-                  WHEN s.sql_exec_start IS NOT NULL
-                  THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
-                  ELSE s.last_call_et * 1000
-                END AS duration_ms,
-                s.username AS username,
-                s.machine AS client_host,
-                s.sql_id AS sql_id,
-                s.event AS event,
-                s.status AS state
-            FROM v$session s
-            LEFT JOIN v$sql q
-              ON s.sql_id = q.sql_id
-             AND s.sql_child_number = q.child_number
-            WHERE s.type = 'USER'
-              AND s.audsid != USERENV('SESSIONID')
-              AND s.sql_id IS NOT NULL
-              AND (
-                CASE
-                  WHEN s.sql_exec_start IS NOT NULL
-                  THEN ROUND((SYSDATE - s.sql_exec_start) * 86400000)
-                  ELSE s.last_call_et * 1000
-                END
-              ) >= :min_duration_ms
-            ORDER BY duration_ms DESC
+                'oracle_sql_monitor' AS source,
+                'oracle:sql_monitor:' || m.inst_id || ':' || m.sql_id || ':'
+                  || NVL(TO_CHAR(m.sql_exec_id), '') || ':'
+                  || TO_CHAR(m.sql_exec_start, 'YYYYMMDDHH24MISS') AS source_ref,
+                m.username AS db_name,
+                SUBSTR(m.sql_text, 1, 4000) AS sql_text,
+                ROUND(m.elapsed_time / 1000) AS duration_ms,
+                ROUND(m.elapsed_time / 1000) AS elapsed_time_ms,
+                ROUND(m.elapsed_time / 1000) AS avg_elapsed_ms,
+                ROUND(m.elapsed_time / 1000) AS avg_duration_ms,
+                ROUND(m.cpu_time / 1000) AS cpu_time_ms,
+                m.username AS username,
+                m.sql_id AS sql_id,
+                m.sql_exec_id AS sql_exec_id,
+                m.sql_exec_start AS occurred_at,
+                m.sql_plan_hash_value AS plan_hash_value,
+                m.status AS status,
+                m.inst_id AS inst_id,
+                m.sid AS session_id,
+                m.session_serial# AS serial,
+                m.process_name AS process_name,
+                m.module AS module,
+                m.action AS action,
+                m.client_identifier AS client_identifier,
+                m.px_servers_requested AS px_servers_requested,
+                m.px_servers_allocated AS px_servers_allocated,
+                m.buffer_gets AS buffer_gets,
+                m.disk_reads AS disk_reads,
+                CAST(NULL AS NUMBER) AS rows_sent
+            FROM gv$sql_monitor m
+            WHERE m.process_name = 'ora'
+              AND m.sql_id IS NOT NULL
+              AND m.sql_exec_start IS NOT NULL
+              AND (:date_start IS NULL OR m.sql_exec_start >= :date_start)
+              AND (:date_end IS NULL OR m.sql_exec_start <= :date_end)
+              AND (:date_start IS NOT NULL OR m.sql_exec_start >= SYSDATE - (:window_minutes / 1440))
+              AND ROUND(m.elapsed_time / 1000) >= :min_duration_ms
+            ORDER BY m.elapsed_time DESC
         )
         WHERE ROWNUM <= :limit
         """
-        rs = await asyncio.to_thread(
-            self._run_query_sync,
-            sql,
-            {"min_duration_ms": int(min_duration_ms), "limit": int(limit)},
-        )
-        if rs.is_success:
+        rs = await asyncio.to_thread(self._run_query_sync, sql_monitor_sql, params)
+        if rs.is_success and rs.rows:
             return rs
+        if rs.error:
+            warnings.append(f"GV$SQL_MONITOR 不可用：{rs.error}")
+
+        awr_sql = """
+        SELECT *
+        FROM (
+            SELECT
+                'oracle_awr_sqlstat' AS source,
+                'oracle:awr_sqlstat:' || h.instance_number || ':' || h.sql_id || ':'
+                  || h.plan_hash_value || ':'
+                  || TO_CHAR(MIN(s.begin_interval_time), 'YYYYMMDDHH24MI') || ':'
+                  || TO_CHAR(MAX(s.end_interval_time), 'YYYYMMDDHH24MI') AS source_ref,
+                MAX(h.parsing_schema_name) AS db_name,
+                MAX(DBMS_LOB.SUBSTR(t.sql_text, 4000, 1)) AS sql_text,
+                ROUND(SUM(h.elapsed_time_delta) / GREATEST(SUM(h.executions_delta), 1) / 1000) AS duration_ms,
+                ROUND(SUM(h.elapsed_time_delta) / 1000) AS elapsed_time_ms,
+                ROUND(SUM(h.elapsed_time_delta) / GREATEST(SUM(h.executions_delta), 1) / 1000) AS avg_elapsed_ms,
+                ROUND(SUM(h.elapsed_time_delta) / GREATEST(SUM(h.executions_delta), 1) / 1000) AS avg_duration_ms,
+                ROUND(SUM(h.cpu_time_delta) / 1000) AS cpu_time_ms,
+                MAX(h.parsing_schema_name) AS username,
+                h.sql_id AS sql_id,
+                CAST(NULL AS NUMBER) AS sql_exec_id,
+                MAX(s.end_interval_time) AS occurred_at,
+                h.plan_hash_value AS plan_hash_value,
+                SUM(h.executions_delta) AS executions,
+                SUM(h.buffer_gets_delta) AS buffer_gets,
+                SUM(h.disk_reads_delta) AS disk_reads,
+                SUM(h.rows_processed_delta) AS rows_sent
+            FROM dba_hist_sqlstat h
+            JOIN dba_hist_snapshot s
+              ON h.snap_id = s.snap_id
+             AND h.dbid = s.dbid
+             AND h.instance_number = s.instance_number
+            LEFT JOIN dba_hist_sqltext t
+              ON h.sql_id = t.sql_id
+             AND h.dbid = t.dbid
+            WHERE h.elapsed_time_delta > 0
+              AND h.sql_id IS NOT NULL
+              AND (:date_start IS NULL OR s.end_interval_time >= :date_start)
+              AND (:date_end IS NULL OR s.begin_interval_time <= :date_end)
+              AND (:date_start IS NOT NULL OR s.end_interval_time >= SYSDATE - (:window_minutes / 1440))
+            GROUP BY h.instance_number, h.sql_id, h.plan_hash_value
+            HAVING ROUND(SUM(h.elapsed_time_delta) / GREATEST(SUM(h.executions_delta), 1) / 1000) >= :min_duration_ms
+            ORDER BY SUM(h.elapsed_time_delta) DESC
+        )
+        WHERE ROWNUM <= :limit
+        """
+        awr_rs = await asyncio.to_thread(self._run_query_sync, awr_sql, params)
+        if awr_rs.is_success and awr_rs.rows:
+            awr_rs.warning = "; ".join(warnings)
+            return awr_rs
+        if awr_rs.error:
+            warnings.append(f"DBA_HIST_SQLSTAT 不可用：{awr_rs.error}")
+
+        cursor_sql = """
+        SELECT *
+        FROM (
+            SELECT
+                'oracle_cursor_cache' AS source,
+                'oracle:cursor_cache:' || inst_id || ':' || sql_id || ':'
+                  || plan_hash_value || ':'
+                  || TO_CHAR(MAX(last_active_time), 'YYYYMMDDHH24MI') AS source_ref,
+                MIN(parsing_schema_name) AS db_name,
+                MAX(DBMS_LOB.SUBSTR(sql_fulltext, 4000, 1)) AS sql_text,
+                ROUND(SUM(elapsed_time) / GREATEST(SUM(executions), 1) / 1000) AS duration_ms,
+                ROUND(SUM(elapsed_time) / 1000) AS elapsed_time_ms,
+                ROUND(SUM(elapsed_time) / GREATEST(SUM(executions), 1) / 1000) AS avg_elapsed_ms,
+                ROUND(SUM(elapsed_time) / GREATEST(SUM(executions), 1) / 1000) AS avg_duration_ms,
+                ROUND(SUM(cpu_time) / 1000) AS cpu_time_ms,
+                MIN(parsing_schema_name) AS username,
+                sql_id AS sql_id,
+                CAST(NULL AS NUMBER) AS sql_exec_id,
+                MAX(last_active_time) AS occurred_at,
+                plan_hash_value AS plan_hash_value,
+                SUM(executions) AS executions,
+                SUM(buffer_gets) AS buffer_gets,
+                SUM(disk_reads) AS disk_reads,
+                SUM(rows_processed) AS rows_sent
+            FROM gv$sql
+            WHERE elapsed_time > 0
+              AND sql_id IS NOT NULL
+              AND sql_text IS NOT NULL
+              AND (:date_start IS NULL OR last_active_time >= :date_start)
+              AND (:date_end IS NULL OR last_active_time <= :date_end)
+              AND (:date_start IS NOT NULL OR last_active_time >= SYSDATE - (:window_minutes / 1440))
+            GROUP BY inst_id, sql_id, plan_hash_value
+            HAVING ROUND(SUM(elapsed_time) / GREATEST(SUM(executions), 1) / 1000) >= :min_duration_ms
+            ORDER BY SUM(elapsed_time) DESC
+        )
+        WHERE ROWNUM <= :limit
+        """
+        cursor_rs = await asyncio.to_thread(self._run_query_sync, cursor_sql, params)
+        if cursor_rs.is_success and cursor_rs.rows:
+            cursor_rs.warning = "; ".join(warnings)
+            return cursor_rs
+        if cursor_rs.error:
+            warnings.append(f"GV$SQL 不可用：{cursor_rs.error}")
 
         fallback = await self.processlist(command_type="ALL")
         if fallback.is_success:
-            fallback.warning = f"v$sql SQL 活动采集不可用，已降级为会话视图：{rs.error}"
+            fallback.warning = (
+                ("; ".join(warnings) + "；" if warnings else "")
+                + "已降级为当前会话 SQL 活动"
+            )
             mapped_rows = [
                 {
                     str(col).lower(): value
@@ -1054,6 +1283,11 @@ class OracleEngine:
                 "sql_id",
                 "event",
                 "state",
+                "inst_id",
+                "session_id",
+                "serial",
+                "wait_class",
+                "seconds_in_wait",
             ]
             fallback.rows = [
                 {
@@ -1069,6 +1303,11 @@ class OracleEngine:
                     "sql_id": row.get("sql_id", "") if isinstance(row, dict) else "",
                     "event": row.get("event", "") if isinstance(row, dict) else "",
                     "state": row.get("state", "") if isinstance(row, dict) else "",
+                    "inst_id": row.get("inst_id", "") if isinstance(row, dict) else "",
+                    "session_id": row.get("session_id", "") if isinstance(row, dict) else "",
+                    "serial": row.get("serial", "") if isinstance(row, dict) else "",
+                    "wait_class": row.get("wait_class", "") if isinstance(row, dict) else "",
+                    "seconds_in_wait": row.get("seconds_in_wait", "") if isinstance(row, dict) else "",
                 }
                 for row in mapped_rows[: int(limit)]
                 if isinstance(row, dict)
@@ -1292,23 +1531,12 @@ class OracleEngine:
         row = fetch_one(
             "version",
             """
-            SELECT banner_full
+            SELECT banner
             FROM v$version
-            WHERE banner_full LIKE 'Oracle Database%'
-               OR banner LIKE 'Oracle Database%'
-            FETCH FIRST 1 ROWS ONLY
+            WHERE banner LIKE 'Oracle Database%'
+              AND ROWNUM = 1
             """,
         )
-        if not row:
-            row = fetch_one(
-                "version",
-                """
-                SELECT banner
-                FROM v$version
-                WHERE banner LIKE 'Oracle Database%'
-                  AND ROWNUM = 1
-                """,
-            )
         if row and row[0]:
             metrics["version"] = {"value": str(row[0])}
 
@@ -1440,31 +1668,140 @@ class OracleEngine:
                 "wait_events",
                 """
                 SELECT event, wait_class, total_waits, time_waited
-                FROM v$system_event
-                WHERE wait_class <> 'Idle'
-                ORDER BY time_waited DESC
-                FETCH FIRST 10 ROWS ONLY
+                FROM (
+                    SELECT event, wait_class, total_waits, time_waited
+                    FROM v$system_event
+                    WHERE wait_class <> 'Idle'
+                    ORDER BY time_waited DESC
+                )
+                WHERE ROWNUM <= 10
+                """,
+            )
+        ]
+        metrics["active_wait_events"] = [
+            {
+                "inst_id": row[0],
+                "event": row[1],
+                "wait_class": row[2],
+                "active_sessions": row[3],
+                "sql_id": row[4],
+                "seconds_in_wait": row[5],
+            }
+            for row in fetch_all(
+                "active_wait_events",
+                """
+                SELECT inst_id, event, wait_class, active_sessions, sql_id, seconds_in_wait
+                FROM (
+                    SELECT
+                        inst_id,
+                        NVL(event, 'ON CPU') AS event,
+                        NVL(wait_class, 'CPU') AS wait_class,
+                        COUNT(*) AS active_sessions,
+                        MAX(sql_id) AS sql_id,
+                        SUM(seconds_in_wait) AS seconds_in_wait
+                    FROM gv$session
+                    WHERE status = 'ACTIVE'
+                      AND type = 'USER'
+                      AND NVL(wait_class, 'CPU') <> 'Idle'
+                    GROUP BY inst_id, NVL(event, 'ON CPU'), NVL(wait_class, 'CPU')
+                    ORDER BY active_sessions DESC, seconds_in_wait DESC
+                )
+                WHERE ROWNUM <= 20
                 """,
             )
         ]
         metrics["blocking_sessions"] = [
             {
-                "sid": row[0],
-                "serial": row[1],
-                "username": row[2],
-                "event": row[3],
-                "blocking_session": row[4],
-                "seconds_in_wait": row[5],
+                "inst_id": row[0],
+                "sid": row[1],
+                "serial": row[2],
+                "username": row[3],
+                "event": row[4],
+                "wait_class": row[5],
+                "blocking_instance": row[6],
+                "blocking_session": row[7],
+                "seconds_in_wait": row[8],
+                "sql_id": row[9],
+                "sql_text": row[10],
             }
             for row in fetch_all(
                 "blocking_sessions",
                 """
-                SELECT sid, serial#, username, event, blocking_session, seconds_in_wait
-                FROM v$session
-                WHERE blocking_session IS NOT NULL
-                   OR event LIKE 'enq:%'
-                ORDER BY seconds_in_wait DESC
-                FETCH FIRST 20 ROWS ONLY
+                SELECT inst_id, sid, serial#, username, event, wait_class,
+                       blocking_instance, blocking_session, seconds_in_wait,
+                       sql_id, sql_text
+                FROM (
+                    SELECT
+                        s.inst_id,
+                        s.sid,
+                        s.serial#,
+                        s.username,
+                        s.event,
+                        s.wait_class,
+                        s.blocking_instance,
+                        s.blocking_session,
+                        s.seconds_in_wait,
+                        s.sql_id,
+                        DBMS_LOB.SUBSTR(q.sql_fulltext, 1000, 1) AS sql_text
+                    FROM gv$session s
+                    LEFT JOIN gv$sql q
+                      ON s.inst_id = q.inst_id
+                     AND s.sql_id = q.sql_id
+                     AND s.sql_child_number = q.child_number
+                    WHERE s.blocking_session IS NOT NULL
+                       OR s.event LIKE 'enq:%'
+                    ORDER BY s.seconds_in_wait DESC
+                )
+                WHERE ROWNUM <= 20
+                """,
+            )
+        ]
+        metrics["long_transactions"] = [
+            {
+                "inst_id": row[0],
+                "session_id": row[1],
+                "serial": row[2],
+                "username": row[3],
+                "client_host": row[4],
+                "sql_id": row[5],
+                "sql_text": row[6],
+                "duration_ms": row[7],
+                "txn_start": row[8],
+                "event": row[9],
+                "blocking_instance": row[10],
+                "blocking_session": row[11],
+            }
+            for row in fetch_all(
+                "long_transactions",
+                """
+                SELECT inst_id, session_id, serial, username, client_host, sql_id,
+                       sql_text, duration_ms, txn_start, event, blocking_instance,
+                       blocking_session
+                FROM (
+                    SELECT
+                        s.inst_id,
+                        s.sid AS session_id,
+                        s.serial# AS serial,
+                        s.username,
+                        s.machine AS client_host,
+                        s.sql_id,
+                        DBMS_LOB.SUBSTR(q.sql_fulltext, 1000, 1) AS sql_text,
+                        ROUND((SYSDATE - t.start_date) * 86400000) AS duration_ms,
+                        TO_CHAR(t.start_date, 'YYYY-MM-DD HH24:MI:SS') AS txn_start,
+                        s.event,
+                        s.blocking_instance,
+                        s.blocking_session
+                    FROM gv$transaction t
+                    JOIN gv$session s
+                      ON s.inst_id = t.inst_id
+                     AND s.taddr = t.addr
+                    LEFT JOIN gv$sql q
+                      ON s.inst_id = q.inst_id
+                     AND s.sql_id = q.sql_id
+                     AND s.sql_child_number = q.child_number
+                    ORDER BY duration_ms DESC
+                )
+                WHERE ROWNUM <= 20
                 """,
             )
         ]
@@ -1512,11 +1849,20 @@ class OracleEngine:
                 "temp_tablespaces",
                 """
                 SELECT
-                    tablespace_name,
-                    used_blocks * block_size AS used_bytes,
-                    tablespace_size * block_size AS total_bytes,
-                    ROUND(used_blocks / NULLIF(tablespace_size, 0) * 100, 2) AS used_pct
-                FROM v$temp_space_header
+                    tf.tablespace_name,
+                    NVL(th.used_bytes, 0) AS used_bytes,
+                    tf.total_bytes AS total_bytes,
+                    ROUND(NVL(th.used_bytes, 0) / NULLIF(tf.total_bytes, 0) * 100, 2) AS used_pct
+                FROM (
+                    SELECT tablespace_name, SUM(bytes) AS total_bytes
+                    FROM dba_temp_files
+                    GROUP BY tablespace_name
+                ) tf
+                LEFT JOIN (
+                    SELECT tablespace_name, SUM(bytes_used) AS used_bytes
+                    FROM v$temp_space_header
+                    GROUP BY tablespace_name
+                ) th ON th.tablespace_name = tf.tablespace_name
                 ORDER BY used_pct DESC
                 """,
             )
@@ -1527,9 +1873,12 @@ class OracleEngine:
                 "top_segments",
                 """
                 SELECT owner, segment_name, segment_type, bytes
-                FROM dba_segments
-                ORDER BY bytes DESC
-                FETCH FIRST 20 ROWS ONLY
+                FROM (
+                    SELECT owner, segment_name, segment_type, bytes
+                    FROM dba_segments
+                    ORDER BY bytes DESC
+                )
+                WHERE ROWNUM <= 20
                 """,
             )
         ]
@@ -1597,15 +1946,67 @@ class OracleEngine:
                     parsing_schema_name,
                     module,
                     executions,
-                    ROUND(elapsed_time / 1000) AS elapsed_time_ms,
-                    ROUND(elapsed_time / NULLIF(executions, 0) / 1000) AS avg_elapsed_ms,
+                    elapsed_time_ms,
+                    avg_elapsed_ms,
                     buffer_gets,
                     disk_reads,
-                    SUBSTR(sql_text, 1, 1000) AS sql_text
-                FROM v$sql
-                WHERE sql_text IS NOT NULL
-                ORDER BY elapsed_time DESC
-                FETCH FIRST 20 ROWS ONLY
+                    sql_text
+                FROM (
+                    SELECT
+                        sql_id,
+                        parsing_schema_name,
+                        module,
+                        executions,
+                        ROUND(elapsed_time / 1000) AS elapsed_time_ms,
+                        ROUND(elapsed_time / NULLIF(executions, 0) / 1000) AS avg_elapsed_ms,
+                        buffer_gets,
+                        disk_reads,
+                        SUBSTR(sql_text, 1, 1000) AS sql_text
+                    FROM v$sql
+                    WHERE sql_text IS NOT NULL
+                    ORDER BY elapsed_time DESC
+                )
+                WHERE ROWNUM <= 20
+                """,
+            )
+        ]
+        metrics["longops"] = [
+            {
+                "inst_id": row[0],
+                "session_id": row[1],
+                "sql_id": row[2],
+                "opname": row[3],
+                "sofar": row[4],
+                "totalwork": row[5],
+                "percent": row[6],
+                "elapsed_seconds": row[7],
+                "time_remaining_seconds": row[8],
+            }
+            for row in fetch_all(
+                "longops",
+                """
+                SELECT inst_id, sid, sql_id, opname, sofar, totalwork, percent,
+                       elapsed_seconds, time_remaining_seconds
+                FROM (
+                    SELECT
+                        inst_id,
+                        sid,
+                        sql_id,
+                        opname,
+                        sofar,
+                        totalwork,
+                        ROUND(sofar * 100 / NULLIF(totalwork, 0)) AS percent,
+                        elapsed_seconds,
+                        CASE
+                          WHEN sofar = 0 THEN 0
+                          ELSE ROUND(elapsed_seconds * (totalwork - sofar) / NULLIF(sofar, 0))
+                        END AS time_remaining_seconds
+                    FROM gv$session_longops
+                    WHERE sofar <> totalwork
+                      AND totalwork > 0
+                    ORDER BY elapsed_seconds DESC
+                )
+                WHERE ROWNUM <= 20
                 """,
             )
         ]
@@ -1625,7 +2026,10 @@ class OracleEngine:
             "connections",
             "stats",
             "wait_events",
+            "active_wait_events",
             "blocking_sessions",
+            "long_transactions",
+            "longops",
             "tablespaces",
             "temp_tablespaces",
             "fra",

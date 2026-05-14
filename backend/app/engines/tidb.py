@@ -392,6 +392,9 @@ class TidbEngine(MysqlEngine):
         self,
         limit: int = 100,
         min_duration_ms: int = 1000,
+        window_minutes: int = 30,
+        start_time: Any | None = None,
+        end_time: Any | None = None,
     ) -> ResultSet:
         limit = self._bounded_int(limit, default=100, minimum=1, maximum=500)
         min_duration_ms = self._bounded_int(
@@ -402,7 +405,7 @@ class TidbEngine(MysqlEngine):
         )
         summary_rs = await self._collect_statement_summary_top_sql(
             limit=limit,
-            window_minutes=30,
+            window_minutes=window_minutes,
             min_duration_ms=min_duration_ms,
         )
         if summary_rs.is_success and summary_rs.rows:
@@ -410,7 +413,7 @@ class TidbEngine(MysqlEngine):
 
         slow_rs = await self._collect_slow_query_top_sql(
             limit=limit,
-            window_minutes=30,
+            window_minutes=window_minutes,
             min_duration_ms=min_duration_ms,
         )
         if slow_rs.is_success and slow_rs.rows:

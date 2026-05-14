@@ -826,9 +826,16 @@ export default function MonitorPage() {
       },
     },
     { title: topSqlHeader('Schema'), width: 110, render: (_: any, row: any) => row.schema_name || row.db_name || '-' },
+    { title: topSqlHeader('状态'), width: 120, render: (_: any, row: any) => row.status || row.state || '-' },
+    { title: topSqlHeader('Exec ID'), width: 120, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.sql_exec_id) },
+    { title: topSqlHeader('Plan Hash'), width: 140, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.plan_hash_value ?? row.sql_plan_hash_value) },
     { title: topSqlHeader('执行次数'), width: 110, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.executions ?? row.count_star) },
     { title: topSqlHeader('总耗时', 'ms'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.elapsed_time_ms ?? row.duration_ms) },
     { title: topSqlHeader('平均耗时', 'ms'), width: 140, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_elapsed_ms ?? row.avg_duration_ms) },
+    { title: topSqlHeader('CPU', 'ms'), width: 120, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.cpu_time_ms) },
+    { title: topSqlHeader('Buffer Gets'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.buffer_gets) },
+    { title: topSqlHeader('Disk Reads'), width: 120, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.disk_reads) },
+    { title: topSqlHeader('PX'), width: 100, align: 'right' as const, render: (_: any, row: any) => row.px_servers_requested || row.px_servers_allocated ? `${row.px_servers_allocated ?? '-'}/${row.px_servers_requested ?? '-'}` : '-' },
     { title: topSqlHeader('Cop 平均耗时', 'ms'), width: 160, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_cop_time_ms) },
     { title: topSqlHeader('平均请求数'), width: 130, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_request_count) },
     { title: topSqlHeader('平均扫描 Keys'), width: 150, align: 'right' as const, render: (_: any, row: any) => formatMetric(row.avg_processed_keys) },
@@ -1182,7 +1189,7 @@ export default function MonitorPage() {
                             </Space>
                           </div>
                           {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
-                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 2340 }} tableLayout="fixed" pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 3050 }} tableLayout="fixed" pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
                           <SqlInsightPanel embedded instanceId={activeId} />
                         </Space>
                       ) : <TableEmptyState title="暂无 SQL 洞察权限" />,

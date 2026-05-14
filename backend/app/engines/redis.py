@@ -261,9 +261,12 @@ class RedisEngine:
                 age_seconds = int(client.get("age") or 0)
                 idle_seconds = int(client.get("idle") or 0)
                 command = str(client.get("cmd") or "")
-                if command_type and command_type.upper() not in {"", "ALL"}:
-                    if command.lower() != command_type.lower():
-                        continue
+                if (
+                    command_type
+                    and command_type.upper() not in {"", "ALL"}
+                    and command.lower() != command_type.lower()
+                ):
+                    continue
                 rows.append(
                     (
                         str(client.get("id") or ""),

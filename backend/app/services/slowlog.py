@@ -71,6 +71,9 @@ SOURCE_LABELS = {
     "tidb_slow_query": "TiDB 慢查询",
     "starrocks_queries": "StarRocks SQL 活动",
     "doris_queries": "Doris SQL 活动",
+    "oracle_sql_monitor": "Oracle SQL Monitor",
+    "oracle_awr_sqlstat": "Oracle AWR SQLStat",
+    "oracle_cursor_cache": "Oracle Cursor Cache",
     "oracle_activity": "Oracle 会话/ASH",
     "mssql_activity": "MSSQL SQL 活动",
     "clickhouse_activity": "ClickHouse SQL 活动",
@@ -106,6 +109,24 @@ def _string(value: Any) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _datetime_value(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not value:
+        return None
+    text = str(value).strip()
+    for parser in (
+        lambda raw: datetime.fromisoformat(raw.replace("Z", "+00:00")),
+        lambda raw: datetime.strptime(raw, "%Y-%m-%d %H:%M:%S"),
+        lambda raw: datetime.strptime(raw, "%Y/%m/%d %H:%M:%S"),
+    ):
+        try:
+            return parser(text)
+        except ValueError:
+            continue
+    return None
 
 
 def row_to_dict(columns: list[str], row: Any) -> dict[str, Any]:
@@ -957,7 +978,7 @@ class SlowLogService:
         if not sql.strip():
             raise AppException("SQL 不能为空", code=422)
         instance = await SlowLogService.get_instance_or_404(db, instance_id, user)
-        if instance.db_type not in {"mysql", "pgsql"}:
+        if instance.db_type not in {"mysql", "pgsql", "oracle"}:
             return SlowQueryExplainResponse(
                 supported=False,
                 db_type=instance.db_type,
@@ -1010,7 +1031,18 @@ class SlowLogService:
             ).hexdigest()
             if item.source != "platform":
                 source_ref = f"{instance.id}:{source_ref}"
-            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "tidb_slow_query", "starrocks_queries", "doris_queries", "oracle_activity"}:
+            if item.source in {
+                "mysql_slowlog",
+                "pgsql_statements",
+                "tidb_statements",
+                "tidb_slow_query",
+                "starrocks_queries",
+                "doris_queries",
+                "oracle_sql_monitor",
+                "oracle_awr_sqlstat",
+                "oracle_cursor_cache",
+                "oracle_activity",
+            }:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
 
             dedupe_key = (item.source, source_ref)
@@ -1253,10 +1285,20 @@ class SlowLogService:
                     db_name=_string(lowered.get("db_name") or lowered.get("db") or lowered.get("datname")),
                     sql_text=sql_text,
                     duration_ms=_as_int(lowered.get("duration_ms") or lowered.get("avg_ms") or lowered.get("mean_exec_time") or lowered.get("duration_us")) // (1000 if lowered.get("duration_us") else 1),
-                    rows_examined=_as_int(lowered.get("rows_examined")),
+                    rows_examined=_as_int(
+                        lowered.get("rows_examined")
+                        or lowered.get("buffer_gets")
+                        or lowered.get("disk_reads")
+                    ),
                     rows_sent=_as_int(lowered.get("rows_sent") or lowered.get("rows")),
                     username=_string(lowered.get("username") or lowered.get("user") or lowered.get("usename")),
                     client_host=_string(lowered.get("client_host") or lowered.get("host")),
+                    occurred_at=_datetime_value(
+                        lowered.get("occurred_at")
+                        or lowered.get("sql_exec_start")
+                        or lowered.get("last_seen")
+                        or lowered.get("last_active_time")
+                    ),
                     raw={k: _string(v) for k, v in raw.items()},
                 )
             )

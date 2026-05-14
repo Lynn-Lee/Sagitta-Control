@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          VERSION="v2.0.1-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          VERSION="v2.1.0-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
           mkdir -p release-record
           cat > release-record/release-version.json <<JSON
           {

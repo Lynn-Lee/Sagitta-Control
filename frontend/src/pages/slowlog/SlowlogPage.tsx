@@ -38,6 +38,9 @@ const SOURCE_OPTIONS = [
   { label: 'TiDB SQL 活动', value: 'tidb_statements' },
   { label: 'StarRocks SQL 活动', value: 'starrocks_queries' },
   { label: 'Doris SQL 活动', value: 'doris_queries' },
+  { label: 'Oracle SQL Monitor', value: 'oracle_sql_monitor' },
+  { label: 'Oracle AWR SQLStat', value: 'oracle_awr_sqlstat' },
+  { label: 'Oracle Cursor Cache', value: 'oracle_cursor_cache' },
   { label: 'Oracle 会话/ASH', value: 'oracle_activity' },
   { label: '会话采样', value: 'session_history' },
 ]
@@ -51,6 +54,9 @@ const SOURCE_COLOR: Record<string, string> = {
   tidb_statements: 'cyan',
   starrocks_queries: 'geekblue',
   doris_queries: 'magenta',
+  oracle_sql_monitor: 'red',
+  oracle_awr_sqlstat: 'gold',
+  oracle_cursor_cache: 'lime',
   oracle_activity: 'volcano',
   session_history: 'purple',
 }
@@ -387,6 +393,20 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       key: 'rows',
       width: 130,
       render: (_, row) => <Text type="secondary">{row.rows_examined || 0} / {row.rows_sent || 0}</Text>,
+    },
+    {
+      title: 'Oracle Monitor',
+      key: 'oracle_monitor',
+      width: 210,
+      render: (_, row) => {
+        const raw = (row.raw || {}) as Record<string, any>
+        const value = [
+          raw.status ? `状态 ${raw.status}` : '',
+          raw.sql_exec_id ? `Exec ${raw.sql_exec_id}` : '',
+          raw.plan_hash_value ? `PHV ${raw.plan_hash_value}` : '',
+        ].filter(Boolean).join(' / ')
+        return value ? <Text ellipsis={{ tooltip: value }}>{value}</Text> : <Text type="secondary">—</Text>
+      },
     },
     {
       title: '标签',
@@ -806,7 +826,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
                   loading={logQuery.isLoading || logQuery.isFetching}
                   size="small"
                   tableLayout="fixed"
-                  scroll={{ x: 1450 }}
+                  scroll={{ x: 1660 }}
                   locale={{ emptyText: <TableEmptyState title="暂无 SQL 样本" /> }}
                   pagination={{
                     current: page,
@@ -1095,7 +1115,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           loading={sampleQuery.isLoading}
           size="small"
           tableLayout="fixed"
-          scroll={{ x: 1350 }}
+          scroll={{ x: 1560 }}
           pagination={false}
         />
       </Modal>

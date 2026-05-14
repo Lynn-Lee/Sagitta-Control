@@ -1130,7 +1130,7 @@ class MonitorService:
         detail = await MonitorService.get_native_detail(db, instance_id, user)
         extra = (detail.get("latest") or {}).get("extra_metrics") or {}
         return {
-            "top_waits": extra.get("wait_events") or extra.get("waits") or [],
+            "top_waits": extra.get("active_wait_events") or extra.get("wait_events") or extra.get("waits") or [],
             "blocking_sessions": extra.get("blocking_sessions") or [],
             "long_transactions": extra.get("long_transactions") or [],
             "missing_groups": (detail.get("latest") or {}).get("missing_groups") or {},
@@ -1159,8 +1159,10 @@ class MonitorService:
             window_minutes = max(1, int((date_end - date_start).total_seconds() // 60) or 1)
         latest = await MonitorService.get_latest_snapshot(db, instance_id)
         extra = (latest or {}).get("extra_metrics") or {}
-        is_tidb = inst.db_type.lower() == "tidb"
-        items = [] if is_tidb else extra.get("top_sql") or []
+        db_type = inst.db_type.lower()
+        is_tidb = db_type == "tidb"
+        is_oracle = db_type == "oracle"
+        items = [] if is_tidb or is_oracle else extra.get("top_sql") or []
         error = ""
         if is_tidb:
             engine = get_engine(inst)
@@ -1180,19 +1182,32 @@ class MonitorService:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
             if not items and extra.get("top_sql"):
                 items = extra.get("top_sql") or []
-        elif not items:
+        elif is_oracle or not items:
             engine = get_engine(inst)
+            tried_activity = False
             if (
-                inst.db_type.lower() in MonitorService.ACTIVITY_TOP_SQL_TYPES
+                db_type in MonitorService.ACTIVITY_TOP_SQL_TYPES
                 and hasattr(engine, "collect_sql_activity")
             ):
-                rs = await engine.collect_sql_activity(limit=limit)
-                error = rs.error
+                tried_activity = True
+                if is_oracle:
+                    rs = await engine.collect_sql_activity(
+                        limit=limit,
+                        min_duration_ms=0,
+                        window_minutes=window_minutes,
+                        start_time=date_start if custom_range else None,
+                        end_time=date_end if custom_range else None,
+                    )
+                else:
+                    rs = await engine.collect_sql_activity(limit=limit)
+                error = rs.error or getattr(rs, "warning", "")
                 if rs.is_success:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
-            elif hasattr(engine, "collect_slow_queries"):
+            if is_oracle and not items and extra.get("top_sql"):
+                items = extra.get("top_sql") or []
+            elif not tried_activity and hasattr(engine, "collect_slow_queries"):
                 rs = await engine.collect_slow_queries(limit=limit)
-                error = rs.error
+                error = rs.error or getattr(rs, "warning", "")
                 if rs.is_success:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
         return {
