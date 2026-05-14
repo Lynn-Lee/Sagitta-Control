@@ -5,7 +5,8 @@ WORKDIR /app
 
 ARG APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
 ARG APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
-ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_DEFAULT_TIMEOUT=120
 ARG SAGITTADB_VERSION=0.0.0
 ARG NUITKA_MODULES=""
 
@@ -29,7 +30,10 @@ RUN set -eux; \
       ca-certificates; \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip config set global.index-url "${PIP_INDEX_URL}" && pip install --no-cache-dir --upgrade pip nuitka
+RUN pip config set global.index-url "${PIP_INDEX_URL}" && \
+    pip config set global.timeout "${PIP_DEFAULT_TIMEOUT}" && \
+    pip config set global.retries 10 && \
+    pip install --no-cache-dir --upgrade pip nuitka
 
 COPY backend/ .
 RUN pip install --no-cache-dir -e .

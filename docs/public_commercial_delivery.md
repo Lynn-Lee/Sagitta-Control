@@ -212,6 +212,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
 - 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`；根 README 保持四产品门户，不由 SagittaDB 发布覆盖。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
+- 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免海外 runner 访问国内镜像源时出现依赖下载超时。
 
 私有仓库需要配置 GitHub Secrets：
 
