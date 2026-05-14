@@ -84,25 +84,41 @@ def test_sql_guards_report_likely_read_keyword_typos(db_type):
     result = get_query_guard(db_type).validate("sselect * from users", "analytics")
 
     assert result.allowed is False
-    assert "SQL 语法可能有误" in result.reason
-    assert "SSELECT" in result.reason
-    assert "是否想输入 SELECT" in result.reason
+    assert "SQL 语法错误" in result.reason
+    assert "是否想输入" not in result.reason
 
 
-def test_sql_guards_report_unknown_prefix_with_supported_read_commands():
-    result = get_query_guard("mysql").validate("foobar * from users", "analytics")
+@pytest.mark.parametrize("sql", ["sselect * from users", "select * form users"])
+def test_sql_guards_report_syntax_errors_before_policy_errors(sql):
+    result = get_query_guard("mysql").validate(sql, "analytics")
 
     assert result.allowed is False
-    assert "仅支持 SELECT/WITH/SHOW/DESC/DESCRIBE/EXPLAIN" in result.reason
-    assert "FOOBAR" in result.reason
+    assert "SQL 语法错误" in result.reason
+    assert "不允许执行" not in result.reason
+    assert "是否想输入" not in result.reason
+
+
+@pytest.mark.parametrize(
+    ("sql", "expected"),
+    [
+        ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作"),
+        ("DROP TABLE users", "在线查询不允许执行 DROP 操作"),
+        ("foobar users", "在线查询不允许执行 FOOBAR 操作"),
+    ],
+)
+def test_sql_guards_report_policy_errors_after_successful_parse(sql, expected):
+    result = get_query_guard("mysql").validate(sql, "analytics")
+
+    assert result.allowed is False
+    assert result.reason == expected
 
 
 def test_cassandra_guard_reports_select_typo():
     result = get_query_guard("cassandra").validate("sselect * from users", "analytics")
 
     assert result.allowed is False
-    assert "CQL 语法可能有误" in result.reason
-    assert "是否想输入 SELECT" in result.reason
+    assert "CQL 语法错误" in result.reason
+    assert "是否想输入" not in result.reason
 
 
 def test_show_create_table_extracts_table_ref():

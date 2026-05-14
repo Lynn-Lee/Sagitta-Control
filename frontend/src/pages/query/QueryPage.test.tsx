@@ -1,10 +1,17 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import QueryPage from './QueryPage'
+import { queryApi } from '@/api/query'
 
 vi.mock('@monaco-editor/react', () => ({
-  default: ({ value }: { value: string }) => <div data-testid="monaco-editor">{value}</div>,
+  default: ({ value, onChange }: { value: string, onChange?: (value: string) => void }) => (
+    <textarea
+      data-testid="monaco-editor"
+      value={value}
+      onChange={(event) => onChange?.(event.currentTarget.value)}
+    />
+  ),
 }))
 
 vi.mock('@/api/query', () => ({
@@ -72,6 +79,10 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 describe('QueryPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders left table browser and bottom ddl preview tab', () => {
     render(<QueryPage />)
 
@@ -83,5 +94,32 @@ describe('QueryPage', () => {
     expect(screen.getByText('简化 DDL')).toBeInTheDocument()
     expect(screen.getByText('原始 DDL')).toBeInTheDocument()
     expect(screen.getByText('从左侧选择一张表后查看预览')).toBeInTheDocument()
+  })
+
+  it('shows backend query guard errors in the result panel', async () => {
+    vi.mocked(queryApi.execute).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { detail: 'SQL 语法错误：无法识别关键字 SSELECT' },
+      },
+    })
+
+    const { container } = render(<QueryPage />)
+    const selectors = container.querySelectorAll('.ant-select-selector')
+
+    fireEvent.mouseDown(selectors[0])
+    fireEvent.click((await within(document.body).findAllByText('MySQL-prod')).pop()!)
+
+    await waitFor(() => expect(selectors[1]).not.toHaveAttribute('aria-disabled', 'true'))
+    fireEvent.mouseDown(selectors[1])
+    fireEvent.click((await within(document.body).findAllByText('demo_db')).pop()!)
+
+    fireEvent.change(screen.getByTestId('monaco-editor'), {
+      target: { value: 'sselect * from users' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /执行/ }))
+
+    expect((await screen.findAllByText('执行失败')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('SQL 语法错误：无法识别关键字 SSELECT').length).toBeGreaterThan(0)
   })
 })
