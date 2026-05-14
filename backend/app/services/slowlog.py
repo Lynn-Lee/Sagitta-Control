@@ -68,6 +68,7 @@ SOURCE_LABELS = {
     "pgsql_statements": "PostgreSQL 统计视图",
     "redis_slowlog": "Redis SLOWLOG",
     "tidb_statements": "TiDB SQL 活动",
+    "tidb_slow_query": "TiDB 慢查询",
     "starrocks_queries": "StarRocks SQL 活动",
     "doris_queries": "Doris SQL 活动",
     "oracle_activity": "Oracle 会话/ASH",
@@ -1009,7 +1010,7 @@ class SlowLogService:
             ).hexdigest()
             if item.source != "platform":
                 source_ref = f"{instance.id}:{source_ref}"
-            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "starrocks_queries", "doris_queries", "oracle_activity"}:
+            if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "tidb_slow_query", "starrocks_queries", "doris_queries", "oracle_activity"}:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
 
             dedupe_key = (item.source, source_ref)

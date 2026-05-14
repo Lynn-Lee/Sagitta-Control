@@ -194,6 +194,127 @@ async def test_get_top_sql_uses_activity_collector_for_starrocks(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_top_sql_uses_tidb_top_sql_collector(monkeypatch):
+    instance = SimpleNamespace(id=29, db_type="tidb")
+    engine = SimpleNamespace(
+        collect_top_sql=AsyncMock(
+            return_value=SimpleNamespace(
+                is_success=True,
+                error="",
+                column_list=[],
+                rows=[
+                    {
+                        "source_ref": "tidb:top_sql:d1",
+                        "db_name": "test",
+                        "sql_text": "select * from orders",
+                        "executions": 2,
+                        "elapsed_time_ms": 800,
+                        "avg_elapsed_ms": 400,
+                    }
+                ],
+            )
+        ),
+        collect_sql_activity=AsyncMock(),
+        collect_slow_queries=AsyncMock(),
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: instance))
+    )
+    monkeypatch.setattr(MonitorService, "check_privilege", AsyncMock(return_value=True))
+    monkeypatch.setattr(MonitorService, "get_latest_snapshot", AsyncMock(return_value=None))
+    monkeypatch.setattr("app.engines.registry.get_engine", lambda _instance: engine)
+
+    result = await MonitorService.get_top_sql(db, 29, {"is_superuser": True}, limit=5)
+
+    engine.collect_top_sql.assert_awaited_once_with(limit=5, window_minutes=30)
+    engine.collect_sql_activity.assert_not_awaited()
+    engine.collect_slow_queries.assert_not_awaited()
+    assert result["error"] == ""
+    assert result["window_minutes"] == 30
+    assert result["items"][0]["avg_elapsed_ms"] == 400
+
+
+@pytest.mark.asyncio
+async def test_get_top_sql_passes_tidb_window_minutes(monkeypatch):
+    instance = SimpleNamespace(id=30, db_type="tidb")
+    engine = SimpleNamespace(
+        collect_top_sql=AsyncMock(
+            return_value=SimpleNamespace(
+                is_success=True,
+                error="",
+                column_list=[],
+                rows=[{"source_ref": "tidb:top_sql:d2", "sql_text": "select 1"}],
+            )
+        ),
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: instance))
+    )
+    monkeypatch.setattr(MonitorService, "check_privilege", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        MonitorService,
+        "get_latest_snapshot",
+        AsyncMock(return_value={"extra_metrics": {"top_sql": [{"source_ref": "cached"}]}}),
+    )
+    monkeypatch.setattr("app.engines.registry.get_engine", lambda _instance: engine)
+
+    result = await MonitorService.get_top_sql(
+        db,
+        30,
+        {"is_superuser": True},
+        limit=5,
+        window_minutes=60,
+    )
+
+    engine.collect_top_sql.assert_awaited_once_with(limit=5, window_minutes=60)
+    assert result["window_minutes"] == 60
+    assert result["items"][0]["source_ref"] == "tidb:top_sql:d2"
+
+
+@pytest.mark.asyncio
+async def test_get_top_sql_passes_tidb_custom_time_range(monkeypatch):
+    instance = SimpleNamespace(id=31, db_type="tidb")
+    engine = SimpleNamespace(
+        collect_top_sql=AsyncMock(
+            return_value=SimpleNamespace(
+                is_success=True,
+                error="",
+                column_list=[],
+                rows=[{"source_ref": "tidb:top_sql:d3", "sql_text": "select 2"}],
+            )
+        ),
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: instance))
+    )
+    date_start = datetime(2026, 5, 14, 10, 0, tzinfo=UTC)
+    date_end = datetime(2026, 5, 14, 10, 45, tzinfo=UTC)
+    monkeypatch.setattr(MonitorService, "check_privilege", AsyncMock(return_value=True))
+    monkeypatch.setattr(MonitorService, "get_latest_snapshot", AsyncMock(return_value=None))
+    monkeypatch.setattr("app.engines.registry.get_engine", lambda _instance: engine)
+
+    result = await MonitorService.get_top_sql(
+        db,
+        31,
+        {"is_superuser": True},
+        limit=5,
+        window_minutes=30,
+        date_start=date_start,
+        date_end=date_end,
+    )
+
+    engine.collect_top_sql.assert_awaited_once_with(
+        limit=5,
+        window_minutes=45,
+        start_time=date_start,
+        end_time=date_end,
+    )
+    assert result["window_minutes"] == 45
+    assert result["date_start"] == "2026-05-14T10:00:00+00:00"
+    assert result["date_end"] == "2026-05-14T10:45:00+00:00"
+
+
+@pytest.mark.asyncio
 async def test_unified_collect_config_list_uses_accessible_instances(monkeypatch):
     instances = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
     monkeypatch.setattr(MonitorService, "_accessible_instances", AsyncMock(return_value=instances))

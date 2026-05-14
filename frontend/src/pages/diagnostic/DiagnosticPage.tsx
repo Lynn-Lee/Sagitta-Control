@@ -34,6 +34,18 @@ const renderDuration = (value?: number | null) => {
   const numeric = durationValue(value)
   return numeric === null ? '-' : numeric.toLocaleString()
 }
+const renderBytes = (value?: number | string | null) => {
+  const numeric = durationValue(value)
+  if (numeric === null) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = numeric
+  let idx = 0
+  while (size >= 1024 && idx < units.length - 1) {
+    size /= 1024
+    idx += 1
+  }
+  return `${size.toFixed(idx === 0 ? 0 : 2)} ${units[idx]}`
+}
 const renderCommandTag = (value?: string | null) => {
   if (!value) return '-'
   return (
@@ -111,6 +123,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     [instanceData?.items, instanceId],
   )
   const isOracle = selectedInstance?.db_type === 'oracle'
+  const isTidb = selectedInstance?.db_type === 'tidb'
 
   const { data: processData, isLoading: processLoading, refetch } = useQuery({
     queryKey: ['processlist', instanceId],
@@ -164,8 +177,17 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
   const sessionColumns: ColumnsType<SessionItem> = [
     { title: '会话ID', dataIndex: 'session_id', width: 110, fixed: 'left' },
     { title: 'Serial', dataIndex: 'serial', width: 90 },
+    ...(isTidb ? [
+      { title: 'TiDB 节点', dataIndex: 'tidb_instance', width: 190, ellipsis: true },
+      { title: '资源组', dataIndex: 'resource_group', width: 110, ellipsis: true },
+    ] as ColumnsType<SessionItem> : []),
     { title: '用户', dataIndex: 'username', width: 120, ellipsis: true },
     { title: '来源', dataIndex: 'host', width: 170, ellipsis: true },
+    ...(isTidb ? [
+      { title: 'TiDB 内存', dataIndex: 'mem_bytes', width: 110, render: renderBytes },
+      { title: 'TiDB 磁盘', dataIndex: 'disk_bytes', width: 110, render: renderBytes },
+      { title: 'TxnStart', dataIndex: 'txn_start', width: 170, ellipsis: true },
+    ] as ColumnsType<SessionItem> : []),
     { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
     { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
@@ -234,6 +256,8 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     { title: '来源', dataIndex: 'source', width: 110, render: (v) => <Tag>{v}</Tag> },
     { title: '错误', dataIndex: 'collect_error', width: 220, ellipsis: true },
   ]
+  const sessionTableScrollX = isTidb ? 2800 : 2100
+  const historyTableScrollX = isTidb ? 3150 : 2450
 
   const applyHistoryFilters = (values: any) => {
     const range = values.range as [Dayjs, Dayjs] | undefined
@@ -333,7 +357,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
                   loading={processLoading}
                   size="small"
                   tableLayout="fixed"
-                  scroll={{ x: 2100 }}
+                  scroll={{ x: sessionTableScrollX }}
                   locale={{ emptyText: <TableEmptyState title={instanceId ? '暂无会话' : '请先选择实例'} /> }}
                   pagination={{ pageSize: 50, showSizeChanger: false }}
                 />
@@ -423,9 +447,9 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
                     dataSource={historyQuery.data?.items ?? []}
                     columns={historyColumns}
                     loading={historyQuery.isLoading || historyQuery.isFetching}
-                    size="small"
-                    tableLayout="fixed"
-                    scroll={{ x: 2450 }}
+                      size="small"
+                      tableLayout="fixed"
+                      scroll={{ x: historyTableScrollX }}
                     locale={{ emptyText: <TableEmptyState title="暂无历史会话" /> }}
                     pagination={{
                       current: historyPage,

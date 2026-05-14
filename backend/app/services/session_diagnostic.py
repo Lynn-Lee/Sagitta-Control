@@ -40,6 +40,12 @@ _ONLINE_COLUMNS = [
     "sql_text",
     "event",
     "blocking_session",
+    "tidb_instance",
+    "digest",
+    "mem_bytes",
+    "disk_bytes",
+    "txn_start",
+    "resource_group",
 ]
 
 
@@ -101,6 +107,13 @@ def _optional_duration_ms(raw: dict[str, Any], *keys: str) -> int | None:
     return max(0, int(round(value)))
 
 
+def _optional_int(raw: dict[str, Any], *keys: str) -> int | None:
+    value = _pick(raw, *keys)
+    if value in (None, ""):
+        return None
+    return _int(value)
+
+
 def row_to_dict(columns: list[str], row: Any) -> dict[str, Any]:
     if isinstance(row, dict):
         return {str(k): v for k, v in row.items()}
@@ -156,9 +169,17 @@ def normalize_session_row(
     item.duration_ms = item.state_duration_ms or 0
     item.time_seconds = item.duration_ms // 1000
     item.sql_id = _string(_pick(raw, "sql_id", "query_id"))
+    item.digest = _string(_pick(raw, "digest"))
+    if not item.sql_id and item.digest:
+        item.sql_id = item.digest
     item.sql_text = _string(_pick(raw, "sql_text", "sql_fulltext", "query", "info"))
     item.event = _string(_pick(raw, "event"))
     item.blocking_session = _string(_pick(raw, "blocking_session"))
+    item.tidb_instance = _string(_pick(raw, "tidb_instance", "instance"))
+    item.mem_bytes = _optional_int(raw, "mem_bytes", "mem")
+    item.disk_bytes = _optional_int(raw, "disk_bytes", "disk")
+    item.txn_start = _string(_pick(raw, "txn_start", "txnstart"))
+    item.resource_group = _string(_pick(raw, "resource_group"))
 
     if not item.command and db_type == "pgsql":
         item.command = "Query"
@@ -442,8 +463,10 @@ class SessionDiagnosticService:
             )
         ).scalars().all()
 
-        return total, [
-            SessionItem(
+        items: list[SessionItem] = []
+        for row in rows:
+            raw = row.raw or {}
+            item = SessionItem(
                 instance_id=row.instance_id,
                 instance_name=row.instance_name,
                 db_type=row.db_type,
@@ -469,10 +492,18 @@ class SessionDiagnosticService:
                 collected_at=row.collected_at,
                 source=row.source,
                 collect_error=row.collect_error,
-                raw=row.raw or {},
+                raw=raw,
             )
-            for row in rows
-        ]
+            item.tidb_instance = _string(_pick(raw, "tidb_instance", "instance"))
+            item.digest = _string(_pick(raw, "digest"))
+            if not item.sql_id and item.digest:
+                item.sql_id = item.digest
+            item.mem_bytes = _optional_int(raw, "mem_bytes", "mem")
+            item.disk_bytes = _optional_int(raw, "disk_bytes", "disk")
+            item.txn_start = _string(_pick(raw, "txn_start", "txnstart"))
+            item.resource_group = _string(_pick(raw, "resource_group"))
+            items.append(item)
+        return total, items
 
     @staticmethod
     async def cleanup_old_snapshots(
