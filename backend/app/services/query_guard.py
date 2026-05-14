@@ -93,7 +93,189 @@ def _read_command_syntax_reason(prefix: str, sql: str, tree: exp.Expression) -> 
     return ""
 
 
-def _incomplete_statement_reason(prefix: str, tree: exp.Expression) -> str:
+def _statement_body(prefix: str, sql: str) -> str:
+    return re.sub(rf"^\s*{re.escape(prefix)}\b", "", sql, count=1, flags=re.I).strip()
+
+
+def _balanced_delimiters(sql: str) -> bool:
+    stack: list[str] = []
+    quote = ""
+    escape = False
+    pairs = {")": "(", "]": "["}
+    for char in sql:
+        if quote:
+            if escape:
+                escape = False
+                continue
+            if char == "\\":
+                escape = True
+                continue
+            if char == quote:
+                quote = ""
+            continue
+        if char in {"'", '"', "`"}:
+            quote = char
+        elif char in {"(", "["}:
+            stack.append(char)
+        elif char in pairs and (not stack or stack.pop() != pairs[char]):
+            return False
+    return not quote and not stack
+
+
+def _basic_syntax_reason(sql: str) -> str:
+    if not _balanced_delimiters(sql):
+        return "SQL 语法错误：括号或引号不匹配"
+    if re.search(r",\s*\)", sql):
+        return "SQL 语法错误：逗号后缺少表达式"
+    if re.search(r"(?:=|<>|!=|<=|>=|<|>|\+|-|/|\|\||&&)\s*$", sql):
+        return "SQL 语法错误：运算符后缺少表达式"
+    return ""
+
+
+def _manual_write_syntax_reason(prefix: str, sql: str) -> tuple[bool, str]:
+    """Cover write statements sqlglot parses loosely or does not parse by dialect."""
+    body = _statement_body(prefix, sql)
+    if prefix == "replace":
+        if not body or re.fullmatch(r"into", body, re.I):
+            return True, "SQL 语法错误：REPLACE 语句缺少目标表"
+        if not re.search(r"\b(?:values?|set|select)\b", body, re.I):
+            return True, "SQL 语法错误：REPLACE 语句缺少 VALUES、SET 或 SELECT 内容"
+        return True, ""
+    if prefix == "grant":
+        if not body:
+            return True, "SQL 语法错误：GRANT 语句缺少授权内容"
+        if not re.search(r"\bto\s+\S+", body, re.I):
+            return True, "SQL 语法错误：GRANT 语句缺少授权对象"
+        return True, ""
+    if prefix == "revoke":
+        if not body:
+            return True, "SQL 语法错误：REVOKE 语句缺少回收内容"
+        if not re.search(r"\bfrom\s+\S+", body, re.I):
+            return True, "SQL 语法错误：REVOKE 语句缺少回收对象"
+        return True, ""
+    if prefix == "rename":
+        if not body or re.fullmatch(r"table", body, re.I):
+            return True, "SQL 语法错误：RENAME 语句缺少目标对象"
+        if re.fullmatch(r"table\s+\S+", body, re.I):
+            return True, "SQL 语法错误：RENAME 语句缺少新对象名"
+        if not re.fullmatch(r"table\s+\S+\s+to\s+\S+(?:\s*,\s*\S+\s+to\s+\S+)*", body, re.I):
+            return True, "SQL 语法错误：RENAME 语句格式不完整"
+        return True, ""
+    if prefix == "set":
+        if not body:
+            return True, "SQL 语法错误：SET 语句缺少配置项"
+        if re.search(r"(?:=|\bto)\s*$", body, re.I):
+            return True, "SQL 语法错误：SET 语句缺少配置值"
+        if not re.search(r"[=]", body) and not re.fullmatch(r"\S+\s+(?:to\s+)?\S+.*", body, re.I):
+            return True, "SQL 语法错误：SET 语句缺少配置值"
+        return True, ""
+    if prefix in {"call", "exec", "execute"}:
+        if not body:
+            return True, f"SQL 语法错误：{prefix.upper()} 语句缺少调用目标"
+        return True, ""
+    if prefix == "use":
+        if not body:
+            return True, "SQL 语法错误：USE 语句缺少目标数据库"
+        return True, ""
+    if prefix == "lock":
+        if not body:
+            return True, "SQL 语法错误：LOCK 语句缺少目标对象"
+        if re.fullmatch(r"tables?\s+\S+", body, re.I):
+            return True, "SQL 语法错误：LOCK TABLES 语句缺少锁模式"
+        return True, ""
+    if prefix == "unlock":
+        if not body:
+            return True, "SQL 语法错误：UNLOCK 语句缺少目标对象"
+        return True, ""
+    if prefix == "copy":
+        if not body or not re.search(r"\b(?:to|from)\b\s+\S+", body, re.I):
+            return True, "SQL 语法错误：COPY 语句缺少 TO/FROM 目标"
+        return True, ""
+    return False, ""
+
+
+def _has_like_property(tree: exp.Expression) -> bool:
+    properties = tree.args.get("properties")
+    expressions = getattr(properties, "expressions", None) or []
+    return any(isinstance(item, exp.LikeProperty) for item in expressions)
+
+
+def _ast_error_reason(tree: exp.Expression) -> str:
+    for node in tree.walk():
+        current = node[0] if isinstance(node, tuple) else node
+        if not isinstance(current, exp.Expression):
+            continue
+        errors = current.error_messages()
+        if errors:
+            return f"SQL 语义错误：{sanitize_sqlglot_error(errors[0])}"
+    return ""
+
+
+def _create_table_semantic_reason(tree: exp.Create) -> str:
+    kind = str(tree.args.get("kind") or "").upper()
+    if kind != "TABLE" or not isinstance(tree.this, exp.Schema):
+        return ""
+    for item in tree.this.expressions:
+        if isinstance(item, exp.ColumnDef):
+            if not item.args.get("kind"):
+                return "SQL 语义错误：CREATE TABLE 列定义缺少数据类型"
+            continue
+        if isinstance(
+            item,
+            (
+                exp.PrimaryKey,
+                exp.UniqueColumnConstraint,
+                exp.ForeignKey,
+                exp.CheckColumnConstraint,
+            ),
+        ):
+            continue
+        return "SQL 语义错误：CREATE TABLE 表结构定义不合法"
+    return ""
+
+
+def _alter_table_semantic_reason(tree: exp.Expression) -> str:
+    if tree.__class__.__name__ not in {"Alter", "AlterTable"}:
+        return ""
+    for action in tree.args.get("actions") or []:
+        if isinstance(action, exp.ColumnDef) and not action.args.get("kind"):
+            return "SQL 语义错误：ALTER TABLE 列定义缺少数据类型"
+        if isinstance(action, exp.Identifier):
+            return "SQL 语义错误：ALTER TABLE 变更动作不完整"
+    return ""
+
+
+def _insert_semantic_reason(tree: exp.Insert) -> str:
+    expression = tree.args.get("expression")
+    if not isinstance(expression, exp.Values):
+        return ""
+    rows = [row for row in expression.expressions if isinstance(row, exp.Tuple)]
+    if not rows:
+        return ""
+    row_lengths = [len(row.expressions) for row in rows]
+    if len(set(row_lengths)) > 1:
+        return "SQL 语义错误：INSERT 每行 VALUES 数量不一致"
+    target = tree.this
+    columns = target.expressions if isinstance(target, exp.Schema) else []
+    if columns and row_lengths[0] != len(columns):
+        return "SQL 语义错误：INSERT 列数量和值数量不一致"
+    return ""
+
+
+def _semantic_validation_reason(prefix: str, tree: exp.Expression) -> str:
+    ast_reason = _ast_error_reason(tree)
+    if ast_reason:
+        return ast_reason
+    if prefix == "insert" and isinstance(tree, exp.Insert):
+        return _insert_semantic_reason(tree)
+    if prefix == "create" and isinstance(tree, exp.Create):
+        return _create_table_semantic_reason(tree)
+    if prefix == "alter":
+        return _alter_table_semantic_reason(tree)
+    return ""
+
+
+def _syntax_validation_reason(prefix: str, sql: str, tree: exp.Expression) -> str:
     if prefix in {"select", "with"} and isinstance(tree, exp.Select) and not tree.expressions:
         return "SQL 语法错误：SELECT 语句缺少查询字段"
     if prefix == "update" and isinstance(tree, exp.Update):
@@ -111,20 +293,68 @@ def _incomplete_statement_reason(prefix: str, tree: exp.Expression) -> str:
         )
         if not has_payload:
             return "SQL 语法错误：INSERT 语句缺少 VALUES 或 SELECT 内容"
+    if prefix == "replace" and isinstance(tree, exp.Command):
+        _, reason = _manual_write_syntax_reason(prefix, sql)
+        if reason:
+            return reason
     if prefix == "delete" and isinstance(tree, exp.Delete) and not tree.this:
         return "SQL 语法错误：DELETE 语句缺少目标表"
+    if prefix == "create" and isinstance(tree, exp.Create):
+        kind = str(tree.args.get("kind") or "").upper()
+        if not tree.this:
+            return "SQL 语法错误：CREATE 语句缺少目标对象"
+        if kind == "TABLE":
+            has_column_defs = isinstance(tree.this, exp.Schema) and bool(tree.this.expressions)
+            if not has_column_defs and not tree.args.get("expression") and not _has_like_property(tree):
+                return "SQL 语法错误：CREATE TABLE 语句缺少列定义或 AS/LIKE 子句"
+        if kind == "VIEW" and not tree.args.get("expression"):
+            return "SQL 语法错误：CREATE VIEW 语句缺少 AS SELECT 子句"
+        if kind in {"FUNCTION", "PROCEDURE"} and not (
+            tree.args.get("expression") or tree.args.get("begin") or tree.args.get("end")
+        ):
+            return f"SQL 语法错误：CREATE {kind} 语句缺少定义体"
     if prefix == "drop" and isinstance(tree, exp.Drop) and not tree.this:
         return "SQL 语法错误：DROP 语句缺少目标对象"
+    if prefix in {"create", "drop"} and isinstance(tree, exp.Command):
+        command_expr = str(tree.args.get("expression") or "").strip()
+        if not command_expr or re.fullmatch(
+            r"(?:database|function|index|procedure|role|schema|sequence|table|trigger|user|view)",
+            command_expr,
+            re.I,
+        ):
+            return f"SQL 语法错误：{prefix.upper()} 语句缺少目标对象"
+        if prefix == "create" and re.fullmatch(r"(?:function|procedure|trigger)\s+\S+", command_expr, re.I):
+            return "SQL 语法错误：CREATE 语句缺少定义体"
     if prefix == "alter" and tree.__class__.__name__ in {"Alter", "AlterTable"}:
         if not tree.this:
             return "SQL 语法错误：ALTER 语句缺少目标对象"
         if not tree.args.get("actions"):
             return "SQL 语法错误：ALTER 语句缺少变更动作"
+    if prefix == "alter" and isinstance(tree, exp.Command):
+        command_expr = str(tree.args.get("expression") or "").strip()
+        if not command_expr:
+            return "SQL 语法错误：ALTER 语句缺少目标对象"
+        if re.fullmatch(r"table", command_expr, re.I):
+            return "SQL 语法错误：ALTER 语句缺少目标对象"
+        if re.fullmatch(r"(?:\w+\s+)?\S+", command_expr, re.I):
+            return "SQL 语法错误：ALTER 语句缺少变更动作"
+        if re.fullmatch(r"(?:table\s+)?\S+\s+rename(?:\s+to)?", command_expr, re.I):
+            return "SQL 语法错误：ALTER RENAME 语句缺少新对象名"
+        if re.fullmatch(r"table\s+\S+\s+add(?:\s+column)?", command_expr, re.I):
+            return "SQL 语法错误：ALTER ADD COLUMN 语句缺少列定义"
     if prefix == "truncate" and isinstance(tree, exp.TruncateTable) and not tree.expressions:
         return "SQL 语法错误：TRUNCATE 语句缺少目标表"
-    if prefix in {"create", "drop"} and isinstance(tree, exp.Command):
+    if prefix == "truncate" and re.fullmatch(r"\s*truncate(?:\s+table)?\s*", sql, re.I):
+        return "SQL 语法错误：TRUNCATE 语句缺少目标表"
+    if prefix == "rename" and re.fullmatch(r"\s*rename(?:\s+table)?\s*", sql, re.I):
+        return "SQL 语法错误：RENAME 语句缺少目标对象"
+    if prefix in {"grant", "revoke", "set", "call", "exec", "execute", "use", "lock", "unlock", "copy"}:
+        _, reason = _manual_write_syntax_reason(prefix, sql)
+        if reason:
+            return reason
+    if prefix in WRITE_PREFIXES and isinstance(tree, exp.Column) and tree.name.lower() == prefix:
         return f"SQL 语法错误：{prefix.upper()} 语句不完整"
-    if prefix == "alter" and re.match(r"^\s*alter\s+table\s+\S+\s*$", tree.sql(), re.I):
+    if prefix == "alter" and re.match(r"^\s*alter\s+table\s+\S+\s*$", sql, re.I):
         return "SQL 语法错误：ALTER 语句缺少变更动作"
     return ""
 
@@ -142,6 +372,14 @@ class SqlQueryGuard:
             return QueryGuardResult(False, "SQL 不能为空")
 
         prefix = _first_word(normalized)
+        basic_syntax_reason = _basic_syntax_reason(normalized)
+        if basic_syntax_reason:
+            return QueryGuardResult(
+                False,
+                basic_syntax_reason,
+                prefix,
+                normalized_sql=normalized,
+            )
         try:
             parsed_statements = [
                 statement
@@ -149,6 +387,21 @@ class SqlQueryGuard:
                 if statement is not None
             ]
         except sqlglot.errors.SqlglotError as exc:
+            has_manual_syntax, manual_reason = _manual_write_syntax_reason(prefix, normalized)
+            if has_manual_syntax:
+                if manual_reason:
+                    return QueryGuardResult(
+                        False,
+                        manual_reason,
+                        prefix,
+                        normalized_sql=normalized,
+                    )
+                return QueryGuardResult(
+                    False,
+                    f"在线查询不允许执行 {prefix.upper()} 操作",
+                    prefix,
+                    normalized_sql=normalized,
+                )
             return QueryGuardResult(
                 False,
                 f"SQL 语法错误：{sanitize_sqlglot_error(str(exc))}",
@@ -232,11 +485,19 @@ class SqlQueryGuard:
                     kind,
                     normalized_sql=normalized,
                 )
-            incomplete_reason = _incomplete_statement_reason(target_prefix, tree)
-            if incomplete_reason:
+            syntax_reason = _syntax_validation_reason(target_prefix, parse_sql, tree)
+            if syntax_reason:
                 return QueryGuardResult(
                     False,
-                    incomplete_reason,
+                    syntax_reason,
+                    kind,
+                    normalized_sql=normalized,
+                )
+            semantic_reason = _semantic_validation_reason(target_prefix, tree)
+            if semantic_reason:
+                return QueryGuardResult(
+                    False,
+                    semantic_reason,
                     kind,
                     normalized_sql=normalized,
                 )
@@ -248,11 +509,19 @@ class SqlQueryGuard:
                     normalized_sql=normalized,
                 )
 
-        incomplete_reason = _incomplete_statement_reason(prefix, tree)
-        if incomplete_reason:
+        syntax_reason = _syntax_validation_reason(prefix, normalized, tree)
+        if syntax_reason:
             return QueryGuardResult(
                 False,
-                incomplete_reason,
+                syntax_reason,
+                prefix,
+                normalized_sql=normalized,
+            )
+        semantic_reason = _semantic_validation_reason(prefix, tree)
+        if semantic_reason:
+            return QueryGuardResult(
+                False,
+                semantic_reason,
                 prefix,
                 normalized_sql=normalized,
             )

@@ -103,9 +103,38 @@ def test_sql_guards_report_likely_read_keyword_typos(db_type):
         "explain analyze select",
         "update sagitta_observe_events",
         "insert into sagitta_observe_events",
+        "replace",
+        "replace into sagitta_observe_events",
+        "create table sagitta_observe_events (id int,)",
         "drop",
         "create",
+        "create table sagitta_observe_events",
+        "create view sagitta_observe_events_view",
+        "create function refresh_events",
+        "drop user",
+        "alter",
+        "alter sagitta_observe_events rename",
+        "alter table sagitta_observe_events",
+        "alter table sagitta_observe_events rename",
         "alter table users",
+        "alter user bob",
+        "rename",
+        "rename table sagitta_observe_events",
+        "grant",
+        "grant select on sagitta_observe_events",
+        "grant select on sagitta_observe_events to",
+        "revoke",
+        "revoke select on sagitta_observe_events",
+        "set search_path =",
+        "set",
+        "set search_path",
+        "use",
+        "call refresh_events(",
+        "call",
+        "execute",
+        "alter table sagitta_observe_events add column",
+        "lock tables sagitta_observe_events",
+        "unlock",
         "foobar users",
     ],
 )
@@ -119,11 +148,50 @@ def test_sql_guards_report_syntax_errors_before_policy_errors(sql):
 
 
 @pytest.mark.parametrize(
+    "sql",
+    [
+        "insert into users (id, name) values (1)",
+        "insert into users values (1), (1, 2)",
+        "create table users (id)",
+        "create table users (id int, name)",
+        "alter table users add column name",
+        "alter table users add column name, add column age int",
+    ],
+)
+def test_sql_guards_report_semantic_errors_before_policy_errors(sql):
+    result = get_query_guard("mysql").validate(sql, "analytics")
+
+    assert result.allowed is False
+    assert "SQL 语义错误" in result.reason
+    assert "不允许执行" not in result.reason
+
+
+@pytest.mark.parametrize(
     ("sql", "expected"),
     [
         ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作"),
+        ("INSERT INTO users VALUES (1)", "在线查询不允许执行 INSERT 操作"),
+        ("REPLACE INTO users VALUES (1)", "在线查询不允许执行 REPLACE 操作"),
+        ("DELETE FROM users", "在线查询不允许执行 DELETE 操作"),
+        ("CREATE TABLE users (id int)", "在线查询不允许执行 CREATE 操作"),
+        ("CREATE VIEW user_view AS SELECT id FROM users", "在线查询不允许执行 CREATE 操作"),
+        ("CREATE USER bob", "在线查询不允许执行 CREATE 操作"),
         ("DROP TABLE users", "在线查询不允许执行 DROP 操作"),
         ("ANALYZE TABLE users", "在线查询不允许执行 ANALYZE 操作"),
+        (
+            "ALTER TABLE sagitta_observe_events RENAME TO sagitta_observe_events_bak",
+            "在线查询不允许执行 ALTER 操作",
+        ),
+        ("ALTER USER bob IDENTIFIED BY x", "在线查询不允许执行 ALTER 操作"),
+        ("RENAME TABLE old_users TO new_users", "在线查询不允许执行 RENAME 操作"),
+        ("GRANT SELECT ON users TO bob", "在线查询不允许执行 GRANT 操作"),
+        ("REVOKE SELECT ON users FROM bob", "在线查询不允许执行 REVOKE 操作"),
+        ("SET search_path = private", "在线查询不允许执行 SET 操作"),
+        ("USE analytics", "在线查询不允许执行 USE 操作"),
+        ("CALL refresh_users()", "在线查询不允许执行 CALL 操作"),
+        ("EXECUTE refresh_stmt", "在线查询不允许执行 EXECUTE 操作"),
+        ("LOCK TABLES users READ", "在线查询不允许执行 LOCK 操作"),
+        ("UNLOCK TABLES", "在线查询不允许执行 UNLOCK 操作"),
     ],
 )
 def test_sql_guards_report_policy_errors_after_successful_parse(sql, expected):
