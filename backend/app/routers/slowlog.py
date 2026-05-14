@@ -297,17 +297,20 @@ async def collect_slow_logs(
         instances = [inst for inst in result.scalars().all() if SlowLogService.can_access_instance(user, inst)]
 
     for inst in instances:
+        inst_id = inst.id
+        inst_name = inst.instance_name
         try:
             cfg = await SlowLogService.ensure_default_config(db, inst, user)
             count, err = await SlowLogService.collect_instance(db, inst, limit=limit, since=since, config=cfg)
             saved += count
             if err:
                 failed += 1
-                errors.append(f"{inst.instance_name}: {err}")
+                errors.append(f"{inst_name}: {err}")
         except Exception as exc:
+            await db.rollback()
             failed += 1
-            logger.warning("slowlog_collect_failed instance_id=%s error=%s", inst.id, exc)
-            errors.append(f"{inst.instance_name}: {exc}")
+            logger.warning("slowlog_collect_failed instance_id=%s error=%s", inst_id, exc)
+            errors.append(f"{inst_name}: {exc}")
 
     return {
         "instances": len(instances),

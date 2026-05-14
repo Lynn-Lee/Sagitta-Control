@@ -4,10 +4,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 
 from app.engines.models import ResultSet
 from app.models.slowlog import SlowQueryLog
-from app.schemas.slowlog import SlowQueryConfigUpdate, SlowQueryConfigUpsert
+from app.schemas.slowlog import SlowQueryConfigUpdate, SlowQueryConfigUpsert, SlowQueryEngineRow
 from app.services.slowlog import (
     SlowLogService,
     analyze_sql,
@@ -384,6 +385,52 @@ async def test_collect_instance_passes_config_threshold_to_engine(monkeypatch):
     assert (count, err) == (1, "")
     engine.collect_slow_queries.assert_awaited_once()
     assert engine.collect_slow_queries.await_args.kwargs["min_duration_ms"] == 1
+
+
+@pytest.mark.asyncio
+async def test_save_engine_rows_deduplicates_repeated_source_refs_before_insert():
+    captured: dict[str, object] = {}
+
+    async def fake_execute(stmt):
+        compiled = stmt.compile(dialect=postgresql.dialect())
+        captured["sql"] = str(compiled)
+        captured["params"] = compiled.params
+        return SimpleNamespace(rowcount=1)
+
+    db = SimpleNamespace(execute=AsyncMock(side_effect=fake_execute), commit=AsyncMock())
+    instance = SimpleNamespace(id=3, db_type="pgsql", instance_name="PostgreSQL16-Test", db_name="test")
+    occurred_at = datetime(2026, 5, 14, 1, 59, tzinfo=UTC)
+    rows = [
+        SlowQueryEngineRow(
+            source="pgsql_statements",
+            source_ref="-11391618518959119",
+            db_name="test",
+            sql_text="SELECT pg_sleep($1)",
+            duration_ms=1102,
+            rows_sent=1,
+            raw={},
+            occurred_at=occurred_at,
+        ),
+        SlowQueryEngineRow(
+            source="pgsql_statements",
+            source_ref="-11391618518959119",
+            db_name="test",
+            sql_text="SELECT pg_sleep($1)",
+            duration_ms=1051,
+            rows_sent=98,
+            raw={},
+            occurred_at=occurred_at,
+        ),
+    ]
+
+    saved = await SlowLogService.save_engine_rows(db, instance, rows)
+
+    assert saved == 1
+    assert "ON CONFLICT ON CONSTRAINT uq_slowlog_source_ref DO NOTHING" in captured["sql"]
+    source_ref_keys = [key for key in captured["params"] if key.startswith("source_ref_m")]
+    assert len(source_ref_keys) == 1
+    assert captured["params"][source_ref_keys[0]] == "3:-11391618518959119:202605140159"
+    db.commit.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import String, cast, delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -996,8 +997,9 @@ class SlowLogService:
         instance: Instance,
         rows: list[SlowQueryEngineRow],
     ) -> int:
-        saved = 0
         now = datetime.now(UTC)
+        seen_refs: set[tuple[str, str]] = set()
+        values: list[dict[str, Any]] = []
         for item in rows:
             fingerprint, fingerprint_text = normalize_sql_fingerprint(item.sql_text)
             occurred = item.occurred_at or now
@@ -1009,33 +1011,31 @@ class SlowLogService:
                 source_ref = f"{instance.id}:{source_ref}"
             if item.source in {"mysql_slowlog", "pgsql_statements", "tidb_statements", "starrocks_queries", "doris_queries", "oracle_activity"}:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
-            exists = await db.execute(
-                select(SlowQueryLog.id).where(
-                    SlowQueryLog.source == item.source,
-                    SlowQueryLog.source_ref == source_ref,
-                )
-            )
-            if exists.scalar_one_or_none():
+
+            dedupe_key = (item.source, source_ref)
+            if dedupe_key in seen_refs:
                 continue
-            db.add(
-                SlowQueryLog(
-                    source=item.source,
-                    source_ref=source_ref,
-                    instance_id=instance.id,
-                    instance_name=instance.instance_name,
-                    db_type=instance.db_type,
-                    db_name=item.db_name or instance.db_name or "",
-                    sql_text=item.sql_text,
-                    sql_fingerprint=fingerprint,
-                    fingerprint_text=fingerprint_text,
-                    duration_ms=item.duration_ms,
-                    rows_examined=item.rows_examined,
-                    rows_sent=item.rows_sent,
-                    username=item.username,
-                    client_host=item.client_host,
-                    occurred_at=occurred,
-                    raw=item.raw,
-                    analysis_tags=analyze_sql(
+            seen_refs.add(dedupe_key)
+
+            values.append(
+                {
+                    "source": item.source,
+                    "source_ref": source_ref,
+                    "instance_id": instance.id,
+                    "instance_name": instance.instance_name,
+                    "db_type": instance.db_type,
+                    "db_name": item.db_name or instance.db_name or "",
+                    "sql_text": item.sql_text,
+                    "sql_fingerprint": fingerprint,
+                    "fingerprint_text": fingerprint_text,
+                    "duration_ms": item.duration_ms,
+                    "rows_examined": item.rows_examined,
+                    "rows_sent": item.rows_sent,
+                    "username": item.username,
+                    "client_host": item.client_host,
+                    "occurred_at": occurred,
+                    "raw": item.raw,
+                    "analysis_tags": analyze_sql(
                         item.sql_text,
                         db_type=instance.db_type,
                         rows_examined=item.rows_examined,
@@ -1043,12 +1043,20 @@ class SlowLogService:
                         duration_ms=item.duration_ms,
                         source=item.source,
                     ),
-                )
+                }
             )
-            saved += 1
-        if saved:
-            await db.commit()
-        return saved
+        if not values:
+            return 0
+
+        stmt = (
+            pg_insert(SlowQueryLog)
+            .values(values)
+            .on_conflict_do_nothing(constraint="uq_slowlog_source_ref")
+        )
+        result = await db.execute(stmt)
+        await db.commit()
+        rowcount = getattr(result, "rowcount", None)
+        return rowcount if isinstance(rowcount, int) and rowcount >= 0 else len(values)
 
     @staticmethod
     def _source_message(sources: list[str]) -> str:
