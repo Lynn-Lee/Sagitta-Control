@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -170,6 +171,8 @@ async def test_tidb_processlist_prefers_cluster_processlist(monkeypatch):
     assert "INSTANCE AS instance" in calls[0]
     assert "TIME * 1000 AS state_duration_ms" in calls[0]
     assert "TIME * 1000 AS duration_ms" in calls[0]
+    assert "DIGEST AS sql_id" in calls[0]
+    assert "active_duration_ms" in calls[0]
     assert "COMMAND != 'Sleep'" not in calls[0]
 
 
@@ -193,6 +196,149 @@ async def test_tidb_processlist_falls_back_to_local_processlist(monkeypatch):
     assert "information_schema.CLUSTER_PROCESSLIST" in calls[0]
     assert "information_schema.PROCESSLIST" in calls[1]
     assert "已降级为本节点 PROCESSLIST" in rs.warning
+
+
+@pytest.mark.asyncio
+async def test_tidb_collect_top_sql_uses_summary_history_and_fixed_percentages(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        return ResultSet(
+            column_list=[
+                "source",
+                "source_ref",
+                "executions",
+                "elapsed_time_ms",
+                "avg_elapsed_ms",
+                "sql_text",
+                "pkey_pct",
+            ],
+            rows=[
+                {
+                    "source": "tidb_statements",
+                    "source_ref": "tidb:top_sql:d1:202605141000",
+                    "executions": 3,
+                    "elapsed_time_ms": 900,
+                    "avg_elapsed_ms": 300,
+                    "sql_text": "select * from t",
+                    "pkey_pct": 29,
+                }
+            ],
+        )
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.collect_top_sql(limit=7, window_minutes=30)
+
+    assert rs.is_success
+    assert rs.rows[0]["pkey_pct"] == 29
+    assert "information_schema.CLUSTER_STATEMENTS_SUMMARY" in calls[0]
+    assert "information_schema.CLUSTER_STATEMENTS_SUMMARY_HISTORY" in calls[0]
+    assert "COALESCE(sqlstat.processed_keys, 0) / NULLIF(totals.total_processed_keys, 0)" in calls[0]
+    assert "if(pkey is null" not in calls[0].lower()
+    assert "LIMIT 7" in calls[0]
+
+
+@pytest.mark.asyncio
+async def test_tidb_collect_top_sql_falls_back_to_slow_query(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    calls: list[str] = []
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        calls.append(sql)
+        if "CLUSTER_STATEMENTS_SUMMARY" in sql:
+            return ResultSet()
+        return ResultSet(
+            column_list=["source", "sql_text", "avg_elapsed_ms"],
+            rows=[{"source": "tidb_slow_query", "sql_text": "select slow", "avg_elapsed_ms": 1200}],
+        )
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.collect_top_sql(limit=5)
+
+    assert rs.is_success
+    assert len(calls) == 2
+    assert "information_schema.CLUSTER_SLOW_QUERY" in calls[1]
+    assert "AND LOWER(Query) NOT LIKE 'analyze%'" in calls[1]
+    assert "AND LOWER(Query) NOT LIKE 'alter%'" in calls[1]
+    assert rs.rows[0]["source"] == "tidb_slow_query"
+
+
+@pytest.mark.asyncio
+async def test_tidb_collect_top_sql_reports_permission_fallback_errors(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+
+    async def fake_query(self, db_name, sql, limit_num=0, parameters=None, **kwargs):
+        if "CLUSTER_STATEMENTS_SUMMARY" in sql:
+            return ResultSet(error="access denied for statement summary")
+        return ResultSet(error="access denied for slow query")
+
+    monkeypatch.setattr(TidbEngine, "query", fake_query)
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    rs = await engine.collect_top_sql()
+
+    assert not rs.is_success
+    assert "CLUSTER_STATEMENTS_SUMMARY 不可用" in rs.error
+    assert "CLUSTER_SLOW_QUERY 不可用" in rs.error
+
+
+@pytest.mark.asyncio
+async def test_tidb_collect_metrics_adds_enhanced_extra_metrics(monkeypatch):
+    monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)
+    monkeypatch.setattr(
+        MysqlEngine,
+        "collect_metrics",
+        AsyncMock(return_value={"health": {"up": 1}, "stats": {"qps": 1}}),
+    )
+    monkeypatch.setattr(
+        TidbEngine,
+        "collect_waits",
+        AsyncMock(
+            return_value=ResultSet(
+                column_list=["row_type", "session_id"],
+                rows=[
+                    {"row_type": "blocking_session", "session_id": 10},
+                    {"row_type": "long_transaction", "session_id": 11},
+                ],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        TidbEngine,
+        "collect_token_usage",
+        AsyncMock(
+            return_value=ResultSet(
+                column_list=["instance", "token_usage"],
+                rows=[{"instance": "tidb:10080", "token_usage": 0.2}],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        TidbEngine,
+        "collect_top_sql",
+        AsyncMock(
+            return_value=ResultSet(
+                column_list=["sql_text", "executions"],
+                rows=[{"sql_text": "select 1", "executions": 1}],
+            )
+        ),
+    )
+    engine = TidbEngine(_Instance(db_type="tidb"))
+
+    raw = await engine.collect_metrics()
+
+    assert raw["blocking_sessions"] == [{"row_type": "blocking_session", "session_id": 10}]
+    assert raw["long_transactions"] == [{"row_type": "long_transaction", "session_id": 11}]
+    assert raw["token_usage"][0]["token_usage"] == 0.2
+    assert raw["top_sql"][0]["sql_text"] == "select 1"
+    assert raw["stats"]["lock_waits"] == 1
+    assert raw["stats"]["long_transactions"] == 1
 
 
 @pytest.mark.asyncio

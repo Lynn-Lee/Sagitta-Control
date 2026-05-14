@@ -1153,7 +1153,13 @@ class MonitorService:
         error = ""
         if not items:
             engine = get_engine(inst)
-            if (
+            collect_top_sql = getattr(engine, "collect_top_sql", None)
+            if inst.db_type.lower() == "tidb" and callable(collect_top_sql):
+                rs = await collect_top_sql(limit=limit)
+                error = rs.error
+                if rs.is_success:
+                    items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
+            elif (
                 inst.db_type.lower() in MonitorService.ACTIVITY_TOP_SQL_TYPES
                 and hasattr(engine, "collect_sql_activity")
             ):
