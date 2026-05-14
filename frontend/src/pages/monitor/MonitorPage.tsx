@@ -793,11 +793,21 @@ export default function MonitorPage() {
   const waitColumns = [
     { title: '事件/会话', width: 220, render: (_: any, row: any) => row.event || row.sid || row.session_id || row.blocked_session || '-' },
     { title: '等待类别', width: 140, render: (_: any, row: any) => row.wait_class || row.row_type || '-' },
+    { title: '事务ID', width: 180, render: (_: any, row: any) => row.trx_id || '-' },
     { title: '等待次数/Keys', width: 130, render: (_: any, row: any) => formatMetric(row.total_waits ?? row.key_count) },
     { title: '等待时间', width: 120, render: (_: any, row: any) => formatMetric(row.time_waited ?? row.seconds_in_wait ?? row.duration_ms) },
     { title: '阻塞源', width: 120, render: (_: any, row: any) => formatMetric(row.blocking_session ?? row.holding_trx_id) },
     { title: '用户', width: 140, render: (_: any, row: any) => row.username || '-' },
     { title: 'SQL', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text }}>{row.sql_text || row.sql_id || '-'}</Text> },
+  ]
+
+  const tokenUsageColumns = [
+    { title: 'TiDB 节点', dataIndex: 'instance', width: 220 },
+    { title: '活跃会话', dataIndex: 'active_sessions', width: 120, render: (value: any) => formatMetric(value) },
+    { title: 'Sleep 会话', dataIndex: 'sleep_sessions', width: 120, render: (value: any) => formatMetric(value) },
+    { title: '总会话', dataIndex: 'total_sessions', width: 110, render: (value: any) => formatMetric(value) },
+    { title: 'Token Limit', dataIndex: 'token_limit', width: 120, render: (value: any) => formatMetric(value) },
+    { title: 'Token 使用率', dataIndex: 'token_usage_pct', width: 130, render: (value: any) => formatMetric(value, '%') },
   ]
 
   const growthColumns = [
@@ -1035,6 +1045,12 @@ export default function MonitorPage() {
                       children: canViewSessions ? (
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                           <Alert type="info" showIcon message="会话洞察" description="在线会话、阻塞链、历史会话和 Oracle ASH/AWR 均使用当前实例上下文。" />
+                          {(active?.db_type || detail?.instance?.db_type) === 'tidb' && (
+                            <div>
+                              <Title level={5} style={{ marginTop: 0 }}>TiDB Token 使用率</Title>
+                              <Table dataSource={engineDetail?.metric_groups?.token_usage || []} columns={tokenUsageColumns} rowKey={(row: any, index) => `${row.instance || 'token'}-${index}`} scroll={{ x: 820 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无 Token 使用率数据" /> }} />
+                            </div>
+                          )}
                           <div>
                             <Title level={5} style={{ marginTop: 0 }}>阻塞会话</Title>
                             <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />

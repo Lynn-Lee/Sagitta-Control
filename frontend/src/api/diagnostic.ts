@@ -23,6 +23,12 @@ export interface SessionItem {
   sql_text: string
   event: string
   blocking_session: string
+  tidb_instance?: string
+  digest?: string
+  mem_bytes?: number | null
+  disk_bytes?: number | null
+  txn_start?: string
+  resource_group?: string
   collected_at?: string | null
   source: string
   collect_error?: string

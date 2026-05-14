@@ -198,6 +198,45 @@ async def test_tidb_processlist_falls_back_to_local_processlist(monkeypatch):
     assert "已降级为本节点 PROCESSLIST" in rs.warning
 
 
+def test_normalize_tidb_processlist_row_exposes_tidb_fields():
+    inst = _Instance(db_type="tidb")
+    item = normalize_session_row(
+        instance=inst,
+        columns=[
+            "instance",
+            "session_id",
+            "username",
+            "sql_id",
+            "digest",
+            "mem",
+            "disk",
+            "txn_start",
+            "resource_group",
+            "sql_text",
+        ],
+        row=(
+            "tidb85-tidb:10080",
+            42,
+            "app",
+            "",
+            "digest-1",
+            2048,
+            4096,
+            "2026-05-14 10:00:00",
+            "rg_app",
+            "select 1",
+        ),
+    )
+
+    assert item.tidb_instance == "tidb85-tidb:10080"
+    assert item.sql_id == "digest-1"
+    assert item.digest == "digest-1"
+    assert item.mem_bytes == 2048
+    assert item.disk_bytes == 4096
+    assert item.txn_start == "2026-05-14 10:00:00"
+    assert item.resource_group == "rg_app"
+
+
 @pytest.mark.asyncio
 async def test_tidb_collect_top_sql_uses_summary_history_and_fixed_percentages(monkeypatch):
     monkeypatch.setattr("app.engines.mysql.decrypt_field", lambda value: value)

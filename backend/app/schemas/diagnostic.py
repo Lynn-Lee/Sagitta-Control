@@ -29,6 +29,12 @@ class SessionItem(BaseModel):
     sql_text: str = ""
     event: str = ""
     blocking_session: str = ""
+    tidb_instance: str = ""
+    digest: str = ""
+    mem_bytes: int | None = None
+    disk_bytes: int | None = None
+    txn_start: str = ""
+    resource_group: str = ""
     collected_at: datetime | None = None
     source: str = "online"
     collect_error: str = ""
