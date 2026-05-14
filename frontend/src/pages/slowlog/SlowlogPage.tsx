@@ -73,6 +73,30 @@ const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD
 const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
 const TREND_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
 
+const renderSourceTag = (source?: string) => {
+  const value = source || ''
+  const label = sourceLabel(value)
+  return (
+    <Tooltip title={label}>
+      <Tag
+        color={SOURCE_COLOR[value] || 'default'}
+        style={{
+          boxSizing: 'border-box',
+          display: 'inline-block',
+          marginInlineEnd: 0,
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          verticalAlign: 'middle',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </Tag>
+    </Tooltip>
+  )
+}
+
 function buildTrendRows(groups: SlowQueryGroupTrend[], metric: 'count' | 'avg_duration_ms') {
   const buckets = Array.from(new Set(groups.flatMap(group => group.points.map(point => point.bucket)))).sort()
   return buckets.map(bucket => {
@@ -330,16 +354,16 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
     {
       title: '来源',
       dataIndex: 'source',
-      width: 110,
-      render: (v: string) => <Tag color={SOURCE_COLOR[v] || 'default'}>{sourceLabel(v)}</Tag>,
+      width: 150,
+      render: renderSourceTag,
     },
     {
       title: '实例 / 数据库',
       key: 'target',
-      width: 220,
+      width: 240,
       render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Text strong ellipsis style={{ maxWidth: 190 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
+        <Space direction="vertical" size={0} style={{ minWidth: 0, width: '100%' }}>
+          <Text strong ellipsis style={{ maxWidth: '100%' }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>{formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}</Text>
         </Space>
       ),
@@ -1071,7 +1095,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           loading={sampleQuery.isLoading}
           size="small"
           tableLayout="fixed"
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1350 }}
           pagination={false}
         />
       </Modal>
