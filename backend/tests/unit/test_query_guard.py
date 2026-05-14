@@ -79,6 +79,32 @@ def test_sql_guards_reject_write_or_side_effect_statements(db_type, sql):
     assert result.reason
 
 
+@pytest.mark.parametrize("db_type", ["mysql", "tidb", "pgsql", "oracle", "mssql", "starrocks"])
+def test_sql_guards_report_likely_read_keyword_typos(db_type):
+    result = get_query_guard(db_type).validate("sselect * from users", "analytics")
+
+    assert result.allowed is False
+    assert "SQL 语法可能有误" in result.reason
+    assert "SSELECT" in result.reason
+    assert "是否想输入 SELECT" in result.reason
+
+
+def test_sql_guards_report_unknown_prefix_with_supported_read_commands():
+    result = get_query_guard("mysql").validate("foobar * from users", "analytics")
+
+    assert result.allowed is False
+    assert "仅支持 SELECT/WITH/SHOW/DESC/DESCRIBE/EXPLAIN" in result.reason
+    assert "FOOBAR" in result.reason
+
+
+def test_cassandra_guard_reports_select_typo():
+    result = get_query_guard("cassandra").validate("sselect * from users", "analytics")
+
+    assert result.allowed is False
+    assert "CQL 语法可能有误" in result.reason
+    assert "是否想输入 SELECT" in result.reason
+
+
 def test_show_create_table_extracts_table_ref():
     result = get_query_guard("mysql").validate("SHOW CREATE TABLE users", "analytics")
 

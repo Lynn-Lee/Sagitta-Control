@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from difflib import get_close_matches
 from typing import Any, Protocol
 
 import sqlglot
@@ -68,6 +69,26 @@ class QueryGuard(Protocol):
 
 
 UNSUPPORTED_ENGINES: set[str] = set()
+READ_COMMANDS = ("SELECT", "WITH", "SHOW", "DESC", "DESCRIBE", "EXPLAIN")
+
+
+def _read_keyword_suggestion(prefix: str, candidates: tuple[str, ...] = READ_COMMANDS) -> str | None:
+    if not prefix:
+        return None
+    matches = get_close_matches(prefix.upper(), candidates, n=1, cutoff=0.76)
+    return matches[0] if matches else None
+
+
+def _unsupported_read_prefix_reason(prefix: str) -> str:
+    current = prefix.upper() or "UNKNOWN"
+    supported = "/".join(READ_COMMANDS)
+    suggestion = _read_keyword_suggestion(prefix)
+    if suggestion:
+        return (
+            f"SQL 语法可能有误：无法识别关键字 {current}，"
+            f"是否想输入 {suggestion}？在线查询仅支持 {supported} 等只读语句。"
+        )
+    return f"在线查询仅支持 {supported} 等只读语句，当前关键字为 {current}。"
 
 
 class SqlQueryGuard:
@@ -102,7 +123,7 @@ class SqlQueryGuard:
         if prefix not in READ_PREFIXES:
             return QueryGuardResult(
                 False,
-                f"在线查询只允许只读语句，不支持 {prefix.upper() or 'UNKNOWN'}",
+                _unsupported_read_prefix_reason(prefix),
                 prefix,
                 normalized_sql=normalized,
             )
@@ -241,9 +262,17 @@ class CassandraQueryGuard:
                 normalized_sql=normalized,
             )
         if prefix != "select":
+            current = prefix.upper() or "UNKNOWN"
+            suggestion = _read_keyword_suggestion(prefix, ("SELECT",))
+            reason = (
+                f"CQL 语法可能有误：无法识别关键字 {current}，是否想输入 SELECT？"
+                "Cassandra 在线查询只允许 SELECT。"
+                if suggestion
+                else f"Cassandra 在线查询只允许 SELECT，当前关键字为 {current}。"
+            )
             return QueryGuardResult(
                 False,
-                f"Cassandra 在线查询只允许 SELECT，不支持 {prefix.upper() or 'UNKNOWN'}",
+                reason,
                 prefix,
                 normalized_sql=normalized,
             )
