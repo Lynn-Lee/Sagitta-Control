@@ -104,6 +104,8 @@ app.include_router(instance.router,   prefix=f"{API_V1}/instances",  tags=["实�
 app.include_router(workflow.router,   prefix=f"{API_V1}/workflow",   tags=["SQL 工单"])
 app.include_router(query.router,      prefix=f"{API_V1}/query",      tags=["在线查询"])
 app.include_router(query_priv.router, prefix=f"{API_V1}/query",      tags=["查询权限"])
+app.include_router(query.router,      prefix=f"{API_V1}/sql-exec",   tags=["在线查询"])
+app.include_router(query_priv.router, prefix=f"{API_V1}/sql-exec",   tags=["查询权限"])
 app.include_router(slowlog.router,    prefix=f"{API_V1}/slowlog",    tags=["慢日志"])
 app.include_router(slowlog.router,    prefix=f"{API_V1}/sql-analysis", tags=["SQL 洞察"])
 app.include_router(diagnostic.router, prefix=f"{API_V1}/diagnostic", tags=["会话诊断"])

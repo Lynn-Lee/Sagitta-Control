@@ -53,14 +53,14 @@ export const queryApi = {
     db_name: string
     sql: string
     limit_num?: number
-  }) => apiClient.post<QueryResult>('/query/', data).then(r => r.data),
+  }) => apiClient.post<QueryResult>('/sql-exec/', data).then(r => r.data),
 
   explainAccess: (data: {
     instance_id: number
     db_name: string
     sql: string
     limit_num?: number
-  }) => apiClient.post<QueryAccessExplanation>('/query/access-check/', data).then(r => r.data),
+  }) => apiClient.post<QueryAccessExplanation>('/sql-exec/access-check/', data).then(r => r.data),
 
   exportResult: async (
     data: {
@@ -73,7 +73,7 @@ export const queryApi = {
     },
     exportFormat: 'xlsx' | 'csv',
   ) => {
-    const response = await apiClient.post('/query/export/', data, {
+    const response = await apiClient.post('/sql-exec/export/', data, {
       params: { export_format: exportFormat },
       responseType: 'blob',
     })
@@ -94,14 +94,14 @@ export const queryApi = {
     date_end?: string
     page?: number
     page_size?: number
-  }) => apiClient.get<QueryLogListResponse>('/query/logs/', { params }).then(r => r.data),
+  }) => apiClient.get<QueryLogListResponse>('/sql-exec/logs/', { params }).then(r => r.data),
 
   toggleFavorite: (log_id: number) =>
-    apiClient.post(`/query/logs/${log_id}/favorite/`).then(r => r.data),
+    apiClient.post(`/sql-exec/logs/${log_id}/favorite/`).then(r => r.data),
 
   // 查询权限
   listPrivileges: (instance_id?: number) =>
-    apiClient.get('/query/privileges/', { params: { instance_id } }).then(r => r.data),
+    apiClient.get('/sql-exec/privileges/', { params: { instance_id } }).then(r => r.data),
 
   listManagePrivileges: (params?: {
     page?: number
@@ -110,7 +110,7 @@ export const queryApi = {
     user_id?: number
     db_name?: string
     status?: 'active' | 'revoked'
-  }) => apiClient.get('/query/privileges/manage/', { params }).then(r => r.data),
+  }) => apiClient.get('/sql-exec/privileges/manage/', { params }).then(r => r.data),
 
   applyPrivilege: (data: {
     title: string
@@ -125,7 +125,7 @@ export const queryApi = {
     priv_type?: number
     apply_reason?: string
     risk_remark?: string
-  }) => apiClient.post('/query/privileges/apply/', data).then(r => r.data),
+  }) => apiClient.post('/sql-exec/privileges/apply/', data).then(r => r.data),
 
   privilegeRiskPlan: (data: {
     title: string
@@ -140,20 +140,20 @@ export const queryApi = {
     priv_type?: number
     apply_reason?: string
     risk_remark?: string
-  }) => apiClient.post<{ status: number; risk_plan: RiskPlan }>('/query/privileges/risk-plan/', data).then(r => r.data),
+  }) => apiClient.post<{ status: number; risk_plan: RiskPlan }>('/sql-exec/privileges/risk-plan/', data).then(r => r.data),
 
   listApplies: (params?: { status?: number; page?: number; page_size?: number }) =>
-    apiClient.get('/query/privileges/applies/', { params }).then(r => r.data),
+    apiClient.get('/sql-exec/privileges/applies/', { params }).then(r => r.data),
 
   listAuditRecords: (params?: { status?: number; page?: number; page_size?: number }) =>
-    apiClient.get('/query/privileges/audit-records/', { params }).then(r => r.data),
+    apiClient.get('/sql-exec/privileges/audit-records/', { params }).then(r => r.data),
 
   auditApply: (apply_id: number, data: { action: 'pass' | 'reject'; remark?: string; valid_date?: string }) =>
-    apiClient.post('/query/privileges/audit/', data, { params: { apply_id } }).then(r => r.data),
+    apiClient.post('/sql-exec/privileges/audit/', data, { params: { apply_id } }).then(r => r.data),
 
   cancelApply: (apply_id: number) =>
-    apiClient.post(`/query/privileges/applies/${apply_id}/cancel/`).then(r => r.data),
+    apiClient.post(`/sql-exec/privileges/applies/${apply_id}/cancel/`).then(r => r.data),
 
   revokePrivilege: (priv_id: number, data?: { reason?: string }) =>
-    apiClient.delete(`/query/privileges/${priv_id}/`, { data: data || {} }).then(r => r.data),
+    apiClient.delete(`/sql-exec/privileges/${priv_id}/`, { data: data || {} }).then(r => r.data),
 }
