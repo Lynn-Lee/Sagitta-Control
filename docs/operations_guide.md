@@ -341,7 +341,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `2.1.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.1.1`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

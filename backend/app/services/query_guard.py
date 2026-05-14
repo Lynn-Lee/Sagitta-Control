@@ -71,12 +71,39 @@ class QueryGuard(Protocol):
 UNSUPPORTED_ENGINES: set[str] = set()
 
 
+def _unknown_keyword_reason(prefix: str) -> str:
+    return f"SQL 语法错误：无法识别关键字 {prefix.upper() or 'UNKNOWN'}"
+
+
+def _read_command_syntax_reason(prefix: str, sql: str, tree: exp.Expression) -> str:
+    if prefix == "show":
+        if re.fullmatch(r"\s*show\s*", sql, re.I):
+            return "SQL 语法错误：SHOW 语句缺少查询对象"
+        if re.match(r"^\s*show\s+create\s+table\s*$", sql, re.I):
+            return "SQL 语法错误：SHOW CREATE TABLE 语句缺少目标表"
+        if re.match(r"^\s*show\s+(?:full\s+)?columns\s+from\s*$", sql, re.I):
+            return "SQL 语法错误：SHOW COLUMNS 语句缺少目标表"
+        if re.match(r"^\s*show\s+index(?:es)?\s+from\s*$", sql, re.I):
+            return "SQL 语法错误：SHOW INDEX 语句缺少目标表"
+        command_expr = tree.args.get("expression")
+        if isinstance(tree, exp.Command) and not str(command_expr or "").strip():
+            return "SQL 语法错误：SHOW 语句缺少查询对象"
+    if prefix in {"desc", "describe"} and not re.match(r"^\s*(?:desc|describe)\s+\S+", sql, re.I):
+        return "SQL 语法错误：DESCRIBE 语句缺少目标对象"
+    return ""
+
+
 def _incomplete_statement_reason(prefix: str, tree: exp.Expression) -> str:
     if prefix in {"select", "with"} and isinstance(tree, exp.Select) and not tree.expressions:
         return "SQL 语法错误：SELECT 语句缺少查询字段"
-    if prefix == "update" and isinstance(tree, exp.Update) and not tree.expressions:
-        return "SQL 语法错误：UPDATE 语句缺少 SET 子句"
+    if prefix == "update" and isinstance(tree, exp.Update):
+        if not tree.this:
+            return "SQL 语法错误：UPDATE 语句缺少目标表"
+        if not tree.expressions:
+            return "SQL 语法错误：UPDATE 语句缺少 SET 子句"
     if prefix == "insert" and isinstance(tree, exp.Insert):
+        if not tree.this:
+            return "SQL 语法错误：INSERT 语句缺少目标表"
         has_payload = (
             tree.args.get("expression")
             or tree.args.get("source")
@@ -86,6 +113,19 @@ def _incomplete_statement_reason(prefix: str, tree: exp.Expression) -> str:
             return "SQL 语法错误：INSERT 语句缺少 VALUES 或 SELECT 内容"
     if prefix == "delete" and isinstance(tree, exp.Delete) and not tree.this:
         return "SQL 语法错误：DELETE 语句缺少目标表"
+    if prefix == "drop" and isinstance(tree, exp.Drop) and not tree.this:
+        return "SQL 语法错误：DROP 语句缺少目标对象"
+    if prefix == "alter" and tree.__class__.__name__ in {"Alter", "AlterTable"}:
+        if not tree.this:
+            return "SQL 语法错误：ALTER 语句缺少目标对象"
+        if not tree.args.get("actions"):
+            return "SQL 语法错误：ALTER 语句缺少变更动作"
+    if prefix == "truncate" and isinstance(tree, exp.TruncateTable) and not tree.expressions:
+        return "SQL 语法错误：TRUNCATE 语句缺少目标表"
+    if prefix in {"create", "drop"} and isinstance(tree, exp.Command):
+        return f"SQL 语法错误：{prefix.upper()} 语句不完整"
+    if prefix == "alter" and re.match(r"^\s*alter\s+table\s+\S+\s*$", tree.sql(), re.I):
+        return "SQL 语法错误：ALTER 语句缺少变更动作"
     return ""
 
 
@@ -126,6 +166,22 @@ class SqlQueryGuard:
             return QueryGuardResult(False, "在线查询不允许执行多语句", normalized_sql=normalized)
 
         kind = "with" if prefix == "with" else prefix
+        tree = parsed_statements[0]
+        if prefix not in READ_PREFIXES and prefix not in WRITE_PREFIXES:
+            return QueryGuardResult(
+                False,
+                _unknown_keyword_reason(prefix),
+                prefix,
+                normalized_sql=normalized,
+            )
+        read_command_reason = _read_command_syntax_reason(prefix, normalized, tree)
+        if read_command_reason:
+            return QueryGuardResult(
+                False,
+                read_command_reason,
+                prefix,
+                normalized_sql=normalized,
+            )
         if prefix in {"show", "desc", "describe"}:
             return QueryGuardResult(
                 True,
@@ -135,7 +191,6 @@ class SqlQueryGuard:
                 needs_limit=False,
             )
 
-        tree = parsed_statements[0]
         if prefix == "explain":
             parse_sql = _strip_explain(normalized)
             try:
@@ -161,20 +216,35 @@ class SqlQueryGuard:
             if len(explain_statements) > 1:
                 return QueryGuardResult(False, "在线查询不允许执行多语句", normalized_sql=normalized)
             tree = explain_statements[0]
-            if re.match(r"^\s*explain\b.*\banalyze\b", normalized, re.I):
+            target_prefix = _first_word(parse_sql)
+            if target_prefix not in READ_PREFIXES and target_prefix not in WRITE_PREFIXES:
                 return QueryGuardResult(
                     False,
-                    "在线查询不允许 EXPLAIN ANALYZE 执行型解释计划",
-                    prefix,
+                    _unknown_keyword_reason(target_prefix),
+                    kind,
                     normalized_sql=normalized,
                 )
-            target_prefix = _first_word(parse_sql)
+            read_command_reason = _read_command_syntax_reason(target_prefix, parse_sql, tree)
+            if read_command_reason:
+                return QueryGuardResult(
+                    False,
+                    read_command_reason,
+                    kind,
+                    normalized_sql=normalized,
+                )
             incomplete_reason = _incomplete_statement_reason(target_prefix, tree)
             if incomplete_reason:
                 return QueryGuardResult(
                     False,
                     incomplete_reason,
                     kind,
+                    normalized_sql=normalized,
+                )
+            if re.match(r"^\s*explain\b.*\banalyze\b", normalized, re.I):
+                return QueryGuardResult(
+                    False,
+                    "在线查询不允许 EXPLAIN ANALYZE 执行型解释计划",
+                    prefix,
                     normalized_sql=normalized,
                 )
 

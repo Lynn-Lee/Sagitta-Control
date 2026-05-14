@@ -95,8 +95,18 @@ def test_sql_guards_report_likely_read_keyword_typos(db_type):
         "select * form users",
         "select",
         "select from users",
+        "show",
+        "show create table",
+        "show columns from",
+        "desc",
+        "explain select",
+        "explain analyze select",
         "update sagitta_observe_events",
         "insert into sagitta_observe_events",
+        "drop",
+        "create",
+        "alter table users",
+        "foobar users",
     ],
 )
 def test_sql_guards_report_syntax_errors_before_policy_errors(sql):
@@ -113,7 +123,7 @@ def test_sql_guards_report_syntax_errors_before_policy_errors(sql):
     [
         ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作"),
         ("DROP TABLE users", "在线查询不允许执行 DROP 操作"),
-        ("foobar users", "在线查询不允许执行 FOOBAR 操作"),
+        ("ANALYZE TABLE users", "在线查询不允许执行 ANALYZE 操作"),
     ],
 )
 def test_sql_guards_report_policy_errors_after_successful_parse(sql, expected):
