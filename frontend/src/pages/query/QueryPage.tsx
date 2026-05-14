@@ -129,6 +129,25 @@ export default function QueryPage() {
     msgApi.success(`已插入表名 ${selectedTable}`)
   }, [insertTextAtCursor, msgApi, selectedTable])
 
+  const handleInstanceChange = useCallback((nextInstanceId: number) => {
+    setInstanceId(nextInstanceId)
+    setDbName('')
+    setSelectedTable('')
+    setTableKeyword('')
+    setResult(null)
+    setAccessExplanation(null)
+    setResultPage(1)
+  }, [])
+
+  const handleDatabaseChange = useCallback((nextDbName: string) => {
+    setDbName(nextDbName)
+    setSelectedTable('')
+    setTableKeyword('')
+    setResult(null)
+    setAccessExplanation(null)
+    setResultPage(1)
+  }, [])
+
   const handleCopyDdl = useCallback(async () => {
     if (!displayedDdl) return
     await navigator.clipboard.writeText(displayedDdl)
@@ -312,7 +331,7 @@ export default function QueryPage() {
           <Select placeholder="选择实例" style={{ minWidth: 220, maxWidth: 360 }}
             value={instanceId}
             popupMatchSelectWidth={false}
-            onChange={setInstanceId} showSearch optionFilterProp="label">
+            onChange={handleInstanceChange} showSearch optionFilterProp="label">
             {instanceData?.items?.map((inst: any) => (
               <Option key={inst.id} value={inst.id} label={inst.instance_name} style={{ whiteSpace: 'normal', wordBreak: 'break-all' }}>
                 <Space>
@@ -324,7 +343,7 @@ export default function QueryPage() {
           </Select>
           <Select placeholder="选择数据库" style={{ minWidth: 180, maxWidth: 400 }} value={dbName || undefined}
             popupMatchSelectWidth={false}
-            onChange={setDbName} loading={dbLoading} disabled={!instanceId} showSearch
+            onChange={handleDatabaseChange} loading={dbLoading} disabled={!instanceId} showSearch
             optionFilterProp="children">
             {(dbData?.databases || []).map((d: any) => (
               <Option key={d.db_name} value={d.db_name} title={d.db_name}>
