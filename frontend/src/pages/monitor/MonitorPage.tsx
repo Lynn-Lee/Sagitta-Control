@@ -13,9 +13,10 @@ import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
-const { Text } = Typography
+const { Text, Title } = Typography
 const { Option } = Select
 const { useBreakpoint } = Grid
+const TOP_SQL_WINDOW_OPTIONS = [5, 15, 30, 60, 180, 360, 720, 1440]
 
 interface MonitorSnapshot {
   collected_at?: string | null
@@ -177,6 +178,13 @@ function formatDurationSeconds(value?: number | null) {
   return parts.slice(0, 2).join(' ')
 }
 
+function formatWindowMinutes(value: number) {
+  if (value < 60) return `${value} 分钟`
+  if (value % 1440 === 0) return `${value / 1440} 天`
+  if (value % 60 === 0) return `${value / 60} 小时`
+  return `${value} 分钟`
+}
+
 function StatusTag({ status }: { status?: string }) {
   const value = status || 'not_configured'
   const label: Record<string, string> = {
@@ -234,6 +242,7 @@ export default function MonitorPage() {
   const [riskFilter, setRiskFilter] = useState<string | undefined>()
   const [collectStatusFilter, setCollectStatusFilter] = useState<string | undefined>()
   const [trendHours, setTrendHours] = useState(24)
+  const [topSqlWindowMinutes, setTopSqlWindowMinutes] = useState(30)
   const [alertRulesText, setAlertRulesText] = useState('{}')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
@@ -290,8 +299,8 @@ export default function MonitorPage() {
     enabled: !!activeId,
   })
   const { data: topSqlData } = useQuery({
-    queryKey: ['native-monitor-top-sql', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`).then(r => r.data),
+    queryKey: ['native-monitor-top-sql', activeId, topSqlWindowMinutes],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`, { params: { window_minutes: topSqlWindowMinutes } }).then(r => r.data),
     enabled: !!activeId && canViewSql,
   })
   const { data: waitsData } = useQuery({
@@ -772,16 +781,23 @@ export default function MonitorPage() {
     { title: '执行次数', width: 110, render: (_: any, row: any) => formatMetric(row.executions ?? row.count_star) },
     { title: '总耗时(ms)', width: 120, render: (_: any, row: any) => formatMetric(row.elapsed_time_ms ?? row.duration_ms) },
     { title: '平均耗时(ms)', width: 130, render: (_: any, row: any) => formatMetric(row.avg_elapsed_ms ?? row.avg_duration_ms) },
+    { title: 'Cop均耗(ms)', width: 120, render: (_: any, row: any) => formatMetric(row.avg_cop_time_ms) },
+    { title: '平均请求数', width: 120, render: (_: any, row: any) => formatMetric(row.avg_request_count) },
+    { title: '平均扫描Keys', width: 140, render: (_: any, row: any) => formatMetric(row.avg_processed_keys) },
+    { title: '总耗时占比', width: 120, render: (_: any, row: any) => formatMetric(row.ela_pct, '%') },
+    { title: 'Cop占比', width: 110, render: (_: any, row: any) => formatMetric(row.coptm_pct, '%') },
+    { title: '扫描Keys占比', width: 130, render: (_: any, row: any) => formatMetric(row.pkey_pct, '%') },
     { title: 'SQL 文本', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text || row.DIGEST_TEXT }}>{row.sql_text || row.DIGEST_TEXT || '-'}</Text> },
   ]
 
   const waitColumns = [
-    { title: '事件/会话', width: 220, render: (_: any, row: any) => row.event || row.sid || row.session_id || '-' },
-    { title: '等待类别', width: 140, render: (_: any, row: any) => row.wait_class || '-' },
-    { title: '等待次数', width: 120, render: (_: any, row: any) => formatMetric(row.total_waits) },
-    { title: '等待时间', width: 120, render: (_: any, row: any) => formatMetric(row.time_waited ?? row.seconds_in_wait) },
-    { title: '阻塞源', width: 120, render: (_: any, row: any) => formatMetric(row.blocking_session) },
+    { title: '事件/会话', width: 220, render: (_: any, row: any) => row.event || row.sid || row.session_id || row.blocked_session || '-' },
+    { title: '等待类别', width: 140, render: (_: any, row: any) => row.wait_class || row.row_type || '-' },
+    { title: '等待次数/Keys', width: 130, render: (_: any, row: any) => formatMetric(row.total_waits ?? row.key_count) },
+    { title: '等待时间', width: 120, render: (_: any, row: any) => formatMetric(row.time_waited ?? row.seconds_in_wait ?? row.duration_ms) },
+    { title: '阻塞源', width: 120, render: (_: any, row: any) => formatMetric(row.blocking_session ?? row.holding_trx_id) },
     { title: '用户', width: 140, render: (_: any, row: any) => row.username || '-' },
+    { title: 'SQL', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text }}>{row.sql_text || row.sql_id || '-'}</Text> },
   ]
 
   const growthColumns = [
@@ -1019,7 +1035,14 @@ export default function MonitorPage() {
                       children: canViewSessions ? (
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                           <Alert type="info" showIcon message="会话洞察" description="在线会话、阻塞链、历史会话和 Oracle ASH/AWR 均使用当前实例上下文。" />
-                          <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 920 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
+                          <div>
+                            <Title level={5} style={{ marginTop: 0 }}>阻塞会话</Title>
+                            <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
+                          </div>
+                          <div>
+                            <Title level={5} style={{ marginTop: 0 }}>长事务</Title>
+                            <Table dataSource={waitsData?.long_transactions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.trx_id || row.session_id || 'trx'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无长事务" /> }} />
+                          </div>
                           <SessionInsightPanel embedded instanceId={activeId} />
                         </Space>
                       ) : <TableEmptyState title="暂无会话洞察权限" />,
@@ -1030,8 +1053,23 @@ export default function MonitorPage() {
                       disabled: !canViewSql,
                       children: canViewSql ? (
                         <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row' }}>
+                            <div>
+                              <Title level={5} style={{ margin: 0 }}>Top SQL</Title>
+                              <Text type="secondary">最近 {formatWindowMinutes(topSqlData?.window_minutes || topSqlWindowMinutes)}</Text>
+                            </div>
+                            <Space wrap>
+                              <Text type="secondary">时间范围</Text>
+                              <Select
+                                value={topSqlWindowMinutes}
+                                style={{ width: 140 }}
+                                onChange={setTopSqlWindowMinutes}
+                                options={TOP_SQL_WINDOW_OPTIONS.map(value => ({ value, label: formatWindowMinutes(value) }))}
+                              />
+                            </Space>
+                          </div>
                           {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
-                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 1100 }} pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 1780 }} pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
                           <SqlInsightPanel embedded instanceId={activeId} />
                         </Space>
                       ) : <TableEmptyState title="暂无 SQL 洞察权限" />,
@@ -1053,7 +1091,22 @@ export default function MonitorPage() {
                     {
                       key: 'waits',
                       label: '等待事件',
-                      children: <Table dataSource={waitsData?.top_waits || []} columns={waitColumns} rowKey={(row: any, index) => `${row.event || 'wait'}-${index}`} scroll={{ x: 920 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无等待事件数据" /> }} />,
+                      children: (
+                        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                          <div>
+                            <Title level={5} style={{ marginTop: 0 }}>等待事件</Title>
+                            <Table dataSource={waitsData?.top_waits || []} columns={waitColumns} rowKey={(row: any, index) => `${row.event || 'wait'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无等待事件数据" /> }} />
+                          </div>
+                          <div>
+                            <Title level={5} style={{ marginTop: 0 }}>锁等待/阻塞会话</Title>
+                            <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无锁等待/阻塞会话" /> }} />
+                          </div>
+                          <div>
+                            <Title level={5} style={{ marginTop: 0 }}>长事务</Title>
+                            <Table dataSource={waitsData?.long_transactions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.trx_id || row.session_id || 'trx'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无长事务" /> }} />
+                          </div>
+                        </Space>
+                      ),
                     },
                     {
                       key: 'capacity-growth',

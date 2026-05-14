@@ -1138,7 +1138,11 @@ class MonitorService:
 
     @staticmethod
     async def get_top_sql(
-        db: AsyncSession, instance_id: int, user: dict, limit: int = 20
+        db: AsyncSession,
+        instance_id: int,
+        user: dict,
+        limit: int = 20,
+        window_minutes: int = 30,
     ) -> dict:
         from app.engines.registry import get_engine
 
@@ -1147,19 +1151,25 @@ class MonitorService:
         inst = (await db.execute(select(Instance).where(Instance.id == instance_id))).scalar_one_or_none()
         if not inst:
             raise NotFoundException(f"实例 ID={instance_id} 不存在")
+        window_minutes = max(1, min(int(window_minutes or 30), 1440))
         latest = await MonitorService.get_latest_snapshot(db, instance_id)
         extra = (latest or {}).get("extra_metrics") or {}
-        items = extra.get("top_sql") or []
+        is_tidb = inst.db_type.lower() == "tidb"
+        items = [] if is_tidb else extra.get("top_sql") or []
         error = ""
-        if not items:
+        if is_tidb:
             engine = get_engine(inst)
             collect_top_sql = getattr(engine, "collect_top_sql", None)
-            if inst.db_type.lower() == "tidb" and callable(collect_top_sql):
-                rs = await collect_top_sql(limit=limit)
+            if callable(collect_top_sql):
+                rs = await collect_top_sql(limit=limit, window_minutes=window_minutes)
                 error = rs.error
                 if rs.is_success:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
-            elif (
+            if not items and extra.get("top_sql"):
+                items = extra.get("top_sql") or []
+        elif not items:
+            engine = get_engine(inst)
+            if (
                 inst.db_type.lower() in MonitorService.ACTIVITY_TOP_SQL_TYPES
                 and hasattr(engine, "collect_sql_activity")
             ):
@@ -1172,7 +1182,12 @@ class MonitorService:
                 error = rs.error
                 if rs.is_success:
                     items = MonitorService._result_rows_to_dicts(rs.column_list, rs.rows)
-        return {"items": items[:limit], "error": error, "missing_groups": (latest or {}).get("missing_groups") or {}}
+        return {
+            "items": items[:limit],
+            "error": error,
+            "window_minutes": window_minutes,
+            "missing_groups": (latest or {}).get("missing_groups") or {},
+        }
 
     @staticmethod
     def _result_rows_to_dicts(columns: list[str], rows: list[Any]) -> list[dict]:

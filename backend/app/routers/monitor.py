@@ -252,10 +252,11 @@ async def native_health(
 async def native_top_sql(
     instance_id: int,
     limit: int = QParam(20, ge=1, le=100),
+    window_minutes: int = QParam(30, ge=1, le=1440),
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await MonitorService.get_top_sql(db, instance_id, user, limit)
+    return await MonitorService.get_top_sql(db, instance_id, user, limit, window_minutes)
 
 
 @router.get("/native/instances/{instance_id}/waits/", summary="等待事件与阻塞摘要")
