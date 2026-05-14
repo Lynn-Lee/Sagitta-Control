@@ -1,0 +1,26 @@
+apiVersion: v2
+name: sagittadb
+description: SagittaDB 矢准数据 — 企业级多引擎数据库管控平台
+type: application
+version: 2.1.1
+appVersion: "2.1.1"
+
+keywords:
+  - database
+  - sql-audit
+  - dba
+  - workflow
+
+home: https://github.com/Lynn-Lee/Public-Releases/tree/main/products/sagittadb
+maintainers:
+  - name: SagittaDB Team
+
+dependencies:
+  - name: postgresql
+    version: "15.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "19.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
