@@ -48,6 +48,32 @@ function extractFileName(contentDisposition?: string, fallback = 'query_result.x
   return normalMatch?.[1] || fallback
 }
 
+function stringifyApiMessage(value: unknown): string | undefined {
+  if (!value) return undefined
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    const parts = value.map((item) => stringifyApiMessage(item)).filter(Boolean)
+    return parts.length ? parts.join('；') : undefined
+  }
+  if (typeof value === 'object') {
+    const data = value as Record<string, unknown>
+    return stringifyApiMessage(data.msg)
+      || stringifyApiMessage(data.message)
+      || stringifyApiMessage(data.reason)
+      || stringifyApiMessage(data.detail)
+  }
+  return String(value)
+}
+
+function getApiErrorMessage(error: any, fallback: string) {
+  const data = error?.response?.data
+  return stringifyApiMessage(data?.msg)
+    || stringifyApiMessage(data?.detail)
+    || stringifyApiMessage(data?.error)
+    || stringifyApiMessage(error?.message)
+    || fallback
+}
+
 export default function QueryPage() {
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [dbName, setDbName] = useState<string>('')
@@ -173,7 +199,15 @@ export default function QueryPage() {
         msgApi.success(`查询成功，${res.affected_rows} 行，耗时 ${res.cost_time_ms}ms`)
       }
     } catch (e: any) {
-      const detail = e.response?.data?.msg || e.response?.data?.detail || '查询失败'
+      const detail = getApiErrorMessage(e, '查询失败')
+      const failureResult: QueryResult = {
+        column_list: [],
+        rows: [],
+        affected_rows: 0,
+        cost_time_ms: 0,
+        is_masked: false,
+        error: detail,
+      }
       if (e.response?.status === 403) {
         try {
           const explanation = await queryApi.explainAccess({
@@ -185,15 +219,25 @@ export default function QueryPage() {
           setAccessExplanation(explanation)
           msgApi.error(explanation.reason || detail)
         } catch {
+          setResult(failureResult)
           msgApi.error(detail)
         }
       } else {
+        setResult(failureResult)
         msgApi.error(detail)
       }
     } finally {
       setExecuting(false)
     }
   }, [instanceId, dbName, sql, limitNum, msgApi])
+
+  const handleClearEditor = useCallback(() => {
+    setSql('')
+    setResult(null)
+    setAccessExplanation(null)
+    setResultPage(1)
+    editorRef.current?.focus()
+  }, [])
 
   const resultColumns = [
     {
@@ -260,7 +304,7 @@ export default function QueryPage() {
       )
       msgApi.success(`已通过后端导出${exportLabel}为${format === 'csv' ? ' CSV' : ' Excel'}`)
     } catch (e: any) {
-      msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '导出失败')
+      msgApi.error(getApiErrorMessage(e, '导出失败'))
     }
   }
 
@@ -360,7 +404,7 @@ export default function QueryPage() {
             onClick={handleExecute} disabled={!instanceId || !dbName}>
             执行
           </Button>
-          <Button icon={<ClearOutlined />} onClick={() => { setSql(''); setResult(null) }}>清空</Button>
+          <Button icon={<ClearOutlined />} onClick={handleClearEditor}>清空</Button>
         </Space>
       </SectionCard>
 
