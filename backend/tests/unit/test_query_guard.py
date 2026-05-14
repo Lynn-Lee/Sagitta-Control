@@ -88,7 +88,17 @@ def test_sql_guards_report_likely_read_keyword_typos(db_type):
     assert "是否想输入" not in result.reason
 
 
-@pytest.mark.parametrize("sql", ["sselect * from users", "select * form users"])
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "sselect * from users",
+        "select * form users",
+        "select",
+        "select from users",
+        "update sagitta_observe_events",
+        "insert into sagitta_observe_events",
+    ],
+)
 def test_sql_guards_report_syntax_errors_before_policy_errors(sql):
     result = get_query_guard("mysql").validate(sql, "analytics")
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import sqlglot
+import sqlglot.expressions as exp
 
 from app.engines.utils import sanitize_sqlglot_error
 from app.services.masking import DIALECT_MAP
@@ -68,6 +69,24 @@ class QueryGuard(Protocol):
 
 
 UNSUPPORTED_ENGINES: set[str] = set()
+
+
+def _incomplete_statement_reason(prefix: str, tree: exp.Expression) -> str:
+    if prefix in {"select", "with"} and isinstance(tree, exp.Select) and not tree.expressions:
+        return "SQL 语法错误：SELECT 语句缺少查询字段"
+    if prefix == "update" and isinstance(tree, exp.Update) and not tree.expressions:
+        return "SQL 语法错误：UPDATE 语句缺少 SET 子句"
+    if prefix == "insert" and isinstance(tree, exp.Insert):
+        has_payload = (
+            tree.args.get("expression")
+            or tree.args.get("source")
+            or tree.args.get("default")
+        )
+        if not has_payload:
+            return "SQL 语法错误：INSERT 语句缺少 VALUES 或 SELECT 内容"
+    if prefix == "delete" and isinstance(tree, exp.Delete) and not tree.this:
+        return "SQL 语法错误：DELETE 语句缺少目标表"
+    return ""
 
 
 class SqlQueryGuard:
@@ -149,6 +168,24 @@ class SqlQueryGuard:
                     prefix,
                     normalized_sql=normalized,
                 )
+            target_prefix = _first_word(parse_sql)
+            incomplete_reason = _incomplete_statement_reason(target_prefix, tree)
+            if incomplete_reason:
+                return QueryGuardResult(
+                    False,
+                    incomplete_reason,
+                    kind,
+                    normalized_sql=normalized,
+                )
+
+        incomplete_reason = _incomplete_statement_reason(prefix, tree)
+        if incomplete_reason:
+            return QueryGuardResult(
+                False,
+                incomplete_reason,
+                prefix,
+                normalized_sql=normalized,
+            )
 
         if prefix in WRITE_PREFIXES:
             return QueryGuardResult(
