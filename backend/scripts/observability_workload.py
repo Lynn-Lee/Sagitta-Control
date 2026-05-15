@@ -29,12 +29,22 @@ TABLE_NAME = "sagitta_observe_events"
 IDX_BUCKET = "idx_sag_obs_bucket"
 REDIS_PREFIX = "sagitta:observe"
 SUPPORTED_TYPES = {"mysql", "pgsql", "redis", "starrocks", "mssql", "tidb", "oracle"}
+REAL_WORKLOAD_DB = os.getenv("OBS_REAL_WORKLOAD_DB", os.getenv("OBS_MYSQL_WORKLOAD_DB", "rd_testdb"))
+REAL_WORKLOAD_TABLE = os.getenv(
+    "OBS_REAL_WORKLOAD_TABLE",
+    os.getenv("OBS_MYSQL_WORKLOAD_TABLE", "idp_task_flow_record"),
+)
+REAL_WORKLOAD_MARKER = os.getenv(
+    "OBS_REAL_WORKLOAD_MARKER",
+    os.getenv("OBS_MYSQL_WORKLOAD_MARKER", "SagittaWorkload"),
+)
 BASE_ROWS = int(os.getenv("OBS_BASE_ROWS", "20000"))
 BASE_ROWS_SMALL = int(os.getenv("OBS_BASE_ROWS_SMALL", "8000"))
 BASE_ROWS_STARROCKS = int(os.getenv("OBS_BASE_ROWS_STARROCKS", "3000"))
 SEED_BATCH_ROWS = int(os.getenv("OBS_SEED_BATCH_ROWS", "1000"))
 WORKLOAD_ROWS = int(os.getenv("OBS_WORKLOAD_ROWS", "32"))
 SLOW_SECONDS = float(os.getenv("OBS_SLOW_SECONDS", "2.2"))
+REAL_WORKLOAD_KEEP_DAYS = int(os.getenv("OBS_REAL_WORKLOAD_KEEP_DAYS", "2"))
 
 warnings.filterwarnings("ignore", message=".*database exists.*")
 warnings.filterwarnings("ignore", message=".*Table .* already exists.*")
@@ -62,6 +72,12 @@ def ident_mssql(name: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_]+", name):
         raise ValueError(f"Unsafe MSSQL identifier: {name!r}")
     return f"[{name}]"
+
+
+def ident_pg(name: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_]+", name):
+        raise ValueError(f"Unsafe PostgreSQL identifier: {name!r}")
+    return f'"{name}"'
 
 
 def esc_sql(value: str) -> str:
@@ -118,6 +134,79 @@ def seed_values(target: Target, count: int) -> list[tuple[int, int, str, float]]
     ]
 
 
+def real_workload_rows(target: Target, count: int = WORKLOAD_ROWS) -> list[dict[str, Any]]:
+    base = int(time.time() * 1000) * 100 + target.id * 1_000_000
+    marker = REAL_WORKLOAD_MARKER[:32]
+    events = [
+        "CREATE_RELEASE_BRANCH",
+        "CREATE_MERGE_REQUEST",
+        "ACCEPT_MERGE_REQUEST",
+        "BUILD_PACKAGE",
+        "DEPLOY_TEST_ENV",
+    ]
+    node_states = ["IN_PROGRESS", "SUCCESS", "FAILED"]
+    child_states = ["PENDING", "RUNNING", "SUCCESS", "FAILED"]
+    rows: list[dict[str, Any]] = []
+    for idx in range(count):
+        row_id = base + idx
+        event = events[idx % len(events)]
+        rows.append(
+            {
+                "id": row_id,
+                "task_id": 10_000_000 + ((row_id // 1000) % 900_000),
+                "execution_id": f"OBS-{target.db_type}-{row_id}",
+                "node_id": 1000 + idx,
+                "child_node_id": f"node-{row_id % 10000}",
+                "child_node_state": child_states[(row_id + idx) % len(child_states)],
+                "node_state": node_states[(row_id + idx) % len(node_states)],
+                "event": event,
+                "detail": f"SagittaDB observability workload tick={base}, event={event}, seq={idx}",
+                "create_name": marker,
+                "update_name": marker,
+                "is_deleted": 0,
+                "create_code": "sagitta-observe",
+                "update_code": "sagitta-observe",
+                "remark": "observability workload",
+            }
+        )
+    return rows
+
+
+def real_mysql_values(rows: list[dict[str, Any]], include_id: bool) -> list[tuple[Any, ...]]:
+    values = []
+    for row in rows:
+        item = (
+            row["task_id"],
+            row["execution_id"],
+            row["node_id"],
+            row["child_node_id"],
+            row["child_node_state"],
+            row["node_state"],
+            row["event"],
+            row["detail"],
+            row["create_name"],
+            row["update_name"],
+            row["is_deleted"],
+            row["create_code"],
+            row["update_code"],
+            row["remark"],
+        )
+        values.append((row["id"], *item) if include_id else item)
+    return values
+
+
+async def mysql_table_exists(cur: Any, db_name: str, table_name: str) -> bool:
+    await cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = %s AND table_name = %s
+        """,
+        (db_name, table_name),
+    )
+    return int((await cur.fetchone())[0] or 0) > 0
+
+
 async def load_targets() -> list[Target]:
     engine = create_async_engine(settings.DATABASE_URL)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -147,6 +236,128 @@ async def load_targets() -> list[Target]:
         await engine.dispose()
 
 
+async def run_mysql_like_idp_task_flow_record(cur: Any, target: Target, flavor: str) -> dict[str, Any]:
+    db_name = REAL_WORKLOAD_DB
+    table_name = REAL_WORKLOAD_TABLE
+    marker = REAL_WORKLOAD_MARKER[:32]
+    table_ref = ident_mysql(table_name)
+    rows = real_workload_rows(target)
+    include_id = flavor == "starrocks"
+    ops = 0
+    warnings: list[str] = []
+    await cur.execute(f"USE {ident_mysql(db_name)}")
+
+    id_column = "id, " if include_id else ""
+    id_placeholder = "%s, " if include_id else ""
+    await cur.executemany(
+        f"""
+        INSERT INTO {table_ref}
+            ({id_column}task_id, execution_id, node_id, child_node_id, child_node_state,
+             node_state, event, detail, create_name, create_time, update_name,
+             update_time, is_deleted, create_code, update_code, remark)
+        VALUES
+            ({id_placeholder}%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, NOW(), %s, %s, %s, %s)
+        """,
+        real_mysql_values(rows, include_id),
+    )
+    ops += len(rows)
+
+    try:
+        if flavor == "starrocks":
+            await cur.execute(
+                f"""
+                SELECT id, task_id, event, node_state, update_time
+                FROM {table_ref}
+                WHERE execution_id = %s
+                LIMIT 1
+                """,
+                (rows[-1]["execution_id"],),
+            )
+            await cur.fetchall()
+            ops += 1
+        else:
+            await cur.execute(
+                f"""
+                UPDATE {table_ref}
+                SET node_state = 'SUCCESS',
+                    child_node_state = 'SUCCESS',
+                    update_name = %s,
+                    update_time = NOW(),
+                    remark = 'observability workload updated'
+                WHERE execution_id = %s
+                LIMIT 1
+                """,
+                (marker, rows[-1]["execution_id"]),
+            )
+            await cur.execute(
+                f"""
+                UPDATE {table_ref}
+                SET update_time = NOW(),
+                    detail = CONCAT(LEFT(COALESCE(detail, ''), 180), ' | tick=', %s)
+                WHERE create_name = %s
+                ORDER BY id DESC
+                LIMIT 50
+                """,
+                (rows[0]["id"], marker),
+            )
+            ops += 2
+    except Exception as exc:
+        warnings.append(f"real-table update skipped: {exc}")
+
+    await cur.execute(
+        f"""
+        SELECT task_id, COUNT(*) AS cnt, MAX(update_time) AS last_update
+        FROM {table_ref}
+        WHERE task_id = %s
+        GROUP BY task_id
+        """,
+        (rows[0]["task_id"],),
+    )
+    await cur.fetchall()
+    await cur.execute(
+        f"""
+        SELECT event, node_state, COUNT(*) AS cnt
+        FROM {table_ref}
+        WHERE create_name = %s
+          AND update_time >= NOW() - INTERVAL 10 MINUTE
+        GROUP BY event, node_state
+        ORDER BY cnt DESC
+        LIMIT 8
+        """,
+        (marker,),
+    )
+    await cur.fetchall()
+    ops += 2
+
+    try:
+        if flavor == "starrocks":
+            pass
+        else:
+            await cur.execute(
+                f"""
+                DELETE FROM {table_ref}
+                WHERE create_name = %s
+                  AND create_time < NOW() - INTERVAL %s DAY
+                LIMIT 500
+                """,
+                (marker, REAL_WORKLOAD_KEEP_DAYS),
+            )
+            ops += 1
+    except Exception as exc:
+        warnings.append(f"real-table cleanup skipped: {exc}")
+
+    try:
+        await cur.execute(f"SELECT SLEEP({SLOW_SECONDS})")
+        await cur.fetchall()
+        ops += 1
+    except Exception as exc:
+        warnings.append(f"sleep query skipped: {exc}")
+    result: dict[str, Any] = {"status": "ok", "ops": ops, "table": f"{db_name}.{table_name}"}
+    if warnings:
+        result["warnings"] = warnings
+    return result
+
+
 async def run_mysql_family(target: Target, flavor: str) -> dict[str, Any]:
     import aiomysql
 
@@ -164,6 +375,18 @@ async def run_mysql_family(target: Target, flavor: str) -> dict[str, Any]:
     warnings: list[str] = []
     try:
         async with conn.cursor() as cur:
+            if (
+                REAL_WORKLOAD_DB
+                and REAL_WORKLOAD_TABLE
+                and flavor in {"mysql", "tidb", "starrocks"}
+            ):
+                if not await mysql_table_exists(cur, REAL_WORKLOAD_DB, REAL_WORKLOAD_TABLE):
+                    return {
+                        "status": "error",
+                        "error": f"{REAL_WORKLOAD_DB}.{REAL_WORKLOAD_TABLE} not found",
+                    }
+                return await run_mysql_like_idp_task_flow_record(cur, target, flavor)
+
             await cur.execute(f"CREATE DATABASE IF NOT EXISTS {ident_mysql(db_name)}")
             await cur.execute(f"USE {ident_mysql(db_name)}")
             if flavor == "starrocks":
@@ -308,8 +531,140 @@ async def run_mysql_family(target: Target, flavor: str) -> dict[str, Any]:
     return {"status": "ok", "ops": ops, "warnings": warnings}
 
 
+async def run_pgsql_idp_task_flow_record(conn: Any, target: Target) -> dict[str, Any]:
+    table_ref = f"public.{ident_pg(REAL_WORKLOAD_TABLE)}"
+    rows = real_workload_rows(target)
+    values = [
+        (
+            row["id"],
+            row["task_id"],
+            row["execution_id"],
+            row["node_id"],
+            row["child_node_id"],
+            row["child_node_state"],
+            row["node_state"],
+            row["event"],
+            row["detail"],
+            row["create_name"],
+            row["update_name"],
+            row["is_deleted"],
+            row["create_code"],
+            row["update_code"],
+            row["remark"],
+        )
+        for row in rows
+    ]
+    await conn.executemany(
+        f"""
+        INSERT INTO {table_ref}
+            (id, task_id, execution_id, node_id, child_node_id, child_node_state,
+             node_state, event, detail, create_name, create_time, update_name,
+             update_time, is_deleted, create_code, update_code, remark)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11, now(), $12, $13, $14, $15)
+        """,
+        values,
+    )
+    await conn.execute(
+        f"""
+        UPDATE {table_ref}
+        SET node_state = 'SUCCESS',
+            child_node_state = 'SUCCESS',
+            update_name = $1,
+            update_time = now(),
+            remark = 'observability workload updated'
+        WHERE execution_id = $2
+        """,
+        REAL_WORKLOAD_MARKER[:32],
+        rows[-1]["execution_id"],
+    )
+    await conn.execute(
+        f"""
+        WITH picked AS (
+            SELECT id
+            FROM {table_ref}
+            WHERE create_name = $1
+            ORDER BY id DESC
+            LIMIT 50
+        )
+        UPDATE {table_ref} t
+        SET update_time = now(),
+            detail = left(coalesce(t.detail, ''), 180) || ' | tick=' || $2::text
+        FROM picked
+        WHERE t.id = picked.id
+        """,
+        REAL_WORKLOAD_MARKER[:32],
+        str(rows[0]["id"]),
+    )
+    await conn.fetch(
+        f"""
+        SELECT task_id, COUNT(*) AS cnt, MAX(update_time) AS last_update
+        FROM {table_ref}
+        WHERE task_id = $1
+        GROUP BY task_id
+        """,
+        rows[0]["task_id"],
+    )
+    await conn.fetch(
+        f"""
+        SELECT event, node_state, COUNT(*) AS cnt
+        FROM {table_ref}
+        WHERE create_name = $1
+          AND update_time >= now() - interval '10 minutes'
+        GROUP BY event, node_state
+        ORDER BY cnt DESC
+        LIMIT 8
+        """,
+        REAL_WORKLOAD_MARKER[:32],
+    )
+    await conn.execute(
+        f"""
+        WITH doomed AS (
+            SELECT id
+            FROM {table_ref}
+            WHERE create_name = $1
+              AND create_time < now() - ($2::int * interval '1 day')
+            LIMIT 500
+        )
+        DELETE FROM {table_ref}
+        WHERE id IN (SELECT id FROM doomed)
+        """,
+        REAL_WORKLOAD_MARKER[:32],
+        REAL_WORKLOAD_KEEP_DAYS,
+    )
+    await conn.fetch("SELECT pg_sleep($1)", SLOW_SECONDS)
+    return {"status": "ok", "ops": len(rows) + 6, "table": f"{REAL_WORKLOAD_DB}.{REAL_WORKLOAD_TABLE}"}
+
+
 async def run_pgsql(target: Target) -> dict[str, Any]:
     import asyncpg
+
+    if REAL_WORKLOAD_DB and REAL_WORKLOAD_TABLE:
+        conn = await asyncpg.connect(
+            host=target.host,
+            port=target.port,
+            user=target.user,
+            password=target.password,
+            database=REAL_WORKLOAD_DB,
+            timeout=10,
+        )
+        try:
+            exists = await conn.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = $1
+                """,
+                REAL_WORKLOAD_TABLE,
+            )
+            if not int(exists or 0):
+                return {
+                    "status": "error",
+                    "error": f"{REAL_WORKLOAD_DB}.{REAL_WORKLOAD_TABLE} not found",
+                }
+            return await run_pgsql_idp_task_flow_record(conn, target)
+        finally:
+            await conn.close()
 
     conn = await asyncpg.connect(
         host=target.host,
@@ -476,10 +831,90 @@ async def run_redis(target: Target) -> dict[str, Any]:
     return {"status": "ok", "ops": ops, "warnings": warnings}
 
 
+def run_mssql_idp_task_flow_record(cur: Any, target: Target) -> dict[str, Any]:
+    table_ref = f"dbo.{ident_mssql(REAL_WORKLOAD_TABLE)}"
+    marker = REAL_WORKLOAD_MARKER[:32]
+    rows = real_workload_rows(target)
+    ops = 0
+    for row in rows:
+        cur.execute(
+            f"""
+            INSERT INTO {table_ref}
+                (id, task_id, execution_id, node_id, child_node_id, child_node_state,
+                 node_state, event, detail, create_name, create_time, update_name,
+                 update_time, is_deleted, create_code, update_code, remark)
+            VALUES (
+                {row["id"]}, {row["task_id"]}, N'{esc_sql(row["execution_id"])}',
+                {row["node_id"]}, N'{esc_sql(row["child_node_id"])}',
+                N'{esc_sql(row["child_node_state"])}', N'{esc_sql(row["node_state"])}',
+                N'{esc_sql(row["event"])}', N'{esc_sql(row["detail"])}',
+                N'{esc_sql(row["create_name"])}', SYSDATETIME(),
+                N'{esc_sql(row["update_name"])}', SYSDATETIME(), {row["is_deleted"]},
+                N'{esc_sql(row["create_code"])}', N'{esc_sql(row["update_code"])}',
+                N'{esc_sql(row["remark"])}'
+            )
+            """
+        )
+        ops += 1
+    cur.execute(
+        f"""
+        UPDATE {table_ref}
+        SET node_state = N'SUCCESS',
+            child_node_state = N'SUCCESS',
+            update_name = N'{esc_sql(marker)}',
+            update_time = SYSDATETIME(),
+            remark = N'observability workload updated'
+        WHERE execution_id = N'{esc_sql(rows[-1]["execution_id"])}'
+        """
+    )
+    cur.execute(
+        f"""
+        UPDATE {table_ref}
+        SET update_time = SYSDATETIME(),
+            detail = LEFT(ISNULL(detail, N''), 180) + N' | tick={rows[0]["id"]}'
+        WHERE id IN (
+            SELECT TOP (50) id
+            FROM {table_ref}
+            WHERE create_name = N'{esc_sql(marker)}'
+            ORDER BY id DESC
+        )
+        """
+    )
+    cur.execute(
+        f"""
+        SELECT task_id, COUNT(*) AS cnt, MAX(update_time) AS last_update
+        FROM {table_ref}
+        WHERE task_id = {rows[0]["task_id"]}
+        GROUP BY task_id
+        """
+    )
+    cur.fetchall()
+    cur.execute(
+        f"""
+        SELECT TOP (8) event, node_state, COUNT(*) AS cnt
+        FROM {table_ref}
+        WHERE create_name = N'{esc_sql(marker)}'
+          AND update_time >= DATEADD(minute, -10, SYSDATETIME())
+        GROUP BY event, node_state
+        ORDER BY cnt DESC
+        """
+    )
+    cur.fetchall()
+    cur.execute(
+        f"""
+        DELETE TOP (500) FROM {table_ref}
+        WHERE create_name = N'{esc_sql(marker)}'
+          AND create_time < DATEADD(day, -{REAL_WORKLOAD_KEEP_DAYS}, SYSDATETIME())
+        """
+    )
+    cur.execute(f"WAITFOR DELAY '00:00:{max(2, int(SLOW_SECONDS)):02d}'")
+    return {"status": "ok", "ops": ops + 6, "table": f"{REAL_WORKLOAD_DB}.dbo.{REAL_WORKLOAD_TABLE}"}
+
+
 def run_mssql_sync(target: Target) -> dict[str, Any]:
     import pytds
 
-    db_name = target.db_name or "test"
+    db_name = REAL_WORKLOAD_DB if REAL_WORKLOAD_DB and REAL_WORKLOAD_TABLE else target.db_name or "test"
     ops = 0
     with pytds.connect(
         server=target.host,
@@ -492,6 +927,22 @@ def run_mssql_sync(target: Target) -> dict[str, Any]:
         autocommit=True,
     ) as conn:
         with conn.cursor() as cur:
+            if REAL_WORKLOAD_DB and REAL_WORKLOAD_TABLE:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = %s
+                    """,
+                    (REAL_WORKLOAD_TABLE,),
+                )
+                if int(cur.fetchone()[0] or 0) == 0:
+                    return {
+                        "status": "error",
+                        "error": f"{REAL_WORKLOAD_DB}.dbo.{REAL_WORKLOAD_TABLE} not found",
+                    }
+                return run_mssql_idp_task_flow_record(cur, target)
+
             cur.execute(
                 f"""
                 IF OBJECT_ID(N'dbo.{TABLE_NAME}', N'U') IS NULL
@@ -574,6 +1025,100 @@ def run_mssql_sync(target: Target) -> dict[str, Any]:
     return {"status": "ok", "ops": ops}
 
 
+def run_oracle_idp_task_flow_record(conn: Any, cur: Any, owner: str, target: Target) -> dict[str, Any]:
+    table_ref = f"{owner}.{REAL_WORKLOAD_TABLE.upper()}"
+    marker = REAL_WORKLOAD_MARKER[:32]
+    rows = real_workload_rows(target)
+    cur.executemany(
+        f"""
+        INSERT INTO {table_ref}
+            (id, task_id, execution_id, node_id, child_node_id, child_node_state,
+             node_state, event, detail, create_name, create_time, update_name,
+             update_time, is_deleted, create_code, update_code, remark)
+        VALUES
+            (:id, :task_id, :execution_id, :node_id, :child_node_id, :child_node_state,
+             :node_state, :event, :detail, :create_name, SYSTIMESTAMP, :update_name,
+             SYSTIMESTAMP, :is_deleted, :create_code, :update_code, :remark)
+        """,
+        rows,
+    )
+    cur.execute(
+        f"""
+        UPDATE {table_ref}
+        SET node_state = 'SUCCESS',
+            child_node_state = 'SUCCESS',
+            update_name = :marker,
+            update_time = SYSTIMESTAMP,
+            remark = 'observability workload updated'
+        WHERE execution_id = :execution_id
+        """,
+        {"marker": marker, "execution_id": rows[-1]["execution_id"]},
+    )
+    cur.execute(
+        f"""
+        UPDATE {table_ref}
+        SET update_time = SYSTIMESTAMP,
+            detail = SUBSTR(NVL(detail, ''), 1, 180) || ' | tick=' || :tick
+        WHERE id IN (
+            SELECT id
+            FROM (
+                SELECT id
+                FROM {table_ref}
+                WHERE create_name = :marker
+                ORDER BY id DESC
+            )
+            WHERE ROWNUM <= 50
+        )
+        """,
+        {"tick": rows[0]["id"], "marker": marker},
+    )
+    cur.execute(
+        f"""
+        SELECT task_id, COUNT(*) AS cnt, MAX(update_time) AS last_update
+        FROM {table_ref}
+        WHERE task_id = :task_id
+        GROUP BY task_id
+        """,
+        {"task_id": rows[0]["task_id"]},
+    )
+    cur.fetchall()
+    cur.execute(
+        f"""
+        SELECT event, node_state, COUNT(*) AS cnt
+        FROM {table_ref}
+        WHERE create_name = :marker
+          AND update_time >= SYSTIMESTAMP - INTERVAL '10' MINUTE
+        GROUP BY event, node_state
+        ORDER BY cnt DESC
+        """,
+        {"marker": marker},
+    )
+    cur.fetchall()
+    cur.execute(
+        f"""
+        DELETE FROM {table_ref}
+        WHERE create_name = :marker
+          AND create_time < SYSTIMESTAMP - NUMTODSINTERVAL(:days, 'DAY')
+          AND ROWNUM <= 500
+        """,
+        {"marker": marker, "days": REAL_WORKLOAD_KEEP_DAYS},
+    )
+    warnings: list[str] = []
+    try:
+        cur.execute(f"BEGIN DBMS_LOCK.SLEEP({SLOW_SECONDS}); END;")
+    except Exception as exc:
+        warnings.append(f"sleep skipped: {exc}")
+    conn.commit()
+    result: dict[str, Any] = {
+        "status": "ok",
+        "ops": len(rows) + 6,
+        "table": f"{owner}.{REAL_WORKLOAD_TABLE.upper()}",
+    }
+    if warnings:
+        result["warnings"] = warnings
+    return result
+
+
 def run_oracle_sync(target: Target) -> dict[str, Any]:
     import oracledb
 
@@ -585,6 +1130,23 @@ def run_oracle_sync(target: Target) -> dict[str, Any]:
     dsn = f"{target.host}:{target.port}/{target.db_name or 'XE'}"
     with oracledb.connect(user=target.user, password=target.password, dsn=dsn) as conn:
         with conn.cursor() as cur:
+            if REAL_WORKLOAD_DB and REAL_WORKLOAD_TABLE:
+                owner = REAL_WORKLOAD_DB.upper()
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM all_tables
+                    WHERE owner = :owner AND table_name = :table_name
+                    """,
+                    {"owner": owner, "table_name": REAL_WORKLOAD_TABLE.upper()},
+                )
+                if int(cur.fetchone()[0] or 0) == 0:
+                    return {
+                        "status": "error",
+                        "error": f"{owner}.{REAL_WORKLOAD_TABLE.upper()} not found",
+                    }
+                return run_oracle_idp_task_flow_record(conn, cur, owner, target)
+
             try:
                 cur.execute(
                     f"""

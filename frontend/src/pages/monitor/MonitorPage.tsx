@@ -161,6 +161,20 @@ function formatMetric(value?: number | string | null, suffix = '') {
   return `${value}${suffix}`
 }
 
+function formatRateMetric(value?: number | string | null, suffix = '') {
+  if (value === null || value === undefined || value === '') return '暂无数据'
+  const numberValue = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numberValue)) return `${value}${suffix}`
+  return `${numberValue.toFixed(2)}${suffix}`
+}
+
+function formatTrendTooltip(value: any, name: string, item?: any) {
+  const dataKey = item?.dataKey
+  if (dataKey === 'size_gb') return [value === null || value === undefined ? '暂无数据' : `${formatMetric(value)} GB`, '容量']
+  if (dataKey === 'qps' || dataKey === 'tps') return [formatRateMetric(value), name]
+  return [formatMetric(value), name]
+}
+
 function formatTime(value?: string | null) {
   if (!value) return '暂无数据'
   return value.replace('T', ' ').slice(0, 19)
@@ -725,7 +739,7 @@ export default function MonitorPage() {
     { title: '采集开关', width: 120, render: (_: any, row: MonitorInstance) => <ConfigStatusTag row={row} /> },
     { title: '采集状态', width: 120, render: (_: any, row: MonitorInstance) => <StatusTag status={row.last_collect_status} /> },
     { title: '连接使用率', width: 130, render: (_: any, row: MonitorInstance) => row.latest?.connection_usage !== null && row.latest?.connection_usage !== undefined ? <Progress percent={Math.round(row.latest.connection_usage * 100)} size="small" /> : <Text type="secondary">暂无数据</Text> },
-    { title: 'QPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.qps) },
+    { title: 'QPS', width: 100, render: (_: any, row: MonitorInstance) => formatRateMetric(row.latest?.qps) },
     {
       title: '慢查询',
       width: 110,
@@ -744,7 +758,7 @@ export default function MonitorPage() {
         </Button>
       ),
     },
-    { title: 'TPS', width: 100, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.tps) },
+    { title: 'TPS', width: 100, render: (_: any, row: MonitorInstance) => formatRateMetric(row.latest?.tps) },
     { title: '容量', width: 130, render: (_: any, row: MonitorInstance) => formatBytes(row.latest?.total_size_bytes) },
     { title: '复制延迟', width: 110, render: (_: any, row: MonitorInstance) => formatMetric(row.latest?.replication_lag_seconds, 's') },
     { title: '最后采集', width: 180, render: (_: any, row: MonitorInstance) => formatTime(row.last_metric_collect_at) },
@@ -1045,9 +1059,9 @@ export default function MonitorPage() {
                             </div>
                             <MetricCard title="健康状态" value={latest?.is_up ? '在线' : '暂无数据'} />
                             <MetricCard title="当前连接" value={latest?.current_connections} />
-                            <MetricCard title="QPS" value={latest?.qps} />
+                            <MetricCard title="QPS" value={formatRateMetric(latest?.qps)} />
                             <MetricCard title="活跃会话" value={latest?.active_sessions} />
-                            <MetricCard title="TPS" value={latest?.tps} />
+                            <MetricCard title="TPS" value={formatRateMetric(latest?.tps)} />
                             <MetricCard title="实例容量" value={formatBytes(latest?.total_size_bytes)} />
                             <MetricCard title="当前慢查询" value={latest?.slow_queries} danger={(latest?.slow_queries || 0) > 0} />
                             <MetricCard title="锁等待会话" value={latest?.lock_waits} danger={(latest?.lock_waits || 0) > 0} />
@@ -1082,7 +1096,7 @@ export default function MonitorPage() {
                                   <CartesianGrid strokeDasharray="3 3" />
                                   <XAxis dataKey="time" />
                                   <YAxis />
-                                  <Tooltip formatter={(value: any, name: string) => name === 'size_gb' ? [`${value} GB`, '容量'] : [value, name]} />
+                                  <Tooltip formatter={formatTrendTooltip} />
                                   <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
                                   <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
                                   <Line type="monotone" dataKey="tps" name="TPS" stroke="#13c2c2" dot={false} />

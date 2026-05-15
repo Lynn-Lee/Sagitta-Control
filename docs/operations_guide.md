@@ -239,6 +239,16 @@ Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `depl
 
 Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。会话页优先读取 `GV$SESSION`、`GV$PROCESS`、`GV$SQL` 和 `GV$TRANSACTION`，兼容 RAC 与 11g；SQL 洞察优先读取 `GV$SQL_MONITOR`，再降级到 `DBA_HIST_SQLSTAT`、`GV$SQL` 和当前会话 SQL。客户账号没有 AWR、SQL Monitor 或部分动态性能视图权限时，页面会保留已采集数据并展示缺失权限 warning。所有 Oracle 采集均为只读查询，不会执行会话 kill、trace dump、SQL profile、baseline、patch 等变更类诊断操作。
 
+测试环境的观测模拟任务通过系统 cron 触发，默认每分钟执行 3 轮，用于给观测中心持续产生连接、查询、事务、容量和等待类指标。云 ECS 测试环境的当前配置如下：
+
+```cron
+* * * * * /usr/bin/flock -n /tmp/sagitta_observe_workload.lock /opt/sagittadb/source/scripts/run-observability-workload-20s.sh
+```
+
+`run-observability-workload-20s.sh` 默认在 `sagittadb-source-test-backend-1` 容器内执行 `backend/scripts/observability_workload.py`，分别在第 0、20、40 秒触发一次，并将结果追加到 `/opt/sagittadb/source/logs/observability_workload.log`。容器名、日志路径和执行轮次可分别通过 `OBS_WORKLOAD_CONTAINER`、`OBS_WORKLOAD_LOG`、`OBS_WORKLOAD_ITERATIONS`、`OBS_WORKLOAD_INTERVAL` 调整。
+
+关系型测试库默认使用真实测试表 `rd_testdb.idp_task_flow_record` 生成负载；可通过 `OBS_REAL_WORKLOAD_DB`、`OBS_REAL_WORKLOAD_TABLE`、`OBS_REAL_WORKLOAD_MARKER`、`OBS_REAL_WORKLOAD_KEEP_DAYS` 覆盖数据库、表名、标记字段和清理窗口。Redis 仍使用 Redis 原生命令模拟；StarRocks 在该表不支持 UPDATE/DELETE 的部署形态下只执行插入和查询负载。观测中心前端展示 QPS/TPS 时统一保留两位小数，趋势图 tooltip 也使用相同格式，原始采集值仍保留在指标数据中。
+
 ## 8. 容量管理
 
 ### 8.1 易增长数据
