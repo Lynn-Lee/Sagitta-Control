@@ -9,6 +9,7 @@ import { userGroupApi, userApi, resourceGroupApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Dragger } = Upload
@@ -78,8 +79,8 @@ const UserGroupManagement: React.FC = () => {
   const [parentIds, setParentIds] = useState<number[]>([])
   const [resourceGroupIds, setResourceGroupIds] = useState<number[]>([])
   const [statuses, setStatuses] = useState<boolean[]>([])
-  const [page] = useState(1)
-  const [pageSize] = useState(200)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [exportScope, setExportScope] = useState<'filtered' | 'selected'>('filtered')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -106,6 +107,11 @@ const UserGroupManagement: React.FC = () => {
     queryFn: () => userApi.list({ page: 1, page_size: 200, is_active: true }),
   })
 
+  const { data: groupOptionsData } = useQuery({
+    queryKey: ['user-groups-options'],
+    queryFn: () => userGroupApi.list({ page: 1, page_size: 200 }),
+  })
+
   const { data: rgsData } = useQuery({
     queryKey: ['all-resource-groups'],
     queryFn: () => resourceGroupApi.list({ page: 1, page_size: 200 }),
@@ -115,6 +121,7 @@ const UserGroupManagement: React.FC = () => {
   const allRgItems = rgsData?.items ?? []
   const allRgs = allRgItems.filter((rg: any) => rg.is_active)
   const groups = groupsData?.items ?? []
+  const optionGroups = groupOptionsData?.items ?? groups
 
   const userTransferSource = allUsers.map((u: any) => ({
     key: String(u.id),
@@ -140,6 +147,7 @@ const UserGroupManagement: React.FC = () => {
     onSuccess: () => {
       messageApi.success('用户组创建成功')
       qc.invalidateQueries({ queryKey: ['user-groups'] })
+      qc.invalidateQueries({ queryKey: ['user-groups-options'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups-for-rg'] })
       setModalOpen(false)
@@ -153,6 +161,7 @@ const UserGroupManagement: React.FC = () => {
     onSuccess: () => {
       messageApi.success('用户组已更新')
       qc.invalidateQueries({ queryKey: ['user-groups'] })
+      qc.invalidateQueries({ queryKey: ['user-groups-options'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups-for-rg'] })
       setModalOpen(false)
@@ -167,6 +176,7 @@ const UserGroupManagement: React.FC = () => {
     onSuccess: () => {
       messageApi.success('用户组已删除')
       qc.invalidateQueries({ queryKey: ['user-groups'] })
+      qc.invalidateQueries({ queryKey: ['user-groups-options'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups-for-rg'] })
     },
@@ -194,6 +204,7 @@ const UserGroupManagement: React.FC = () => {
     mutationFn: (file: File) => userGroupApi.import(file),
     onSuccess: (resp: any) => {
       qc.invalidateQueries({ queryKey: ['user-groups'] })
+      qc.invalidateQueries({ queryKey: ['user-groups-options'] })
       qc.invalidateQueries({ queryKey: ['all-user-groups'] })
       const data = resp?.data as ImportResult
       setImportOpen(false)
@@ -289,11 +300,13 @@ const UserGroupManagement: React.FC = () => {
   }
 
   const handleFilterChange = <T,>(setter: (value: T) => void, value: T) => {
+    setPage(1)
     setSelectedRowKeys([])
     setter(value)
   }
 
   const resetFilters = () => {
+    setPage(1)
     setSelectedRowKeys([])
     setSearch('')
     setLeaderIds([])
@@ -306,7 +319,7 @@ const UserGroupManagement: React.FC = () => {
     value: u.id, label: `${u.display_name || u.username} (${u.username})`,
   }))
 
-  const parentOptions = groups
+  const parentOptions = optionGroups
     .filter((g: any) => g.id !== editId)
     .map((g: any) => ({
       value: g.id, label: g.name_cn || g.name,
@@ -322,11 +335,11 @@ const UserGroupManagement: React.FC = () => {
   )
 
   const groupNameMap = new Map<number, string>(
-    groups.map((g: any) => [g.id, g.name_cn || g.name]),
+    optionGroups.map((g: any) => [g.id, g.name_cn || g.name]),
   )
 
   const activeFilterTags = [
-    ...(search ? [{ key: `search:${search}`, label: `关键词：${search}`, onClose: () => setSearch('') }] : []),
+    ...(search ? [{ key: `search:${search}`, label: `关键词：${search}`, onClose: () => { setSearch(''); setPage(1) } }] : []),
     ...leaderIds.map((leaderId) => {
       const label = leaderOptions.find((item) => item.value === leaderId)?.label || String(leaderId)
       return {
@@ -450,8 +463,8 @@ const UserGroupManagement: React.FC = () => {
             placeholder="搜索用户组标识或中文名"
             allowClear
             value={search}
-            onSearch={setSearch}
-            onChange={(e) => setSearch(e.target.value)}
+            onSearch={(value) => { setSearch(value); setPage(1) }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             style={{ width: isMobile ? '100%' : 400, maxWidth: '100%' }}
           />
           <Select
@@ -553,7 +566,17 @@ const UserGroupManagement: React.FC = () => {
           locale={{ emptyText: <TableEmptyState title="暂无用户组数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1180 }}
-          pagination={false}
+          pagination={getTablePaginationConfig({
+            total: groupsData?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 个用户组`,
+            onChange: (nextPage, nextPageSize) => {
+              if (nextPage !== page || nextPageSize !== pageSize) setSelectedRowKeys([])
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
           size="middle"
           rowSelection={{
             selectedRowKeys,

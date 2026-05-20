@@ -9,6 +9,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -31,6 +32,7 @@ export default function QueryHistoryPage() {
   const queryClient = useQueryClient()
   const [msgApi, msgCtx] = message.useMessage()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   const [instanceId, setInstanceId] = useState<number | undefined>()
   const [username, setUsername] = useState('')
   const [dbName, setDbName] = useState('')
@@ -55,8 +57,8 @@ export default function QueryHistoryPage() {
     date_start: dateRange?.[0],
     date_end: dateRange?.[1],
     page,
-    page_size: 50,
-  }), [dateRange, dbName, instanceId, masking, operationType, page, sqlKeyword, username])
+    page_size: pageSize,
+  }), [dateRange, dbName, instanceId, masking, operationType, page, pageSize, sqlKeyword, username])
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['query-history', params],
@@ -260,7 +262,7 @@ export default function QueryHistoryPage() {
         </Space>
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table
           dataSource={data?.items}
           columns={columns}
@@ -270,14 +272,16 @@ export default function QueryHistoryPage() {
           size="small"
           tableLayout="fixed"
           scroll={{ x: 1600 }}
-          pagination={{
+          pagination={getTablePaginationConfig({
             total: data?.total,
             current: page,
-            pageSize: 50,
-            onChange: (p) => setPage(p),
-            showSizeChanger: false,
+            pageSize,
             showTotal: (t) => `共 ${t} 条记录`,
-          }}
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
         />
       </Card>
 

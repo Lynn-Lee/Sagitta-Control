@@ -14,6 +14,7 @@ import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -735,17 +736,15 @@ export default function QueryPage() {
                           size="small"
                           locale={{ emptyText: <TableEmptyState title="暂无查询结果" /> }}
                           scroll={{ x: 'max-content', y: resultTableHeight - 56 }}
-                          pagination={{
+                          pagination={getTablePaginationConfig({
                             current: resultPage,
                             pageSize: resultPageSize,
                             total: resultRows.length,
-                            showSizeChanger: true,
-                            pageSizeOptions: ['20', '50', '100'],
                             onChange: (page, pageSize) => {
                               setResultPage(page)
                               setResultPageSize(pageSize)
                             },
-                          }} />
+                          })} />
                   )}
                   {!result && !executing && !accessExplanation && (
                     <div style={{ minHeight: resultTableHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

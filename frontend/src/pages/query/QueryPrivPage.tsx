@@ -11,6 +11,7 @@ import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 import dayjs from 'dayjs'
 
 const { Text } = Typography
@@ -58,6 +59,14 @@ export default function QueryPrivPage() {
   const [auditTarget, setAuditTarget] = useState<any>(null)
   const [riskPlan, setRiskPlan] = useState<RiskPlan | null>(null)
   const [riskChecking, setRiskChecking] = useState(false)
+  const [applyPage, setApplyPage] = useState(1)
+  const [applyPageSize, setApplyPageSize] = useState(20)
+  const [auditPage, setAuditPage] = useState(1)
+  const [auditPageSize, setAuditPageSize] = useState(20)
+  const [managePage, setManagePage] = useState(1)
+  const [managePageSize, setManagePageSize] = useState(20)
+  const [revokedPage, setRevokedPage] = useState(1)
+  const [revokedPageSize, setRevokedPageSize] = useState(20)
   const [msgApi, msgCtx] = message.useMessage()
 
   useEffect(() => {
@@ -89,27 +98,27 @@ export default function QueryPrivPage() {
 
   // 申请列表
   const { data: applyData } = useQuery({
-    queryKey: ['query-priv-applies', user?.id],
-    queryFn: () => queryApi.listApplies({ page_size: 50 }),
+    queryKey: ['query-priv-applies', user?.id, applyPage, applyPageSize],
+    queryFn: () => queryApi.listApplies({ page: applyPage, page_size: applyPageSize }),
     refetchOnMount: 'always',
     refetchInterval: 5000,
   })
 
   const { data: auditData } = useQuery({
-    queryKey: ['query-priv-audit-records', user?.id],
-    queryFn: () => queryApi.listAuditRecords({ page_size: 50 }),
+    queryKey: ['query-priv-audit-records', user?.id, auditPage, auditPageSize],
+    queryFn: () => queryApi.listAuditRecords({ page: auditPage, page_size: auditPageSize }),
     refetchOnMount: 'always',
     refetchInterval: 5000,
   })
   const { data: manageData } = useQuery({
-    queryKey: ['query-priv-manage', user?.id],
-    queryFn: () => queryApi.listManagePrivileges({ page_size: 50, status: 'active' }),
+    queryKey: ['query-priv-manage', user?.id, managePage, managePageSize],
+    queryFn: () => queryApi.listManagePrivileges({ page: managePage, page_size: managePageSize, status: 'active' }),
     refetchOnMount: 'always',
     refetchInterval: 5000,
   })
   const { data: revokedData } = useQuery({
-    queryKey: ['query-priv-revoked', user?.id],
-    queryFn: () => queryApi.listManagePrivileges({ page_size: 50, status: 'revoked' }),
+    queryKey: ['query-priv-revoked', user?.id, revokedPage, revokedPageSize],
+    queryFn: () => queryApi.listManagePrivileges({ page: revokedPage, page_size: revokedPageSize, status: 'revoked' }),
     refetchOnMount: 'always',
     refetchInterval: 5000,
   })
@@ -490,13 +499,36 @@ export default function QueryPrivPage() {
     },
   ]
 
+  const remotePagination = (
+    total: number | undefined,
+    current: number,
+    pageSize: number,
+    setCurrent: (value: number) => void,
+    setSize: (value: number) => void,
+    label: string,
+  ) => getTablePaginationConfig({
+    total,
+    current,
+    pageSize,
+    showTotal: t => `共 ${t} ${label}`,
+    onChange: (nextPage, nextPageSize) => {
+      setCurrent(nextPageSize !== pageSize ? 1 : nextPage)
+      setSize(nextPageSize)
+    },
+  })
+
   const tabItems = [
     {
       key: 'privs',
       label: `我的权限（${privData?.items?.length ?? 0}）`,
       children: (
         <Table dataSource={privData?.items} columns={privColumns}
-          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 950 }} pagination={{ pageSize: 20 }} />
+          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 950 }}
+          pagination={getTablePaginationConfig({
+            pageSize: 20,
+            total: privData?.total ?? privData?.items?.length,
+            showTotal: t => `共 ${t} 条`,
+          })} />
       ),
     },
     {
@@ -504,7 +536,8 @@ export default function QueryPrivPage() {
       label: `申请记录（${applyData?.total ?? 0}）`,
       children: (
         <Table dataSource={applyData?.items} columns={applyColumns as any}
-          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1840 }} pagination={{ pageSize: 20 }} />
+          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1840 }}
+          pagination={remotePagination(applyData?.total, applyPage, applyPageSize, setApplyPage, setApplyPageSize, '条申请')} />
       ),
     },
     {
@@ -518,7 +551,7 @@ export default function QueryPrivPage() {
           size="small"
           tableLayout="fixed"
           scroll={{ x: 2100 }}
-          pagination={{ pageSize: 20 }}
+          pagination={remotePagination(auditData?.total, auditPage, auditPageSize, setAuditPage, setAuditPageSize, '条记录')}
         />
       ),
     },
@@ -537,7 +570,7 @@ export default function QueryPrivPage() {
             size="small"
             tableLayout="fixed"
             scroll={{ x: 1200 }}
-            pagination={{ pageSize: 20 }}
+            pagination={remotePagination(manageData?.total, managePage, managePageSize, setManagePage, setManagePageSize, '条权限')}
           />
         </>
       ),
@@ -557,7 +590,7 @@ export default function QueryPrivPage() {
             size="small"
             tableLayout="fixed"
             scroll={{ x: 1540 }}
-            pagination={{ pageSize: 20 }}
+            pagination={remotePagination(revokedData?.total, revokedPage, revokedPageSize, setRevokedPage, setRevokedPageSize, '条权限')}
           />
         </>
       ),

@@ -7,6 +7,7 @@ import apiClient from '@/api/client'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -28,6 +29,7 @@ export default function AuditLog() {
   const [result, setResult] = useState<string | undefined>()
   const [dateRange, setDateRange] = useState<[string, string] | null>(null)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
   const params = {
     username: username || undefined,
@@ -37,7 +39,7 @@ export default function AuditLog() {
     date_start: dateRange?.[0] || undefined,
     date_end: dateRange?.[1] || undefined,
     page,
-    page_size: 50,
+    page_size: pageSize,
   }
 
   const { data, isLoading, refetch } = useQuery({
@@ -109,8 +111,7 @@ export default function AuditLog() {
         </Space>
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table
           dataSource={data?.items}
           columns={columns}
@@ -120,11 +121,14 @@ export default function AuditLog() {
           size="small"
           tableLayout="fixed"
           scroll={{ x: 1100 }}
-          pagination={{
-            total: data?.total, current: page, pageSize: 50,
-            onChange: p => setPage(p), showSizeChanger: false,
+          pagination={getTablePaginationConfig({
+            total: data?.total, current: page, pageSize,
             showTotal: t => `共 ${t} 条记录`,
-          }}
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
         />
       </Card>
     </div>

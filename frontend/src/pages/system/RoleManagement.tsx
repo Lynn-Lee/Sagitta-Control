@@ -8,6 +8,7 @@ import { roleApi, permissionApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { useBreakpoint } = Grid
 
@@ -172,7 +173,11 @@ const RoleManagement: React.FC = () => {
           locale={{ emptyText: <TableEmptyState title="暂无角色数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1180 }}
-          pagination={false}
+          pagination={getTablePaginationConfig({
+            pageSize: 20,
+            total: filtered.length,
+            showTotal: t => `共 ${t} 个角色`,
+          })}
           size="middle"
         />
       </Card>

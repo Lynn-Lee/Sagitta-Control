@@ -7,6 +7,7 @@ import { userApi, roleApi, userGroupApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Dragger } = Upload
@@ -552,7 +553,7 @@ export default function UserManagement() {
           </Space>
         </div>
       </FilterCard>
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无用户数据" /> }}
           rowSelection={{
@@ -560,12 +561,10 @@ export default function UserManagement() {
             onChange: (keys) => setSelectedRowKeys(keys.map((key) => Number(key))),
           }}
           scroll={{ x: 1680 }}
-          pagination={{
+          pagination={getTablePaginationConfig({
             current: page,
             total: data?.total,
             pageSize,
-            showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50, 100],
             showTotal: t => `共 ${t} 个用户`,
             onChange: (nextPage, nextPageSize) => {
               if (nextPage !== page || nextPageSize !== pageSize) setSelectedRowKeys([])
@@ -576,7 +575,7 @@ export default function UserManagement() {
               }
               setPageSize(nextPageSize)
             },
-          }} />
+          })} />
       </Card>
       <Modal title={editId ? '编辑用户' : '新建用户'} open={modalOpen} maskClosable={false} onOk={handleSubmit} onCancel={() => setModalOpen(false)}
         okText={editId ? '保存' : '创建'} confirmLoading={createMut.isPending || updateMut.isPending} width={640}>

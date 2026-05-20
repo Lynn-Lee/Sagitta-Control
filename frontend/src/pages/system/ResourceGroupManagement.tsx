@@ -11,6 +11,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { useBreakpoint } = Grid
@@ -25,14 +26,16 @@ export default function ResourceGroupManagement() {
   const [editRecord, setEditRecord] = useState<any>(null)
   const [currentRg, setCurrentRg] = useState<any>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [ugTargetKeys, setUgTargetKeys] = useState<string[]>([])
   const [savingMembers, setSavingMembers] = useState(false)
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['resource-groups', search],
-    queryFn: () => resourceGroupApi.list({ search: search || undefined, page_size: 100 }),
+    queryKey: ['resource-groups', search, page, pageSize],
+    queryFn: () => resourceGroupApi.list({ search: search || undefined, page, page_size: pageSize }),
   })
 
   const { data: instanceData } = useQuery({
@@ -228,16 +231,25 @@ export default function ResourceGroupManagement() {
 
       <FilterCard>
         <Input.Search placeholder="搜索资源组名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
-          onSearch={setSearch} onChange={e => !e.target.value && setSearch('')} />
+          onSearch={(value) => { setSearch(value); setPage(1) }}
+          onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无资源组数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1080 }}
-          pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />
+          pagination={getTablePaginationConfig({
+            total: data?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 个资源组`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })} />
       </Card>
 
       {/* 新建/编辑资源组 Modal */}

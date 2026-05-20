@@ -13,6 +13,7 @@ import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
 import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text, Title } = Typography
 const { Option } = Select
@@ -282,9 +283,12 @@ export default function MonitorPage() {
   const [configTarget, setConfigTarget] = useState<MonitorInstance | null>(null)
   const [configScope, setConfigScope] = useState<'single' | 'all'>('single')
   const [configOpen, setConfigOpen] = useState(false)
+  const [overviewPage, setOverviewPage] = useState(1)
+  const [overviewPageSize, setOverviewPageSize] = useState(20)
   const [tableDb, setTableDb] = useState<string | undefined>()
   const [tableSearch, setTableSearch] = useState('')
   const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(100)
   const [form] = Form.useForm()
 
   const { data, isLoading } = useQuery({
@@ -314,6 +318,10 @@ export default function MonitorPage() {
     if (collectStatusFilter && item.last_collect_status !== collectStatusFilter) return false
     return true
   }), [allInstances, dbTypeFilter, riskFilter, collectStatusFilter])
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(instances.length / overviewPageSize))
+    if (overviewPage > maxPage) setOverviewPage(maxPage)
+  }, [instances.length, overviewPage, overviewPageSize])
   const activeId = selectedId || instances[0]?.instance_id || null
   const active = instances.find(i => i.instance_id === activeId) || null
   const topSqlDateStart = topSqlCustomRange?.[0]?.format(TOP_SQL_TIME_FORMAT)
@@ -375,8 +383,8 @@ export default function MonitorPage() {
     enabled: !!activeId,
   })
   const { data: tableCapacity, isLoading: tableLoading } = useQuery({
-    queryKey: ['native-monitor-table-capacity', activeId, tableDb, tableSearch, tablePage],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/tables/`, { params: { db_name: tableDb, search: tableSearch, page: tablePage, page_size: 100 } }).then(r => r.data),
+    queryKey: ['native-monitor-table-capacity', activeId, tableDb, tableSearch, tablePage, tablePageSize],
+    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/tables/`, { params: { db_name: tableDb, search: tableSearch, page: tablePage, page_size: tablePageSize } }).then(r => r.data),
     enabled: !!activeId,
   })
   const showOverviewActions = mainTab === 'instance-overview'
@@ -767,15 +775,33 @@ export default function MonitorPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 420,
+      width: 210,
       render: (_: any, row: MonitorInstance) => (
-        <Space onClick={(event) => event.stopPropagation()}>
-          <Button size="small" icon={<BarChartOutlined />} onClick={() => showInstanceMonitor(row.instance_id)}>查看监控</Button>
-          {canViewSessions && <Button size="small" icon={<FieldTimeOutlined />} onClick={() => openWorkbench(row.instance_id, 'sessions')}>会话</Button>}
-          {canViewSql && <Button size="small" icon={<AlertOutlined />} onClick={() => openWorkbench(row.instance_id, 'sql')}>SQL</Button>}
-          {canManageConfig && <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(row)}>配置</Button>}
-          {canManageConfig && <Button size="small" type="primary" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)}>立即采集指标</Button>}
-        </Space>
+        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8 }} onClick={(event) => event.stopPropagation()}>
+          <AntTooltip title="查看监控">
+            <Button size="small" aria-label="查看监控" icon={<BarChartOutlined />} onClick={() => showInstanceMonitor(row.instance_id)} />
+          </AntTooltip>
+          {canViewSessions && (
+            <AntTooltip title="会话">
+              <Button size="small" aria-label="会话" icon={<FieldTimeOutlined />} onClick={() => openWorkbench(row.instance_id, 'sessions')} />
+            </AntTooltip>
+          )}
+          {canViewSql && (
+            <AntTooltip title="SQL">
+              <Button size="small" aria-label="SQL" icon={<AlertOutlined />} onClick={() => openWorkbench(row.instance_id, 'sql')} />
+            </AntTooltip>
+          )}
+          {canManageConfig && (
+            <AntTooltip title="配置">
+              <Button size="small" aria-label="配置" icon={<SettingOutlined />} onClick={() => openConfig(row)} />
+            </AntTooltip>
+          )}
+          {canManageConfig && (
+            <AntTooltip title="立即采集指标">
+              <Button size="small" type="primary" aria-label="立即采集指标" icon={<PlayCircleOutlined />} disabled={collectAll.isPending} loading={collectNow.isPending && activeId === row.instance_id} onClick={() => triggerCollect(row.instance_id)} />
+            </AntTooltip>
+          )}
+        </div>
       ),
     },
   ]
@@ -964,16 +990,16 @@ export default function MonitorPage() {
                 </div>
                 <Card size="small" styles={{ body: { padding: 12 } }}>
                   <Space wrap>
-                    <Select allowClear placeholder="数据库类型" style={{ width: 180 }} value={dbTypeFilter} onChange={setDbTypeFilter}>
+                    <Select allowClear placeholder="数据库类型" style={{ width: 180 }} value={dbTypeFilter} onChange={(value) => { setDbTypeFilter(value); setOverviewPage(1) }}>
                       {dbTypeOptions.map(type => <Option key={type} value={type}>{formatDbTypeLabel(type)}</Option>)}
                     </Select>
-                    <Select allowClear placeholder="风险等级" style={{ width: 160 }} value={riskFilter} onChange={setRiskFilter}>
+                    <Select allowClear placeholder="风险等级" style={{ width: 160 }} value={riskFilter} onChange={(value) => { setRiskFilter(value); setOverviewPage(1) }}>
                       <Option value="critical">严重</Option>
                       <Option value="warning">警告</Option>
                       <Option value="attention">关注</Option>
                       <Option value="healthy">健康</Option>
                     </Select>
-                    <Select allowClear placeholder="采集状态" style={{ width: 160 }} value={collectStatusFilter} onChange={setCollectStatusFilter}>
+                    <Select allowClear placeholder="采集状态" style={{ width: 160 }} value={collectStatusFilter} onChange={(value) => { setCollectStatusFilter(value); setOverviewPage(1) }}>
                       <Option value="success">正常</Option>
                       <Option value="partial">部分缺失</Option>
                       <Option value="failed">采集失败</Option>
@@ -987,8 +1013,17 @@ export default function MonitorPage() {
                   rowKey="instance_id"
                   loading={isLoading}
                   tableLayout="fixed"
-                  scroll={{ x: 2230 }}
-                  pagination={false}
+                  scroll={{ x: 'max-content' }}
+                  pagination={getTablePaginationConfig({
+                    total: instances.length,
+                    current: overviewPage,
+                    pageSize: overviewPageSize,
+                    showTotal: t => `共 ${t} 个实例`,
+                    onChange: (nextPage, nextPageSize) => {
+                      setOverviewPage(nextPageSize !== overviewPageSize ? 1 : nextPage)
+                      setOverviewPageSize(nextPageSize)
+                    },
+                  })}
                   rowClassName={(row) => row.instance_id === activeId ? 'ant-table-row-selected' : ''}
                   onRow={(row) => ({
                     onClick: () => showInstanceMonitor(row.instance_id),
@@ -1130,7 +1165,16 @@ export default function MonitorPage() {
                             </Select>
                             <Input.Search allowClear placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
                           </Space>
-                          <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={{ total: tableCapacity?.total, pageSize: 100, current: tablePage, showSizeChanger: false, onChange: setTablePage }} locale={{ emptyText: <TableEmptyState title="暂无表容量数据" /> }} />
+                          <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={getTablePaginationConfig({
+                            total: tableCapacity?.total,
+                            pageSize: tablePageSize,
+                            current: tablePage,
+                            showTotal: t => `共 ${t} 张表`,
+                            onChange: (nextPage, nextPageSize) => {
+                              setTablePage(nextPageSize !== tablePageSize ? 1 : nextPage)
+                              setTablePageSize(nextPageSize)
+                            },
+                          })} locale={{ emptyText: <TableEmptyState title="暂无表容量数据" /> }} />
                         </Space>
                       ),
                     },
@@ -1203,7 +1247,11 @@ export default function MonitorPage() {
                             </Space>
                           </div>
                           {topSqlData?.error && <Alert type="warning" showIcon message="Top SQL 采集受限" description={topSqlData.error} />}
-                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 3050 }} tableLayout="fixed" pagination={{ pageSize: 10 }} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
+                          <Table dataSource={topSqlData?.items || []} columns={topSqlColumns} rowKey={(row: any, index) => `${row.sql_id || row.source_ref || row.sql_text || 'sql'}-${index}`} scroll={{ x: 3050 }} tableLayout="fixed" pagination={getTablePaginationConfig({
+                            pageSize: 10,
+                            total: topSqlData?.items?.length,
+                            showTotal: t => `共 ${t} 条 SQL`,
+                          })} locale={{ emptyText: <TableEmptyState title="暂无 Top SQL 数据" /> }} />
                           <SqlInsightPanel embedded instanceId={activeId} />
                         </Space>
                       ) : <TableEmptyState title="暂无 SQL 洞察权限" />,

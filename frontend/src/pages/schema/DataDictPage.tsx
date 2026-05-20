@@ -16,6 +16,7 @@ import SectionLoading from '@/components/common/SectionLoading'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -530,8 +531,7 @@ export default function DataDictPage() {
                   {columns.length > 0 && <Tag>{columns.length} 列</Tag>}
                 </Space>
               ) : '请选择一张表查看字段详情'}
-              style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-              styles={{ body: { padding: 0 } }}>
+              style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
               {selectedTable ? (
                 <>
                   <Table
@@ -542,7 +542,11 @@ export default function DataDictPage() {
                     size="small"
                     tableLayout="fixed"
                     scroll={{ x: 1200 }}
-                    pagination={{ pageSize: 50, showSizeChanger: false }}
+                    pagination={getTablePaginationConfig({
+                      pageSize: 50,
+                      total: decoratedColumns.length,
+                      showTotal: t => `共 ${t} 个字段`,
+                    })}
                   />
 
                   <div style={{ padding: '0 16px 16px' }}>

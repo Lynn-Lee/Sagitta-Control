@@ -14,6 +14,7 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 import dayjs from 'dayjs'
 
 const { Text } = Typography
@@ -163,6 +164,7 @@ export default function WorkflowList() {
   const [dbNameFilter, setDbNameFilter] = useState('')
   const [dateRange, setDateRange] = useState<[string, string] | null>(null)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const { data: instanceData } = useQuery({
     queryKey: ['instances-for-wf-filter'],
@@ -179,7 +181,7 @@ export default function WorkflowList() {
     date_start: dateRange?.[0] || undefined,
     date_end: dateRange?.[1] || undefined,
     page,
-    page_size: 20,
+    page_size: pageSize,
   }
 
   const { data, isLoading, refetch } = useQuery({
@@ -403,7 +405,6 @@ export default function WorkflowList() {
 
       <Card
         style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}
       >
         <Table
           dataSource={data?.items}
@@ -413,14 +414,16 @@ export default function WorkflowList() {
           locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
           scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1885 : activeTab === 'execute' ? 1815 : 1745 }}
-          pagination={{
+          pagination={getTablePaginationConfig({
             total: data?.total,
             current: page,
-            pageSize: 20,
-            onChange: p => setPage(p),
-            showSizeChanger: false,
+            pageSize,
             showTotal: t => `共 ${t} 个工单`,
-          }}
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
         />
       </Card>
     </div>

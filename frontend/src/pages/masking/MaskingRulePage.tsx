@@ -10,6 +10,7 @@ import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -143,6 +144,8 @@ export default function MaskingRulePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [ruleType, setRuleType] = useState('phone')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
 
@@ -155,8 +158,8 @@ export default function MaskingRulePage() {
     queryFn: () => instanceApi.list({ page_size: 200 }),
   })
   const { data, isLoading } = useQuery({
-    queryKey: ['masking-rules'],
-    queryFn: () => apiClient.get('/masking/').then(r => r.data),
+    queryKey: ['masking-rules', page, pageSize],
+    queryFn: () => apiClient.get('/masking/', { params: { page, page_size: pageSize } }).then(r => r.data),
   })
 
   const createMut = useMutation({
@@ -238,12 +241,21 @@ export default function MaskingRulePage() {
         actions={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button>}
       />
 
-      <SectionCard bodyPadding={0} marginBottom={0}>
+      <SectionCard marginBottom={0}>
         <Table dataSource={data?.items} columns={columns} rowKey="id" loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无脱敏规则" /> }}
           tableLayout="fixed"
           scroll={{ x: 980 }}
-          pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />
+          pagination={getTablePaginationConfig({
+            total: data?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 条规则`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })} />
       </SectionCard>
 
       <Modal title={editId ? '编辑脱敏规则' : '新建脱敏规则'} open={modalOpen}

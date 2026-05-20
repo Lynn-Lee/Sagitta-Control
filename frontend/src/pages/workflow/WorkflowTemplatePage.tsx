@@ -39,6 +39,7 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -67,6 +68,8 @@ export default function WorkflowTemplatePage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewData, setPreviewData] = useState<WorkflowTemplateItem | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [sql, setSql] = useState('')
   const [form] = Form.useForm<TemplateFormValues>()
   const [msgApi, msgCtx] = message.useMessage()
@@ -87,8 +90,8 @@ export default function WorkflowTemplatePage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['workflow-templates', search],
-    queryFn: () => workflowTemplateApi.list({ search: search || undefined, page_size: 100 }),
+    queryKey: ['workflow-templates', search, page, pageSize],
+    queryFn: () => workflowTemplateApi.list({ search: search || undefined, page, page_size: pageSize }),
   })
 
   const instanceItems = useMemo(() => instances?.items || [], [instances?.items])
@@ -374,12 +377,12 @@ export default function WorkflowTemplatePage() {
           placeholder="搜索模板名称或描述"
           allowClear
           style={{ width: 320 }}
-          onSearch={setSearch}
-          onChange={(e) => !e.target.value && setSearch('')}
+          onSearch={(value) => { setSearch(value); setPage(1) }}
+          onChange={(e) => { if (!e.target.value) { setSearch(''); setPage(1) } }}
         />
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }} styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table
           dataSource={data?.items || []}
           columns={columns}
@@ -388,7 +391,16 @@ export default function WorkflowTemplatePage() {
           locale={{ emptyText: <TableEmptyState title="暂无工单模板" /> }}
           tableLayout="fixed"
           scroll={{ x: 1700 }}
-          pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }}
+          pagination={getTablePaginationConfig({
+            total: data?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 个模板`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
         />
       </Card>
 

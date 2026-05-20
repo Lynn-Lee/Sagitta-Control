@@ -15,6 +15,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { DB_TYPES, formatDbTypeLabel, getEngineSupport, isExperimentalDbType } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { Option } = Select
@@ -152,7 +153,11 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         size="small"
         tableLayout="fixed"
         scroll={{ x: 820 }}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        pagination={getTablePaginationConfig({
+          pageSize: 20,
+          total: data?.total,
+          showTotal: t => `共 ${t} 个${dbLabel}`,
+        })}
       />
 
       <Modal title={`添加${dbLabel}`} open={addModalOpen}
@@ -197,16 +202,19 @@ export default function InstanceList() {
   const [selectedInstance, setSelectedInstance] = useState<InstanceItem | null>(null)
   const [editRecord, setEditRecord] = useState<InstanceItem | null>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [testResults, setTestResults] = useState<Record<number, any>>({})
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
   const selectedDbType = Form.useWatch('db_type', form)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['instances', search],
+    queryKey: ['instances', search, page, pageSize],
     queryFn: () => instanceApi.list({
       search: search || undefined,
-      page_size: 100,
+      page,
+      page_size: pageSize,
       include_inactive: true,
     }),
   })
@@ -341,17 +349,26 @@ export default function InstanceList() {
 
       <FilterCard>
         <Input.Search placeholder="搜索实例名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
-          onSearch={setSearch} onChange={e => !e.target.value && setSearch('')} />
+          onSearch={(value) => { setSearch(value); setPage(1) }}
+          onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-        styles={{ body: { padding: 0 } }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table dataSource={data?.items} columns={columns} rowKey="id"
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无实例数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1080 }}
-          pagination={{ total: data?.total, pageSize: 20, showSizeChanger: false }} />
+          pagination={getTablePaginationConfig({
+            total: data?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 个实例`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })} />
       </Card>
 
       {/* 新建/编辑实例 Modal */}

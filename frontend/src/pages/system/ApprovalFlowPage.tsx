@@ -12,6 +12,7 @@ import { approvalFlowApi, type ApprovalFlowNode } from '@/api/approvalFlow'
 import { userApi } from '@/api/system'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
 const { useBreakpoint } = Grid
@@ -35,13 +36,15 @@ export default function ApprovalFlowPage() {
   const [drawerOpen, setDrawerOpen]   = useState(false)
   const [editId, setEditId]           = useState<number | null>(null)
   const [search, setSearch]           = useState('')
+  const [page, setPage]               = useState(1)
+  const [pageSize, setPageSize]       = useState(20)
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
 
   // ── Data queries ────────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ['approval-flows', search],
-    queryFn: () => approvalFlowApi.list({ search: search || undefined, page_size: 100 }),
+    queryKey: ['approval-flows', search, page, pageSize],
+    queryFn: () => approvalFlowApi.list({ search: search || undefined, page, page_size: pageSize }),
   })
 
   const { data: allUsers } = useQuery({
@@ -201,8 +204,8 @@ export default function ApprovalFlowPage() {
               placeholder="搜索审批流名称"
               allowClear
               style={{ width: isMobile ? '100%' : 220 }}
-              onSearch={v => setSearch(v)}
-              onChange={e => !e.target.value && setSearch('')}
+              onSearch={v => { setSearch(v); setPage(1) }}
+              onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }}
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
               style={isMobile ? { width: '100%' } : undefined}>
@@ -212,7 +215,7 @@ export default function ApprovalFlowPage() {
         )}
       />
 
-      <Card bordered={false} bodyStyle={{ padding: 0 }}>
+      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table
           rowKey="id"
           columns={columns}
@@ -221,7 +224,16 @@ export default function ApprovalFlowPage() {
           locale={{ emptyText: <TableEmptyState title="暂无审批流数据" /> }}
           tableLayout="fixed"
           scroll={{ x: 1100 }}
-          pagination={{ pageSize: 20, showSizeChanger: false, showTotal: t => `共 ${t} 条` }}
+          pagination={getTablePaginationConfig({
+            total: data?.total,
+            current: page,
+            pageSize,
+            showTotal: t => `共 ${t} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize !== pageSize ? 1 : nextPage)
+              setPageSize(nextPageSize)
+            },
+          })}
         />
       </Card>
 

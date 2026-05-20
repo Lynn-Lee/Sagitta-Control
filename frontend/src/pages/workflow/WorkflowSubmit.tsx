@@ -13,6 +13,7 @@ import SectionCard from '@/components/common/SectionCard'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 import {
   workflowTemplateApi,
   type WorkflowTemplateCategory,
@@ -453,7 +454,11 @@ export default function WorkflowSubmit() {
       {checkResults.length > 0 && (
         <SectionCard title="预检查结果" bodyPadding={0}>
           <Table dataSource={checkResults} columns={checkColumns} rowKey="id" size="small"
-            tableLayout="fixed" scroll={{ x: 900 }} pagination={false} />
+            tableLayout="fixed" scroll={{ x: 900 }} pagination={getTablePaginationConfig({
+              pageSize: 20,
+              total: checkResults.length,
+              showTotal: t => `共 ${t} 条检查结果`,
+            })} />
         </SectionCard>
       )}
 

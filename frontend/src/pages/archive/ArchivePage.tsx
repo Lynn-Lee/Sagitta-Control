@@ -27,6 +27,7 @@ import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text, Paragraph } = Typography
 const { Option } = Select
@@ -78,6 +79,8 @@ export default function ArchivePage() {
   const [drawerTab, setDrawerTab] = useState('summary')
   const [executeModalOpen, setExecuteModalOpen] = useState(false)
   const [executeTarget, setExecuteTarget] = useState<ArchiveJob | null>(null)
+  const [jobsPage, setJobsPage] = useState(1)
+  const [jobsPageSize, setJobsPageSize] = useState(50)
   const executeMode = Form.useWatch('mode', executeForm) || 'immediate'
 
   const { data: instances } = useQuery({
@@ -98,8 +101,8 @@ export default function ArchivePage() {
     queryFn: () => approvalFlowApi.list({ page_size: 100 }),
   })
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
-    queryKey: ['archive-jobs'],
-    queryFn: () => archiveApi.listJobs({ page_size: 50 }),
+    queryKey: ['archive-jobs', jobsPage, jobsPageSize],
+    queryFn: () => archiveApi.listJobs({ page: jobsPage, page_size: jobsPageSize }),
     refetchInterval: 3000,
   })
   const { data: selectedJob, isLoading: jobLoading } = useQuery({
@@ -665,14 +668,22 @@ export default function ArchivePage() {
               <SectionCard
                 title="归档作业"
                 extra={<Button icon={<ReloadOutlined />} onClick={invalidateJobs}>刷新</Button>}
-                bodyPadding={0}
               >
                 {jobsLoading ? <SectionLoading text="加载归档作业中..." compact /> : (
                   <Table
                     rowKey="id"
                     columns={jobColumns}
                     dataSource={jobsData?.items || []}
-                    pagination={false}
+                    pagination={getTablePaginationConfig({
+                      total: jobsData?.total,
+                      current: jobsPage,
+                      pageSize: jobsPageSize,
+                      showTotal: t => `共 ${t} 个作业`,
+                      onChange: (nextPage, nextPageSize) => {
+                        setJobsPage(nextPageSize !== jobsPageSize ? 1 : nextPage)
+                        setJobsPageSize(nextPageSize)
+                      },
+                    })}
                     tableLayout="fixed"
                     scroll={{ x: 1220 }}
                   />
