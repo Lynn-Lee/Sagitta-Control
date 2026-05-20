@@ -22,6 +22,7 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import Editor from '@monaco-editor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -341,22 +342,26 @@ export default function WorkflowTemplatePage() {
     },
     {
       title: '操作',
-      width: 210,
+      width: 270,
       fixed: 'right' as const,
       render: (_: unknown, record: WorkflowTemplateItem) => (
         <Space size={4} wrap>
           <Button size="small" type="primary" icon={<CopyOutlined />} onClick={() => handleUseTemplate(record)}>
             使用
           </Button>
-          <Button size="small" icon={<EyeOutlined />} onClick={() => { setPreviewData(record); setPreviewOpen(true) }}>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => { setPreviewData(record); setPreviewOpen(true) }}>
             预览
           </Button>
-          <Button size="small" icon={<CopyOutlined />} onClick={() => cloneMut.mutate(record.id)}>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => cloneMut.mutate(record.id)}>
             复制
           </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-          <Popconfirm title="确认删除此模板？" onConfirm={() => deleteMut.mutate(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+            编辑
+          </Button>
+          <Popconfirm title="确认删除此模板？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(record.id)}>
+            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -376,6 +381,7 @@ export default function WorkflowTemplatePage() {
         <Input.Search
           placeholder="搜索模板名称或描述"
           allowClear
+          enterButton={<><SearchOutlined />搜索</>}
           style={{ width: 320 }}
           onSearch={(value) => { setSearch(value); setPage(1) }}
           onChange={(e) => { if (!e.target.value) { setSearch(''); setPage(1) } }}
@@ -411,6 +417,8 @@ export default function WorkflowTemplatePage() {
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
         confirmLoading={createMut.isPending || updateMut.isPending}
+        okText={editId ? '保存' : '创建'}
+        cancelText="取消"
         width={820}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>

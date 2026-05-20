@@ -3,7 +3,10 @@ import {
   Button, Card, Col, Form, Input, Modal, Row, Select, Space, Switch, Table, Tag, Transfer, Typography, Upload, message, Grid,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, DownloadOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined, DownloadOutlined, InboxOutlined, UploadOutlined,
+  EditOutlined, DeleteOutlined, ReloadOutlined, CloseOutlined, SaveOutlined, SearchOutlined,
+} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userGroupApi, userApi, resourceGroupApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
@@ -415,11 +418,15 @@ const UserGroupManagement: React.FC = () => {
       render: (v: boolean) => v ? <Tag color="green">启用</Tag> : <Tag color="red">停用</Tag>,
     },
     {
-      title: '操作', width: 140,
+      title: '操作', width: 160,
       render: (_: any, record: any) => (
         <Space>
-          <a onClick={() => void openEdit(record.id)}>编辑</a>
-          <a onClick={() => deleteMut.mutate(record.id)} style={{ color: '#ff4d4f' }}>删除</a>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => void openEdit(record.id)}>
+            编辑
+          </Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteMut.mutate(record.id)}>
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -433,6 +440,7 @@ const UserGroupManagement: React.FC = () => {
         actions={(
           <Space wrap size={[8, 8]} style={isMobile ? { display: 'flex', width: '100%' } : undefined}>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
               icon={<DownloadOutlined />}
               loading={exportMut.isPending}
               onClick={() => handleExport('xlsx')}
@@ -441,6 +449,7 @@ const UserGroupManagement: React.FC = () => {
               导出 Excel
             </Button>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
               icon={<DownloadOutlined />}
               loading={exportMut.isPending}
               onClick={() => handleExport('csv')}
@@ -448,7 +457,7 @@ const UserGroupManagement: React.FC = () => {
             >
               导出 CSV
             </Button>
-            <Button icon={<UploadOutlined />} onClick={openImport} style={isMobile ? { flex: 1 } : undefined}>
+            <Button className="sagitta-action-btn sagitta-action-btn--upload" icon={<UploadOutlined />} onClick={openImport} style={isMobile ? { flex: 1 } : undefined}>
               导入用户组
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
@@ -462,6 +471,7 @@ const UserGroupManagement: React.FC = () => {
           <Input.Search
             placeholder="搜索用户组标识或中文名"
             allowClear
+            enterButton={<><SearchOutlined />搜索</>}
             value={search}
             onSearch={(value) => { setSearch(value); setPage(1) }}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
@@ -521,7 +531,9 @@ const UserGroupManagement: React.FC = () => {
             value={exportScope}
             onChange={setExportScope}
           />
-          <Button onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>重置筛选</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>
+            重置筛选
+          </Button>
         </Space>
         <div style={{ marginTop: 12 }}>
           <Space wrap size={[8, 8]} style={{
@@ -592,6 +604,10 @@ const UserGroupManagement: React.FC = () => {
         onOk={() => void handleSubmit()}
         onCancel={() => { setModalOpen(false); form.resetFields(); setEditId(null) }}
         confirmLoading={createMut.isPending || updateMut.isPending}
+        okText={editId ? '保存' : '创建'}
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}
         width={700}
       >
         <Form form={form} layout="vertical">
@@ -677,7 +693,10 @@ const UserGroupManagement: React.FC = () => {
         onOk={handleImport}
         onCancel={() => { setImportOpen(false); setImportFile(null) }}
         okText="开始导入"
+        cancelText="取消"
         confirmLoading={importMut.isPending}
+        okButtonProps={{ icon: <UploadOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}
         width={680}
       >
         <Form layout="vertical" style={{ marginTop: 16 }}>
@@ -703,6 +722,8 @@ const UserGroupManagement: React.FC = () => {
           </Form.Item>
           <Space wrap size={12}>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
+              icon={<DownloadOutlined />}
               style={{
                 minWidth: 168,
                 whiteSpace: 'nowrap',
@@ -715,6 +736,8 @@ const UserGroupManagement: React.FC = () => {
               下载 Excel 模板
             </Button>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
+              icon={<DownloadOutlined />}
               style={{ minWidth: 168, whiteSpace: 'nowrap' }}
               onClick={() => void handleDownloadTemplate('csv')}
             >
@@ -733,13 +756,14 @@ const UserGroupManagement: React.FC = () => {
           importResult?.failed ? (
             <Button
               key="export-errors"
+              className="sagitta-action-btn sagitta-action-btn--download"
               icon={<DownloadOutlined />}
               onClick={() => downloadImportErrors(importResult.errors, importResult.import_headers)}
             >
               导出失败记录
             </Button>
           ) : null,
-          <Button key="close" type="primary" onClick={() => setImportResultOpen(false)}>
+          <Button key="close" type="primary" icon={<CloseOutlined />} onClick={() => setImportResultOpen(false)}>
             关闭
           </Button>,
         ]}

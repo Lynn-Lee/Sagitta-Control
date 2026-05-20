@@ -1,4 +1,5 @@
 import { Result, Button } from 'antd'
+import { HomeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 
 export default function Placeholder({ title }: { title: string }) {
@@ -8,7 +9,7 @@ export default function Placeholder({ title }: { title: string }) {
       status="info"
       title={title}
       subTitle="此功能正在开发中，敬请期待"
-      extra={<Button type="primary" onClick={() => navigate('/dashboard')}>返回首页</Button>}
+      extra={<Button type="primary" icon={<HomeOutlined />} onClick={() => navigate('/dashboard')}>返回首页</Button>}
     />
   )
 }

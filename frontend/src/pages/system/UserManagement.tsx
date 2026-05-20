@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, Upload, message, Grid } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined,
+  InboxOutlined, UploadOutlined, ReloadOutlined, CloseOutlined, SaveOutlined, SearchOutlined,
+} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userApi, roleApi, userGroupApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
@@ -414,7 +417,27 @@ export default function UserManagement() {
       render: v => v || <Text type="secondary">—</Text>,
     },
     { title: '状态', dataIndex: 'is_active', width: 80, render: (v, r) => <Switch checked={v} size="small" onChange={c => updateMut.mutate({ id: r.id, data: { is_active: c } })} /> },
-    { title: '操作', width: 100, render: (_, r) => <Space><Button size="small" icon={<EditOutlined />} onClick={() => void openEditWithLatestGroups(r)} /><Popconfirm title="确认删除？" onConfirm={() => deleteMut.mutate(r.id)} okText="删除" cancelText="取消"><Button size="small" danger icon={<DeleteOutlined />} /></Popconfirm></Space> },
+    {
+      title: '操作',
+      width: 160,
+      render: (_, r) => (
+        <Space>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => void openEditWithLatestGroups(r)}>
+            编辑
+          </Button>
+          <Popconfirm
+            title="确认删除？"
+            onConfirm={() => deleteMut.mutate(r.id)}
+            okText="删除"
+            cancelText="取消"
+          >
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ]
 
   return (
@@ -426,6 +449,7 @@ export default function UserManagement() {
         actions={(
           <Space wrap size={[8, 8]} style={isMobile ? { display: 'flex', width: '100%' } : undefined}>
           <Button
+            className="sagitta-action-btn sagitta-action-btn--download"
             icon={<DownloadOutlined />}
             loading={exportMut.isPending}
             onClick={() => handleExport('xlsx')}
@@ -434,6 +458,7 @@ export default function UserManagement() {
             导出 Excel
           </Button>
           <Button
+            className="sagitta-action-btn sagitta-action-btn--download"
             icon={<DownloadOutlined />}
             loading={exportMut.isPending}
             onClick={() => handleExport('csv')}
@@ -441,7 +466,7 @@ export default function UserManagement() {
           >
             导出 CSV
           </Button>
-          <Button icon={<UploadOutlined />} onClick={openImport} style={isMobile ? { flex: 1 } : undefined}>导入用户</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--upload" icon={<UploadOutlined />} onClick={openImport} style={isMobile ? { flex: 1 } : undefined}>导入用户</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => void openCreate()}
             style={isMobile ? { flex: 1 } : undefined}>新建用户</Button>
           </Space>
@@ -452,6 +477,7 @@ export default function UserManagement() {
           <Input.Search
             placeholder="搜索用户名 / 显示名 / 邮箱 / 电话号码"
             allowClear
+            enterButton={<><SearchOutlined />搜索</>}
             style={{ width: filterWidth(320) }}
             value={search}
             onSearch={handleSearch}
@@ -518,7 +544,9 @@ export default function UserManagement() {
             value={exportScope}
             onChange={setExportScope}
           />
-          <Button onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>重置筛选</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>
+            重置筛选
+          </Button>
         </Space>
         <div style={{ marginTop: 12 }}>
           <Space wrap size={[8, 8]} style={{
@@ -578,7 +606,10 @@ export default function UserManagement() {
           })} />
       </Card>
       <Modal title={editId ? '编辑用户' : '新建用户'} open={modalOpen} maskClosable={false} onOk={handleSubmit} onCancel={() => setModalOpen(false)}
-        okText={editId ? '保存' : '创建'} confirmLoading={createMut.isPending || updateMut.isPending} width={640}>
+        okText={editId ? '保存' : '创建'} confirmLoading={createMut.isPending || updateMut.isPending} width={640}
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input disabled={!!editId} /></Form.Item>
           <Form.Item name="display_name" label="显示名称"><Input /></Form.Item>
@@ -610,7 +641,10 @@ export default function UserManagement() {
         onOk={handleImport}
         onCancel={() => { setImportOpen(false); setImportFile(null) }}
         okText="开始导入"
+        cancelText="取消"
         confirmLoading={importMut.isPending}
+        okButtonProps={{ icon: <UploadOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}
         width={680}
       >
         <Form form={importForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -644,6 +678,8 @@ export default function UserManagement() {
           </Form.Item>
           <Space wrap size={12}>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
+              icon={<DownloadOutlined />}
               style={{
                 minWidth: 168,
                 whiteSpace: 'nowrap',
@@ -656,6 +692,8 @@ export default function UserManagement() {
               下载 Excel 模板
             </Button>
             <Button
+              className="sagitta-action-btn sagitta-action-btn--download"
+              icon={<DownloadOutlined />}
               style={{ minWidth: 168, whiteSpace: 'nowrap' }}
               onClick={() => void handleDownloadTemplate('csv')}
             >
@@ -673,13 +711,14 @@ export default function UserManagement() {
           importResult?.failed ? (
             <Button
               key="export-errors"
+              className="sagitta-action-btn sagitta-action-btn--download"
               icon={<DownloadOutlined />}
               onClick={() => downloadImportErrors(importResult.errors, importResult.import_headers)}
             >
               导出失败记录
             </Button>
           ) : null,
-          <Button key="close" type="primary" onClick={() => setImportResultOpen(false)}>
+          <Button key="close" type="primary" icon={<CloseOutlined />} onClick={() => setImportResultOpen(false)}>
             关闭
           </Button>,
         ]}

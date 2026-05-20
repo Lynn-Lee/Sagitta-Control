@@ -243,6 +243,7 @@ export default function ArchivePage() {
           </Space>
         ),
         okText: '提交审批',
+        cancelText: '取消',
         okButtonProps: { danger: true },
         onOk: () => submitMut.mutate(payload),
       })
@@ -363,8 +364,12 @@ export default function ArchivePage() {
     {
       title: '任务号',
       dataIndex: 'id',
-      width: 105,
-      render: (_: number, job: ArchiveJob) => <Button type="link" onClick={() => openJob(job)}>#{displayJobNo(job)}</Button>,
+      width: 120,
+      render: (_: number, job: ArchiveJob) => (
+        <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openJob(job)}>
+          #{displayJobNo(job)}
+        </Button>
+      ),
     },
     {
       title: '源表',
@@ -420,6 +425,7 @@ export default function ArchivePage() {
             {canCancelApplication(job) && (
               <Button
                 size="small"
+                className="sagitta-action-btn sagitta-action-btn--danger"
                 danger
                 icon={<StopOutlined />}
                 loading={actionMut.isPending}
@@ -441,6 +447,7 @@ export default function ArchivePage() {
             {canCancelJobControl(job) && (
               <Button
                 size="small"
+                className="sagitta-action-btn sagitta-action-btn--danger"
                 danger
                 icon={<StopOutlined />}
                 loading={actionMut.isPending}

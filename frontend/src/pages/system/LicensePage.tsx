@@ -14,7 +14,10 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, ReloadOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  CopyOutlined, ReloadOutlined, SafetyCertificateOutlined,
+  UploadOutlined, ThunderboltOutlined, FileSyncOutlined,
+} from '@ant-design/icons'
 import { licenseApi, type LicenseFingerprintPreview, type LicenseStatus } from '@/api/license'
 
 const { TextArea } = Input
@@ -228,7 +231,7 @@ export default function LicensePage() {
           <SafetyCertificateOutlined style={{ fontSize: 22, color: '#165DFF' }} />
           <Typography.Title level={4} style={{ margin: 0 }}>授权管理</Typography.Title>
         </Space>
-        <Button icon={<ReloadOutlined />} onClick={loadStatus} loading={loading}>刷新</Button>
+        <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={loadStatus} loading={loading}>刷新</Button>
       </Space>
 
       <Alert
@@ -288,11 +291,13 @@ export default function LicensePage() {
                   <Space size={4}>
                     <Text style={{ wordBreak: 'break-all' }}>{status.deployment_fingerprint}</Text>
                     <Button
-                      type="text"
+                      className="sagitta-action-btn sagitta-action-btn--copy"
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={() => handleCopyText(status.deployment_fingerprint || '', '当前授权部署指纹已复制')}
-                    />
+                    >
+                      复制
+                    </Button>
                   </Space>
                 ) : '-'}
               </Descriptions.Item>
@@ -301,11 +306,13 @@ export default function LicensePage() {
                   <Space size={4}>
                     <Text style={{ wordBreak: 'break-all' }}>{status.activation_deployment_fingerprint}</Text>
                     <Button
-                      type="text"
+                      className="sagitta-action-btn sagitta-action-btn--copy"
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={() => handleCopyText(status.activation_deployment_fingerprint || '', '当前激活部署指纹已复制')}
-                    />
+                    >
+                      复制
+                    </Button>
                   </Space>
                 ) : '-'}
               </Descriptions.Item>
@@ -365,10 +372,10 @@ export default function LicensePage() {
                 <Col xs={24} md={6}>
                   <Form.Item label=" ">
                     <Space>
-                      <Button type="primary" onClick={handleActivate} loading={activating}>
+                      <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleActivate} loading={activating}>
                         在线激活
                       </Button>
-                      <Button onClick={handleRefresh} loading={refreshing}>
+                      <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={handleRefresh} loading={refreshing}>
                         联网刷新
                       </Button>
                     </Space>
@@ -387,12 +394,14 @@ export default function LicensePage() {
                       placeholder={customerId.trim() ? (fingerprintLoading ? '正在计算' : '请输入有效客户 ID') : '输入客户 ID 后自动生成'}
                       addonAfter={(
                         <Button
-                          type="text"
+                          className="sagitta-action-btn sagitta-action-btn--copy"
                           size="small"
                           icon={<CopyOutlined />}
                           disabled={!activationFingerprint}
                           onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}
-                        />
+                        >
+                          复制
+                        </Button>
                       )}
                     />
                   </Form.Item>
@@ -407,7 +416,9 @@ export default function LicensePage() {
             <Form layout="vertical">
               <Form.Item label="离线 Challenge">
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  <Button onClick={handleCreateChallenge}>生成 Challenge</Button>
+                  <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<FileSyncOutlined />} onClick={handleCreateChallenge}>
+                    生成 Challenge
+                  </Button>
                   {challengeText && (
                     <TextArea
                       rows={8}

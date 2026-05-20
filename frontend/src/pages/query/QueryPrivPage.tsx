@@ -618,6 +618,8 @@ export default function QueryPrivPage() {
       <Modal title="申请查询权限" open={applyModalOpen}
         maskClosable={false}
         onOk={handleApply} onCancel={() => { setApplyModalOpen(false); setRiskPlan(null) }}
+        okText="提交申请"
+        cancelText="取消"
         confirmLoading={applyMut.isPending || riskChecking} width={640}>
         <Form
           form={applyForm}
@@ -719,6 +721,7 @@ export default function QueryPrivPage() {
         onCancel={() => { setAuditModalOpen(false); setAuditTarget(null); auditForm.resetFields() }}
         confirmLoading={auditMut.isPending}
         okText="通过"
+        cancelText="取消"
         width={520}
       >
         {auditTarget?.risk_level && (

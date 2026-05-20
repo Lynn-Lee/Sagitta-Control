@@ -3,7 +3,7 @@ import {
   Alert, Button, Card, Divider, Form, Input,
   message, Space, Switch, Tabs, Typography, Grid, Tooltip, Upload,
 } from 'antd'
-import { ApiOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
+import { ApiOutlined, SaveOutlined, UploadOutlined, UndoOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
@@ -69,7 +69,7 @@ function TestButton({ label, onTest }: { label: string; onTest: () => Promise<an
 
   return (
     <Space direction="vertical" size={4}>
-      <Button icon={<ApiOutlined />} loading={loading} onClick={handleTest} size="small">
+      <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<ApiOutlined />} loading={loading} onClick={handleTest} size="small">
         {label}
       </Button>
       {result && (
@@ -120,9 +120,11 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
                     return false
                   }}
                 >
-                  <Button icon={<UploadOutlined />}>选择图片</Button>
+                  <Button className="sagitta-action-btn sagitta-action-btn--upload" icon={<UploadOutlined />}>选择图片</Button>
                 </Upload>
-                <Button onClick={() => form.setFieldValue(item.key, '')}>恢复默认 Logo</Button>
+                <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<UndoOutlined />} onClick={() => form.setFieldValue(item.key, '')}>
+                  恢复默认 Logo
+                </Button>
                 <Form.Item noStyle shouldUpdate={(prev, next) => prev[item.key] !== next[item.key]}>
                   {() => {
                     const logoUrl = form.getFieldValue(item.key)

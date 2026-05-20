@@ -3,7 +3,7 @@ import {
   Button, Card, Col, Collapse, Divider, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Tree, Typography, message,
 } from 'antd'
 import {
-  DatabaseOutlined, TableOutlined, FieldBinaryOutlined, KeyOutlined,
+  DatabaseOutlined, TableOutlined, FieldBinaryOutlined, KeyOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -463,6 +463,7 @@ export default function DataDictPage() {
             <div style={{ marginTop: 16 }}>
               <Button
                 type="primary"
+                icon={<KeyOutlined />}
                 onClick={() => navigate('/query/privileges', {
                   state: {
                     openApply: true,
@@ -494,6 +495,7 @@ export default function DataDictPage() {
                       <Input.Search
                         allowClear
                         placeholder="搜索表名关键字"
+                        enterButton={<><SearchOutlined />搜索</>}
                         value={tableKeyword}
                         onChange={(e) => setTableKeyword(e.target.value)}
                       />
@@ -617,6 +619,7 @@ export default function DataDictPage() {
             <div style={{ marginTop: 16 }}>
               <Button
                 type="primary"
+                icon={<KeyOutlined />}
                 onClick={() => navigate('/query/privileges', {
                   state: {
                     openApply: true,

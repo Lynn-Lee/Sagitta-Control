@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Card, DatePicker, Input, Select, Space, Table, Tag, Typography, Grid } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { ClearOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import apiClient from '@/api/client'
@@ -105,8 +105,8 @@ export default function AuditLog() {
           </Select>
           <RangePicker style={{ width: filterWidth(230) }}
             onChange={(_, strs) => { setDateRange(strs[0] ? [strs[0], strs[1]] : null); setPage(1) }} />
-          <Button onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()}
+          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()}
             style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
         </Space>
       </FilterCard>

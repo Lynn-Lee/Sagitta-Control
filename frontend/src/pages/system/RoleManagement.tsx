@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
-  Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag, message, Grid,
+  Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message, Grid,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { roleApi, permissionApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
@@ -126,12 +126,18 @@ const RoleManagement: React.FC = () => {
       },
     },
     {
-      title: '操作', width: 140,
+      title: '操作', width: 160,
       render: (_: any, record: any) => (
         <Space>
-          <a onClick={() => openEdit(record.id)}>编辑</a>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(record.id)}>
+            编辑
+          </Button>
           {!record.is_system && (
-            <a onClick={() => deleteMut.mutate(record.id)} style={{ color: '#ff4d4f' }}>删除</a>
+            <Popconfirm title="确认删除此角色？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(record.id)}>
+              <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+                删除
+              </Button>
+            </Popconfirm>
           )}
         </Space>
       ),
@@ -159,6 +165,7 @@ const RoleManagement: React.FC = () => {
         <Input.Search
           placeholder="搜索角色标识或中文名"
           allowClear
+          enterButton={<><SearchOutlined />搜索</>}
           onSearch={setSearch}
           style={{ width: isMobile ? '100%' : 400, maxWidth: '100%' }}
         />
@@ -189,6 +196,10 @@ const RoleManagement: React.FC = () => {
         onOk={handleSubmit}
         onCancel={() => { setModalOpen(false); form.resetFields(); setEditId(null) }}
         confirmLoading={createMut.isPending || updateMut.isPending}
+        okText={editId ? '保存' : '创建'}
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}
         width={640}
       >
         <Form form={form} layout="vertical">

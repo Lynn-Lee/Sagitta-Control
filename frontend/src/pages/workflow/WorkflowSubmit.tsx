@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Card, Empty, Form, Input, List, Modal, Select, Space, Switch, Typography, message, Alert, Table, Tag } from 'antd'
 import Editor from '@monaco-editor/react'
-import { CopyOutlined, RobotOutlined, SaveOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CloseOutlined, CopyOutlined, RobotOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { instanceApi, type InstanceDatabase, type InstanceItem } from '@/api/instance'
@@ -336,7 +336,7 @@ export default function WorkflowSubmit() {
     { title: 'SQL', dataIndex: 'sql', ellipsis: true },
     { title: '级别', dataIndex: 'errlevel', width: 80,
       render: (v: number) => {
-        if (v === 0) return <Tag color="success">OK</Tag>
+        if (v === 0) return <Tag color="success">通过</Tag>
         if (v === 1) return <Tag color="warning">警告</Tag>
         if (riskPlan?.level === 'high' && (riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql)) return <Tag color="error">高危</Tag>
         return <Tag color="error">错误</Tag>
@@ -443,7 +443,7 @@ export default function WorkflowSubmit() {
             <Button size="small" icon={<RobotOutlined />} onClick={() => setAiModalOpen(true)}>
               AI 生成 SQL
             </Button>
-            <Button size="small" loading={checking} onClick={handleCheck}>SQL 预检查</Button>
+            <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<CheckCircleOutlined />} loading={checking} onClick={handleCheck}>SQL 预检查</Button>
           </Space>
         }>
         <Editor height="300px" defaultLanguage="sql" value={sql}
@@ -465,13 +465,14 @@ export default function WorkflowSubmit() {
       <Space>
         <Button
           type="primary"
+          icon={<SaveOutlined />}
           disabled={riskPlanRequiresHighRiskPermission && !(riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql)}
           loading={submitMut.isPending || riskChecking}
           onClick={handleSubmit}
         >
           提交工单
         </Button>
-        <Button onClick={() => navigate('/workflow')}>取消</Button>
+        <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseOutlined />} onClick={() => navigate('/workflow')}>取消</Button>
       </Space>
 
 
@@ -482,6 +483,7 @@ export default function WorkflowSubmit() {
         onOk={handleApplySelectedTemplate}
         onCancel={() => setTemplatePickerOpen(false)}
         okText="使用模板"
+        cancelText="取消"
         okButtonProps={{ loading: useTemplateMut.isPending }}
         width={980}
       >
@@ -489,6 +491,7 @@ export default function WorkflowSubmit() {
           <Input.Search
             allowClear
             placeholder="搜索模板名称或描述"
+            enterButton={<><SearchOutlined />搜索</>}
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
           />
@@ -608,6 +611,7 @@ export default function WorkflowSubmit() {
         onOk={handleSaveTemplate}
         onCancel={() => setSaveTemplateOpen(false)}
         okText="保存模板"
+        cancelText="取消"
         okButtonProps={{ loading: saveTemplateMut.isPending }}
         width={760}
       >
@@ -681,7 +685,7 @@ export default function WorkflowSubmit() {
       {/* AI Text2SQL Modal */}
       <Modal title={<Space><RobotOutlined />AI 自然语言生成 SQL</Space>}
         open={aiModalOpen} maskClosable={false} onOk={handleAiGenerate} onCancel={() => setAiModalOpen(false)}
-        confirmLoading={aiLoading} okText="生成 SQL">
+        confirmLoading={aiLoading} okText="生成 SQL" cancelText="取消">
         <div style={{ marginTop: 16 }}>
           <div style={{ marginBottom: 8 }}>
             <Typography.Text>描述你想执行的操作：</Typography.Text>

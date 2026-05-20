@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sagittadb-backend"
-version = "2.1.2"
+version = "2.1.3"
 description = "数据库管理平台 2.0 后端"
 requires-python = ">=3.12"
 dependencies = [

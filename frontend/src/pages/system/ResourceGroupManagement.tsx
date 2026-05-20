@@ -3,7 +3,10 @@ import {
   Button, Card, Form, Input, Modal, Popconfirm,
   Select, Space, Switch, Table, Tag, Transfer, Typography, message, Grid,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, DatabaseOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined,
+  DatabaseOutlined, SaveOutlined, CloseOutlined, SearchOutlined,
+} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import { resourceGroupApi, userGroupApi } from '@/api/system'
@@ -186,8 +189,8 @@ export default function ResourceGroupManagement() {
       title: '关联用户组', dataIndex: 'user_group_count', width: 260,
       render: (v: number, r: any) => (
         <Space direction="vertical" size={4}>
-          <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => openMembers(r)} style={{ padding: 0 }}>
-            {v} 个
+          <Button className="sagitta-action-btn sagitta-action-btn--manage" size="small" icon={<TeamOutlined />} onClick={() => openMembers(r)}>
+            管理 {v} 个
           </Button>
           {!!r.user_groups?.length && (
             <Space wrap size={[4, 4]}>
@@ -204,13 +207,17 @@ export default function ResourceGroupManagement() {
       render: (v: boolean) => v ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>,
     },
     {
-      title: '操作', width: 110,
+      title: '操作', width: 160,
       render: (_: any, r: any) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Popconfirm title="确认删除？"
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+            编辑
+          </Button>
+          <Popconfirm title="确认删除？" okText="删除" cancelText="取消"
             onConfirm={() => deleteMut.mutate(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -231,6 +238,7 @@ export default function ResourceGroupManagement() {
 
       <FilterCard>
         <Input.Search placeholder="搜索资源组名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
+          enterButton={<><SearchOutlined />搜索</>}
           onSearch={(value) => { setSearch(value); setPage(1) }}
           onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
       </FilterCard>
@@ -256,7 +264,11 @@ export default function ResourceGroupManagement() {
       <Modal title={editId ? '编辑资源组' : '新建资源组'} open={modalOpen}
         maskClosable={false}
         onOk={handleSubmit} onCancel={() => { setModalOpen(false); setEditRecord(null) }}
-        confirmLoading={createMut.isPending || updateMut.isPending}>
+        confirmLoading={createMut.isPending || updateMut.isPending}
+        okText={editId ? '保存' : '创建'}
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="group_name" label="资源组标识（英文）"
             rules={[{ required: true, message: '请输入资源组标识' }]}>
@@ -312,6 +324,9 @@ export default function ResourceGroupManagement() {
         confirmLoading={savingMembers}
         width={720}
         okText="保存关联"
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}
       >
         <div style={{ marginTop: 16 }}>
           <div style={{ marginBottom: 24 }}>

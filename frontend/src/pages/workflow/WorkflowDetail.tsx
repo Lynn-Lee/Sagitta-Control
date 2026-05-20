@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, DatePicker, Descriptions, Form, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tag, Typography, message } from 'antd'
-import { CheckOutlined, CloseOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CheckOutlined, CloseOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -157,7 +157,7 @@ export default function WorkflowDetail() {
               <Button icon={<StopOutlined />}>取消工单</Button>
             </Popconfirm>
           )}
-          <Button onClick={() => navigate('/workflow')}>返回列表</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ArrowLeftOutlined />} onClick={() => navigate('/workflow')}>返回列表</Button>
           </Space>
         }
         marginBottom={20}

@@ -99,6 +99,89 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .ant-btn-primary { background: var(--color-primary) !important; }
 .ant-btn-primary:hover { background: var(--color-primary-hover) !important; }
 
+/* 全局操作按钮：同功能按钮保持相同图标、文字、尺寸和边框颜色 */
+.ant-btn:not(.ant-btn-icon-only):not(.ant-btn-block) {
+  min-width: 72px;
+}
+
+.ant-btn-sm:not(.ant-btn-icon-only):not(.ant-btn-block) {
+  min-width: 64px;
+}
+
+.sagitta-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.sagitta-action-btn--edit,
+.sagitta-action-btn--manage,
+.sagitta-action-btn--copy,
+.sagitta-action-btn--refresh,
+.sagitta-action-btn--download,
+.sagitta-action-btn--upload,
+.sagitta-action-btn--inspect {
+  color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  background: #fff !important;
+}
+
+.sagitta-action-btn--edit .anticon,
+.sagitta-action-btn--manage .anticon,
+.sagitta-action-btn--copy .anticon,
+.sagitta-action-btn--refresh .anticon,
+.sagitta-action-btn--download .anticon,
+.sagitta-action-btn--upload .anticon,
+.sagitta-action-btn--inspect .anticon {
+  color: var(--color-primary) !important;
+}
+
+.sagitta-action-btn--edit:hover,
+.sagitta-action-btn--manage:hover,
+.sagitta-action-btn--copy:hover,
+.sagitta-action-btn--refresh:hover,
+.sagitta-action-btn--download:hover,
+.sagitta-action-btn--upload:hover,
+.sagitta-action-btn--inspect:hover {
+  color: var(--color-primary-hover) !important;
+  border-color: var(--color-primary-hover) !important;
+  background: var(--color-primary-bg) !important;
+}
+
+.sagitta-action-btn--neutral {
+  color: var(--text-secondary) !important;
+  border-color: var(--border-strong) !important;
+  background: #fff !important;
+}
+
+.sagitta-action-btn--neutral .anticon {
+  color: var(--text-secondary) !important;
+}
+
+.sagitta-action-btn--neutral:hover {
+  color: var(--text-primary) !important;
+  border-color: var(--text-muted) !important;
+  background: #f7f8fa !important;
+}
+
+.sagitta-action-btn--danger {
+  color: var(--color-error) !important;
+  border-color: var(--color-error) !important;
+  background: #fff !important;
+}
+
+.sagitta-action-btn--danger .anticon {
+  color: var(--color-error) !important;
+}
+
+.sagitta-action-btn--danger:hover {
+  color: #cb272d !important;
+  border-color: #cb272d !important;
+  background: #fff2f0 !important;
+}
+
 /* 输入框 focus 发光 */
 .ant-input:focus, .ant-input-focused,
 .ant-select-focused .ant-select-selector,

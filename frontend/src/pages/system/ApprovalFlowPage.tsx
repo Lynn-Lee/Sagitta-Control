@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import {
   Button, Card, Col, Drawer, Form, Input, Popconfirm,
-  Row, Select, Space, Table, Tag, Tooltip, Typography, message, Grid,
+  Row, Select, Space, Table, Tag, Typography, message, Grid,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, StopOutlined,
-  ApartmentOutlined, HolderOutlined,
+  ApartmentOutlined, HolderOutlined, DeleteOutlined, SaveOutlined, CloseOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { approvalFlowApi, type ApprovalFlowNode } from '@/api/approvalFlow'
@@ -168,21 +168,21 @@ export default function ApprovalFlowPage() {
       render: (value: string) => value ? new Date(value).toLocaleString('zh-CN') : '—',
     },
     {
-      title: '操作', key: 'actions', width: 140,
+      title: '操作', key: 'actions', width: 160,
       render: (_: unknown, r: any) => (
         <Space>
-          <Tooltip title="编辑">
-            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r.id)} />
-          </Tooltip>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r.id)}>
+            编辑
+          </Button>
           {r.is_active && (
             <Popconfirm
               title="停用后，已使用该审批流的工单不受影响，新工单将无法选择此流程。确认停用？"
               onConfirm={() => deactivateMut.mutate(r.id)}
               okText="停用" cancelText="取消" okButtonProps={{ danger: true }}
             >
-              <Tooltip title="停用">
-                <Button size="small" danger icon={<StopOutlined />} />
-              </Tooltip>
+              <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<StopOutlined />}>
+                停用
+              </Button>
             </Popconfirm>
           )}
         </Space>
@@ -203,6 +203,7 @@ export default function ApprovalFlowPage() {
             <Input.Search
               placeholder="搜索审批流名称"
               allowClear
+              enterButton={<><SearchOutlined />搜索</>}
               style={{ width: isMobile ? '100%' : 220 }}
               onSearch={v => { setSearch(v); setPage(1) }}
               onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }}
@@ -246,8 +247,8 @@ export default function ApprovalFlowPage() {
         width={640}
         footer={
           <Space style={{ float: 'right' }}>
-            <Button onClick={() => setDrawerOpen(false)}>取消</Button>
-            <Button type="primary" loading={isSaving} onClick={handleSubmit}>保存</Button>
+            <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseOutlined />} onClick={() => setDrawerOpen(false)}>取消</Button>
+            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={handleSubmit}>保存</Button>
           </Space>
         }
       >
@@ -285,7 +286,9 @@ export default function ApprovalFlowPage() {
                     extra={
                       fields.length > 1 && (
                         <Button
-                          type="link" danger size="small"
+                          className="sagitta-action-btn sagitta-action-btn--danger"
+                          icon={<DeleteOutlined />}
+                          danger size="small"
                           onClick={() => remove(field.name)}
                         >
                           删除

@@ -7,7 +7,7 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, ApiOutlined,
   ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DatabaseOutlined, SyncOutlined,
+  DatabaseOutlined, SyncOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi, type InstanceItem } from '@/api/instance'
@@ -103,7 +103,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         : <Text type="secondary" style={{ fontSize: 11 }}>手动添加</Text>,
     },
     {
-      title: '操作', width: 80,
+      title: '操作', width: 90,
       render: (_: any, r: any) => (
         <Popconfirm
           title={`确认删除 "${r.db_name}"？`}
@@ -111,7 +111,9 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
           cancelText="取消"
           onConfirm={() => deleteMut.mutate(r.id)}
         >
-          <Button size="small" danger icon={<DeleteOutlined />} />
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
+            删除
+          </Button>
         </Popconfirm>
       ),
     },
@@ -129,7 +131,9 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
           onClick={() => { setSyncResult(null); syncMut.mutate() }}>
           从实例自动同步
         </Button>
-        <Button size="small" icon={<ReloadOutlined />} onClick={() => refetch()} />
+        <Button size="small" className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()}>
+          刷新
+        </Button>
         <Text type="secondary" style={{ fontSize: 12 }}>
           共 {data?.total ?? 0} 个{dbLabel}
         </Text>
@@ -314,20 +318,24 @@ export default function InstanceList() {
       },
     },
     {
-      title: '操作', width: 160,
+      title: '操作', width: 230,
       render: (_: any, r: InstanceItem) => (
         <Space size={4}>
-          <Tooltip title="管理数据库">
-            <Button size="small" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)} />
-          </Tooltip>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--manage" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)}>
+            管理数据库
+          </Button>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+            编辑
+          </Button>
           <Popconfirm
             title="确认停用此实例？"
             okText="确定"
             cancelText="取消"
             onConfirm={() => deleteMut.mutate(r.id)}
           >
-            <Button size="small" danger icon={<DeleteOutlined />} disabled={!r.is_active} />
+            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />} disabled={!r.is_active}>
+              停用
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -349,6 +357,7 @@ export default function InstanceList() {
 
       <FilterCard>
         <Input.Search placeholder="搜索实例名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
+          enterButton={<><SearchOutlined />搜索</>}
           onSearch={(value) => { setSearch(value); setPage(1) }}
           onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
       </FilterCard>

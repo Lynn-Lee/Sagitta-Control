@@ -4,7 +4,7 @@ import {
   Popconfirm, Space, Table, Tabs, Tag, Typography, Tooltip, Grid, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, SearchOutlined, StopOutlined } from '@ant-design/icons'
+import { ClearOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, StopOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
@@ -30,19 +30,18 @@ const STATUS_COLOR: Record<number, string> = {
 const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth = 350) =>
   (name: string, r: any) => (
     <Tooltip title={name}>
-      <a
+      <Button
+        size="small"
+        className="sagitta-action-btn sagitta-action-btn--inspect"
+        icon={<EyeOutlined />}
         onClick={() => navigate(`/workflow/${r.id}`)}
         style={{
           fontWeight: 500,
-          display: 'inline-block',
           maxWidth,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
         }}
       >
         {name}
-      </a>
+      </Button>
     </Tooltip>
   )
 
@@ -210,16 +209,23 @@ export default function WorkflowList() {
   const idColumn: ColumnsType<any>[number] = {
     title: 'ID', dataIndex: 'id', width: 65,
     render: (id) => (
-      <a onClick={() => navigate(`/workflow/${id}`)}
-        style={{ fontFamily: 'monospace', color: '#1558A8' }}>#{id}</a>
+      <Button
+        size="small"
+        className="sagitta-action-btn sagitta-action-btn--inspect"
+        icon={<EyeOutlined />}
+        onClick={() => navigate(`/workflow/${id}`)}
+        style={{ fontFamily: 'monospace' }}
+      >
+        #{id}
+      </Button>
     ),
   }
 
   const detailColumn: ColumnsType<any>[number] = {
-    title: '操作', width: 132, fixed: 'right',
+    title: '操作', width: 150, fixed: 'right',
     render: (_, r) => (
       <Space size={4}>
-        <Button size="small" type="link" onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
+        <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
         {activeTab === 'mine' && r.can_cancel && (
           <Popconfirm
             title="确认取消此工单？"
@@ -228,7 +234,7 @@ export default function WorkflowList() {
             cancelText="返回"
             onConfirm={() => cancelMut.mutate(r.id)}
           >
-            <Button size="small" type="link" danger icon={<StopOutlined />} loading={cancelMut.isPending}>
+            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<StopOutlined />} loading={cancelMut.isPending}>
               取消
             </Button>
           </Popconfirm>
@@ -397,8 +403,8 @@ export default function WorkflowList() {
               setPage(1)
             }}
           />
-          <Button onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()}
+          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={handleReset} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()}
             style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
         </Space>
       </FilterCard>

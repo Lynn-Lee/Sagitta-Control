@@ -441,7 +441,7 @@ export default function QueryPage() {
                   <Text strong style={{ fontSize: 15 }}>表浏览器</Text>
                   {allTables.length > 0 && <Tag>{allTables.length}</Tag>}
                 </Space>
-                <Button size="small" onClick={handleInsertTableName} disabled={!selectedTable}>
+                <Button size="small" className="sagitta-action-btn sagitta-action-btn--manage" icon={<TableOutlined />} onClick={handleInsertTableName} disabled={!selectedTable}>
                   插入表名
                 </Button>
               </div>

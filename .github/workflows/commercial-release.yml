@@ -26,7 +26,7 @@ permissions:
 env:
   PRODUCT_CODE: sagittadb
   PRODUCT_NAME: SagittaDB Enterprise
-  COMMERCIAL_BASE_VERSION: "2.1.2"
+  COMMERCIAL_BASE_VERSION: "2.1.3"
   PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Public-Releases
   PUBLIC_PRODUCT_DIR: products/sagittadb
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb

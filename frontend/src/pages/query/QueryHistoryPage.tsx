@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button, Card, DatePicker, Input, Modal, Select, Space, Table, Tag, Typography, message, Grid } from 'antd'
-import { CopyOutlined, EyeOutlined, ReloadOutlined, StarFilled, StarOutlined } from '@ant-design/icons'
+import { ClearOutlined, CloseOutlined, CopyOutlined, EyeOutlined, ReloadOutlined, StarFilled, StarOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { instanceApi } from '@/api/instance'
@@ -167,24 +167,32 @@ export default function QueryHistoryPage() {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 128,
+      width: 260,
       render: (_: unknown, row: QueryLogItem) => (
         <Space size={4}>
-          <Button icon={<EyeOutlined />} size="small" onClick={() => setSqlDetail(row)} />
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} size="small" onClick={() => setSqlDetail(row)}>
+            查看
+          </Button>
           <Button
+            className="sagitta-action-btn sagitta-action-btn--copy"
             icon={<CopyOutlined />}
             size="small"
             onClick={async () => {
               await navigator.clipboard.writeText(row.sqllog)
               msgApi.success('SQL 已复制')
             }}
-          />
+          >
+            复制
+          </Button>
           <Button
+            className="sagitta-action-btn sagitta-action-btn--neutral"
             icon={row.is_favorite ? <StarFilled /> : <StarOutlined />}
             size="small"
             loading={favoriteMut.isPending}
             onClick={() => favoriteMut.mutate(row.id)}
-          />
+          >
+            {row.is_favorite ? '取消收藏' : '收藏'}
+          </Button>
         </Space>
       ),
     },
@@ -257,8 +265,8 @@ export default function QueryHistoryPage() {
             value={sqlKeyword}
             onChange={(e) => { setSqlKeyword(e.target.value); setPage(1) }}
           />
-          <Button onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>重置</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()} style={isMobile ? { width: '100%' } : undefined}>刷新</Button>
         </Space>
       </FilterCard>
 
@@ -292,14 +300,14 @@ export default function QueryHistoryPage() {
         maskClosable={false}
         onCancel={() => setSqlDetail(null)}
         footer={[
-          <Button key="copy" icon={<CopyOutlined />} onClick={async () => {
+          <Button key="copy" className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={async () => {
             if (!sqlDetail) return
             await navigator.clipboard.writeText(sqlDetail.sqllog)
             msgApi.success('SQL 已复制')
           }}>
             复制 SQL
           </Button>,
-          <Button key="close" type="primary" onClick={() => setSqlDetail(null)}>关闭</Button>,
+          <Button key="close" className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseOutlined />} onClick={() => setSqlDetail(null)}>关闭</Button>,
         ]}
       >
         {sqlDetail && (

@@ -4,7 +4,7 @@ import {
   Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { BulbOutlined, CloudDownloadOutlined, CopyOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { BulbOutlined, ClearOutlined, CloudDownloadOutlined, CopyOutlined, EyeOutlined, LineChartOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts'
@@ -422,11 +422,15 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       title: '操作',
       key: 'actions',
       fixed: 'right',
-      width: 120,
+      width: 150,
       render: (_, row) => (
         <Space size={4}>
-          <Button size="small" icon={<EyeOutlined />} onClick={() => openLogDetail(row)} />
-          <Button size="small" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)} />
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openLogDetail(row)}>
+            查看
+          </Button>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)}>
+            诊断
+          </Button>
         </Space>
       ),
     },
@@ -462,6 +466,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       render: (_, row) => (
         <Button
           size="small"
+          className="sagitta-action-btn sagitta-action-btn--inspect"
           icon={<SearchOutlined />}
           onClick={() => {
             if (instanceId) {
@@ -524,12 +529,18 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       title: '操作',
       key: 'sample',
       fixed: 'right',
-      width: 140,
+      width: 210,
       render: (_, row) => (
         <Space size={4}>
-          <Button size="small" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)} />
-          <Button size="small" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)} />
-          <Button size="small" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)} />
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)}>
+            样本
+          </Button>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)}>
+            查看
+          </Button>
+          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)}>
+            诊断
+          </Button>
         </Space>
       ),
     },
@@ -556,6 +567,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       render: (_: any, row: any) => (
         <Button
           size="small"
+          className="sagitta-action-btn sagitta-action-btn--inspect"
           icon={<BulbOutlined />}
           disabled={!canAnalyze || !instanceId || !getRealtimeSql(row)}
           loading={diagnoseMut.isPending}
@@ -639,6 +651,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
             <Text strong>{result.summary}</Text>
             <Button
               size="small"
+              className="sagitta-action-btn sagitta-action-btn--copy"
               icon={<CopyOutlined />}
               onClick={() => navigator.clipboard.writeText(result.sql).then(() => msgApi.success('SQL 已复制'))}
             >
@@ -749,9 +762,9 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
             options={tagSelectOptions}
           />
           <InputNumber min={0} step={500} addonAfter="ms" style={{ width: filterWidth(140) }} value={minDurationMs} onChange={(v) => { setMinDurationMs(Number(v || 0)); setPage(1) }} />
-          <Button icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => { overviewQuery.refetch(); logQuery.refetch(); fingerprintQuery.refetch(); realtimeQuery.refetch() }}>刷新</Button>
           <Button icon={<CloudDownloadOutlined />} type="primary" disabled={!canManageCollect} loading={collectMut.isPending} onClick={() => collectMut.mutate()}>立即采集一次</Button>
-          <Button onClick={resetFilters}>{embedded ? '重置条件' : '重置'}</Button>
+          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={resetFilters}>{embedded ? '重置条件' : '重置'}</Button>
         </Space>
       </FilterCard>
 
@@ -919,7 +932,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
                       <Button type="primary" icon={<BulbOutlined />} htmlType="submit" disabled={!canAnalyze} loading={manualDiagnoseMut.isPending}>
                         开始诊断
                       </Button>
-                      <Button onClick={() => { manualForm.resetFields(); setManualDiagnosis(null) }}>
+                      <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={() => { manualForm.resetFields(); setManualDiagnosis(null) }}>
                         清空
                       </Button>
                     </Space>

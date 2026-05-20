@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
-import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
+import { ClearOutlined, EyeOutlined, ReloadOutlined, SearchOutlined, StopOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { diagnosticApi, type SessionItem } from '@/api/diagnostic'
@@ -139,10 +139,10 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       serial: row.serial,
     }),
     onSuccess: () => {
-      msgApi.success('会话已 Kill')
+      msgApi.success('会话已终止')
       qc.invalidateQueries({ queryKey: ['processlist'] })
     },
-    onError: (e: any) => msgApi.error(e.response?.data?.detail || e.response?.data?.msg || 'Kill 失败'),
+    onError: (e: any) => msgApi.error(e.response?.data?.detail || e.response?.data?.msg || '终止失败'),
   })
 
   const historyQuery = useQuery({
@@ -229,7 +229,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       width: 300,
       ellipsis: true,
       render: (v: string, row) => v
-        ? <Button type="link" size="small" onClick={() => setSqlDetail(row)}>{v}</Button>
+        ? <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} size="small" onClick={() => setSqlDetail(row)}>{v}</Button>
         : <Text type="secondary">-</Text>,
     },
     { title: '等待事件', dataIndex: 'event', width: 180, ellipsis: true },
@@ -250,12 +250,12 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
         if (row.db_type === 'oracle' && !row.serial) return null
         return (
           <Popconfirm
-            title={`确认 Kill 会话 ${row.session_id}${row.serial ? `,${row.serial}` : ''}？`}
+            title={`确认终止会话 ${row.session_id}${row.serial ? `,${row.serial}` : ''}？`}
             onConfirm={() => killMut.mutate(row)}
-            okText="Kill"
+            okText="终止"
             cancelText="取消"
           >
-            <Button size="small" danger icon={<StopOutlined />} loading={killMut.isPending}>Kill</Button>
+            <Button size="small" danger icon={<StopOutlined />} loading={killMut.isPending}>终止</Button>
           </Popconfirm>
         )
       },
@@ -448,10 +448,10 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
                       </Form.Item>
                     )}
                     <Form.Item style={{ margin: 0, flex: '0 0 auto' }}>
-                      <Button type="primary" htmlType="submit">查询</Button>
+                      <Button type="primary" icon={<SearchOutlined />} htmlType="submit">查询</Button>
                     </Form.Item>
                     <Form.Item style={{ margin: 0, flex: '0 0 auto' }}>
-                      <Button onClick={resetHistoryFilters}>重置条件</Button>
+                      <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<ClearOutlined />} onClick={resetHistoryFilters}>重置条件</Button>
                     </Form.Item>
                   </Form>
                 </FilterCard>

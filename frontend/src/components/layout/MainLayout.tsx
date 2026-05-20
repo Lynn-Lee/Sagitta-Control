@@ -331,7 +331,7 @@ export default function MainLayout() {
       }}>
         {/* 左侧：折叠按钮 + Logo */}
         <Space size={0}>
-          <Button type="text"
+          <Button
             icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
             onClick={() => {
               if (isMobile) {
@@ -340,8 +340,10 @@ export default function MainLayout() {
               }
               setCollapsed(!collapsed)
             }}
-            style={{ color: 'rgba(255,255,255,0.65)', width: 56, height: 56, borderRadius: 0 }}
-          />
+            style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', height: 32, margin: '0 12px' }}
+          >
+            菜单
+          </Button>
           <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate(homePath)}>
             <BrandLogo logoUrl={branding.platform_logo_url} size={26} color="#165DFF" />
             <div style={{ lineHeight: 1 }}>
@@ -376,8 +378,10 @@ export default function MainLayout() {
         <Space size={4}>
           <Tooltip title="通知">
             <Badge count={0} size="small">
-              <Button type="text" icon={<BellOutlined />}
-                style={{ color: 'rgba(255,255,255,0.65)', borderRadius: 6 }} />
+              <Button icon={<BellOutlined />}
+                style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                通知
+              </Button>
             </Badge>
           </Tooltip>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
@@ -496,7 +500,7 @@ export default function MainLayout() {
               message="密码即将到期"
               description={`当前密码将在 ${user.days_until_password_expiry ?? 0} 天后到期，请尽快修改密码，避免影响登录。`}
               action={
-                <Button size="small" type="primary" onClick={() => setChangePasswordModalOpen(true)}>
+                <Button size="small" type="primary" icon={<KeyOutlined />} onClick={() => setChangePasswordModalOpen(true)}>
                   立即修改
                 </Button>
               }

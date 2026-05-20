@@ -3,7 +3,7 @@ import {
   Alert, Button, Form, Input, InputNumber, Modal, Popconfirm,
   Select, Space, Switch, Table, Tag, Typography, message,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi } from '@/api/instance'
 import apiClient from '@/api/client'
@@ -118,7 +118,7 @@ function PreviewPanel({ form }: { form: any }) {
       <Space>
         <Input value={previewValue} onChange={e => setPreviewValue(e.target.value)}
           style={{ width: 200 }} placeholder="输入测试数据" />
-        <Button size="small" icon={<EyeOutlined />} loading={loading} onClick={handlePreview}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" size="small" icon={<EyeOutlined />} loading={loading} onClick={handlePreview}>
           预览效果
         </Button>
       </Space>
@@ -221,11 +221,15 @@ export default function MaskingRulePage() {
     { title: '创建人', dataIndex: 'created_by', width: 110 },
     { title: '创建时间', dataIndex: 'created_at', width: 160,
       render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '—' },
-    { title: '操作', width: 110, render: (_: any, r: any) => (
+    { title: '操作', width: 160, render: (_: any, r: any) => (
       <Space>
-        <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-        <Popconfirm title="确认删除此规则？" onConfirm={() => deleteMut.mutate(r.id)}>
-          <Button size="small" danger icon={<DeleteOutlined />} />
+        <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+          编辑
+        </Button>
+        <Popconfirm title="确认删除此规则？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(r.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+            删除
+          </Button>
         </Popconfirm>
       </Space>
     )},
@@ -261,7 +265,11 @@ export default function MaskingRulePage() {
       <Modal title={editId ? '编辑脱敏规则' : '新建脱敏规则'} open={modalOpen}
         maskClosable={false}
         onOk={handleSubmit} onCancel={() => setModalOpen(false)}
-        confirmLoading={createMut.isPending || updateMut.isPending} width={560}>
+        confirmLoading={createMut.isPending || updateMut.isPending} width={560}
+        okText={editId ? '保存' : '创建'}
+        cancelText="取消"
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        cancelButtonProps={{ icon: <CloseOutlined /> }}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           {!editId && (
             <Form.Item label="常用模板">

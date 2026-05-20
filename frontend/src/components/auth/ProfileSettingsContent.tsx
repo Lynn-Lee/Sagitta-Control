@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Col, Divider, Form, Input, QRCode, Row, Space, Steps, Tag, Typography, message } from 'antd'
-import { MailOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, PlayCircleOutlined, SaveOutlined, StopOutlined, MailOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
@@ -139,7 +139,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                 <Form.Item name="email" label="邮箱">
                   <Input prefix={<MailOutlined />} maxLength={100} placeholder="可选" />
                 </Form.Item>
-                <Button type="primary" htmlType="submit" loading={updateProfileMut.isPending}>
+                <Button type="primary" icon={<SaveOutlined />} htmlType="submit" loading={updateProfileMut.isPending}>
                   保存个人信息
                 </Button>
               </Form>
@@ -168,6 +168,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                     onChange={(event) => setDisableCode(event.target.value)}
                   />
                   <Button
+                    icon={<StopOutlined />}
                     danger
                     loading={disable2faMut.isPending}
                     disabled={disableCode.length < 6}
@@ -196,6 +197,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                         <Button
                           type="primary"
                           size="small"
+                          icon={<PlayCircleOutlined />}
                           loading={setup2faMut.isPending}
                           onClick={() => setup2faMut.mutate(undefined)}
                           style={{ marginTop: 8 }}
@@ -234,6 +236,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                           <Button
                             type="primary"
                             size="small"
+                            icon={<CheckCircleOutlined />}
                             loading={verify2faMut.isPending}
                             disabled={totpCode.length < 6}
                             onClick={() => verify2faMut.mutate(totpCode)}

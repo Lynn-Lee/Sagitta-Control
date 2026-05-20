@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Form, Input, Alert, Divider, Tooltip, Tag, Modal, Typography } from 'antd'
 import {
-  UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined,
+  UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined, LoginOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
@@ -371,8 +371,8 @@ export default function LoginPage() {
           <>
             <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Button
-                type="text" size="small" icon={<ArrowLeftOutlined />}
-                style={{ color: 'rgba(255,255,255,0.45)', padding: 0 }}
+                size="small" icon={<ArrowLeftOutlined />}
+                style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.04)' }}
                 onClick={() => { setSearchParams({}); setError('') }}
               >
                 返回
@@ -414,6 +414,7 @@ export default function LoginPage() {
               <Form.Item style={{ marginBottom: 0 }}>
                 <Button
                   type="primary" htmlType="submit" loading={loading} block
+                  icon={<LoginOutlined />}
                   style={{
                     height: 46, borderRadius: 8,
                     background: '#5E7CE0', border: 'none',
@@ -498,6 +499,7 @@ export default function LoginPage() {
                       htmlType="submit"
                       loading={forceChangeLoading}
                       block
+                      icon={<SaveOutlined />}
                       style={{
                         height: 46, borderRadius: 8,
                         background: '#165DFF', border: 'none',
@@ -510,6 +512,7 @@ export default function LoginPage() {
                   </Form.Item>
                   <Button
                     block
+                    icon={<ArrowLeftOutlined />}
                     onClick={() => {
                       setForceChangeMode(false)
                       setPasswordChangeToken('')
@@ -554,6 +557,7 @@ export default function LoginPage() {
                       htmlType="submit"
                       loading={twoFactorLoading}
                       block
+                      icon={<LoginOutlined />}
                       style={{
                         height: 46, borderRadius: 8,
                         background: '#165DFF', border: 'none',
@@ -566,6 +570,7 @@ export default function LoginPage() {
                   </Form.Item>
                   <Button
                     block
+                    icon={<ArrowLeftOutlined />}
                     onClick={() => {
                       setTwoFactorMode(false)
                       setTwoFactorToken('')
@@ -611,6 +616,7 @@ export default function LoginPage() {
                 <Form.Item style={{ marginBottom: 0 }}>
                   <Button
                     type="primary" htmlType="submit" loading={loading} block
+                    icon={<LoginOutlined />}
                     style={{
                       height: 46, borderRadius: 8,
                       background: '#165DFF', border: 'none',
@@ -692,7 +698,7 @@ export default function LoginPage() {
         lineHeight: 1.8,
       }}>
         <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
-        <div>{branding.platform_name} v2.1.2 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>{branding.platform_name} v2.1.3 · Full Engine Compatibility, End-to-End Observability</div>
       </div>
     </div>
   )

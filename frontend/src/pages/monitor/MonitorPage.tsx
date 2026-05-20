@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MenuProps } from 'antd'
 import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
-import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
+import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -723,7 +723,7 @@ export default function MonitorPage() {
       width: 220,
       render: (_: any, row: MonitorInstance) => (
         <Space direction="vertical" size={0}>
-          <Button type="link" style={{ padding: 0, height: 22, fontWeight: 600 }} onClick={() => showInstanceMonitor(row.instance_id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" size="small" icon={<BarChartOutlined />} style={{ fontWeight: 600 }} onClick={() => showInstanceMonitor(row.instance_id)}>
             {row.instance_name}
           </Button>
           <Space size={4}>
@@ -752,7 +752,7 @@ export default function MonitorPage() {
       title: '慢查询',
       width: 110,
       render: (_: any, row: MonitorInstance) => (
-        <Button type="link" size="small" style={{ padding: 0 }} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sql') }}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<AlertOutlined />} size="small" onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sql') }}>
           {formatMetric(row.latest?.slow_queries)}
         </Button>
       ),
@@ -761,7 +761,7 @@ export default function MonitorPage() {
       title: '锁/长事务',
       width: 120,
       render: (_: any, row: MonitorInstance) => (
-        <Button type="link" size="small" style={{ padding: 0 }} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sessions') }}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<FieldTimeOutlined />} size="small" onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sessions') }}>
           {formatMetric((row.latest?.lock_waits || 0) + (row.latest?.long_transactions || 0))}
         </Button>
       ),
@@ -900,11 +900,13 @@ export default function MonitorPage() {
             </AntTooltip>
             <AntTooltip title="复制完整 SQL">
               <Button
-                type="text"
+                className="sagitta-action-btn sagitta-action-btn--copy"
                 size="small"
                 icon={<CopyOutlined />}
                 onClick={() => copyTopSql(sql)}
-              />
+              >
+                复制
+              </Button>
             </AntTooltip>
           </Space>
         )
@@ -1163,7 +1165,7 @@ export default function MonitorPage() {
                             <Select allowClear placeholder="库/Schema" style={{ width: 220 }} value={tableDb} onChange={(value) => { setTableDb(value); setTablePage(1) }}>
                               {dbItems.map((item: any) => <Option key={item.db_name} value={item.db_name}>{item.db_name}</Option>)}
                             </Select>
-                            <Input.Search allowClear placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
+                            <Input.Search allowClear enterButton={<><SearchOutlined />搜索</>} placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
                           </Space>
                           <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={getTablePaginationConfig({
                             total: tableCapacity?.total,
@@ -1346,7 +1348,7 @@ export default function MonitorPage() {
                             onChange={(event) => setAlertRulesText(event.target.value)}
                             disabled={!canManageAlerts}
                           />
-                          {canManageAlerts && <Button type="primary" loading={saveAlertRules.isPending} onClick={() => saveAlertRules.mutate()}>保存告警规则</Button>}
+                          {canManageAlerts && <Button type="primary" icon={<SaveOutlined />} loading={saveAlertRules.isPending} onClick={() => saveAlertRules.mutate()}>保存告警规则</Button>}
                         </Space>
                       ),
                     },
@@ -1395,6 +1397,8 @@ export default function MonitorPage() {
           if (instanceId) saveConfig.mutate({ instanceId, values })
         })}
         confirmLoading={saveConfig.isPending || saveAllConfig.isPending}
+        okText="保存"
+        cancelText="取消"
         maskClosable={false}
         width={720}
       >
