@@ -140,12 +140,12 @@ npm run build
 ## 商业交付
 
 当前版本：`v2.1 商业部署版 + v2-lite 授权体系`。
-当前商业部署版本：`2.1.1`。
+当前商业部署版本：`2.1.2`。
 状态：正式版商业交付。
 
 v2.1 重点增强 Oracle 引擎观测能力：会话监控优先使用 RAC 友好的 `GV$SESSION/GV$PROCESS/GV$SQL` 组合，SQL 洞察新增 Oracle SQL Monitor、AWR SQLStat、Cursor Cache 和当前会话 SQL 降级链路，并补充等待事件、阻塞会话、长事务和长操作摘要。所有 Oracle 诊断采集均使用 `python-oracledb` 参数化只读查询；权限不足时返回 warning 并自动降级，不执行 kill、dump、baseline、profile、patch 等高风险诊断动作。
 
-v2.1.1 重点优化在线查询错误提示：所有关系型 SQL 先执行语法校验和基础 AST 语义校验，再判断是否属于允许的只读语句；关键字拼写错误、括号/引号不匹配、缺少 SELECT 字段、缺少 UPDATE SET、缺少 INSERT 内容、半截 SHOW/DESC/EXPLAIN/DDL/DCL 等场景统一提示语法错误，INSERT 列和值数量不一致、CREATE TABLE 列定义缺少类型、ALTER TABLE ADD COLUMN 列定义不完整等场景提示语义错误，语法和语义正确但不允许的 DML/DDL/DCL/控制类语句才提示“不允许执行 XXXX 操作”。
+v2.1.2 重点统一前端表格分页体验：系统管理、实例管理、查询审计、工单、归档和观测中心等页面统一使用可切换的分页大小与中文 `条/页` 文案；观测中心舰队总览补充分页状态，并收紧固定操作列的图标按钮布局，减少宽屏下的空白和错位。
 
 商业授权接入统一授权中心 `License-Server-Center`。客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
 
