@@ -15,9 +15,20 @@
 
   /* ── 功能色 ────────────────────────────────────────────────*/
   --color-success:        #00B42A;
+  --color-success-hover:  #009A29;
+  --color-success-bg:     #E8FFEA;
   --color-warning:        #FF7D00;
+  --color-warning-hover:  #D25F00;
+  --color-warning-bg:     #FFF7E8;
   --color-error:          #F53F3F;
+  --color-error-hover:    #CB272D;
+  --color-error-bg:       #FFF2F0;
   --color-info:           #165DFF;
+  --color-info-hover:     #0E42C1;
+  --color-info-bg:        #EEF3FF;
+  --color-utility:        #08979C;
+  --color-utility-hover:  #006D75;
+  --color-utility-bg:     #E6FFFB;
 
   /* ── 背景层级 ──────────────────────────────────────────────*/
   --bg-page:              #F2F3F5;   /* 页面底色 */
@@ -55,6 +66,11 @@
 
   /* ── 过渡 ──────────────────────────────────────────────────*/
   --transition: 0.2s ease;
+
+  /* ── 按钮规划 ──────────────────────────────────────────────*/
+  --button-height: 36px;
+  --button-min-width: 72px;
+  --button-gap: 6px;
 }
 
 /* ── 全局重置 ─────────────────────────────────────────────────*/
@@ -94,92 +110,203 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   border-color: var(--border-blue) !important;
 }
 
-/* 去掉按钮阴影 */
-.ant-btn { box-shadow: none !important; }
-.ant-btn-primary { background: var(--color-primary) !important; }
-.ant-btn-primary:hover { background: var(--color-primary-hover) !important; }
-
-/* 全局操作按钮：同功能按钮保持相同图标、文字、尺寸和边框颜色 */
-.ant-btn:not(.ant-btn-icon-only):not(.ant-btn-block) {
-  min-width: 72px;
-}
-
-.ant-btn-sm:not(.ant-btn-icon-only):not(.ant-btn-block) {
-  min-width: 64px;
-}
-
-.sagitta-action-btn {
+/*
+  按钮规范：
+  - 尺寸：所有 Button 统一 36px 高，按钮内容统一为图标 + 文字。
+  - 主操作：type="primary"，用于新建、保存、提交、执行、登录。
+  - 查看/管理/刷新：sagitta-action-btn--inspect/manage/refresh，信息蓝。
+  - 编辑：sagitta-action-btn--edit，提示橙。
+  - 复制/导入/导出：sagitta-action-btn--copy/upload/download，工具青。
+  - 取消/返回/重置/关闭：sagitta-action-btn--neutral，中性灰。
+  - 删除/终止/拒绝：danger 或 sagitta-action-btn--danger，危险红。
+*/
+.ant-btn {
+  height: var(--button-height) !important;
+  min-height: var(--button-height) !important;
+  padding: 0 14px !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--button-gap);
+  border-radius: var(--radius-sm) !important;
   font-weight: 500;
+  box-shadow: none !important;
+  line-height: 1 !important;
+  white-space: nowrap;
 }
 
-.sagitta-action-btn--edit,
-.sagitta-action-btn--manage,
-.sagitta-action-btn--copy,
-.sagitta-action-btn--refresh,
-.sagitta-action-btn--download,
-.sagitta-action-btn--upload,
-.sagitta-action-btn--inspect {
-  color: var(--color-primary) !important;
+.ant-btn:not(.ant-btn-icon-only):not(.ant-btn-block) {
+  min-width: var(--button-min-width);
+}
+
+.ant-btn-sm,
+.ant-btn-lg {
+  height: var(--button-height) !important;
+  min-height: var(--button-height) !important;
+  padding: 0 14px !important;
+}
+
+.ant-btn .anticon {
+  font-size: 14px;
+}
+
+.ant-btn-primary {
+  color: #fff !important;
+  background: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
-  background: #fff !important;
 }
 
-.sagitta-action-btn--edit .anticon,
-.sagitta-action-btn--manage .anticon,
-.sagitta-action-btn--copy .anticon,
-.sagitta-action-btn--refresh .anticon,
-.sagitta-action-btn--download .anticon,
-.sagitta-action-btn--upload .anticon,
-.sagitta-action-btn--inspect .anticon {
-  color: var(--color-primary) !important;
-}
-
-.sagitta-action-btn--edit:hover,
-.sagitta-action-btn--manage:hover,
-.sagitta-action-btn--copy:hover,
-.sagitta-action-btn--refresh:hover,
-.sagitta-action-btn--download:hover,
-.sagitta-action-btn--upload:hover,
-.sagitta-action-btn--inspect:hover {
-  color: var(--color-primary-hover) !important;
+.ant-btn-primary:hover {
+  color: #fff !important;
+  background: var(--color-primary-hover) !important;
   border-color: var(--color-primary-hover) !important;
-  background: var(--color-primary-bg) !important;
+}
+
+.ant-btn-dangerous {
+  color: var(--color-error) !important;
+  border-color: var(--color-error) !important;
+}
+
+.ant-btn-dangerous:hover {
+  color: var(--color-error-hover) !important;
+  border-color: var(--color-error-hover) !important;
+  background: var(--color-error-bg) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous {
+  color: #fff !important;
+  background: var(--color-error) !important;
+  border-color: var(--color-error) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous:hover {
+  color: #fff !important;
+  background: var(--color-error-hover) !important;
+  border-color: var(--color-error-hover) !important;
+}
+
+.sagitta-action-btn {
+  --button-fg: var(--color-info);
+  --button-border: var(--color-info);
+  --button-bg: #fff;
+  --button-hover-fg: var(--color-info-hover);
+  --button-hover-border: var(--color-info-hover);
+  --button-hover-bg: var(--color-info-bg);
+  color: var(--button-fg) !important;
+  border-color: var(--button-border) !important;
+  background: var(--button-bg) !important;
+}
+
+.sagitta-action-btn .anticon {
+  color: var(--button-fg) !important;
+}
+
+.sagitta-action-btn:hover {
+  color: var(--button-hover-fg) !important;
+  border-color: var(--button-hover-border) !important;
+  background: var(--button-hover-bg) !important;
+}
+
+.sagitta-action-btn:hover .anticon {
+  color: var(--button-hover-fg) !important;
+}
+
+.sagitta-action-btn--manage,
+.sagitta-action-btn--refresh,
+.sagitta-action-btn--inspect {
+  --button-fg: var(--color-info);
+  --button-border: var(--color-info);
+  --button-hover-fg: var(--color-info-hover);
+  --button-hover-border: var(--color-info-hover);
+  --button-hover-bg: var(--color-info-bg);
+}
+
+.sagitta-action-btn--edit {
+  --button-fg: var(--color-warning);
+  --button-border: var(--color-warning);
+  --button-hover-fg: var(--color-warning-hover);
+  --button-hover-border: var(--color-warning-hover);
+  --button-hover-bg: var(--color-warning-bg);
+}
+
+.sagitta-action-btn--copy,
+.sagitta-action-btn--download,
+.sagitta-action-btn--upload {
+  --button-fg: var(--color-utility);
+  --button-border: var(--color-utility);
+  --button-hover-fg: var(--color-utility-hover);
+  --button-hover-border: var(--color-utility-hover);
+  --button-hover-bg: var(--color-utility-bg);
 }
 
 .sagitta-action-btn--neutral {
-  color: var(--text-secondary) !important;
-  border-color: var(--border-strong) !important;
-  background: #fff !important;
-}
-
-.sagitta-action-btn--neutral .anticon {
-  color: var(--text-secondary) !important;
-}
-
-.sagitta-action-btn--neutral:hover {
-  color: var(--text-primary) !important;
-  border-color: var(--text-muted) !important;
-  background: #f7f8fa !important;
+  --button-fg: var(--text-secondary);
+  --button-border: var(--border-strong);
+  --button-hover-fg: var(--text-primary);
+  --button-hover-border: var(--text-muted);
+  --button-hover-bg: #F7F8FA;
 }
 
 .sagitta-action-btn--danger {
-  color: var(--color-error) !important;
-  border-color: var(--color-error) !important;
-  background: #fff !important;
+  --button-fg: var(--color-error);
+  --button-border: var(--color-error);
+  --button-hover-fg: var(--color-error-hover);
+  --button-hover-border: var(--color-error-hover);
+  --button-hover-bg: var(--color-error-bg);
 }
 
-.sagitta-action-btn--danger .anticon {
-  color: var(--color-error) !important;
+.sagitta-action-btn--success {
+  --button-fg: var(--color-success);
+  --button-border: var(--color-success);
+  --button-hover-fg: var(--color-success-hover);
+  --button-hover-border: var(--color-success-hover);
+  --button-hover-bg: var(--color-success-bg);
 }
 
-.sagitta-action-btn--danger:hover {
-  color: #cb272d !important;
-  border-color: #cb272d !important;
-  background: #fff2f0 !important;
+.sagitta-oauth-btn {
+  width: 100%;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  color: rgba(255,255,255,0.72) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  background: rgba(255,255,255,0.04) !important;
+}
+
+.sagitta-oauth-btn .anticon,
+.sagitta-oauth-btn img {
+  color: var(--oauth-color, #fff) !important;
+}
+
+.sagitta-oauth-btn:hover {
+  color: #fff !important;
+  border-color: color-mix(in srgb, var(--oauth-color, #fff) 55%, transparent) !important;
+  background: color-mix(in srgb, var(--oauth-color, #fff) 18%, transparent) !important;
+}
+
+.ant-modal-footer .ant-btn:not(:has(.anticon))::before,
+.ant-modal-confirm-btns .ant-btn:not(:has(.anticon))::before,
+.ant-popconfirm-buttons .ant-btn:not(:has(.anticon))::before {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ant-modal-footer .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before,
+.ant-modal-confirm-btns .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before,
+.ant-popconfirm-buttons .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before {
+  content: "✓";
+}
+
+.ant-modal-footer .ant-btn-dangerous:not(:has(.anticon))::before,
+.ant-modal-confirm-btns .ant-btn-dangerous:not(:has(.anticon))::before,
+.ant-popconfirm-buttons .ant-btn-dangerous:not(:has(.anticon))::before {
+  content: "!";
+}
+
+.ant-modal-footer .ant-btn-default:not(:has(.anticon))::before,
+.ant-modal-confirm-btns .ant-btn-default:not(:has(.anticon))::before,
+.ant-popconfirm-buttons .ant-btn-default:not(:has(.anticon))::before {
+  content: "×";
 }
 
 /* 输入框 focus 发光 */

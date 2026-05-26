@@ -15,7 +15,7 @@ import { useBranding } from '@/hooks/useBranding'
 const PlatformIcon = ({ src, alt }: { src: string; alt: string }) => (
   <img
     src={src} alt={alt}
-    width={24} height={24}
+    width={18} height={18}
     style={{ objectFit: 'contain', display: 'block' }}
   />
 )
@@ -25,38 +25,16 @@ const OAuthBtn = ({
   icon, label, color, loading, onClick,
 }: { icon: React.ReactNode; label: string; color: string; loading?: boolean; onClick: () => void }) => (
   <Tooltip title={loading ? '正在跳转…' : `使用 ${label} 登录`} placement="top">
-    <button onClick={onClick} disabled={loading} style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-      padding: '10px 6px', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer',
-      background: loading ? `${color}20` : 'rgba(255,255,255,0.04)',
-      border: loading ? `1px solid ${color}60` : '1px solid rgba(255,255,255,0.08)',
-      transition: 'all 0.2s',
-      minWidth: 0,
-      opacity: loading ? 0.7 : 1,
-    }}
-    onMouseEnter={e => {
-      if (!loading) {
-        (e.currentTarget as HTMLElement).style.background = `${color}18`
-        ;(e.currentTarget as HTMLElement).style.borderColor = `${color}55`
-      }
-    }}
-    onMouseLeave={e => {
-      if (!loading) {
-        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
-        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
-      }
-    }}>
-      {/* 图标区域：固定 24×24 容器，emoji 和 img 都居中 */}
-      <span style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-        {loading ? '⏳' : icon}
-      </span>
-      <span style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 10, color: loading ? color : 'rgba(255,255,255,0.4)',
-        letterSpacing: '0.5px',
-        whiteSpace: 'nowrap',
-      }}>{label}</span>
-    </button>
+    <Button
+      className="sagitta-oauth-btn"
+      icon={icon}
+      loading={loading}
+      disabled={loading}
+      onClick={onClick}
+      style={{ '--oauth-color': color } as React.CSSProperties}
+    >
+      {label}
+    </Button>
   </Tooltip>
 )
 

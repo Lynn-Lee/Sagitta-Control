@@ -96,6 +96,11 @@ const antTheme = {
     motionDurationFast: '0.1s',
     motionDurationMid:  '0.2s',
     motionDurationSlow: '0.25s',
+
+    // 按钮：所有尺寸入口统一为 36px，避免页面操作区高低不齐
+    controlHeight:   36,
+    controlHeightSM: 36,
+    controlHeightLG: 36,
   },
   components: {
     Layout: {
@@ -131,6 +136,9 @@ const antTheme = {
       dangerShadow:  'none',
       borderRadius:  6,
       fontWeight:    500,
+      paddingInline:   14,
+      paddingInlineSM: 14,
+      paddingInlineLG: 14,
     },
     Card: {
       boxShadow:    'none',
