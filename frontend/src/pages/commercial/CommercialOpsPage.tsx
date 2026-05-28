@@ -198,10 +198,10 @@ export default function CommercialOpsPage() {
         <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} loading={loading} onClick={loadAll}>刷新</Button>
       </Space>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} lg={8}>
-          <Card>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+      <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 16 }}>
+        <Col xs={24} lg={8} style={{ display: 'flex' }}>
+          <Card style={{ width: '100%', minHeight: 196 }} styles={{ body: { height: '100%' } }}>
+            <Space direction="vertical" size={10} style={{ width: '100%', height: '100%' }}>
               <Space style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Text strong>推广就绪度</Text>
                 <Tag color={readinessColor[about?.readiness?.status || ''] || 'default'}>
@@ -216,9 +216,9 @@ export default function CommercialOpsPage() {
             </Space>
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
-          <Card>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <Col xs={24} lg={8} style={{ display: 'flex' }}>
+          <Card style={{ width: '100%', minHeight: 196 }} styles={{ body: { height: '100%' } }}>
+            <Space direction="vertical" size={10} style={{ width: '100%', height: '100%' }}>
               <Space style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Text strong>试用与授权</Text>
                 <Tag color={licenseStatusColor[about?.license?.status || ''] || 'default'}>
@@ -239,9 +239,9 @@ export default function CommercialOpsPage() {
             </Space>
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
-          <Card>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <Col xs={24} lg={8} style={{ display: 'flex' }}>
+          <Card style={{ width: '100%', minHeight: 196 }} styles={{ body: { height: '100%' } }}>
+            <Space direction="vertical" size={10} style={{ width: '100%', height: '100%' }}>
               <Text strong>客户环境用量</Text>
               <Descriptions size="small" column={1}>
                 <Descriptions.Item label="活跃用户">{about?.usage?.active_users ?? '-'}</Descriptions.Item>
