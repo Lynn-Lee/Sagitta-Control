@@ -48,6 +48,7 @@ class TestConfigDefinitions:
         assert CONFIG_ORDER["ldap_enabled"] > CONFIG_ORDER["ldap_attr_title"]
         assert CONFIG_ORDER["cas_enabled"] > CONFIG_ORDER["cas_username_attribute"]
         assert CONFIG_ORDER["oidc_enabled"] > CONFIG_ORDER["oidc_display_name_claim"]
+        assert CONFIG_ORDER["sms_enabled"] > CONFIG_ORDER["sms_endpoint"]
 
 
 class TestGetValue:

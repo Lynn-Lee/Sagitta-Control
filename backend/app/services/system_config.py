@@ -97,13 +97,13 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "oidc_display_name_claim": ("显示名 Claim", "oidc", False, "name"),
     "oidc_enabled": ("启用 OIDC 登录", "oidc", False, "false"),
     # ── 短信验证码 ──────────────────────────────────────────
-    "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     "sms_provider": ("短信服务商（aliyun/tencent/custom）", "sms", False, "aliyun"),
     "sms_sign_name": ("短信签名", "sms", False, ""),
     "sms_template_code": ("验证码模板CODE", "sms", False, ""),
     "sms_access_key_id": ("AccessKey ID", "sms", False, ""),
     "sms_access_key_secret": ("AccessKey Secret", "sms", True, ""),
     "sms_endpoint": ("自定义 API 端点（custom 时使用）", "sms", False, ""),
+    "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     # ── AI 配置 ───────────────────────────────────────────────
     "ai_enabled": ("启用 AI 功能", "ai", False, "false"),
     "ai_api_key": ("Anthropic API Key", "ai", True, ""),
