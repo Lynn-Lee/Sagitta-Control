@@ -8,6 +8,7 @@ import {
   LogoutOutlined, UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   BugOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined, HistoryOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal'
@@ -214,6 +215,7 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/masking', icon: <EyeInvisibleOutlined />, label: '数据脱敏规则' },
     ],
   },
+  { key: '/commercial', icon: <CustomerServiceOutlined />, label: '商业运营', permission: 'system_config_manage' },
   { key: '/audit', icon: <AuditOutlined />, label: '审计日志', permission: 'menu_audit' },
 ]
 

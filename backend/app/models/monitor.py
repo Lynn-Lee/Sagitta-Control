@@ -229,3 +229,44 @@ class MonitorTableCapacitySnapshot(BaseModel):
         Index("ix_mtcs_total_size", "instance_id", "total_size_bytes"),
         Index("ix_mtcs_tenant", "tenant_id"),
     )
+
+
+class MonitorAlertEvent(BaseModel):
+    """监控告警事件生命周期。"""
+
+    __tablename__ = "monitor_alert_event"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    instance_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sql_instance.id", ondelete="CASCADE"), nullable=False
+    )
+    rule_key: Mapped[str] = mapped_column(String(80), nullable=False, comment="告警规则键")
+    severity: Mapped[str] = mapped_column(String(20), default="warning", comment="warning/critical")
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="firing",
+        comment="firing/acknowledged/silenced/resolved/closed",
+    )
+    title: Mapped[str] = mapped_column(String(200), default="", comment="告警标题")
+    message: Mapped[str] = mapped_column(Text, default="", comment="告警详情")
+    metric_value: Mapped[float | None] = mapped_column(Float, nullable=True, comment="触发值")
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True, comment="阈值")
+    snapshot_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("monitor_metric_snapshot.id", ondelete="SET NULL"), nullable=True
+    )
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_by: Mapped[str] = mapped_column(String(100), default="")
+    silenced_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by: Mapped[str] = mapped_column(String(100), default="")
+    close_reason: Mapped[str] = mapped_column(String(500), default="")
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_alert_event_instance_status", "instance_id", "status"),
+        Index("ix_alert_event_rule_status", "rule_key", "status"),
+        Index("ix_alert_event_tenant", "tenant_id"),
+    )

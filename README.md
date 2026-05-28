@@ -149,6 +149,8 @@ v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查�
 
 商业授权接入统一授权中心 `License-Server-Center`。客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
 
+商业运营闭环已内置到产品：管理员可在 `商业运营` 页面完成实施交付向导、生成 Markdown/JSON 验收报告、导出脱敏诊断包、查看合规报表、处理告警事件和确认引擎支持矩阵。在线激活和联网刷新会向授权中心上报 usage/runtime 摘要，便于客户成功、续费和支持排障。
+
 发布机制与 DataFusionX 对齐：源码 `main` 分支只触发快速 CI 和版本记录，不自动发布商业包；推送 `release/**` 分支生成 RC 候选商业镜像和部署包，但不默认同步 Public-Releases；推送正式 `vX.Y.Z` 标签生成最终商业交付包并同步到 `Lynn-Lee/Public-Releases/products/sagittadb/`。手动触发商业发布时默认只生成临时包，只有显式勾选发布才同步公开发布仓库。
 
 正式交付包含：

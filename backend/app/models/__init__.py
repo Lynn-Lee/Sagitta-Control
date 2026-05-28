@@ -9,6 +9,7 @@ from app.models.base import Base, BaseModel  # noqa: F401
 from app.models.instance import Instance, InstanceDatabase, InstanceTag, SshTunnel  # noqa: F401
 from app.models.masking import MaskingRule, WorkflowTemplate  # noqa: F401
 from app.models.monitor import (  # noqa: F401
+    MonitorAlertEvent,
     MonitorCollectConfig,
     MonitorDatabaseCapacitySnapshot,
     MonitorMetricSnapshot,
@@ -21,6 +22,8 @@ from app.models.role import Role, UserGroup  # noqa: F401
 from app.models.session import SessionCollectConfig, SessionSnapshot  # noqa: F401
 from app.models.slowlog import SlowQueryConfig, SlowQueryLog  # noqa: F401
 from app.models.system import (  # noqa: F401
+    DeliveryAcceptanceRun,
+    DiagnosticBundle,
     LicenseRecord,
     NotificationDeliveryLog,
     OperationLog,
@@ -68,6 +71,7 @@ __all__ = [
     "SlowQueryLog",
     "SlowQueryConfig",
     "MonitorCollectConfig",
+    "MonitorAlertEvent",
     "MonitorMetricSnapshot",
     "MonitorDatabaseCapacitySnapshot",
     "MonitorTableCapacitySnapshot",
@@ -77,6 +81,8 @@ __all__ = [
     "OperationLog",
     "NotificationDeliveryLog",
     "LicenseRecord",
+    "DeliveryAcceptanceRun",
+    "DiagnosticBundle",
     "MaskingRule",
     "WorkflowTemplate",
 ]

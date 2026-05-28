@@ -42,6 +42,8 @@ EVENT_TITLES = {
     "execution_started": "执行开始",
     "execution_succeeded": "执行成功",
     "execution_failed": "执行失败",
+    "alert_firing": "告警触发",
+    "alert_resolved": "告警恢复",
 }
 
 EVENT_TEMPLATE = {
@@ -53,6 +55,8 @@ EVENT_TEMPLATE = {
     "execution_started": "blue",
     "execution_succeeded": "green",
     "execution_failed": "red",
+    "alert_firing": "red",
+    "alert_resolved": "green",
 }
 
 # 旧测试和旧调用仍依赖这两个常量。

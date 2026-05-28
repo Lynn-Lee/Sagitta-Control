@@ -70,7 +70,7 @@ class QueryPrivService:
         db: AsyncSession,
         operator: dict,
         node: dict,
-    ) -> None:
+    ) -> QueryLog:
         if operator.get("is_superuser"):
             return
 
@@ -1284,6 +1284,8 @@ class QueryPrivService:
         )
         db.add(log)
         await db.commit()
+        await db.refresh(log)
+        return log
 
     @staticmethod
     async def list_logs(

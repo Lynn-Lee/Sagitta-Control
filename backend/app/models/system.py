@@ -126,3 +126,43 @@ class LicenseRecord(BaseModel):
         Index("ix_license_deployment_fingerprint", "deployment_fingerprint"),
         Index("ix_license_tenant", "tenant_id"),
     )
+
+
+class DeliveryAcceptanceRun(BaseModel):
+    """商业交付验收运行记录。"""
+
+    __tablename__ = "delivery_acceptance_run"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(20), default="success", comment="success/failed")
+    options: Mapped[dict] = mapped_column(JSON, default=dict, comment="验收选项")
+    report_json: Mapped[dict] = mapped_column(JSON, default=dict, comment="结构化验收报告")
+    report_markdown: Mapped[str] = mapped_column(Text, default="", comment="Markdown 验收报告")
+    created_by: Mapped[str] = mapped_column(String(100), default="", comment="创建人")
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="完成时间"
+    )
+
+    __table_args__ = (
+        Index("ix_delivery_run_status", "status"),
+        Index("ix_delivery_run_tenant", "tenant_id"),
+    )
+
+
+class DiagnosticBundle(BaseModel):
+    """商业支持诊断包记录。"""
+
+    __tablename__ = "diagnostic_bundle"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(20), default="success", comment="success/failed")
+    bundle_json: Mapped[dict] = mapped_column(JSON, default=dict, comment="脱敏后的诊断内容")
+    created_by: Mapped[str] = mapped_column(String(100), default="", comment="创建人")
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="完成时间"
+    )
+
+    __table_args__ = (
+        Index("ix_diagnostic_bundle_status", "status"),
+        Index("ix_diagnostic_bundle_tenant", "tenant_id"),
+    )

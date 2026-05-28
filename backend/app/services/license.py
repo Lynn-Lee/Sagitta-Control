@@ -507,6 +507,8 @@ class LicenseService:
 
     @staticmethod
     async def activate(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:
+        from app.services.commercial_ops import CommercialOpsService
+
         activation_code = str(data.get("activation_code") or "").strip()
         customer_id = str(data.get("customer_id") or settings.LICENSE_CUSTOMER_ID or "").strip()
         if not activation_code:
@@ -519,6 +521,8 @@ class LicenseService:
                 "activation_code": activation_code,
                 "customer_id": customer_id,
                 "deployment_fingerprint": LicenseService.deployment_fingerprint(customer_id),
+                "usage": await CommercialOpsService.usage_payload(db),
+                "runtime": await CommercialOpsService.runtime_payload(db, "activation"),
                 **LicenseService._license_server_project_payload(),
             },
         )
@@ -537,6 +541,8 @@ class LicenseService:
 
     @staticmethod
     async def refresh(db: AsyncSession) -> dict[str, Any]:
+        from app.services.commercial_ops import CommercialOpsService
+
         current = await LicenseService._current_record(db)
         if not current or current.source != "online":
             raise HTTPException(status_code=400, detail="当前 License 不是在线激活授权，无法联网续期")
@@ -547,6 +553,8 @@ class LicenseService:
                 "license_id": current.license_id,
                 "customer_id": current.customer_id,
                 "deployment_fingerprint": LicenseService.deployment_fingerprint(current.customer_id),
+                "usage": await CommercialOpsService.usage_payload(db),
+                "runtime": await CommercialOpsService.runtime_payload(db, current.source),
                 **LicenseService._license_server_project_payload(),
             },
         )

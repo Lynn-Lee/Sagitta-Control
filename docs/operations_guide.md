@@ -239,6 +239,8 @@ Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `depl
 
 Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。会话页优先读取 `GV$SESSION`、`GV$PROCESS`、`GV$SQL` 和 `GV$TRANSACTION`，兼容 RAC 与 11g；SQL 洞察优先读取 `GV$SQL_MONITOR`，再降级到 `DBA_HIST_SQLSTAT`、`GV$SQL` 和当前会话 SQL。客户账号没有 AWR、SQL Monitor 或部分动态性能视图权限时，页面会保留已采集数据并展示缺失权限 warning。所有 Oracle 采集均为只读查询，不会执行会话 kill、trace dump、SQL profile、baseline、patch 等变更类诊断操作。
 
+告警规则命中阈值后会生成告警事件，事件状态为 `firing`、`acknowledged`、`silenced`、`resolved`、`closed`。采集恢复后系统自动标记为 `resolved`，人工处理完成后可关闭为 `closed`。通知链路复用现有邮件、飞书、钉钉和企业微信配置，建议在客户验收时至少验证一个通知渠道可用。
+
 测试环境的观测模拟任务通过系统 cron 触发，默认每分钟执行 3 轮，用于给观测中心持续产生连接、查询、事务、容量和等待类指标。云 ECS 测试环境的当前配置如下：
 
 ```cron
@@ -268,6 +270,8 @@ Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。�
 - 定期清理无业务价值的旧诊断采样。
 - 监控 PostgreSQL 数据卷使用率。
 - 下载文件、导出文件和临时文件建议设置清理任务。
+
+商业运营页提供审计、查询历史、通知日志和诊断采样的保留策略入口。第一版以配置和手动清理为主，客户有强合规要求时应在交付记录中明确保留天数、清理责任人和清理前备份策略。
 
 ## 9. 常见故障处理
 
@@ -348,6 +352,8 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 ```
 
 也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
+
+产品内 `商业运营` 页面已沉淀同类非破坏性验收能力，建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 

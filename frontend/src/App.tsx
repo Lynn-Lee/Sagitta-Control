@@ -34,6 +34,7 @@ const RoleManagement       = lazy(() => import('@/pages/system/RoleManagement'))
 const UserGroupManagement  = lazy(() => import('@/pages/system/UserGroupManagement'))
 const AuditLog             = lazy(() => import('@/pages/audit/AuditLog'))
 const ArchivePage          = lazy(() => import('@/pages/archive/ArchivePage'))
+const CommercialOpsPage    = lazy(() => import('@/pages/commercial/CommercialOpsPage'))
 
 const Loading = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="system/license"       element={<PermissionGuard permission="system_config_manage"><LicensePage /></PermissionGuard>} />
           <Route path="masking"              element={<PermissionGuard permission="menu_system"><MaskingRulePage /></PermissionGuard>} />
           <Route path="audit"                element={<PermissionGuard permission="menu_audit"><AuditLog /></PermissionGuard>} />
+          <Route path="commercial"           element={<PermissionGuard permission="system_config_manage"><CommercialOpsPage /></PermissionGuard>} />
           <Route path="profile"              element={<ProfilePage />} />
           <Route path="*"                    element={<DefaultAuthedRoute />} />
         </Route>

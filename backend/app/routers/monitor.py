@@ -102,6 +102,66 @@ async def instance_overview(
     return await DashboardService.get_instance_overview(db, user=user)
 
 
+# ── 告警事件生命周期 ──────────────────────────────────────────
+
+
+@router.get("/alerts/events", summary="告警事件列表")
+async def list_alert_events(
+    status: str | None = QParam(None, pattern="^(firing|acknowledged|silenced|resolved|closed)$"),
+    instance_id: int | None = None,
+    page: int = QParam(1, ge=1),
+    page_size: int = QParam(50, ge=1, le=200),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await MonitorService.list_alert_events(
+        db, user, status=status, instance_id=instance_id, page=page, page_size=page_size
+    )
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@router.get("/alerts/events/{event_id}", summary="告警事件详情")
+async def get_alert_event(
+    event_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.get_alert_event(db, event_id, user)
+
+
+@router.post("/alerts/events/{event_id}/ack", summary="确认告警事件")
+async def ack_alert_event(
+    event_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.change_alert_event(db, event_id, "ack", user)
+
+
+@router.post("/alerts/events/{event_id}/silence", summary="静默告警事件")
+async def silence_alert_event(
+    event_id: int,
+    payload: dict = Body(default_factory=dict),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.change_alert_event(
+        db, event_id, "silence", user, minutes=int(payload.get("minutes") or 60)
+    )
+
+
+@router.post("/alerts/events/{event_id}/close", summary="关闭告警事件")
+async def close_alert_event(
+    event_id: int,
+    payload: dict = Body(default_factory=dict),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.change_alert_event(
+        db, event_id, "close", user, reason=str(payload.get("reason") or "")
+    )
+
+
 # ── 原生数据库监控 ────────────────────────────────────────────
 
 

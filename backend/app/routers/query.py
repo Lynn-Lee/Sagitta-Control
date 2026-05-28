@@ -5,6 +5,7 @@
 
 import csv
 import logging
+from datetime import datetime
 from io import BytesIO, StringIO
 from urllib.parse import quote
 
@@ -21,6 +22,7 @@ from app.core.deps import current_user
 from app.engines.registry import get_engine
 from app.models.instance import Instance, InstanceDatabase
 from app.schemas.query import QueryExecuteRequest
+from app.services.commercial_ops import CommercialOpsService
 from app.services.masking import DataMaskingService
 from app.services.masking_rule import MaskingRuleService
 from app.services.query_guard import get_query_guard
@@ -129,7 +131,7 @@ async def _run_query_with_permissions(
         masked_result.affected_rows = len(masked_result.rows)
 
     try:
-        await QueryPrivService.write_log(
+        query_log = await QueryPrivService.write_log(
             db=db,
             user_id=user["id"],
             instance_id=inst.id,
@@ -147,8 +149,10 @@ async def _run_query_with_permissions(
             db_type=inst.db_type,
             client_ip=client_ip,
         )
+        query_log_id = query_log.id
     except Exception as e:
         logger.warning("write_query_log failed: %s", str(e))
+        query_log_id = None
 
     rows_as_list = []
     for row in masked_result.rows:
@@ -170,6 +174,7 @@ async def _run_query_with_permissions(
         "affected_rows": masked_result.affected_rows,
         "cost_time_ms": masked_result.cost_time,
         "is_masked": is_masked,
+        "query_log_id": query_log_id,
         "error": "",
     }
 
@@ -219,7 +224,12 @@ async def _write_failed_query_log(
         logger.warning("write_failed_query_log failed: %s", str(e))
 
 
-def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, str, str]:
+def _build_query_export_file(
+    result: dict,
+    export_format: str,
+    metadata: dict[str, str] | None = None,
+) -> tuple[bytes, str, str]:
+    metadata = metadata or {}
     headers = ["row_num", *(result.get("column_list") or [])]
     rows = [
         [idx + 1, *row]
@@ -230,6 +240,10 @@ def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, s
     if fmt == "csv":
         output = StringIO()
         writer = csv.writer(output)
+        for key, value in metadata.items():
+            writer.writerow([f"# {key}", value])
+        if metadata:
+            writer.writerow([])
         writer.writerow(headers)
         writer.writerows(rows)
         return (
@@ -244,6 +258,11 @@ def _build_query_export_file(result: dict, export_format: str) -> tuple[bytes, s
     ws.append(headers)
     for row in rows:
         ws.append(row)
+    if metadata:
+        meta = wb.create_sheet("Export Metadata")
+        meta.append(["key", "value"])
+        for key, value in metadata.items():
+            meta.append([key, value])
     content = BytesIO()
     wb.save(content)
     return (
@@ -309,7 +328,16 @@ async def export_query_result(
             export_format=export_format,
             client_ip=client_ip,
         )
-        content, media_type, filename = _build_query_export_file(result, export_format)
+        metadata = {
+            "export_user": user.get("username") or "",
+            "export_time": datetime.now().isoformat(),
+            "instance_id": str(data.instance_id),
+            "db_name": data.db_name,
+            "sql_summary": data.sql[:500],
+            "query_log_id": str(result.get("query_log_id") or ""),
+            "masked": "true" if result.get("is_masked") else "false",
+        }
+        content, media_type, filename = _build_query_export_file(result, export_format, metadata)
         headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
         return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
     except HTTPException as e:
@@ -415,6 +443,61 @@ async def list_query_logs(
             for log in logs
         ],
     }
+
+
+@router.get("/history/export", summary="导出查询历史合规记录")
+async def export_query_history(
+    instance_id: int | None = None,
+    username: str | None = None,
+    db_name: str | None = None,
+    operation_type: str | None = QParam(None, pattern="^(execute|export)$"),
+    masking: bool | None = None,
+    sql_keyword: str | None = None,
+    date_start: str | None = None,
+    date_end: str | None = None,
+    export_format: str = QParam("xlsx", pattern="^(xlsx|csv|json)$"),
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _total, logs = await QueryPrivService.list_logs(
+        db,
+        user=user,
+        instance_id=instance_id,
+        username=username,
+        db_name=db_name,
+        operation_type=operation_type,
+        masking=masking,
+        sql_keyword=sql_keyword,
+        date_start=date_start,
+        date_end=date_end,
+        page=1,
+        page_size=10000,
+    )
+    rows = [
+        {
+            "id": log.id,
+            "username": log.username,
+            "instance_name": log.instance_name,
+            "db_type": log.db_type,
+            "db_name": log.db_name,
+            "operation_type": log.operation_type,
+            "export_format": log.export_format,
+            "effect_row": log.effect_row,
+            "cost_time_ms": log.cost_time_ms,
+            "priv_check": log.priv_check,
+            "masking": log.masking,
+            "client_ip": log.client_ip,
+            "error": log.error,
+            "sql": log.sqllog,
+            "created_at": log.created_at.isoformat() if log.created_at else "",
+        }
+        for log in logs
+    ]
+    content, media_type, filename = CommercialOpsService.build_rows_file(
+        rows, export_format, "query_history"
+    )
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
 
 
 @router.post("/logs/{log_id}/favorite/", summary="收藏/取消收藏查询")
