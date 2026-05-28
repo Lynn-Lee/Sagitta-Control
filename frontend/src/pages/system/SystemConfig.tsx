@@ -7,8 +7,12 @@ import {
   ApiOutlined,
   GlobalOutlined,
   KeyOutlined,
+  MailOutlined,
+  MessageOutlined,
+  RobotOutlined,
   SaveOutlined,
   SendOutlined,
+  SettingOutlined,
   UploadOutlined,
   UndoOutlined,
 } from '@ant-design/icons'
@@ -24,6 +28,7 @@ const { useBreakpoint } = Grid
 const tabLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
+  gap: 6,
   whiteSpace: 'nowrap',
 }
 
@@ -33,14 +38,27 @@ const CompactTabLabel = ({ title, children }: { title: string; children: React.R
   </Tooltip>
 )
 
-// 平台图标：与登录页保持一致，使用 public/icons/ 官方矢量图
+const systemConfigTabIconStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 18,
+  height: 18,
+  fontSize: 18,
+  lineHeight: 1,
+  color: '#0f766e',
+}
+
+// 平台图标：与 DataFusionX-Enterprise 系统配置页保持一致
 const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
-  <img src={src} alt={alt} width={14} height={14}
-    style={{ objectFit: 'contain', verticalAlign: 'middle', marginRight: 5 }} />
+  <span style={systemConfigTabIconStyle}>
+    <img src={src} alt={alt} width={18} height={18}
+      style={{ objectFit: 'contain', display: 'block' }} />
+  </span>
 )
 
 const TabIcon = ({ children }: { children: React.ReactNode }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: 5 }}>
+  <span style={systemConfigTabIconStyle}>
     {children}
   </span>
 )
@@ -53,16 +71,16 @@ const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) 
 })
 
 const GROUP_LABEL: Record<string, React.ReactNode> = {
-  basic:    <CompactTabLabel title="基础设置">⚙️ 基础</CompactTabLabel>,
-  mail:     <CompactTabLabel title="邮件通知">📧 邮件</CompactTabLabel>,
+  basic:    <CompactTabLabel title="基础设置"><TabIcon><SettingOutlined /></TabIcon>基础</CompactTabLabel>,
+  mail:     <CompactTabLabel title="邮件通知"><TabIcon><MailOutlined /></TabIcon>邮件</CompactTabLabel>,
   dingtalk: <CompactTabLabel title="钉钉通知"><PlatformImg src="/icons/dingtalk.svg" alt="钉钉" />钉钉</CompactTabLabel>,
   wecom:    <CompactTabLabel title="企业微信通知"><PlatformImg src="/icons/wecom.svg" alt="企微" />企微</CompactTabLabel>,
   feishu:   <CompactTabLabel title="飞书通知"><PlatformImg src="/icons/feishu.svg" alt="飞书" />飞书</CompactTabLabel>,
   ldap:     <CompactTabLabel title="LDAP 认证"><PlatformImg src="/icons/ldap.svg" alt="LDAP" />LDAP</CompactTabLabel>,
-  cas:      <CompactTabLabel title="CAS SSO"><TabIcon><GlobalOutlined style={{ color: '#0f766e' }} /></TabIcon>CAS</CompactTabLabel>,
-  oidc:     <CompactTabLabel title="OIDC SSO"><TabIcon><KeyOutlined style={{ color: '#2f80ed' }} /></TabIcon>OIDC</CompactTabLabel>,
-  sms:      <CompactTabLabel title="短信验证码"><PlatformImg src="/icons/sms.svg" alt="短信" />短信</CompactTabLabel>,
-  ai:       <CompactTabLabel title="AI 功能">🤖 AI</CompactTabLabel>,
+  cas:      <CompactTabLabel title="CAS SSO"><TabIcon><GlobalOutlined /></TabIcon>CAS</CompactTabLabel>,
+  oidc:     <CompactTabLabel title="OIDC SSO"><TabIcon><KeyOutlined /></TabIcon>OIDC</CompactTabLabel>,
+  sms:      <CompactTabLabel title="短信验证码"><TabIcon><MessageOutlined /></TabIcon>短信</CompactTabLabel>,
+  ai:       <CompactTabLabel title="AI 功能"><TabIcon><RobotOutlined /></TabIcon>AI</CompactTabLabel>,
 }
 
 const NotifySendIcon = () => <SendOutlined />
@@ -206,7 +224,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
             <Form.Item name="_test_mail_to" noStyle>
               <Input placeholder="收件人邮箱" style={{ width: 220 }} />
             </Form.Item>
-            <TestButton label="发送测试" onTest={async () => {
+            <TestButton label="发送测试邮件" icon={<NotifySendIcon />} onTest={async () => {
               const to = form.getFieldValue('_test_mail_to')
               if (!to) return { success: false, message: '请输入收件人邮箱' }
               return apiClient.post('/system/config/test/mail/', { to_email: to }).then(r => r.data)
@@ -220,7 +238,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
             <TestButton label="发送钉钉机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/dingtalk/').then(r => r.data)} />
           </Form.Item>
-          <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
+          <Form.Item label="精准通知测试">
             <Space>
               <Form.Item name="_test_notify_user_id_dingtalk" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
@@ -240,7 +258,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
             <TestButton label="发送企微机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/wecom/').then(r => r.data)} />
           </Form.Item>
-          <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
+          <Form.Item label="精准通知测试">
             <Space>
               <Form.Item name="_test_notify_user_id_wecom" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
@@ -260,7 +278,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
             <TestButton label="发送飞书机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/feishu/').then(r => r.data)} />
           </Form.Item>
-          <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
+          <Form.Item label="精准通知测试">
             <Space>
               <Form.Item name="_test_notify_user_id_feishu" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
