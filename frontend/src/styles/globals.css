@@ -264,12 +264,17 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .sagitta-oauth-btn {
+  --button-height: 40px;
+  aspect-ratio: 1;
   width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
   min-width: 0 !important;
-  padding: 0 8px !important;
+  padding: 0 !important;
   color: rgba(255,255,255,0.72) !important;
   border-color: rgba(255,255,255,0.12) !important;
   background: rgba(255,255,255,0.04) !important;
+  border-radius: 8px !important;
 }
 
 .sagitta-oauth-btn .anticon,
@@ -277,10 +282,70 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   color: var(--oauth-color, #fff) !important;
 }
 
+.sagitta-oauth-btn img {
+  width: 20px;
+  height: 20px;
+}
+
 .sagitta-oauth-btn:hover {
   color: #fff !important;
   border-color: color-mix(in srgb, var(--oauth-color, #fff) 55%, transparent) !important;
   background: color-mix(in srgb, var(--oauth-color, #fff) 18%, transparent) !important;
+}
+
+.sagitta-login-mode-header {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sagitta-login-back-btn {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  color: rgba(255,255,255,0.72) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  background: rgba(255,255,255,0.04) !important;
+  border-radius: 8px !important;
+}
+
+.sagitta-login-back-btn:hover {
+  color: #fff !important;
+  border-color: rgba(255,255,255,0.28) !important;
+  background: rgba(255,255,255,0.08) !important;
+}
+
+.sagitta-login-back-btn .anticon {
+  font-size: 16px;
+}
+
+.sagitta-login-mode-title {
+  height: 40px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255,255,255,0.86);
+  border: 1px solid rgba(94,124,224,0.32);
+  background: rgba(94,124,224,0.12);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sagitta-login-mode-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mode-color, #5E7CE0) 20%, transparent);
 }
 
 .ant-modal-footer .ant-btn:not(:has(.anticon))::before,

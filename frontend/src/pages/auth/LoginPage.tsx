@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Form, Input, Alert, Divider, Tooltip, Tag, Modal, Typography } from 'antd'
+import { Button, Form, Input, Alert, Divider, Tooltip, Modal } from 'antd'
 import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined, LoginOutlined, SaveOutlined,
 } from '@ant-design/icons'
@@ -12,10 +12,10 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { useBranding } from '@/hooks/useBranding'
 
 // ── 平台图标（官方矢量图） ─────────────────────────────────────
-const PlatformIcon = ({ src, alt }: { src: string; alt: string }) => (
+const PlatformIcon = ({ src, alt, size = 18 }: { src: string; alt: string; size?: number }) => (
   <img
     src={src} alt={alt}
-    width={18} height={18}
+    width={size} height={size}
     style={{ objectFit: 'contain', display: 'block' }}
   />
 )
@@ -28,13 +28,12 @@ const OAuthBtn = ({
     <Button
       className="sagitta-oauth-btn"
       icon={icon}
+      aria-label={`使用 ${label} 登录`}
       loading={loading}
       disabled={loading}
       onClick={onClick}
       style={{ '--oauth-color': color } as React.CSSProperties}
-    >
-      {label}
-    </Button>
+    />
   </Tooltip>
 )
 
@@ -347,18 +346,22 @@ export default function LoginPage() {
         {isLdap ? (
           /* ── LDAP 登录表单 ── */
           <>
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Button
-                size="small" icon={<ArrowLeftOutlined />}
-                style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.04)' }}
-                onClick={() => { setSearchParams({}); setError('') }}
-              >
-                返回
-              </Button>
-              <Tag style={{ borderRadius: 4, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(94,124,224,0.15)', border: '1px solid rgba(94,124,224,0.4)', color: '#A5B4FC' }}>
-                <img src="/icons/ldap.svg" width={13} height={13} style={{ objectFit: 'contain' }} alt="LDAP" />
-                LDAP 认证
-              </Tag>
+            <div className="sagitta-login-mode-header">
+              <Tooltip title="返回账号密码登录" placement="top">
+                <Button
+                  className="sagitta-login-back-btn"
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  aria-label="返回账号密码登录"
+                  onClick={() => { setSearchParams({}); setError('') }}
+                />
+              </Tooltip>
+              <div className="sagitta-login-mode-title">
+                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#5E7CE0' } as React.CSSProperties}>
+                  <PlatformIcon src="/icons/ldap.svg" alt="LDAP" size={20} />
+                </span>
+                <span>LDAP 认证</span>
+              </div>
             </div>
             <Form onFinish={handleLdapLogin} size="large" layout="vertical">
               <Form.Item name="username" rules={[{ required: true, message: '请输入 LDAP 用户名' }]}
@@ -622,8 +625,9 @@ export default function LoginPage() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-              gap: 8,
+              gridTemplateColumns: 'repeat(5, 40px)',
+              justifyContent: 'center',
+              gap: 10,
             }}>
               {/* LDAP — 紫蓝 #5E7CE0 */}
               <OAuthBtn
