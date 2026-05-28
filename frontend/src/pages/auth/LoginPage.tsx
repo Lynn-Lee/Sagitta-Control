@@ -12,6 +12,14 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { useBranding } from '@/hooks/useBranding'
 
 // ── 平台图标（官方矢量图） ─────────────────────────────────────
+const OAUTH_PROVIDER_LABELS: Record<string, string> = {
+  ldap: 'LDAP',
+  cas: 'CAS',
+  dingtalk: '钉钉',
+  feishu: '飞书',
+  wecom: '企业微信',
+}
+
 const PlatformIcon = ({ src, alt, size = 18 }: { src: string; alt: string; size?: number }) => (
   <img
     src={src} alt={alt}
@@ -172,6 +180,7 @@ export default function LoginPage() {
   }
 
   const handleOAuth = async (type: string) => {
+    const label = OAUTH_PROVIDER_LABELS[type] || type
     if (type === 'ldap') {
       setSearchParams({ method: 'ldap' })
       setError('')
@@ -183,7 +192,7 @@ export default function LoginPage() {
       const resp = await apiClient.get(`/auth/${type}/authorize/`)
       window.location.href = resp.data.url
     } catch (e: any) {
-      setError(e.response?.data?.detail || `${type} 登录暂不可用，请联系管理员开启`)
+      setError(e.response?.data?.detail || `${label} 登录暂不可用，请联系管理员开启`)
       setOauthLoading('')
     }
   }

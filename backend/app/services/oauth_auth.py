@@ -354,6 +354,13 @@ async def handle_cas_callback(
 
 SUPPORTED_PROVIDERS = ("dingtalk", "feishu", "wecom", "cas")
 
+PROVIDER_DISPLAY_NAMES = {
+    "dingtalk": "钉钉",
+    "feishu": "飞书",
+    "wecom": "企业微信",
+    "cas": "CAS",
+}
+
 _PROVIDER_ENABLED_KEY: dict[str, str] = {
     "dingtalk": "ding_login_enabled",
     "feishu":   "feishu_login_enabled",
@@ -384,7 +391,7 @@ async def get_authorize_url(
     enabled_key = _PROVIDER_ENABLED_KEY[provider]
     enabled = await SystemConfigService.get_value(db, enabled_key)
     if enabled.lower() != "true":
-        raise ValueError(f"{provider} 登录未启用，请在系统配置中开启")
+        raise ValueError(f"{PROVIDER_DISPLAY_NAMES[provider]} 登录未启用，请在系统配置中开启")
     return await _GET_URL[provider](db, callback_url, state)
 
 
