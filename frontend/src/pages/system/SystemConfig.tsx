@@ -3,7 +3,15 @@ import {
   Alert, Button, Card, Divider, Form, Input,
   message, Space, Switch, Tabs, Typography, Grid, Tooltip, Upload,
 } from 'antd'
-import { ApiOutlined, SaveOutlined, UploadOutlined, UndoOutlined } from '@ant-design/icons'
+import {
+  ApiOutlined,
+  GlobalOutlined,
+  KeyOutlined,
+  SaveOutlined,
+  SendOutlined,
+  UploadOutlined,
+  UndoOutlined,
+} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
@@ -31,6 +39,12 @@ const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
     style={{ objectFit: 'contain', verticalAlign: 'middle', marginRight: 5 }} />
 )
 
+const TabIcon = ({ children }: { children: React.ReactNode }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: 5 }}>
+    {children}
+  </span>
+)
+
 const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = () => resolve(String(reader.result || ''))
@@ -45,13 +59,21 @@ const GROUP_LABEL: Record<string, React.ReactNode> = {
   wecom:    <CompactTabLabel title="企业微信通知"><PlatformImg src="/icons/wecom.svg" alt="企微" />企微</CompactTabLabel>,
   feishu:   <CompactTabLabel title="飞书通知"><PlatformImg src="/icons/feishu.svg" alt="飞书" />飞书</CompactTabLabel>,
   ldap:     <CompactTabLabel title="LDAP 认证"><PlatformImg src="/icons/ldap.svg" alt="LDAP" />LDAP</CompactTabLabel>,
-  cas:      <CompactTabLabel title="CAS SSO"><PlatformImg src="/icons/cas.svg" alt="CAS" />CAS</CompactTabLabel>,
-  oidc:     <CompactTabLabel title="OIDC SSO"><PlatformImg src="/icons/oidc.svg" alt="OIDC" />OIDC</CompactTabLabel>,
+  cas:      <CompactTabLabel title="CAS SSO"><TabIcon><GlobalOutlined style={{ color: '#0f766e' }} /></TabIcon>CAS</CompactTabLabel>,
+  oidc:     <CompactTabLabel title="OIDC SSO"><TabIcon><KeyOutlined style={{ color: '#2f80ed' }} /></TabIcon>OIDC</CompactTabLabel>,
   sms:      <CompactTabLabel title="短信验证码"><PlatformImg src="/icons/sms.svg" alt="短信" />短信</CompactTabLabel>,
   ai:       <CompactTabLabel title="AI 功能">🤖 AI</CompactTabLabel>,
 }
 
-function TestButton({ label, onTest }: { label: string; onTest: () => Promise<any> }) {
+function TestButton({
+  label,
+  icon,
+  onTest,
+}: {
+  label: string
+  icon?: React.ReactNode
+  onTest: () => Promise<any>
+}) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -70,7 +92,7 @@ function TestButton({ label, onTest }: { label: string; onTest: () => Promise<an
 
   return (
     <Space direction="vertical" size={4}>
-      <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<ApiOutlined />} loading={loading} onClick={handleTest} size="small">
+      <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={icon ?? <ApiOutlined />} loading={loading} onClick={handleTest} size="small">
         {label}
       </Button>
       {result && (
@@ -193,7 +215,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'dingtalk' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送钉钉机器人测试消息" onTest={() =>
+            <TestButton label="发送钉钉机器人测试消息" icon={<SendOutlined />} onTest={() =>
               apiClient.post('/system/config/test/dingtalk/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -201,7 +223,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_dingtalk" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" onTest={async () => {
+              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_dingtalk'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)
@@ -213,7 +235,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'wecom' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送企微机器人测试消息" onTest={() =>
+            <TestButton label="发送企微机器人测试消息" icon={<SendOutlined />} onTest={() =>
               apiClient.post('/system/config/test/wecom/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -221,7 +243,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_wecom" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" onTest={async () => {
+              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_wecom'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)
@@ -233,7 +255,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'feishu' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送飞书机器人测试消息" onTest={() =>
+            <TestButton label="发送飞书机器人测试消息" icon={<SendOutlined />} onTest={() =>
               apiClient.post('/system/config/test/feishu/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -241,7 +263,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_feishu" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" onTest={async () => {
+              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_feishu'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)
@@ -254,6 +276,18 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
         <Form.Item label="连通性测试">
           <TestButton label="测试 LDAP 连接" onTest={() =>
             apiClient.post('/system/config/test/ldap/', {}).then(r => r.data)} />
+        </Form.Item>
+      )}
+      {group === 'cas' && (
+        <Form.Item label="连通性测试">
+          <TestButton label="测试 CAS 连接" onTest={() =>
+            apiClient.post('/system/config/test/cas/', {}).then(r => r.data)} />
+        </Form.Item>
+      )}
+      {group === 'oidc' && (
+        <Form.Item label="连通性测试">
+          <TestButton label="测试 OIDC 连接" onTest={() =>
+            apiClient.post('/system/config/test/oidc/', {}).then(r => r.data)} />
         </Form.Item>
       )}
     </div>

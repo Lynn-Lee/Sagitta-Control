@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Alert, Divider, Tooltip, Modal, Space, message } from 'antd'
 import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined, LoginOutlined, SaveOutlined,
+  GlobalOutlined, KeyOutlined,
 } from '@ant-design/icons'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore, type AuthProvider } from '@/store/auth'
@@ -837,16 +838,16 @@ export default function LoginPage() {
                   )}
                   {authMethods.cas && (
                     <OAuthBtn
-                      icon={<PlatformIcon src="/icons/cas.svg" alt="CAS" />}
-                      label={OAUTH_PROVIDER_LABELS.cas} color="#0590DF"
+                      icon={<GlobalOutlined />}
+                      label={OAUTH_PROVIDER_LABELS.cas} color="#0F766E"
                       loading={oauthLoading === 'cas'}
                       onClick={() => handleOAuth('cas')}
                     />
                   )}
                   {authMethods.oidc && (
                     <OAuthBtn
-                      icon={<PlatformIcon src="/icons/oidc.svg" alt="OIDC" />}
-                      label={OAUTH_PROVIDER_LABELS.oidc} color="#6F48D8"
+                      icon={<KeyOutlined />}
+                      label={OAUTH_PROVIDER_LABELS.oidc} color="#2F80ED"
                       loading={oauthLoading === 'oidc'}
                       onClick={() => handleOAuth('oidc')}
                     />

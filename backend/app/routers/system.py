@@ -941,6 +941,22 @@ async def test_ldap_config(
     return await SystemConfigService.test_ldap(db, data.test_username, data.test_password)
 
 
+@router.post("/config/test/cas/", summary="测试 CAS 配置")
+async def test_cas_config(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    return await SystemConfigService.test_cas(db)
+
+
+@router.post("/config/test/oidc/", summary="测试 OIDC 配置")
+async def test_oidc_config(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    return await SystemConfigService.test_oidc(db)
+
+
 # ═══════════════════════════════════════════════════════════
 # 商业授权
 # ═══════════════════════════════════════════════════════════

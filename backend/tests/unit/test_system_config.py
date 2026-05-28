@@ -140,6 +140,38 @@ class TestPublicAuthMethods:
         }
 
 
+class TestConnectivityChecks:
+    """测试系统配置连通性检查的基础配置校验。"""
+
+    @pytest.mark.asyncio
+    async def test_cas_requires_server_url(self):
+        mock_db = AsyncMock()
+        with patch.object(SystemConfigService, "get_value", new=AsyncMock(return_value="")):
+            result = await SystemConfigService.test_cas(mock_db)
+
+        assert result == {"success": False, "message": "CAS 服务器地址未配置"}
+
+    @pytest.mark.asyncio
+    async def test_oidc_requires_issuer_or_manual_endpoints(self):
+        mock_db = AsyncMock()
+        values = {
+            "oidc_issuer_url": "",
+            "oidc_authorization_endpoint": "",
+            "oidc_token_endpoint": "",
+        }
+
+        async def fake_get_value(_db, key):
+            return values[key]
+
+        with patch.object(SystemConfigService, "get_value", side_effect=fake_get_value):
+            result = await SystemConfigService.test_oidc(mock_db)
+
+        assert result == {
+            "success": False,
+            "message": "OIDC Issuer 地址未配置；如不使用自动发现，请填写授权端点和 Token 端点",
+        }
+
+
 class TestUpdateBatch:
     """测试 SystemConfigService.update_batch 批量写入逻辑。"""
 

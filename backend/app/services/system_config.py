@@ -408,3 +408,81 @@ class SystemConfigService:
             }
         except Exception as e:
             return {"success": False, "message": str(e)}
+
+    @staticmethod
+    async def test_cas(db: AsyncSession) -> dict:
+        """测试 CAS 服务端可达性。"""
+        try:
+            import httpx
+
+            server_url = (await SystemConfigService.get_value(db, "cas_server_url")).strip().rstrip("/")
+            if not server_url:
+                return {"success": False, "message": "CAS 服务器地址未配置"}
+
+            async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+                resp = await client.get(f"{server_url}/login")
+                if resp.status_code == 404:
+                    resp = await client.get(server_url)
+                if resp.status_code >= 400:
+                    body = resp.text[:300]
+                    return {"success": False, "message": f"CAS 连接测试失败，HTTP {resp.status_code}：{body}"}
+
+            return {"success": True, "message": "CAS 连接测试通过"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    async def test_oidc(db: AsyncSession) -> dict:
+        """测试 OIDC Discovery 或授权端点可达性。"""
+        try:
+            import httpx
+
+            issuer_url = (await SystemConfigService.get_value(db, "oidc_issuer_url")).strip().rstrip("/")
+            authorization_endpoint = (
+                await SystemConfigService.get_value(db, "oidc_authorization_endpoint")
+            ).strip()
+            token_endpoint = (await SystemConfigService.get_value(db, "oidc_token_endpoint")).strip()
+
+            async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+                if issuer_url:
+                    discovery_url = f"{issuer_url}/.well-known/openid-configuration"
+                    resp = await client.get(discovery_url)
+                    if resp.status_code >= 400:
+                        body = resp.text[:300]
+                        return {
+                            "success": False,
+                            "message": f"OIDC 发现配置连接失败，HTTP {resp.status_code}：{body}",
+                        }
+                    try:
+                        metadata = resp.json()
+                    except ValueError:
+                        return {"success": False, "message": "OIDC 发现配置未返回 JSON 元数据"}
+                    missing = [
+                        key
+                        for key in ("authorization_endpoint", "token_endpoint")
+                        if not metadata.get(key)
+                    ]
+                    if missing:
+                        return {
+                            "success": False,
+                            "message": f"OIDC 发现配置缺少字段：{', '.join(missing)}",
+                        }
+                    return {"success": True, "message": "OIDC 连接测试通过"}
+
+                if not authorization_endpoint or not token_endpoint:
+                    return {
+                        "success": False,
+                        "message": "OIDC Issuer 地址未配置；如不使用自动发现，请填写授权端点和 Token 端点",
+                    }
+
+                resp = await client.get(authorization_endpoint)
+                if resp.status_code >= 500:
+                    body = resp.text[:300]
+                    return {
+                        "success": False,
+                        "message": f"OIDC 授权端点连接失败，HTTP {resp.status_code}：{body}",
+                    }
+
+            return {"success": True, "message": "OIDC 连接测试通过"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
