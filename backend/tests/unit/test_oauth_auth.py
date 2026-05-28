@@ -51,27 +51,62 @@ async def test_get_authorize_url_disabled(mock_db):
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="该企业登录方式未启用。"),
+        pytest.raises(ValueError, match="钉钉登录未启用或 AppKey 未配置。"),
     ):
         await oauth_auth.get_authorize_url("dingtalk", mock_db, "http://cb", "state")
 
 
 @pytest.mark.asyncio
 async def test_get_authorize_url_disabled_uses_enterprise_prompt(mock_db):
-    cfg = _make_config(feishu_login_enabled="false", cas_enabled="false")
+    cfg = _make_config(
+        feishu_login_enabled="false",
+        wecom_login_enabled="false",
+        cas_enabled="false",
+    )
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="该企业登录方式未启用。"),
+        pytest.raises(ValueError, match="飞书登录未启用或 App ID 未配置。"),
     ):
         await oauth_auth.get_authorize_url("feishu", mock_db, "http://cb", "state")
 
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="该企业登录方式未启用。"),
+        pytest.raises(ValueError, match="企业微信登录未启用或 CorpID / AgentId 未配置。"),
+    ):
+        await oauth_auth.get_authorize_url("wecom", mock_db, "http://cb", "state")
+
+    with (
+        patch("app.services.oauth_auth.SystemConfigService.get_value",
+              side_effect=await _mock_get_value(cfg)),
+        pytest.raises(ValueError, match="CAS 登录未启用或服务器地址未配置。"),
     ):
         await oauth_auth.get_authorize_url("cas", mock_db, "http://cb", "state")
+
+
+@pytest.mark.asyncio
+async def test_missing_provider_config_uses_enterprise_prompt(mock_db):
+    cfg = _make_config(
+        ding_login_app_id="",
+        feishu_app_id="",
+        wecom_login_corp_id="",
+        cas_enabled="true",
+        cas_server_url="",
+    )
+    expected = {
+        "dingtalk": "钉钉登录未启用或 AppKey 未配置。",
+        "feishu": "飞书登录未启用或 App ID 未配置。",
+        "wecom": "企业微信登录未启用或 CorpID / AgentId 未配置。",
+        "cas": "CAS 登录未启用或服务器地址未配置。",
+    }
+    for provider, message in expected.items():
+        with (
+            patch("app.services.oauth_auth.SystemConfigService.get_value",
+                  side_effect=await _mock_get_value(cfg)),
+            pytest.raises(ValueError, match=message),
+        ):
+            await oauth_auth.get_authorize_url(provider, mock_db, "http://cb", "state")
 
 
 @pytest.mark.asyncio

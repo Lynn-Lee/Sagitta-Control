@@ -25,6 +25,13 @@ from app.services.system_config import SystemConfigService
 
 logger = logging.getLogger(__name__)
 
+PROVIDER_CONFIG_PROMPTS: dict[str, str] = {
+    "dingtalk": "钉钉登录未启用或 AppKey 未配置。",
+    "feishu": "飞书登录未启用或 App ID 未配置。",
+    "wecom": "企业微信登录未启用或 CorpID / AgentId 未配置。",
+    "cas": "CAS 登录未启用或服务器地址未配置。",
+}
+
 
 # ── 公共用户 Provision ────────────────────────────────────────
 
@@ -83,7 +90,7 @@ async def get_dingtalk_authorize_url(
 ) -> str:
     app_id = await SystemConfigService.get_value(db, "ding_login_app_id")
     if not app_id:
-        raise ValueError("钉钉登录 AppKey 未配置，请在系统配置 → 钉钉通知中填写")
+        raise ValueError(PROVIDER_CONFIG_PROMPTS["dingtalk"])
     params = {
         "response_type": "code",
         "client_id": app_id,
@@ -140,7 +147,7 @@ async def get_feishu_authorize_url(
 ) -> str:
     app_id = await SystemConfigService.get_value(db, "feishu_app_id")
     if not app_id:
-        raise ValueError("飞书 App ID 未配置，请在系统配置 → 飞书通知中填写")
+        raise ValueError(PROVIDER_CONFIG_PROMPTS["feishu"])
     params = {
         "app_id": app_id,
         "redirect_uri": callback_url,
@@ -199,7 +206,7 @@ async def get_wecom_authorize_url(
     corp_id = await SystemConfigService.get_value(db, "wecom_login_corp_id")
     agent_id = await SystemConfigService.get_value(db, "wecom_login_agent_id")
     if not corp_id or not agent_id:
-        raise ValueError("企业微信 CorpID 或 AgentId 未配置")
+        raise ValueError(PROVIDER_CONFIG_PROMPTS["wecom"])
     params = {
         "appid": corp_id,
         "agentid": agent_id,
@@ -281,7 +288,7 @@ async def get_cas_authorize_url(
 ) -> str:
     cas_server_url = await SystemConfigService.get_value(db, "cas_server_url")
     if not cas_server_url:
-        raise ValueError("CAS 服务器地址未配置，请在系统配置 → CAS 单点登录中填写")
+        raise ValueError(PROVIDER_CONFIG_PROMPTS["cas"])
     cas_base_url = _normalize_cas_server_url(cas_server_url)
     if not cas_base_url:
         raise ValueError("CAS 服务器地址格式不正确")
@@ -384,7 +391,7 @@ async def get_authorize_url(
     enabled_key = _PROVIDER_ENABLED_KEY[provider]
     enabled = await SystemConfigService.get_value(db, enabled_key)
     if enabled.lower() != "true":
-        raise ValueError("该企业登录方式未启用。")
+        raise ValueError(PROVIDER_CONFIG_PROMPTS[provider])
     return await _GET_URL[provider](db, callback_url, state)
 
 
