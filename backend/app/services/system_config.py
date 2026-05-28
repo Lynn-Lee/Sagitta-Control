@@ -81,11 +81,10 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "ldap_attr_department": ("部门属性", "ldap", False, "department"),
     "ldap_attr_title": ("职位属性", "ldap", False, "title"),
     # ── CAS（Central Authentication Service）────────────────
-    "cas_enabled": ("启用 CAS 登录", "cas", False, "false"),
     "cas_server_url": ("CAS 服务器地址", "cas", False, ""),
     "cas_username_attribute": ("用户名属性（留空默认 user）", "cas", False, ""),
+    "cas_enabled": ("启用 CAS 登录", "cas", False, "false"),
     # ── OIDC（OpenID Connect）───────────────────────────────
-    "oidc_enabled": ("启用 OIDC 登录", "oidc", False, "false"),
     "oidc_issuer_url": ("Issuer 地址（支持自动发现）", "oidc", False, ""),
     "oidc_authorization_endpoint": ("授权端点（留空使用自动发现）", "oidc", False, ""),
     "oidc_token_endpoint": ("Token 端点（留空使用自动发现）", "oidc", False, ""),
@@ -96,6 +95,7 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "oidc_username_claim": ("用户名 Claim", "oidc", False, "preferred_username"),
     "oidc_email_claim": ("邮箱 Claim", "oidc", False, "email"),
     "oidc_display_name_claim": ("显示名 Claim", "oidc", False, "name"),
+    "oidc_enabled": ("启用 OIDC 登录", "oidc", False, "false"),
     # ── 短信验证码 ──────────────────────────────────────────
     "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     "sms_provider": ("短信服务商（aliyun/tencent/custom）", "sms", False, "aliyun"),
@@ -111,6 +111,7 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
 }
 
 ALLOWED_LOGO_PREFIXES = ("https://", "http://", "/", "data:image/")
+CONFIG_ORDER = {key: index for index, key in enumerate(CONFIG_DEFINITIONS)}
 
 
 def _normalize_config_value(key: str, value: str) -> str:
@@ -154,7 +155,7 @@ class SystemConfigService:
         configs = result.scalars().all()
 
         groups: dict[str, list[dict]] = {k: [] for k in CONFIG_GROUPS}
-        for cfg in configs:
+        for cfg in sorted(configs, key=lambda item: CONFIG_ORDER.get(item.config_key, len(CONFIG_ORDER))):
             group = cfg.group if cfg.group in groups else "basic"
             defn = CONFIG_DEFINITIONS.get(cfg.config_key)
             is_sensitive = defn[2] if defn else cfg.is_encrypted

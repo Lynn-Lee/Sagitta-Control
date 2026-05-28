@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.system_config import CONFIG_DEFINITIONS, SystemConfigService
+from app.services.system_config import CONFIG_DEFINITIONS, CONFIG_ORDER, SystemConfigService
 
 
 class TestConfigDefinitions:
@@ -43,6 +43,10 @@ class TestConfigDefinitions:
     def test_no_duplicate_keys(self):
         keys = list(CONFIG_DEFINITIONS.keys())
         assert len(keys) == len(set(keys)), "存在重复的配置 key"
+
+    def test_sso_enable_switches_render_after_main_fields(self):
+        assert CONFIG_ORDER["cas_enabled"] > CONFIG_ORDER["cas_username_attribute"]
+        assert CONFIG_ORDER["oidc_enabled"] > CONFIG_ORDER["oidc_display_name_claim"]
 
 
 class TestGetValue:

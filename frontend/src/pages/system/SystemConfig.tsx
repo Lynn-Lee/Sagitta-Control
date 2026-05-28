@@ -65,6 +65,8 @@ const GROUP_LABEL: Record<string, React.ReactNode> = {
   ai:       <CompactTabLabel title="AI 功能">🤖 AI</CompactTabLabel>,
 }
 
+const NotifySendIcon = () => <SendOutlined />
+
 function TestButton({
   label,
   icon,
@@ -215,7 +217,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'dingtalk' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送钉钉机器人测试消息" icon={<SendOutlined />} onTest={() =>
+            <TestButton label="发送钉钉机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/dingtalk/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -223,7 +225,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_dingtalk" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
+              <TestButton label="发送到用户" icon={<NotifySendIcon />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_dingtalk'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)
@@ -235,7 +237,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'wecom' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送企微机器人测试消息" icon={<SendOutlined />} onTest={() =>
+            <TestButton label="发送企微机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/wecom/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -243,7 +245,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_wecom" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
+              <TestButton label="发送到用户" icon={<NotifySendIcon />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_wecom'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)
@@ -255,7 +257,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
       {group === 'feishu' && (
         <>
           <Form.Item label="连通性测试">
-            <TestButton label="发送飞书机器人测试消息" icon={<SendOutlined />} onTest={() =>
+            <TestButton label="发送飞书机器人测试消息" icon={<NotifySendIcon />} onTest={() =>
               apiClient.post('/system/config/test/feishu/').then(r => r.data)} />
           </Form.Item>
           <Form.Item label="精准通知测试" extra="填写系统用户 ID，将按该用户维护的钉钉/飞书/企微账号和邮箱尝试投递。">
@@ -263,7 +265,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Form.Item name="_test_notify_user_id_feishu" noStyle>
                 <Input placeholder="用户 ID" style={{ width: 160 }} />
               </Form.Item>
-              <TestButton label="发送到用户" icon={<SendOutlined />} onTest={async () => {
+              <TestButton label="发送到用户" icon={<NotifySendIcon />} onTest={async () => {
                 const userId = Number(form.getFieldValue('_test_notify_user_id_feishu'))
                 if (!userId) return { success: false, message: '请输入用户 ID' }
                 return apiClient.post('/system/config/test/notify-user/', { user_id: userId }).then(r => r.data)

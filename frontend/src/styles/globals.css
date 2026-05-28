@@ -266,10 +266,11 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .sagitta-oauth-btn {
   --button-height: 40px;
   aspect-ratio: 1;
-  width: 100%;
+  width: 40px !important;
   height: 40px !important;
   min-height: 40px !important;
-  min-width: 0 !important;
+  min-width: 40px !important;
+  flex: 0 0 40px;
   padding: 0 !important;
   color: rgba(255,255,255,0.72) !important;
   border-color: rgba(255,255,255,0.12) !important;

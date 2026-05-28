@@ -388,7 +388,7 @@ export default function LoginPage() {
       <div style={{
         position: 'relative', zIndex: 2,
         width: '100%',
-        maxWidth: 420,
+        maxWidth: visibleLoginMethods.length > 6 ? 460 : 420,
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(79,70,229,0.22)',
         borderRadius: 20,
@@ -824,10 +824,12 @@ export default function LoginPage() {
                 </Divider>
 
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.min(visibleLoginMethods.length, 6)}, 40px)`,
-                  justifyContent: 'center',
-                  gap: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: visibleLoginMethods.length > 1 ? 'space-between' : 'center',
+                  gap: visibleLoginMethods.length > 1 ? 'clamp(6px, 2.4vw, 18px)' : 0,
+                  width: '100%',
+                  flexWrap: 'nowrap',
                 }}>
                   {authMethods.ldap && (
                     <OAuthBtn
