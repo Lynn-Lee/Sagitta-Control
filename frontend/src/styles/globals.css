@@ -496,7 +496,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .system-config-tabs .ant-tabs-tab-btn {
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
 }
 

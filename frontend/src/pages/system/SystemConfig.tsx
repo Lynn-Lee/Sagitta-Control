@@ -8,7 +8,6 @@ import {
   GlobalOutlined,
   KeyOutlined,
   MailOutlined,
-  MessageOutlined,
   RobotOutlined,
   SaveOutlined,
   SendOutlined,
@@ -28,7 +27,7 @@ const { useBreakpoint } = Grid
 const tabLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
+  gap: 5,
   whiteSpace: 'nowrap',
 }
 
@@ -42,17 +41,17 @@ const systemConfigTabIconStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 18,
-  height: 18,
-  fontSize: 18,
+  width: 15,
+  height: 15,
+  fontSize: 15,
   lineHeight: 1,
   color: '#0f766e',
 }
 
-// 平台图标：与 DataFusionX-Enterprise 系统配置页保持一致
+// 登录接入图标：登录页以系统配置页的图标口径保持一致
 const PlatformImg = ({ src, alt }: { src: string; alt: string }) => (
   <span style={systemConfigTabIconStyle}>
-    <img src={src} alt={alt} width={18} height={18}
+    <img src={src} alt={alt} width={15} height={15}
       style={{ objectFit: 'contain', display: 'block' }} />
   </span>
 )
@@ -79,7 +78,7 @@ const GROUP_LABEL: Record<string, React.ReactNode> = {
   ldap:     <CompactTabLabel title="LDAP 认证"><PlatformImg src="/icons/ldap.svg" alt="LDAP" />LDAP</CompactTabLabel>,
   cas:      <CompactTabLabel title="CAS SSO"><TabIcon><GlobalOutlined /></TabIcon>CAS</CompactTabLabel>,
   oidc:     <CompactTabLabel title="OIDC SSO"><TabIcon><KeyOutlined /></TabIcon>OIDC</CompactTabLabel>,
-  sms:      <CompactTabLabel title="短信验证码"><TabIcon><MessageOutlined /></TabIcon>短信</CompactTabLabel>,
+  sms:      <CompactTabLabel title="短信验证码"><PlatformImg src="/icons/sms.svg" alt="短信" />短信</CompactTabLabel>,
   ai:       <CompactTabLabel title="AI 功能"><TabIcon><RobotOutlined /></TabIcon>AI</CompactTabLabel>,
 }
 
