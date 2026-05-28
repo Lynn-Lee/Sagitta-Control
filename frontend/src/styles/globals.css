@@ -348,6 +348,20 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   background: color-mix(in srgb, var(--mode-color, #5E7CE0) 20%, transparent);
 }
 
+.sagitta-login-error-alert {
+  padding: 10px 12px !important;
+}
+
+.sagitta-login-error-alert .ant-alert-icon {
+  margin-inline-end: 8px;
+}
+
+.sagitta-login-error-alert .ant-alert-message {
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
 .sagitta-auth-form .ant-input,
 .sagitta-auth-form .ant-input-affix-wrapper,
 .sagitta-auth-form .ant-input-affix-wrapper > input.ant-input {
@@ -361,6 +375,12 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 
 .sagitta-auth-form .ant-btn {
   font-size: 15px;
+}
+
+@media (max-width: 480px) {
+  .sagitta-login-error-alert .ant-alert-message {
+    white-space: normal;
+  }
 }
 
 .ant-modal-footer .ant-btn:not(:has(.anticon))::before,

@@ -28,6 +28,8 @@ const PlatformIcon = ({ src, alt, size = 18 }: { src: string; alt: string; size?
   />
 )
 
+const formatLoginError = (message: string) => message.replace(/CorpID\s*\/\s*AgentId/g, 'CorpID/AgentId')
+
 // ── 第三方登录按钮 ──────────────────────────────────────────
 const OAuthBtn = ({
   icon, label, color, loading, onClick,
@@ -63,7 +65,7 @@ export default function LoginPage() {
   const [passwordChangeReasons, setPasswordChangeReasons] = useState<string[]>([])
   const [pendingUsername, setPendingUsername] = useState('')
   const [error, setError] = useState(
-    searchParams.get('oauth_error') ? decodeURIComponent(searchParams.get('oauth_error')!) : ''
+    searchParams.get('oauth_error') ? formatLoginError(decodeURIComponent(searchParams.get('oauth_error')!)) : ''
   )
   const { branding } = useBranding()
 
@@ -191,7 +193,7 @@ export default function LoginPage() {
       const resp = await apiClient.get(`/auth/${type}/authorize/`)
       window.location.href = resp.data.url
     } catch (e: any) {
-      setError(e.response?.data?.detail || '企业登录跳转失败')
+      setError(formatLoginError(e.response?.data?.detail || '企业登录跳转失败'))
       setOauthLoading('')
     }
   }
@@ -341,6 +343,7 @@ export default function LoginPage() {
         {/* ── 错误提示 ── */}
         {error && (
           <Alert
+            className="sagitta-login-error-alert"
             type="error"
             message={<span style={{ color: '#FEE2E2' }}>{error}</span>}
             showIcon
