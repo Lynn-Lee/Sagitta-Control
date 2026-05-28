@@ -247,15 +247,21 @@ bash deploy/update-prod.sh --ref v2.1.3
 bash deploy/update-prod.sh --ref <commit_sha>
 ```
 
-脚本固定执行以下步骤：检查 tracked 工作区、校验 SSH Git remote、拉取远端引用、切换目标版本、部署前备份 PostgreSQL、构建应用镜像、启动基础服务、执行 Alembic 迁移、重建应用服务、等待 backend/frontend 健康检查、输出 Compose 状态。
+脚本固定执行以下步骤：检查 tracked 工作区、校验 SSH Git remote、拉取远端引用、切换目标版本、按变更范围决定是否备份 PostgreSQL、构建应用镜像、启动基础服务、执行 Alembic 迁移、重建应用服务、等待 backend/frontend 健康检查、输出 Compose 状态。
 
-如果刚刚完成过手工备份或连续重试同一版本，可显式跳过备份：
+默认只有目标版本相对当前版本包含数据库相关变更时才执行 `pg_dump`，匹配范围包括 `backend/alembic/`、`backend/app/models/`、数据库连接核心文件以及 Compose/Helm 部署配置。普通前端、文档、业务服务代码更新会自动跳过部署前备份，降低测试环境更新耗时。若发布前需要留档备份，可显式强制备份：
+
+```bash
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --force-backup
+```
+
+如果刚刚完成过手工备份、连续重试同一版本，或已确认数据库变更不需要现场备份，可显式跳过备份：
 
 ```bash
 COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --skip-backup
 ```
 
-跳过备份必须在发布记录中注明最近一次可用备份文件。
+对生产环境显式跳过数据库相关变更备份时，必须在发布记录中注明最近一次可用备份文件。
 
 ### 6.3 发布后验证
 

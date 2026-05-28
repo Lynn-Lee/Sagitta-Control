@@ -13,6 +13,14 @@ DEFAULT_GIT_REMOTE="origin"
 DEFAULT_RELEASE_BRANCH="main"
 DEFAULT_BACKUP_DIR="/data/sagittadb/backups"
 DEFAULT_BACKUP_RETAIN_DAYS="7"
+DB_CHANGE_PATTERNS=(
+  "backend/alembic/"
+  "backend/app/models/"
+  "backend/app/core/database.py"
+  "docker-compose.yml"
+  "deploy/docker-compose.yml"
+  "deploy/helm/"
+)
 
 usage() {
   cat <<'EOF'
@@ -22,7 +30,7 @@ usage() {
 默认流程：
   1. 检查本地已跟踪文件是否干净
   2. 通过 SSH Git remote 拉取 origin，并把本地 main 快进到 origin/main，或切换到 --ref 指定版本
-  3. 通过 postgres 容器执行部署前 PostgreSQL 备份
+  3. 检测目标版本是否包含数据库相关变更；如包含则通过 postgres 容器执行部署前 PostgreSQL 备份
   4. 构建生产镜像
   5. 确保 postgres/redis 正在运行
   6. 执行 alembic 迁移
@@ -36,7 +44,8 @@ usage() {
 
 选项：
   --ref <git-ref>          部署指定 tag、branch 或 commit，默认 origin/main。
-  --skip-backup            跳过部署前数据库备份。
+  --force-backup           即使未检测到数据库相关变更，也执行部署前数据库备份。
+  --skip-backup            跳过部署前数据库备份；优先级高于 --force-backup。
   --skip-migrate           跳过 alembic upgrade head。
   --no-cache               使用 --no-cache 构建 Docker 镜像。
   --prune                  部署成功后清理悬空 Docker 镜像。
@@ -57,6 +66,7 @@ usage() {
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
   bash deploy/update-prod.sh --ref v2.0.0
+  bash deploy/update-prod.sh --force-backup
   bash deploy/update-prod.sh --skip-backup --no-cache
 EOF
 }
@@ -157,8 +167,31 @@ run_container_backup() {
   find "${backup_dir}" -name "sagittadb_*.sql.gz" -mtime "+${retain_days}" -delete
 }
 
+db_changes_between_revisions() {
+  local old_ref="$1"
+  local new_ref="$2"
+  local changed_file pattern
+
+  if [[ "${old_ref}" == "${new_ref}" ]]; then
+    return 1
+  fi
+
+  while IFS= read -r changed_file; do
+    [[ -n "${changed_file}" ]] || continue
+    for pattern in "${DB_CHANGE_PATTERNS[@]}"; do
+      if [[ "${changed_file}" == "${pattern}"* ]]; then
+        printf '%s\n' "${changed_file}"
+        return 0
+      fi
+    done
+  done < <(git diff --name-only "${old_ref}" "${new_ref}")
+
+  return 1
+}
+
 REF=""
 SKIP_BACKUP=0
+FORCE_BACKUP=0
 SKIP_MIGRATE=0
 NO_CACHE=0
 PRUNE=0
@@ -177,6 +210,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-backup)
       SKIP_BACKUP=1
+      shift
+      ;;
+    --force-backup)
+      FORCE_BACKUP=1
       shift
       ;;
     --skip-migrate)
@@ -225,6 +262,7 @@ cd "${ROOT_DIR}"
 ensure_clean_tracked_tree
 
 old_revision="$(git rev-parse --short HEAD)"
+old_revision_full="$(git rev-parse HEAD)"
 log "当前版本：${old_revision}"
 
 ensure_git_remote_ready
@@ -240,12 +278,25 @@ else
 fi
 
 new_revision="$(git rev-parse --short HEAD)"
+new_revision_full="$(git rev-parse HEAD)"
 log "目标版本：${new_revision}"
 
 if [[ ${SKIP_BACKUP} -eq 0 ]]; then
-  log "备份前确保基础服务正在运行：${BASE_SERVICES[*]}"
-  compose up -d "${BASE_SERVICES[@]}"
-  run_container_backup
+  backup_reason=""
+  if [[ ${FORCE_BACKUP} -eq 1 ]]; then
+    backup_reason="按 --force-backup 要求强制备份"
+  elif matched_db_change="$(db_changes_between_revisions "${old_revision_full}" "${new_revision_full}")"; then
+    backup_reason="检测到数据库相关变更：${matched_db_change}"
+  fi
+
+  if [[ -n "${backup_reason}" ]]; then
+    log "${backup_reason}"
+    log "备份前确保基础服务正在运行：${BASE_SERVICES[*]}"
+    compose up -d "${BASE_SERVICES[@]}"
+    run_container_backup
+  else
+    log "未检测到数据库相关变更，自动跳过部署前数据库备份；如需备份请使用 --force-backup"
+  fi
 else
   log "按要求跳过数据库备份"
 fi

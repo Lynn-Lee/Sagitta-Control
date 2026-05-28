@@ -92,6 +92,7 @@ ln -sfn ../.env deploy/.env
 COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
 ```
 
+- `deploy/update-prod.sh` 会根据当前版本到目标版本的变更路径自动判断是否执行 PostgreSQL 备份；只有 Alembic、模型、数据库连接核心文件或 Compose/Helm 部署配置变化时才默认 `pg_dump`。普通前端、文档或无数据库变更的业务代码更新应自动跳过备份；如确需留档备份可传 `--force-backup`，如已人工确认可传 `--skip-backup`。
 - 更新前后应记录当前分支、提交 SHA、服务重建结果和健康检查结果。至少验证：
 
 ```bash
