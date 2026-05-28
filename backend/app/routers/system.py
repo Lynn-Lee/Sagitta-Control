@@ -906,6 +906,20 @@ async def test_feishu_config(
     return await SystemConfigService.test_feishu(db)
 
 
+@router.post("/config/test/ai/", summary="测试 AI 配置")
+async def test_ai_config(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    license_check = await LicenseService.check_access(db, "/api/v1/ai/text2sql/", "POST")
+    if not license_check.allowed:
+        return {
+            "success": False,
+            "message": license_check.reason or "当前 License 未授权 AI 功能",
+        }
+    return await SystemConfigService.test_ai(db)
+
+
 @router.post("/config/test/notify-user/", summary="测试应用消息精准通知")
 async def test_notify_user_config(
     data: NotifyUserTestRequest,

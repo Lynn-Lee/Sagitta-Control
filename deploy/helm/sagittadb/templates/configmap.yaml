@@ -11,7 +11,10 @@ data:
   ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.app.accessTokenExpireMinutes | quote }}
   REFRESH_TOKEN_EXPIRE_DAYS: {{ .Values.app.refreshTokenExpireDays | quote }}
   TENANT_ID: {{ .Values.app.tenantId | quote }}
+  AI_ENABLED: {{ .Values.app.aiEnabled | quote }}
   AI_PROVIDER: {{ .Values.app.aiProvider | quote }}
+  AI_BASE_URL: {{ .Values.app.aiBaseUrl | quote }}
+  AI_MODEL: {{ .Values.app.aiModel | quote }}
   PROMETHEUS_URL: {{ .Values.app.prometheusUrl | quote }}
   ALERTMANAGER_URL: {{ .Values.app.alertmanagerUrl | quote }}
   STORAGE_TYPE: {{ .Values.app.storageType | quote }}

@@ -12,7 +12,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.instance import Instance
-from app.services.system_config import SystemConfigService
+from app.services.system_config import (
+    AI_DEFAULT_PROVIDER,
+    AI_PRESET_BASE_URLS,
+    AI_PRESET_MODELS,
+    AI_PROVIDER_PRESETS,
+    SystemConfigService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,47 +31,6 @@ _DIALECT_NAMES: dict[str, str] = {
     "clickhouse": "ClickHouse",
     "doris": "Doris",
 }
-
-_DEFAULT_PROVIDER = "anthropic"
-
-_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
-    "anthropic": {
-        "protocol": "anthropic",
-        "base_url": "https://api.anthropic.com",
-        "model": "claude-sonnet-4-20250514",
-    },
-    "openai": {
-        "protocol": "openai_compatible",
-        "base_url": "https://api.openai.com/v1",
-        "model": "gpt-4o-mini",
-    },
-    "deepseek": {
-        "protocol": "openai_compatible",
-        "base_url": "https://api.deepseek.com",
-        "model": "deepseek-v4-flash",
-    },
-    "qwen": {
-        "protocol": "openai_compatible",
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen-turbo",
-    },
-    "minimax": {
-        "protocol": "openai_compatible",
-        "base_url": "https://api.minimax.io/v1",
-        "model": "MiniMax-M2.7",
-    },
-    "xiaomi": {
-        "protocol": "openai_compatible",
-        "base_url": "",
-        "model": "",
-    },
-    "custom": {
-        "protocol": "openai_compatible",
-        "base_url": "",
-        "model": "",
-    },
-}
-
 
 @dataclass
 class AIConfig:
@@ -143,17 +108,19 @@ async def _load_ai_config(db: AsyncSession) -> AIConfig:
     if enabled.lower() != "true":
         raise ValueError("AI 功能未启用，请先在系统配置中开启 AI 功能")
 
-    provider = (await SystemConfigService.get_value(db, "ai_provider") or _DEFAULT_PROVIDER).lower()
-    if provider not in _PROVIDER_PRESETS:
+    provider = (await SystemConfigService.get_value(db, "ai_provider") or AI_DEFAULT_PROVIDER).lower()
+    if provider not in AI_PROVIDER_PRESETS:
         raise ValueError(f"AI 模型服务商不支持：{provider}")
-    preset = _PROVIDER_PRESETS[provider]
+    preset = AI_PROVIDER_PRESETS[provider]
 
     api_key = await SystemConfigService.get_value(db, "ai_api_key")
     if not api_key:
         raise ValueError("AI 功能未配置，请在系统配置中设置 API Key")
 
-    base_url = (await SystemConfigService.get_value(db, "ai_base_url") or preset["base_url"]).rstrip("/")
-    model = await SystemConfigService.get_value(db, "ai_model") or preset["model"]
+    configured_base_url = (await SystemConfigService.get_value(db, "ai_base_url")).rstrip("/")
+    configured_model = await SystemConfigService.get_value(db, "ai_model")
+    base_url = _resolve_provider_value(configured_base_url, preset["base_url"], AI_PRESET_BASE_URLS)
+    model = _resolve_provider_value(configured_model, preset["model"], AI_PRESET_MODELS)
     if not base_url:
         raise ValueError("AI Base URL 未配置，请填写兼容 OpenAI 的 API Base URL")
     if not model:
@@ -166,6 +133,15 @@ async def _load_ai_config(db: AsyncSession) -> AIConfig:
         model=model,
         base_url=base_url,
     )
+
+
+def _resolve_provider_value(configured: str, preset: str, known_presets: set[str]) -> str:
+    """Use the provider preset when the stored value is empty or another provider's preset."""
+    if not configured:
+        return preset
+    if preset and configured in known_presets and configured != preset:
+        return preset
+    return configured
 
 
 def _build_system_prompt(db_type: str, db_name: str | None) -> str:

@@ -3,8 +3,8 @@
 所有配置项均有默认值，便于开发环境零配置启动。
 
 注意：认证（LDAP/CAS/OIDC）、通知（钉钉/飞书/企微/邮件）、AI 等功能
-统一使用 SystemConfig 数据库配置（通过 /api/v1/system/config 管理），
-不在此处通过环境变量配置（方便运行时修改，无需重启服务）。
+统一使用 SystemConfig 数据库配置（通过 /api/v1/system/config 管理）。
+AI_* 环境变量仅作为首次初始化 SystemConfig 时的部署默认值，运行时修改仍以数据库配置为准。
 """
 
 from typing import Literal
@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     PROMETHEUS_URL: str = "http://localhost:9090"
     ALERTMANAGER_URL: str = "http://localhost:9093"
     GRAFANA_URL: str = "http://localhost:3000"
+
+    # ─── AI 首次初始化默认值（写入 SystemConfig 后以数据库为准）──────────
+    AI_ENABLED: str = ""
+    AI_PROVIDER: str = ""
+    AI_API_KEY: str = ""
+    AI_BASE_URL: str = ""
+    AI_MODEL: str = ""
 
     # ─── goInception（可选增强，用于 MySQL SQL 审核）──────────
     ENABLE_GOINCEPTION: bool = False

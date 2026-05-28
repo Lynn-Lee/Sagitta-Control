@@ -370,7 +370,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - 基础设置：平台名称、平台 Logo、平台访问地址、SQL 审核和查询默认限制。
 - LDAP、OIDC、钉钉、飞书、企业微信、CAS 登录。
 - 邮件、钉钉、飞书、企微通知。
-- AI Text2SQL 模型服务商、API Key、API Base URL 和模型 ID，支持 Anthropic Claude、OpenAI、DeepSeek、阿里 Qwen、MiniMax、小米及其他兼容 OpenAI Chat Completions 的国内主流模型网关。
+- AI Text2SQL 模型服务商、API Key、API Base URL 和模型 ID，支持 Anthropic Claude、OpenAI、DeepSeek、阿里 Qwen、MiniMax、Moonshot/Kimi、智谱 GLM、小米及其他兼容 OpenAI Chat Completions 的国内主流模型网关。
 - 安全策略和其他运行时配置。
 
 敏感配置会加密存储，修改后通常无需重启服务。系统配置页提供邮件、钉钉、飞书、企微、LDAP、CAS 和 OIDC 的连通性测试，其中 CAS/OIDC 测试按钮与 LDAP 保持一致，邮件、钉钉、飞书、企微测试发送按钮使用纸飞机发送图标。登录页只展示系统配置中已开启的登录接入方式，并在同一行内自适应分布。

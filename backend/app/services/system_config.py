@@ -11,10 +11,60 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import decrypt_field, encrypt_field
 from app.models.system import SystemConfig
 
 logger = logging.getLogger(__name__)
+
+AI_DEFAULT_PROVIDER = "anthropic"
+AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
+    "anthropic": {
+        "protocol": "anthropic",
+        "base_url": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-20250514",
+    },
+    "openai": {
+        "protocol": "openai_compatible",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+    },
+    "deepseek": {
+        "protocol": "openai_compatible",
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-v4-flash",
+    },
+    "qwen": {
+        "protocol": "openai_compatible",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-turbo",
+    },
+    "minimax": {
+        "protocol": "openai_compatible",
+        "base_url": "https://api.minimax.io/v1",
+        "model": "MiniMax-M2.7",
+    },
+    "moonshot": {
+        "protocol": "openai_compatible",
+        "base_url": "https://api.moonshot.ai/v1",
+        "model": "kimi-k2.6",
+    },
+    "zhipu": {
+        "protocol": "openai_compatible",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "model": "glm-4.7-flash",
+    },
+    "xiaomi": {
+        "protocol": "openai_compatible",
+        "base_url": "",
+        "model": "",
+    },
+    "custom": {
+        "protocol": "openai_compatible",
+        "base_url": "",
+        "model": "",
+    },
+}
 
 # ── 配置分组定义 ──────────────────────────────────────────────
 CONFIG_GROUPS = {
@@ -105,15 +155,52 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "sms_endpoint": ("自定义 API 端点（custom 时使用）", "sms", False, ""),
     "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     # ── AI 配置 ───────────────────────────────────────────────
-    "ai_provider": ("模型服务商（支持 Claude/OpenAI/DeepSeek/Qwen/MiniMax/小米等）", "ai", False, "anthropic"),
+    "ai_provider": ("模型服务商（支持 Claude/OpenAI/DeepSeek/Qwen/MiniMax/Moonshot/智谱/小米等）", "ai", False, AI_DEFAULT_PROVIDER),
     "ai_base_url": ("API Base URL（可选）", "ai", False, ""),
     "ai_api_key": ("API Key", "ai", True, ""),
-    "ai_model": ("AI 模型", "ai", False, "claude-sonnet-4-20250514"),
+    "ai_model": ("AI 模型", "ai", False, AI_PROVIDER_PRESETS[AI_DEFAULT_PROVIDER]["model"]),
     "ai_enabled": ("启用 AI 功能", "ai", False, "false"),
 }
 
 ALLOWED_LOGO_PREFIXES = ("https://", "http://", "/", "data:image/")
 CONFIG_ORDER = {key: index for index, key in enumerate(CONFIG_DEFINITIONS)}
+AI_PRESET_BASE_URLS = {item["base_url"] for item in AI_PROVIDER_PRESETS.values() if item["base_url"]}
+AI_PRESET_MODELS = {item["model"] for item in AI_PROVIDER_PRESETS.values() if item["model"]}
+
+
+def _truthy(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+def _runtime_ai_provider() -> str:
+    provider = settings.AI_PROVIDER.strip().lower()
+    if provider in {"", "none", "disabled", "off"}:
+        return AI_DEFAULT_PROVIDER
+    if provider in AI_PROVIDER_PRESETS:
+        return provider
+    logger.warning("invalid AI_PROVIDER ignored: %s", settings.AI_PROVIDER)
+    return AI_DEFAULT_PROVIDER
+
+
+def _runtime_default_for_key(key: str, default: str) -> str:
+    """Resolve deployment-time AI_* defaults used only when a config row is first created."""
+    if key == "ai_provider":
+        return _runtime_ai_provider()
+    if key == "ai_api_key":
+        return settings.AI_API_KEY.strip() or default
+    if key == "ai_base_url":
+        provider = _runtime_ai_provider()
+        return settings.AI_BASE_URL.strip() or AI_PROVIDER_PRESETS[provider]["base_url"] or default
+    if key == "ai_model":
+        provider = _runtime_ai_provider()
+        return settings.AI_MODEL.strip() or AI_PROVIDER_PRESETS[provider]["model"] or default
+    if key == "ai_enabled":
+        explicit = settings.AI_ENABLED.strip()
+        if explicit:
+            return "true" if _truthy(explicit) else "false"
+        if settings.AI_API_KEY.strip():
+            return "true"
+    return default
 
 
 def _normalize_config_value(key: str, value: str) -> str:
@@ -129,8 +216,8 @@ def _normalize_config_value(key: str, value: str) -> str:
         if not value.startswith(ALLOWED_LOGO_PREFIXES):
             raise ValueError("Logo 仅支持 http(s)、站内路径或 data:image 格式")
     if key == "ai_provider":
-        value = value.lower() or "anthropic"
-        if value not in {"anthropic", "openai", "deepseek", "qwen", "minimax", "xiaomi", "custom"}:
+        value = value.lower() or AI_DEFAULT_PROVIDER
+        if value not in AI_PROVIDER_PRESETS:
             raise ValueError("AI 模型服务商不支持")
     if key == "ai_base_url" and value and not value.startswith(("https://", "http://")):
         raise ValueError("AI API Base URL 仅支持 http(s) 地址")
@@ -145,11 +232,13 @@ class SystemConfigService:
             existing = await db.execute(select(SystemConfig).where(SystemConfig.config_key == key))
             cfg = existing.scalar_one_or_none()
             if not cfg:
+                value = _runtime_default_for_key(key, default)
+                encrypted = _sensitive and bool(value)
                 db.add(
                     SystemConfig(
                         config_key=key,
-                        config_value=default,
-                        is_encrypted=False,
+                        config_value=encrypt_field(value) if encrypted else value,
+                        is_encrypted=encrypted,
                         description=desc,
                         group=group,
                     )
@@ -236,7 +325,24 @@ class SystemConfigService:
         count = 0
         change_summary = []
 
-        for key, value in updates.items():
+        normalized_updates = dict(updates)
+        provider = normalized_updates.get("ai_provider")
+        if provider:
+            normalized_provider = provider.strip().lower()
+            preset = AI_PROVIDER_PRESETS.get(normalized_provider)
+            if preset:
+                model_value = normalized_updates.get("ai_model", "").strip()
+                base_url_value = normalized_updates.get("ai_base_url", "").strip()
+                if (not model_value or model_value in AI_PRESET_MODELS) and preset["model"]:
+                    normalized_updates["ai_model"] = preset["model"]
+                elif not preset["model"] and model_value in AI_PRESET_MODELS:
+                    normalized_updates["ai_model"] = ""
+                if (not base_url_value or base_url_value in AI_PRESET_BASE_URLS) and preset["base_url"]:
+                    normalized_updates["ai_base_url"] = preset["base_url"]
+                elif not preset["base_url"] and base_url_value in AI_PRESET_BASE_URLS:
+                    normalized_updates["ai_base_url"] = ""
+
+        for key, value in normalized_updates.items():
             if key not in CONFIG_DEFINITIONS:
                 continue
             desc, group, is_sensitive, _ = CONFIG_DEFINITIONS[key]
@@ -273,6 +379,25 @@ class SystemConfigService:
         await db.commit()
         logger.info("system_config_updated: %d keys", count)
         return count, change_summary
+
+    @staticmethod
+    async def test_ai(db: AsyncSession) -> dict:
+        """调用当前 AI 配置生成一条最小 SQL，用于验证模型服务是否可用。"""
+        try:
+            from app.services.text2sql import generate_sql
+
+            result = await generate_sql(
+                db,
+                question="生成一条用于连通性测试的 SELECT 1 查询",
+                dialect_hint="mysql",
+            )
+            preview = result.sql.replace("\n", " ")[:80]
+            return {
+                "success": True,
+                "message": f"AI 连接成功，模型 {result.model} 返回：{preview}",
+            }
+        except Exception as exc:
+            return {"success": False, "message": str(exc)}
 
     # ── 连通性测试 ────────────────────────────────────────────
 

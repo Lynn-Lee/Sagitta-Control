@@ -6,7 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.system_config import CONFIG_DEFINITIONS, CONFIG_ORDER, SystemConfigService
+from app.services.system_config import (
+    CONFIG_DEFINITIONS,
+    CONFIG_ORDER,
+    SystemConfigService,
+    _runtime_default_for_key,
+)
 
 
 class TestConfigDefinitions:
@@ -42,6 +47,9 @@ class TestConfigDefinitions:
         assert "ai_base_url" in ai_keys
         assert "ai_api_key" in ai_keys
         assert CONFIG_ORDER["ai_enabled"] > CONFIG_ORDER["ai_model"]
+        desc = CONFIG_DEFINITIONS["ai_provider"][0]
+        assert "Moonshot" in desc
+        assert "智谱" in desc
 
     def test_no_duplicate_keys(self):
         keys = list(CONFIG_DEFINITIONS.keys())
@@ -52,6 +60,18 @@ class TestConfigDefinitions:
         assert CONFIG_ORDER["cas_enabled"] > CONFIG_ORDER["cas_username_attribute"]
         assert CONFIG_ORDER["oidc_enabled"] > CONFIG_ORDER["oidc_display_name_claim"]
         assert CONFIG_ORDER["sms_enabled"] > CONFIG_ORDER["sms_endpoint"]
+
+    def test_ai_runtime_defaults_from_environment(self):
+        with patch("app.services.system_config.settings.AI_PROVIDER", "moonshot"), patch(
+            "app.services.system_config.settings.AI_API_KEY", "sk-test"
+        ), patch("app.services.system_config.settings.AI_ENABLED", ""), patch(
+            "app.services.system_config.settings.AI_BASE_URL", ""
+        ), patch("app.services.system_config.settings.AI_MODEL", ""):
+            assert _runtime_default_for_key("ai_provider", "anthropic") == "moonshot"
+            assert _runtime_default_for_key("ai_api_key", "") == "sk-test"
+            assert _runtime_default_for_key("ai_base_url", "") == "https://api.moonshot.ai/v1"
+            assert _runtime_default_for_key("ai_model", "claude-sonnet-4-20250514") == "kimi-k2.6"
+            assert _runtime_default_for_key("ai_enabled", "false") == "true"
 
 
 class TestGetValue:
@@ -350,3 +370,107 @@ class TestUpdateBatch:
 
         with pytest.raises(ValueError, match="平台名称"):
             await SystemConfigService.update_batch(mock_db, {"platform_name": "x" * 81})
+
+    @pytest.mark.asyncio
+    async def test_ai_provider_updates_related_preset_fields(self):
+        mock_db = AsyncMock()
+        records = {}
+
+        async def fake_execute(_stmt):
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = None
+            return mock_result
+
+        mock_db.execute = AsyncMock(side_effect=fake_execute)
+        mock_db.add = lambda item: records.setdefault(item.config_key, item)
+        mock_db.commit = AsyncMock()
+
+        count, _ = await SystemConfigService.update_batch(
+            mock_db,
+            {
+                "ai_provider": "openai",
+                "ai_base_url": "https://api.anthropic.com",
+                "ai_model": "claude-sonnet-4-20250514",
+            },
+        )
+
+        assert count == 3
+        assert records["ai_base_url"].config_value == "https://api.openai.com/v1"
+        assert records["ai_model"].config_value == "gpt-4o-mini"
+
+    @pytest.mark.asyncio
+    async def test_ai_provider_supports_moonshot_and_zhipu_presets(self):
+        for provider, expected_base_url, expected_model in [
+            ("moonshot", "https://api.moonshot.ai/v1", "kimi-k2.6"),
+            ("zhipu", "https://open.bigmodel.cn/api/paas/v4", "glm-4.7-flash"),
+        ]:
+            mock_db = AsyncMock()
+            records = {}
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db.execute = AsyncMock(return_value=mock_result)
+
+            def add_record(item, target=records):
+                target.setdefault(item.config_key, item)
+
+            mock_db.add = add_record
+            mock_db.commit = AsyncMock()
+
+            count, _ = await SystemConfigService.update_batch(
+                mock_db,
+                {"ai_provider": provider, "ai_base_url": "", "ai_model": ""},
+            )
+
+            assert count == 3
+            assert records["ai_provider"].config_value == provider
+            assert records["ai_base_url"].config_value == expected_base_url
+            assert records["ai_model"].config_value == expected_model
+
+    @pytest.mark.asyncio
+    async def test_ai_provider_clears_known_preset_fields_for_custom_provider(self):
+        mock_db = AsyncMock()
+        records = {}
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        def add_record(item):
+            records.setdefault(item.config_key, item)
+
+        mock_db.add = add_record
+        mock_db.commit = AsyncMock()
+
+        count, _ = await SystemConfigService.update_batch(
+            mock_db,
+            {
+                "ai_provider": "custom",
+                "ai_base_url": "https://api.moonshot.ai/v1",
+                "ai_model": "kimi-k2.6",
+            },
+        )
+
+        assert count == 3
+        assert records["ai_provider"].config_value == "custom"
+        assert records["ai_base_url"].config_value == ""
+        assert records["ai_model"].config_value == ""
+
+
+class TestAiConnectivity:
+    @pytest.mark.asyncio
+    async def test_test_ai_returns_success(self):
+        mock_result = MagicMock()
+        mock_result.sql = "SELECT 1"
+        mock_result.model = "gpt-4o-mini"
+
+        with patch("app.services.text2sql.generate_sql", AsyncMock(return_value=mock_result)):
+            result = await SystemConfigService.test_ai(AsyncMock())
+
+        assert result["success"] is True
+        assert "gpt-4o-mini" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_ai_returns_failure_message(self):
+        with patch("app.services.text2sql.generate_sql", AsyncMock(side_effect=ValueError("AI 功能未启用"))):
+            result = await SystemConfigService.test_ai(AsyncMock())
+
+        assert result == {"success": False, "message": "AI 功能未启用"}

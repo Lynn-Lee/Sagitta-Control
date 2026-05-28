@@ -30,9 +30,26 @@ const AI_PROVIDER_OPTIONS = [
   { value: 'deepseek', label: 'DeepSeek' },
   { value: 'qwen', label: '阿里 Qwen / DashScope' },
   { value: 'minimax', label: 'MiniMax' },
+  { value: 'moonshot', label: 'Moonshot / Kimi' },
+  { value: 'zhipu', label: '智谱 GLM / BigModel' },
   { value: 'xiaomi', label: '小米 / 其他兼容' },
   { value: 'custom', label: '自定义 OpenAI 兼容' },
 ]
+
+const AI_PROVIDER_PRESETS: Record<string, { baseUrl: string; model: string }> = {
+  anthropic: { baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' },
+  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+  minimax: { baseUrl: 'https://api.minimax.io/v1', model: 'MiniMax-M2.7' },
+  moonshot: { baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' },
+  zhipu: { baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4.7-flash' },
+  xiaomi: { baseUrl: '', model: '' },
+  custom: { baseUrl: '', model: '' },
+}
+
+const AI_PRESET_BASE_URLS = new Set(Object.values(AI_PROVIDER_PRESETS).map(v => v.baseUrl).filter(Boolean))
+const AI_PRESET_MODELS = new Set(Object.values(AI_PROVIDER_PRESETS).map(v => v.model).filter(Boolean))
 
 const tabLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -202,7 +219,25 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               label={item.description}
               style={{ marginBottom: 14 }}
             >
-              <Select options={AI_PROVIDER_OPTIONS} />
+              <Select
+                options={AI_PROVIDER_OPTIONS}
+                onChange={(provider) => {
+                  const preset = AI_PROVIDER_PRESETS[provider]
+                  if (!preset) return
+                  const currentBaseUrl = String(form.getFieldValue('ai_base_url') || '')
+                  const currentModel = String(form.getFieldValue('ai_model') || '')
+                  if (preset.baseUrl && (!currentBaseUrl || AI_PRESET_BASE_URLS.has(currentBaseUrl))) {
+                    form.setFieldValue('ai_base_url', preset.baseUrl)
+                  } else if (!preset.baseUrl && AI_PRESET_BASE_URLS.has(currentBaseUrl)) {
+                    form.setFieldValue('ai_base_url', '')
+                  }
+                  if (preset.model && (!currentModel || AI_PRESET_MODELS.has(currentModel))) {
+                    form.setFieldValue('ai_model', preset.model)
+                  } else if (!preset.model && AI_PRESET_MODELS.has(currentModel)) {
+                    form.setFieldValue('ai_model', '')
+                  }
+                }}
+              />
             </Form.Item>
           )
         }
@@ -330,6 +365,12 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
         <Form.Item label="连通性测试">
           <TestButton label="测试 OIDC 连接" onTest={() =>
             apiClient.post('/system/config/test/oidc/', {}).then(r => r.data)} />
+        </Form.Item>
+      )}
+      {group === 'ai' && (
+        <Form.Item label="连通性测试">
+          <TestButton label="测试 AI 生成" icon={<RobotOutlined />} onTest={() =>
+            apiClient.post('/system/config/test/ai/', {}).then(r => r.data)} />
         </Form.Item>
       )}
     </div>

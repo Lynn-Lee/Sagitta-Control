@@ -51,6 +51,46 @@ async def test_load_ai_config_uses_openai_preset():
 
 
 @pytest.mark.asyncio
+async def test_load_ai_config_replaces_other_provider_preset_values():
+    values = {
+        "ai_enabled": "true",
+        "ai_provider": "deepseek",
+        "ai_api_key": "sk-test",
+        "ai_base_url": "https://api.openai.com/v1",
+        "ai_model": "gpt-4o-mini",
+    }
+    with patch("app.services.text2sql.SystemConfigService.get_value", side_effect=_mock_config_getter(values)):
+        config = await _load_ai_config(AsyncMock())
+
+    assert config.provider == "deepseek"
+    assert config.base_url == "https://api.deepseek.com"
+    assert config.model == "deepseek-v4-flash"
+
+
+@pytest.mark.asyncio
+async def test_load_ai_config_supports_moonshot_and_zhipu_presets():
+    cases = [
+        ("moonshot", "https://api.moonshot.ai/v1", "kimi-k2.6"),
+        ("zhipu", "https://open.bigmodel.cn/api/paas/v4", "glm-4.7-flash"),
+    ]
+    for provider, base_url, model in cases:
+        values = {
+            "ai_enabled": "true",
+            "ai_provider": provider,
+            "ai_api_key": "sk-test",
+            "ai_base_url": "",
+            "ai_model": "",
+        }
+        with patch("app.services.text2sql.SystemConfigService.get_value", side_effect=_mock_config_getter(values)):
+            config = await _load_ai_config(AsyncMock())
+
+        assert config.provider == provider
+        assert config.protocol == "openai_compatible"
+        assert config.base_url == base_url
+        assert config.model == model
+
+
+@pytest.mark.asyncio
 async def test_generate_sql_dispatches_openai_compatible_provider():
     config = AIConfig(
         provider="deepseek",
