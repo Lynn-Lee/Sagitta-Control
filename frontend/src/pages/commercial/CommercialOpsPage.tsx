@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
@@ -71,9 +71,11 @@ export default function CommercialOpsPage() {
   const [about, setAbout] = useState<SupportAbout | null>(null)
   const [retention, setRetention] = useState<any>(null)
   const [alerts, setAlerts] = useState<AlertEvent[]>([])
+  const [activeTab, setActiveTab] = useState('onboarding')
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
   const [retentionForm] = Form.useForm()
+  const deliveryActionsRef = useRef<HTMLDivElement>(null)
 
   const loadAll = async () => {
     setLoading(true)
@@ -163,6 +165,13 @@ export default function CommercialOpsPage() {
 
   const goPath = (path: string) => {
     if (!path) return
+    if (path === '/commercial') {
+      setActiveTab('onboarding')
+      window.setTimeout(() => {
+        deliveryActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
+      return
+    }
     navigate(path)
   }
 
@@ -282,6 +291,8 @@ export default function CommercialOpsPage() {
       </Row>
 
       <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
         items={[
           {
             key: 'onboarding',
@@ -321,33 +332,35 @@ export default function CommercialOpsPage() {
                   </Card>
                 </Col>
                 <Col span={24}>
-                  <Card title="交付验收与诊断包">
-                    <Form form={form} layout="inline">
-                      <Form.Item name="instance_id" label="实例 ID">
-                        <InputNumber min={1} placeholder="可选" />
-                      </Form.Item>
-                      <Form.Item name="db_name" label="数据库">
-                        <Input placeholder="可选" />
-                      </Form.Item>
-                      <Form.Item>
-                        <Button icon={<FileDoneOutlined />} type="primary" onClick={createAcceptance}>生成验收报告</Button>
-                      </Form.Item>
-                      <Form.Item>
-                        <Button icon={<ToolOutlined />} onClick={createDiagnostic}>生成诊断包</Button>
-                      </Form.Item>
-                    </Form>
-                    <Space style={{ marginTop: 16 }}>
-                      {acceptanceRunId && (
-                        <>
-                          <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('md')}>下载 Markdown</Button>
-                          <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('json')}>下载 JSON</Button>
-                        </>
-                      )}
-                      {diagnosticId && (
-                        <Button icon={<CloudDownloadOutlined />} onClick={downloadDiagnostic}>下载诊断包</Button>
-                      )}
-                    </Space>
-                  </Card>
+                  <div ref={deliveryActionsRef}>
+                    <Card title="交付验收与诊断包">
+                      <Form form={form} layout="inline">
+                        <Form.Item name="instance_id" label="实例 ID">
+                          <InputNumber min={1} placeholder="可选" />
+                        </Form.Item>
+                        <Form.Item name="db_name" label="数据库">
+                          <Input placeholder="可选" />
+                        </Form.Item>
+                        <Form.Item>
+                          <Button icon={<FileDoneOutlined />} type="primary" onClick={createAcceptance}>生成验收报告</Button>
+                        </Form.Item>
+                        <Form.Item>
+                          <Button icon={<ToolOutlined />} onClick={createDiagnostic}>生成诊断包</Button>
+                        </Form.Item>
+                      </Form>
+                      <Space style={{ marginTop: 16 }}>
+                        {acceptanceRunId && (
+                          <>
+                            <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('md')}>下载 Markdown</Button>
+                            <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('json')}>下载 JSON</Button>
+                          </>
+                        )}
+                        {diagnosticId && (
+                          <Button icon={<CloudDownloadOutlined />} onClick={downloadDiagnostic}>下载诊断包</Button>
+                        )}
+                      </Space>
+                    </Card>
+                  </div>
                 </Col>
               </Row>
             ),
