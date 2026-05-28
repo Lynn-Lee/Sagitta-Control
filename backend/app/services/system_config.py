@@ -105,9 +105,11 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "sms_endpoint": ("自定义 API 端点（custom 时使用）", "sms", False, ""),
     "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     # ── AI 配置 ───────────────────────────────────────────────
-    "ai_enabled": ("启用 AI 功能", "ai", False, "false"),
-    "ai_api_key": ("Anthropic API Key", "ai", True, ""),
+    "ai_provider": ("模型服务商（支持 Claude/OpenAI/DeepSeek/Qwen/MiniMax/小米等）", "ai", False, "anthropic"),
+    "ai_base_url": ("API Base URL（可选）", "ai", False, ""),
+    "ai_api_key": ("API Key", "ai", True, ""),
     "ai_model": ("AI 模型", "ai", False, "claude-sonnet-4-20250514"),
+    "ai_enabled": ("启用 AI 功能", "ai", False, "false"),
 }
 
 ALLOWED_LOGO_PREFIXES = ("https://", "http://", "/", "data:image/")
@@ -126,6 +128,12 @@ def _normalize_config_value(key: str, value: str) -> str:
             raise ValueError("Logo 数据过大，请使用 512KB 以内的图片或图片 URL")
         if not value.startswith(ALLOWED_LOGO_PREFIXES):
             raise ValueError("Logo 仅支持 http(s)、站内路径或 data:image 格式")
+    if key == "ai_provider":
+        value = value.lower() or "anthropic"
+        if value not in {"anthropic", "openai", "deepseek", "qwen", "minimax", "xiaomi", "custom"}:
+            raise ValueError("AI 模型服务商不支持")
+    if key == "ai_base_url" and value and not value.startswith(("https://", "http://")):
+        raise ValueError("AI API Base URL 仅支持 http(s) 地址")
     return value
 
 
@@ -135,7 +143,8 @@ class SystemConfigService:
         """首次调用时初始化所有配置项默认值。"""
         for key, (desc, group, _sensitive, default) in CONFIG_DEFINITIONS.items():
             existing = await db.execute(select(SystemConfig).where(SystemConfig.config_key == key))
-            if not existing.scalar_one_or_none():
+            cfg = existing.scalar_one_or_none()
+            if not cfg:
                 db.add(
                     SystemConfig(
                         config_key=key,
@@ -145,6 +154,9 @@ class SystemConfigService:
                         group=group,
                     )
                 )
+            else:
+                cfg.description = desc
+                cfg.group = group
         await db.commit()
 
     @staticmethod

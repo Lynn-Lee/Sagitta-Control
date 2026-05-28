@@ -92,8 +92,8 @@ export default function WorkflowSubmit() {
       setAiInput('')
       msgApi.success('SQL 已生成，请检查后提交')
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { msg?: string } } }
-      setAiError(err.response?.data?.msg || 'AI 生成失败，请检查配置')
+      const err = error as { response?: { data?: { detail?: string; msg?: string } } }
+      setAiError(err.response?.data?.detail || err.response?.data?.msg || 'AI 生成失败，请检查配置')
     } finally { setAiLoading(false) }
   }
   const [msgApi, msgCtx] = message.useMessage()

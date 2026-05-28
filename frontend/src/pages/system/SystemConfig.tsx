@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Alert, Button, Card, Divider, Form, Input,
-  message, Space, Switch, Tabs, Typography, Grid, Tooltip, Upload,
+  message, Space, Switch, Tabs, Typography, Grid, Tooltip, Upload, Select,
 } from 'antd'
 import {
   ApiOutlined,
@@ -23,6 +23,16 @@ import TableEmptyState from '@/components/common/TableEmptyState'
 
 const { Text } = Typography
 const { useBreakpoint } = Grid
+
+const AI_PROVIDER_OPTIONS = [
+  { value: 'anthropic', label: 'Anthropic Claude' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'qwen', label: '阿里 Qwen / DashScope' },
+  { value: 'minimax', label: 'MiniMax' },
+  { value: 'xiaomi', label: '小米 / 其他兼容' },
+  { value: 'custom', label: '自定义 OpenAI 兼容' },
+]
 
 const tabLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -180,6 +190,19 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
                   }}
                 </Form.Item>
               </Space>
+            </Form.Item>
+          )
+        }
+
+        if (item.key === 'ai_provider') {
+          return (
+            <Form.Item
+              key={item.key}
+              name={item.key}
+              label={item.description}
+              style={{ marginBottom: 14 }}
+            >
+              <Select options={AI_PROVIDER_OPTIONS} />
             </Form.Item>
           )
         }

@@ -38,7 +38,10 @@ class TestConfigDefinitions:
     def test_ai_group_config_exists(self):
         ai_keys = [k for k, v in CONFIG_DEFINITIONS.items() if v[1] == "ai"]
         assert "ai_enabled" in ai_keys
+        assert "ai_provider" in ai_keys
+        assert "ai_base_url" in ai_keys
         assert "ai_api_key" in ai_keys
+        assert CONFIG_ORDER["ai_enabled"] > CONFIG_ORDER["ai_model"]
 
     def test_no_duplicate_keys(self):
         keys = list(CONFIG_DEFINITIONS.keys())
@@ -144,6 +147,36 @@ class TestPublicAuthMethods:
             "sms": True,
             "oidc": False,
         }
+
+
+class TestEnsureDefaults:
+    """测试默认配置初始化与元数据刷新。"""
+
+    @pytest.mark.asyncio
+    async def test_refreshes_existing_metadata_without_overwriting_value(self):
+        mock_db = AsyncMock()
+        existing = MagicMock()
+        existing.description = "Anthropic API Key"
+        existing.group = "old_group"
+        existing.config_value = "encrypted_saved_key"
+
+        keys = iter(CONFIG_DEFINITIONS.keys())
+
+        async def fake_execute(_stmt):
+            key = next(keys)
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = existing if key == "ai_api_key" else None
+            return result
+
+        mock_db.execute = AsyncMock(side_effect=fake_execute)
+        mock_db.add = MagicMock()
+        mock_db.commit = AsyncMock()
+
+        await SystemConfigService._ensure_defaults(mock_db)
+
+        assert existing.description == CONFIG_DEFINITIONS["ai_api_key"][0]
+        assert existing.group == "ai"
+        assert existing.config_value == "encrypted_saved_key"
 
 
 class TestConnectivityChecks:

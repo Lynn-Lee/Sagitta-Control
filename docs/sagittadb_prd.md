@@ -207,7 +207,7 @@ Dashboard 面向不同角色展示权限范围内的统计信息，包括在线�
 
 ### 5.3 SQL 工单
 
-SQL 工单支持提交、列表、详情、审批、执行、取消、模板复用和 AI Text2SQL。列表按“我的工单、审批记录、执行记录”分视角展示，减少不同角色之间的信息噪声。
+SQL 工单支持提交、列表、详情、审批、执行、取消、模板复用和 AI Text2SQL。AI Text2SQL 通过系统配置接入模型服务商，除 Anthropic Claude 外，也支持 OpenAI、DeepSeek、阿里 Qwen、MiniMax、小米及其他兼容 OpenAI Chat Completions 的国内主流模型网关。列表按“我的工单、审批记录、执行记录”分视角展示，减少不同角色之间的信息噪声。
 
 SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎公共风险规则，包括无 WHERE 的 UPDATE/DELETE、高风险 DDL、DROP/TRUNCATE、SELECT *、INSERT ... SELECT 和多语句执行顺序提示。goInception 仅作为 MySQL 专用可选扩展位，不作为 v2.0 主线能力承诺。
 
