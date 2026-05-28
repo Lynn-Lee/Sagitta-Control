@@ -839,6 +839,11 @@ async def get_public_branding(db: AsyncSession = Depends(get_db)):
     return await SystemConfigService.get_branding(db)
 
 
+@router.get("/auth-methods/", summary="获取公开登录方式配置")
+async def get_public_auth_methods(db: AsyncSession = Depends(get_db)):
+    return await SystemConfigService.get_public_auth_methods(db)
+
+
 @router.post("/config/", summary="批量更新系统配置")
 async def update_system_config(
     data: ConfigUpdateRequest,

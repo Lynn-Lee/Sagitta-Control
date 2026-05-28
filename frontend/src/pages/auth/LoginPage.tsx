@@ -1,10 +1,10 @@
-import { useState } from 'react'
-import { Button, Form, Input, Alert, Divider, Tooltip, Modal } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Form, Input, Alert, Divider, Tooltip, Modal, Space, message } from 'antd'
 import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined, LoginOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuthStore } from '@/store/auth'
+import { useAuthStore, type AuthProvider } from '@/store/auth'
 import apiClient from '@/api/client'
 import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
@@ -15,9 +15,21 @@ import { useBranding } from '@/hooks/useBranding'
 const OAUTH_PROVIDER_LABELS: Record<string, string> = {
   ldap: 'LDAP',
   cas: 'CAS',
+  sms: '短信验证码',
   dingtalk: '钉钉',
   feishu: '飞书',
   wecom: '企业微信',
+}
+
+type LoginMethod = 'ldap' | 'cas' | 'sms' | 'dingtalk' | 'feishu' | 'wecom'
+
+const DEFAULT_AUTH_METHODS: Record<LoginMethod, boolean> = {
+  ldap: true,
+  cas: true,
+  sms: false,
+  dingtalk: true,
+  feishu: true,
+  wecom: true,
 }
 
 const PlatformIcon = ({ src, alt, size = 18 }: { src: string; alt: string; size?: number }) => (
@@ -52,6 +64,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [loginForm] = Form.useForm()
+  const [smsForm] = Form.useForm()
   const [forcePwForm] = Form.useForm()
   const { setTokens, setUser, setAuthProvider, isAuthenticated, user } = useAuthStore()
   const [loading, setLoading] = useState(false)
@@ -60,10 +73,15 @@ export default function LoginPage() {
   const [twoFactorMode, setTwoFactorMode] = useState(false)
   const [twoFactorLoading, setTwoFactorLoading] = useState(false)
   const [twoFactorToken, setTwoFactorToken] = useState('')
+  const [authMethods, setAuthMethods] = useState<Record<LoginMethod, boolean>>(DEFAULT_AUTH_METHODS)
+  const [smsSending, setSmsSending] = useState(false)
+  const [smsLoginLoading, setSmsLoginLoading] = useState(false)
+  const [smsCountdown, setSmsCountdown] = useState(0)
   const [forceChangeLoading, setForceChangeLoading] = useState(false)
   const [passwordChangeToken, setPasswordChangeToken] = useState('')
   const [passwordChangeReasons, setPasswordChangeReasons] = useState<string[]>([])
   const [pendingUsername, setPendingUsername] = useState('')
+  const [pendingAuthProvider, setPendingAuthProvider] = useState<AuthProvider>('local')
   const [error, setError] = useState(
     searchParams.get('oauth_error') ? formatLoginError(decodeURIComponent(searchParams.get('oauth_error')!)) : ''
   )
@@ -71,6 +89,35 @@ export default function LoginPage() {
 
   const method = searchParams.get('method')
   const isLdap = method === 'ldap'
+  const isSms = method === 'sms'
+  const visibleLoginMethods = useMemo(
+    () => (Object.keys(authMethods) as LoginMethod[]).filter((key) => authMethods[key]),
+    [authMethods],
+  )
+
+  useEffect(() => {
+    let active = true
+    apiClient
+      .get('/system/auth-methods/')
+      .then((res) => {
+        if (!active) return
+        setAuthMethods({ ...DEFAULT_AUTH_METHODS, ...res.data })
+      })
+      .catch(() => {
+        if (active) setAuthMethods(DEFAULT_AUTH_METHODS)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (smsCountdown <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setSmsCountdown((current) => Math.max(0, current - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [smsCountdown])
 
   const passwordRules = [
     { required: true, message: '请输入新密码' },
@@ -92,7 +139,7 @@ export default function LoginPage() {
   const finishLogin = async (
     access_token: string,
     refresh_token: string,
-    provider: 'local' | 'ldap' = 'local',
+    provider: AuthProvider = 'local',
   ) => {
     setTokens(access_token, refresh_token)
     setAuthProvider(provider)
@@ -119,11 +166,13 @@ export default function LoginPage() {
       two_fa_token?: string | null
     },
     username?: string,
+    provider: AuthProvider = 'local',
   ) => {
     if (tokenData.password_change_required) {
       setPasswordChangeToken(tokenData.password_change_token || '')
       setPasswordChangeReasons(tokenData.password_change_reasons || [])
       setPendingUsername(username || '')
+      setPendingAuthProvider(provider)
       setForceChangeMode(true)
       setTwoFactorMode(false)
       setTwoFactorToken('')
@@ -138,6 +187,7 @@ export default function LoginPage() {
       }
       setTwoFactorToken(tokenData.two_fa_token)
       setPendingUsername(username || '')
+      setPendingAuthProvider(provider)
       setTwoFactorMode(true)
       setForceChangeMode(false)
       setError('')
@@ -149,7 +199,7 @@ export default function LoginPage() {
     if (!access_token || !refresh_token) {
       throw new Error('登录响应缺少 token')
     }
-    await finishLogin(access_token, refresh_token, isLdap ? 'ldap' : 'local')
+    await finishLogin(access_token, refresh_token, provider)
   }
 
   const handleLogin = async (values: { username: string; password: string }) => {
@@ -160,7 +210,7 @@ export default function LoginPage() {
         username: values.username,
         password: values.password,
       })
-      await _doLogin(tokenRes.data, values.username)
+      await _doLogin(tokenRes.data, values.username, 'local')
     } catch (e: any) {
       setError(e.response?.data?.detail || '用户名或密码错误')
     } finally {
@@ -173,7 +223,7 @@ export default function LoginPage() {
     setError('')
     try {
       const tokenData = await authApi.ldapLogin(values.username, values.password)
-      await _doLogin(tokenData)
+      await _doLogin(tokenData, values.username, 'ldap')
     } catch (e: any) {
       setError(e.response?.data?.detail || 'LDAP 认证失败')
     } finally {
@@ -187,6 +237,11 @@ export default function LoginPage() {
       setError('')
       return
     }
+    if (type === 'sms') {
+      setSearchParams({ method: 'sms' })
+      setError('')
+      return
+    }
     setOauthLoading(type)
     setError('')
     try {
@@ -195,6 +250,39 @@ export default function LoginPage() {
     } catch (e: any) {
       setError(formatLoginError(e.response?.data?.detail || '企业登录跳转失败'))
       setOauthLoading('')
+    }
+  }
+
+  const handleSendSmsCode = async () => {
+    try {
+      const { phone } = await smsForm.validateFields(['phone'])
+      setSmsSending(true)
+      setError('')
+      const result = await authApi.sendSmsCode(phone)
+      if (result.success === false) {
+        setError(result.message || '短信验证码发送失败')
+        return
+      }
+      message.success(result.message || '验证码已发送')
+      setSmsCountdown(60)
+    } catch (e: any) {
+      if (e?.errorFields) return
+      setError(e.response?.data?.detail || e.response?.data?.message || '短信验证码发送失败')
+    } finally {
+      setSmsSending(false)
+    }
+  }
+
+  const handleSmsLogin = async (values: { phone: string; code: string }) => {
+    setSmsLoginLoading(true)
+    setError('')
+    try {
+      const tokenData = await authApi.smsLogin(values.phone, values.code)
+      await _doLogin(tokenData, values.phone, 'sms')
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '短信验证码登录失败')
+    } finally {
+      setSmsLoginLoading(false)
     }
   }
 
@@ -237,7 +325,7 @@ export default function LoginPage() {
       const tokenData = await authApi.verifyLogin2fa(twoFactorToken, values.totp_code)
       setTwoFactorMode(false)
       setTwoFactorToken('')
-      await _doLogin(tokenData, pendingUsername)
+      await _doLogin(tokenData, pendingUsername, pendingAuthProvider)
     } catch (e: any) {
       setError(e.response?.data?.detail || '二步验证失败')
     } finally {
@@ -419,6 +507,101 @@ export default function LoginPage() {
               </Form.Item>
             </Form>
           </>
+        ) : isSms ? (
+          /* ── 短信验证码登录表单 ── */
+          <>
+            <div className="sagitta-login-mode-header">
+              <Tooltip title="返回账号密码登录" placement="top">
+                <Button
+                  className="sagitta-login-back-btn"
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  aria-label="返回账号密码登录"
+                  onClick={() => { setSearchParams({}); setError('') }}
+                />
+              </Tooltip>
+              <div className="sagitta-login-mode-title">
+                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#1677FF' } as React.CSSProperties}>
+                  <PlatformIcon src="/icons/sms.svg" alt="短信验证码" size={20} />
+                </span>
+                <span>短信验证码</span>
+              </div>
+            </div>
+            <Form className="sagitta-auth-form" form={smsForm} onFinish={handleSmsLogin} size="large" layout="vertical">
+              <Form.Item
+                name="phone"
+                rules={[
+                  { required: true, message: '请输入手机号' },
+                  { min: 6, message: '手机号格式不正确' },
+                ]}
+                style={{ marginBottom: 14 }}
+              >
+                <Input
+                  prefix={<PlatformIcon src="/icons/sms.svg" alt="手机号" size={16} />}
+                  placeholder="手机号"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8, color: '#FFFFFF', height: 46,
+                  }}
+                />
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 22 }}>
+                <Space.Compact style={{ width: '100%' }}>
+                  <Form.Item
+                    name="code"
+                    noStyle
+                    rules={[
+                      { required: true, message: '请输入短信验证码' },
+                      { min: 4, message: '验证码格式不正确' },
+                    ]}
+                  >
+                    <Input
+                      prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
+                      placeholder="短信验证码"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px 0 0 8px', color: '#FFFFFF', height: 46,
+                      }}
+                    />
+                  </Form.Item>
+                  <Button
+                    loading={smsSending}
+                    disabled={smsCountdown > 0}
+                    onClick={handleSendSmsCode}
+                    style={{
+                      height: 46,
+                      minWidth: 116,
+                      color: '#FFFFFF',
+                      borderColor: 'rgba(255,255,255,0.14)',
+                      background: 'rgba(22,119,255,0.24)',
+                    }}
+                  >
+                    {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
+                  </Button>
+                </Space.Compact>
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button
+                  type="primary" htmlType="submit" loading={smsLoginLoading} block
+                  icon={<LoginOutlined />}
+                  style={{
+                    height: 46, borderRadius: 8,
+                    background: '#1677FF', border: 'none',
+                    fontWeight: 600, fontSize: 15, letterSpacing: '1px',
+                    boxShadow: '0 4px 20px rgba(22,119,255,0.42)',
+                  }}
+                >
+                  短信登录
+                </Button>
+              </Form.Item>
+            </Form>
+          </>
         ) : (
           /* ── 本地登录表单 ── */
           <>
@@ -567,6 +750,7 @@ export default function LoginPage() {
                       setTwoFactorMode(false)
                       setTwoFactorToken('')
                       setPendingUsername('')
+                      setPendingAuthProvider('local')
                       setError('')
                     }}
                   >
@@ -622,59 +806,75 @@ export default function LoginPage() {
               </Form>
             )}
 
-            {/* ── 第三方登录 ── */}
-            <Divider style={{
-              borderColor: 'rgba(255,255,255,0.07)',
-              color: 'rgba(255,255,255,0.22)',
-              fontSize: 11,
-              fontFamily: "'JetBrains Mono', monospace",
-              letterSpacing: '1px',
-              margin: '20px 0 16px',
-            }}>
-              其他登录方式
-            </Divider>
+            {visibleLoginMethods.length > 0 && (
+              <>
+                {/* ── 第三方登录 ── */}
+                <Divider style={{
+                  borderColor: 'rgba(255,255,255,0.07)',
+                  color: 'rgba(255,255,255,0.22)',
+                  fontSize: 11,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: '1px',
+                  margin: '20px 0 16px',
+                }}>
+                  其他登录方式
+                </Divider>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 40px)',
-              justifyContent: 'center',
-              gap: 10,
-            }}>
-              {/* LDAP — 紫蓝 #5E7CE0 */}
-              <OAuthBtn
-                icon={<PlatformIcon src="/icons/ldap.svg" alt="LDAP" />}
-                label="LDAP"  color="#5E7CE0"
-                onClick={() => handleOAuth('ldap')}
-              />
-              {/* CAS — 统一认证服务 */}
-              <OAuthBtn
-                icon={<PlatformIcon src="/icons/cas.svg" alt="CAS" />}
-                label="CAS"  color="#0590DF"
-                loading={oauthLoading === 'cas'}
-                onClick={() => handleOAuth('cas')}
-              />
-              {/* 钉钉 — 天蓝 #3AA2EB */}
-              <OAuthBtn
-                icon={<PlatformIcon src="/icons/dingtalk.svg" alt="钉钉" />}
-                label="钉钉"  color="#3AA2EB"
-                loading={oauthLoading === 'dingtalk'}
-                onClick={() => handleOAuth('dingtalk')}
-              />
-              {/* 飞书 — 青绿 #00D6B9 */}
-              <OAuthBtn
-                icon={<PlatformIcon src="/icons/feishu.svg" alt="飞书" />}
-                label="飞书"  color="#00D6B9"
-                loading={oauthLoading === 'feishu'}
-                onClick={() => handleOAuth('feishu')}
-              />
-              {/* 企微 — 钢蓝 #3970BA */}
-              <OAuthBtn
-                icon={<PlatformIcon src="/icons/wecom.svg" alt="企微" />}
-                label="企微"  color="#3970BA"
-                loading={oauthLoading === 'wecom'}
-                onClick={() => handleOAuth('wecom')}
-              />
-            </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${Math.min(visibleLoginMethods.length, 6)}, 40px)`,
+                  justifyContent: 'center',
+                  gap: 10,
+                }}>
+                  {authMethods.ldap && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/ldap.svg" alt="LDAP" />}
+                      label={OAUTH_PROVIDER_LABELS.ldap} color="#5E7CE0"
+                      onClick={() => handleOAuth('ldap')}
+                    />
+                  )}
+                  {authMethods.cas && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/cas.svg" alt="CAS" />}
+                      label={OAUTH_PROVIDER_LABELS.cas} color="#0590DF"
+                      loading={oauthLoading === 'cas'}
+                      onClick={() => handleOAuth('cas')}
+                    />
+                  )}
+                  {authMethods.sms && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/sms.svg" alt="短信验证码" />}
+                      label={OAUTH_PROVIDER_LABELS.sms} color="#1677FF"
+                      onClick={() => handleOAuth('sms')}
+                    />
+                  )}
+                  {authMethods.dingtalk && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/dingtalk.svg" alt="钉钉" />}
+                      label={OAUTH_PROVIDER_LABELS.dingtalk} color="#3AA2EB"
+                      loading={oauthLoading === 'dingtalk'}
+                      onClick={() => handleOAuth('dingtalk')}
+                    />
+                  )}
+                  {authMethods.feishu && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/feishu.svg" alt="飞书" />}
+                      label={OAUTH_PROVIDER_LABELS.feishu} color="#00D6B9"
+                      loading={oauthLoading === 'feishu'}
+                      onClick={() => handleOAuth('feishu')}
+                    />
+                  )}
+                  {authMethods.wecom && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/wecom.svg" alt="企微" />}
+                      label={OAUTH_PROVIDER_LABELS.wecom} color="#3970BA"
+                      loading={oauthLoading === 'wecom'}
+                      onClick={() => handleOAuth('wecom')}
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

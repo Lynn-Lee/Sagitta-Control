@@ -172,6 +172,23 @@ class SystemConfigService:
         }
 
     @staticmethod
+    async def get_public_auth_methods(db: AsyncSession) -> dict[str, bool]:
+        """返回登录页公开可读取的认证方式开关，不包含任何密钥或服务端地址。"""
+        await SystemConfigService._ensure_defaults(db)
+        keys = {
+            "ldap": "ldap_enabled",
+            "cas": "cas_enabled",
+            "dingtalk": "ding_login_enabled",
+            "feishu": "feishu_login_enabled",
+            "wecom": "wecom_login_enabled",
+            "sms": "sms_enabled",
+        }
+        return {
+            provider: (await SystemConfigService.get_value(db, config_key)).lower() == "true"
+            for provider, config_key in keys.items()
+        }
+
+    @staticmethod
     async def get_value(db: AsyncSession, key: str) -> str:
         """获取解密后的配置值（内部使用）。"""
         result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == key))

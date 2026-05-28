@@ -32,6 +32,12 @@ export const authApi = {
   ldapLogin: (username: string, password: string) =>
     apiClient.post<TokenResp>('/auth/ldap/', { username, password }).then(r => r.data),
 
+  sendSmsCode: (phone: string) =>
+    apiClient.post<{ success: boolean; message: string }>('/auth/sms/send/', { phone }).then(r => r.data),
+
+  smsLogin: (phone: string, code: string) =>
+    apiClient.post<TokenResp>('/auth/sms/login/', { phone, code }).then(r => r.data),
+
   changePassword: (old_password: string, new_password: string) =>
     apiClient.post('/auth/password/change/', { old_password, new_password }).then(r => r.data),
 

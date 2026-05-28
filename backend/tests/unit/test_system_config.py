@@ -2,7 +2,7 @@
 系统配置服务单元测试。
 验证配置读写、加密字段处理、批量更新逻辑。
 """
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -102,6 +102,40 @@ class TestGetValue:
 
         val = await SystemConfigService.get_value(mock_db, "non_existent_key_xyz")
         assert val == ""
+
+
+class TestPublicAuthMethods:
+    """测试登录页公开认证方式开关。"""
+
+    @pytest.mark.asyncio
+    async def test_returns_only_boolean_auth_method_flags(self):
+        mock_db = AsyncMock()
+        values = {
+            "ldap_enabled": "true",
+            "cas_enabled": "false",
+            "ding_login_enabled": "true",
+            "feishu_login_enabled": "",
+            "wecom_login_enabled": "TRUE",
+            "sms_enabled": "true",
+        }
+
+        async def fake_get_value(_db, key):
+            return values[key]
+
+        with (
+            patch.object(SystemConfigService, "_ensure_defaults", new=AsyncMock()),
+            patch.object(SystemConfigService, "get_value", side_effect=fake_get_value),
+        ):
+            methods = await SystemConfigService.get_public_auth_methods(mock_db)
+
+        assert methods == {
+            "ldap": True,
+            "cas": False,
+            "dingtalk": True,
+            "feishu": False,
+            "wecom": True,
+            "sms": True,
+        }
 
 
 class TestUpdateBatch:

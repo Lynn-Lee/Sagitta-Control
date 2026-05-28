@@ -26,7 +26,7 @@ export interface UserInfo {
   days_until_password_expiry?: number
 }
 
-export type AuthProvider = 'local' | 'ldap' | 'dingtalk' | 'feishu' | 'wecom' | 'cas'
+export type AuthProvider = 'local' | 'ldap' | 'sms' | 'dingtalk' | 'feishu' | 'wecom' | 'cas'
 
 interface AuthState {
   accessToken: string | null
