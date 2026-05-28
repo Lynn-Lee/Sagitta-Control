@@ -85,6 +85,17 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
 | [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
 
+## 内部源码发布
+
+内部 ECS 测试环境和可访问私有仓库的自管环境，统一使用服务器端 SSH deploy key 直接拉取 Git 并部署：
+
+```bash
+cd /opt/sagittadb/source
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main
+```
+
+`deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本、执行部署前备份、构建镜像、迁移数据库、重建服务并完成健康检查。首次配置 deploy key、remote、回滚和发布后验证步骤见 [运维管理手册](docs/operations_guide.md#24-内部-ecs-源码直拉部署约定)。
+
 ## 生产环境安全提示
 
 生产部署前必须完成以下检查：

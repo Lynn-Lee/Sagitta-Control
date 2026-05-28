@@ -9,6 +9,7 @@ APP_SERVICES=(backend celery_worker celery_beat flower frontend)
 BASE_SERVICES=(postgres redis)
 DEFAULT_BACKEND_HEALTH_URL="http://127.0.0.1:8000/health"
 DEFAULT_FRONTEND_HEALTH_URL="http://127.0.0.1/health"
+DEFAULT_GIT_REMOTE="origin"
 DEFAULT_RELEASE_BRANCH="main"
 DEFAULT_BACKUP_DIR="/data/sagittadb/backups"
 DEFAULT_BACKUP_RETAIN_DAYS="7"
@@ -20,13 +21,18 @@ usage() {
 
 默认流程：
   1. 检查本地已跟踪文件是否干净
-  2. 拉取 origin 并把本地 main 快进到 origin/main，或切换到 --ref 指定版本
+  2. 通过 SSH Git remote 拉取 origin，并把本地 main 快进到 origin/main，或切换到 --ref 指定版本
   3. 通过 postgres 容器执行部署前 PostgreSQL 备份
   4. 构建生产镜像
   5. 确保 postgres/redis 正在运行
   6. 执行 alembic 迁移
   7. 重建应用服务
   8. 等待健康检查并展示服务状态
+
+默认约定：
+  - ECS 测试/生产源码部署目录直接保留 Git 工作区，例如 /opt/sagittadb/source。
+  - origin 使用 SSH deploy key，例如 git@github.com-sagittadb:Lynn-Lee/SagittaDB.git。
+  - 未显式传 --ref 时，脚本部署 origin/main 的最新快进版本。
 
 选项：
   --ref <git-ref>          部署指定 tag、branch 或 commit，默认 origin/main。
@@ -38,7 +44,16 @@ usage() {
   --frontend-health <url>  前端健康检查 URL，默认 http://127.0.0.1/health
   -h, --help               显示帮助信息。
 
+环境变量：
+  GIT_REMOTE               Git remote 名称，默认 origin。
+  RELEASE_BRANCH           默认发布分支，默认 main。
+  REQUIRE_SSH_GIT_REMOTE   是否要求 remote 为 SSH URL，默认 1；临时 HTTPS 凭据场景可设为 0。
+  BACKUP_DIR               数据库备份目录，默认 /data/sagittadb/backups。
+  BACKUP_RETAIN_DAYS       备份保留天数，默认 7。
+  COMPOSE_PROJECT_NAME     Compose 项目名；ECS 测试环境使用 sagittadb-source-test。
+
 示例：
+  COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
   bash deploy/update-prod.sh --ref v2.0.0
@@ -91,13 +106,30 @@ show_recent_logs() {
   compose logs --tail=120 backend frontend celery_worker || true
 }
 
+ensure_git_remote_ready() {
+  local remote_url
+
+  if ! remote_url="$(git remote get-url "${GIT_REMOTE_NAME}" 2>/dev/null)"; then
+    die "未找到 Git remote：${GIT_REMOTE_NAME}。请先配置 origin SSH remote，例如 git@github.com-sagittadb:Lynn-Lee/SagittaDB.git。"
+  fi
+
+  log "Git remote ${GIT_REMOTE_NAME}: ${remote_url}"
+
+  if [[ "${REQUIRE_SSH_GIT_REMOTE}" == "1" && ! "${remote_url}" =~ ^(git@|ssh://) ]]; then
+    die "生产发布要求使用 SSH Git remote。当前 ${GIT_REMOTE_NAME}=${remote_url}。请配置 GitHub deploy key 后执行：git remote set-url ${GIT_REMOTE_NAME} git@github.com-sagittadb:Lynn-Lee/SagittaDB.git；如确需使用 HTTPS，可临时设置 REQUIRE_SSH_GIT_REMOTE=0。"
+  fi
+
+  log "校验 Git 远端访问"
+  git ls-remote --exit-code "${GIT_REMOTE_NAME}" HEAD >/dev/null
+}
+
 checkout_default_ref() {
-  log "切换到 ${DEFAULT_RELEASE_BRANCH} 并快进到 origin/${DEFAULT_RELEASE_BRANCH}"
-  if git show-ref --verify --quiet "refs/heads/${DEFAULT_RELEASE_BRANCH}"; then
-    git checkout "${DEFAULT_RELEASE_BRANCH}"
-    git merge --ff-only "origin/${DEFAULT_RELEASE_BRANCH}"
+  log "切换到 ${RELEASE_BRANCH_NAME} 并快进到 ${GIT_REMOTE_NAME}/${RELEASE_BRANCH_NAME}"
+  if git show-ref --verify --quiet "refs/heads/${RELEASE_BRANCH_NAME}"; then
+    git checkout "${RELEASE_BRANCH_NAME}"
+    git merge --ff-only "${GIT_REMOTE_NAME}/${RELEASE_BRANCH_NAME}"
   else
-    git checkout -b "${DEFAULT_RELEASE_BRANCH}" "origin/${DEFAULT_RELEASE_BRANCH}"
+    git checkout -b "${RELEASE_BRANCH_NAME}" "${GIT_REMOTE_NAME}/${RELEASE_BRANCH_NAME}"
   fi
 }
 
@@ -132,6 +164,9 @@ NO_CACHE=0
 PRUNE=0
 BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-${DEFAULT_BACKEND_HEALTH_URL}}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-${DEFAULT_FRONTEND_HEALTH_URL}}"
+GIT_REMOTE_NAME="${GIT_REMOTE:-${DEFAULT_GIT_REMOTE}}"
+RELEASE_BRANCH_NAME="${RELEASE_BRANCH:-${DEFAULT_RELEASE_BRANCH}}"
+REQUIRE_SSH_GIT_REMOTE="${REQUIRE_SSH_GIT_REMOTE:-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -192,8 +227,10 @@ ensure_clean_tracked_tree
 old_revision="$(git rev-parse --short HEAD)"
 log "当前版本：${old_revision}"
 
+ensure_git_remote_ready
+
 log "拉取最新 Git 引用"
-git fetch --tags origin
+git fetch --tags "${GIT_REMOTE_NAME}"
 
 if [[ -n "${REF}" ]]; then
   log "切换到目标 ref：${REF}"

@@ -60,6 +60,34 @@ Linux 容器中通常不需要额外设置 `ORACLE_CLIENT_LIB_DIR`，前提是 I
 
 Flower、Prometheus、Grafana 不包含在客户商业部署包的默认 Compose 服务中。如客户已有统一监控平台，可将平台健康接口、系统日志和数据库指标接入客户现有监控体系；如另行部署这些组件，应按客户安全规范限制访问范围。
 
+### 2.4 内部 ECS 源码直拉部署约定
+
+内部测试环境和可访问私有仓库的自管环境，统一采用“服务器保留 Git 工作区，发布时由服务器通过 SSH deploy key 直接拉取 `origin/main` 并执行部署脚本”的方式。标准目录约定：
+
+```text
+/opt/sagittadb/source
+```
+
+Git remote 必须使用 SSH URL，不使用交互式 HTTPS 账号密码。GitHub deploy key 建议只授予当前仓库只读权限：
+
+```bash
+ssh-keygen -t ed25519 -C "sagittadb-ecs-deploy" -f ~/.ssh/sagittadb_deploy -N ""
+
+cat >> ~/.ssh/config <<'EOF'
+Host github.com-sagittadb
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/sagittadb_deploy
+  IdentitiesOnly yes
+EOF
+
+ssh -T git@github.com-sagittadb
+git remote set-url origin git@github.com-sagittadb:Lynn-Lee/SagittaDB.git
+git fetch origin
+```
+
+`deploy/update-prod.sh` 默认会检查 remote 是否为 SSH URL，并执行 `git ls-remote` 校验 deploy key 是否可用。未显式传 `--ref` 时，脚本会拉取最新引用并把本地 `main` 快进到 `origin/main`。如确有临时 HTTPS 凭据场景，可设置 `REQUIRE_SSH_GIT_REMOTE=0`，但不作为常规发布方式。
+
 ## 3. 日常巡检
 
 建议每日执行一次基础巡检，每周执行一次完整巡检。
@@ -196,8 +224,49 @@ bash deploy/backup/restore-postgres.sh
 
 ### 6.2 标准升级
 
+内部 ECS 测试环境标准命令：
+
 ```bash
-bash deploy/update-prod.sh --ref <target_ref>
+cd /opt/sagittadb/source
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main
+```
+
+正式生产环境沿用同一入口，按实际 Compose 项目名和目标版本执行：
+
+```bash
+cd /opt/sagittadb/source
+COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagittadb/backups bash deploy/update-prod.sh --ref <target_ref>
+```
+
+常见发布目标：
+
+```bash
+bash deploy/update-prod.sh                  # 默认部署 origin/main
+bash deploy/update-prod.sh --ref origin/main
+bash deploy/update-prod.sh --ref v2.1.3
+bash deploy/update-prod.sh --ref <commit_sha>
+```
+
+脚本固定执行以下步骤：检查 tracked 工作区、校验 SSH Git remote、拉取远端引用、切换目标版本、部署前备份 PostgreSQL、构建应用镜像、启动基础服务、执行 Alembic 迁移、重建应用服务、等待 backend/frontend 健康检查、输出 Compose 状态。
+
+如果刚刚完成过手工备份或连续重试同一版本，可显式跳过备份：
+
+```bash
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --skip-backup
+```
+
+跳过备份必须在发布记录中注明最近一次可用备份文件。
+
+### 6.3 发布后验证
+
+在 ECS 上验证当前版本、服务状态和健康接口：
+
+```bash
+cd /opt/sagittadb/source
+git rev-parse --short HEAD
+COMPOSE_PROJECT_NAME=sagittadb-source-test docker compose -f deploy/docker-compose.yml ps
+curl -fsS http://127.0.0.1:8000/health
+curl -fsS http://127.0.0.1/health
 ```
 
 升级后验证：
@@ -211,11 +280,20 @@ bash deploy/update-prod.sh --ref <target_ref>
 - SQL 工单、在线查询和 Celery 任务正常。
 - Alembic 版本为最新。
 
-### 6.3 回滚原则
+### 6.4 回滚原则
 
 - 如果只涉及应用异常，优先回滚镜像或 Git tag。
 - 如果涉及数据库迁移异常，优先使用升级前备份恢复。
 - 不建议在未确认迁移脚本可逆时直接执行 `alembic downgrade`。
+
+应用版本回滚仍走同一脚本入口，目标 ref 使用上一版 tag 或提交号：
+
+```bash
+cd /opt/sagittadb/source
+COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref <previous_tag_or_commit>
+```
+
+如果异常来自不可逆或破坏性数据库迁移，应先停止写入流量，再按 5.3 使用升级前备份恢复数据库。
 
 ## 7. 监控告警
 
