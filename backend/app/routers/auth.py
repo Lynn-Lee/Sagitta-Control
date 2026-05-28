@@ -1,5 +1,5 @@
 """
-认证路由：本地登录、LDAP、第三方 OAuth2（钉钉/飞书/企微/CAS）、2FA、Token 管理。
+认证路由：本地登录、LDAP、第三方 OAuth2/OIDC（钉钉/飞书/企微/CAS/OIDC）、2FA、Token 管理。
 """
 
 import logging
@@ -399,7 +399,7 @@ async def oauth_authorize(
 ):
     """
     返回指定 provider 的授权跳转 URL。
-    支持：dingtalk / feishu / wecom / cas
+    支持：dingtalk / feishu / wecom / cas / oidc
     """
     if provider not in oauth_auth.SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=404, detail=f"不支持的登录方式: {provider}")

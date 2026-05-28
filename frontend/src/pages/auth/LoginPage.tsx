@@ -15,17 +15,19 @@ import { useBranding } from '@/hooks/useBranding'
 const OAUTH_PROVIDER_LABELS: Record<string, string> = {
   ldap: 'LDAP',
   cas: 'CAS',
+  oidc: 'OIDC',
   sms: '短信验证码',
   dingtalk: '钉钉',
   feishu: '飞书',
   wecom: '企业微信',
 }
 
-type LoginMethod = 'ldap' | 'cas' | 'sms' | 'dingtalk' | 'feishu' | 'wecom'
+type LoginMethod = 'ldap' | 'cas' | 'oidc' | 'sms' | 'dingtalk' | 'feishu' | 'wecom'
 
 const DEFAULT_AUTH_METHODS: Record<LoginMethod, boolean> = {
   ldap: true,
   cas: true,
+  oidc: false,
   sms: false,
   dingtalk: true,
   feishu: true,
@@ -839,6 +841,14 @@ export default function LoginPage() {
                       label={OAUTH_PROVIDER_LABELS.cas} color="#0590DF"
                       loading={oauthLoading === 'cas'}
                       onClick={() => handleOAuth('cas')}
+                    />
+                  )}
+                  {authMethods.oidc && (
+                    <OAuthBtn
+                      icon={<PlatformIcon src="/icons/oidc.svg" alt="OIDC" />}
+                      label={OAUTH_PROVIDER_LABELS.oidc} color="#6F48D8"
+                      loading={oauthLoading === 'oidc'}
+                      onClick={() => handleOAuth('oidc')}
                     />
                   )}
                   {authMethods.sms && (

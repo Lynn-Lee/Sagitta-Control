@@ -26,6 +26,13 @@ def _make_config(**overrides):
         "wecom_login_corp_id":      "wx_corp",
         "wecom_login_agent_id":     "1000001",
         "wecom_login_app_secret":   "corp_secret",
+        "oidc_enabled":             "true",
+        "oidc_client_id":           "oidc_client",
+        "oidc_client_secret":       "oidc_secret",
+        "oidc_authorization_endpoint": "https://idp.example.com/oauth2/authorize",
+        "oidc_token_endpoint":      "https://idp.example.com/oauth2/token",
+        "oidc_userinfo_endpoint":   "https://idp.example.com/oauth2/userinfo",
+        "oidc_scope":               "openid email profile",
     }
     base.update(overrides)
     return base
@@ -62,6 +69,7 @@ async def test_get_authorize_url_disabled_uses_enterprise_prompt(mock_db):
         feishu_login_enabled="false",
         wecom_login_enabled="false",
         cas_enabled="false",
+        oidc_enabled="false",
     )
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
@@ -84,6 +92,13 @@ async def test_get_authorize_url_disabled_uses_enterprise_prompt(mock_db):
     ):
         await oauth_auth.get_authorize_url("cas", mock_db, "http://cb", "state")
 
+    with (
+        patch("app.services.oauth_auth.SystemConfigService.get_value",
+              side_effect=await _mock_get_value(cfg)),
+        pytest.raises(ValueError, match="OIDC 登录未启用或 Client ID / Issuer 未配置。"),
+    ):
+        await oauth_auth.get_authorize_url("oidc", mock_db, "http://cb", "state")
+
 
 @pytest.mark.asyncio
 async def test_missing_provider_config_uses_enterprise_prompt(mock_db):
@@ -93,12 +108,14 @@ async def test_missing_provider_config_uses_enterprise_prompt(mock_db):
         wecom_login_corp_id="",
         cas_enabled="true",
         cas_server_url="",
+        oidc_client_id="",
     )
     expected = {
         "dingtalk": "钉钉登录未启用或 AppKey 未配置。",
         "feishu": "飞书登录未启用或 App ID 未配置。",
         "wecom": "企业微信登录未启用或 CorpID / AgentId 未配置。",
         "cas": "CAS 登录未启用或服务器地址未配置。",
+        "oidc": "OIDC 登录未启用或 Client ID / Issuer 未配置。",
     }
     for provider, message in expected.items():
         with (
@@ -164,3 +181,20 @@ async def test_cas_authorize_url_normalizes_login_endpoint(mock_db):
         )
     assert url.startswith("https://cas.example.com/login?")
     assert "/login/login?" not in url
+
+
+@pytest.mark.asyncio
+async def test_oidc_authorize_url_uses_configured_endpoint(mock_db):
+    cfg = _make_config()
+    with patch("app.services.oauth_auth.SystemConfigService.get_value",
+               side_effect=await _mock_get_value(cfg)):
+        url = await oauth_auth.get_authorize_url(
+            "oidc", mock_db, "https://db.example.com/api/v1/auth/oidc/callback/", "st6"
+        )
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    assert parsed.geturl().startswith("https://idp.example.com/oauth2/authorize?")
+    assert query["client_id"] == ["oidc_client"]
+    assert query["redirect_uri"] == ["https://db.example.com/api/v1/auth/oidc/callback/"]
+    assert query["scope"] == ["openid email profile"]
+    assert query["state"] == ["st6"]

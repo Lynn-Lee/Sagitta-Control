@@ -46,6 +46,7 @@ const GROUP_LABEL: Record<string, React.ReactNode> = {
   feishu:   <CompactTabLabel title="飞书通知"><PlatformImg src="/icons/feishu.svg" alt="飞书" />飞书</CompactTabLabel>,
   ldap:     <CompactTabLabel title="LDAP 认证"><PlatformImg src="/icons/ldap.svg" alt="LDAP" />LDAP</CompactTabLabel>,
   cas:      <CompactTabLabel title="CAS SSO"><PlatformImg src="/icons/cas.svg" alt="CAS" />CAS</CompactTabLabel>,
+  oidc:     <CompactTabLabel title="OIDC SSO"><PlatformImg src="/icons/oidc.svg" alt="OIDC" />OIDC</CompactTabLabel>,
   sms:      <CompactTabLabel title="短信验证码"><PlatformImg src="/icons/sms.svg" alt="短信" />短信</CompactTabLabel>,
   ai:       <CompactTabLabel title="AI 功能">🤖 AI</CompactTabLabel>,
 }

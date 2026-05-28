@@ -117,6 +117,7 @@ class TestPublicAuthMethods:
             "feishu_login_enabled": "",
             "wecom_login_enabled": "TRUE",
             "sms_enabled": "true",
+            "oidc_enabled": "false",
         }
 
         async def fake_get_value(_db, key):
@@ -135,6 +136,7 @@ class TestPublicAuthMethods:
             "feishu": False,
             "wecom": True,
             "sms": True,
+            "oidc": False,
         }
 
 

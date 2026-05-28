@@ -1,7 +1,7 @@
 """
 第三方 OAuth2 登录服务。
 
-支持：钉钉（DingTalk）/ 飞书（Feishu）/ 企业微信（WeCom）/ CAS（通用）。
+支持：钉钉（DingTalk）/ 飞书（Feishu）/ 企业微信（WeCom）/ CAS / OIDC。
 
 通用流程：
   1. get_authorize_url(provider, db, callback_url, state) → 平台授权 URL
@@ -30,6 +30,7 @@ PROVIDER_CONFIG_PROMPTS: dict[str, str] = {
     "feishu": "飞书登录未启用或 App ID 未配置。",
     "wecom": "企业微信登录未启用或 CorpID / AgentId 未配置。",
     "cas": "CAS 登录未启用或服务器地址未配置。",
+    "oidc": "OIDC 登录未启用或 Client ID / Issuer 未配置。",
 }
 
 
@@ -357,15 +358,143 @@ async def handle_cas_callback(
     return await _provision_oauth_user(db, username, email, display_name or username, username, "cas")
 
 
+# ── OIDC（OpenID Connect）───────────────────────────────────
+
+def _normalize_oidc_issuer_url(raw_url: str) -> str:
+    url = raw_url.strip().rstrip("/")
+    suffix = "/.well-known/openid-configuration"
+    if url.lower().endswith(suffix):
+        url = url[: -len(suffix)].rstrip("/")
+    return url
+
+
+async def _get_oidc_metadata(db: AsyncSession) -> dict[str, str]:
+    issuer_url = _normalize_oidc_issuer_url(
+        await SystemConfigService.get_value(db, "oidc_issuer_url")
+    )
+    metadata: dict[str, str] = {}
+    if issuer_url:
+        discovery_url = issuer_url + "/.well-known/openid-configuration"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(discovery_url)
+                resp.raise_for_status()
+                body = resp.json()
+            metadata = {
+                "authorization_endpoint": body.get("authorization_endpoint", ""),
+                "token_endpoint": body.get("token_endpoint", ""),
+                "userinfo_endpoint": body.get("userinfo_endpoint", ""),
+            }
+        except Exception as exc:
+            logger.warning("oidc_discovery_failed: issuer=%s error=%s", issuer_url, exc)
+
+    overrides = {
+        "authorization_endpoint": await SystemConfigService.get_value(
+            db, "oidc_authorization_endpoint"
+        ),
+        "token_endpoint": await SystemConfigService.get_value(db, "oidc_token_endpoint"),
+        "userinfo_endpoint": await SystemConfigService.get_value(db, "oidc_userinfo_endpoint"),
+    }
+    for key, value in overrides.items():
+        if value:
+            metadata[key] = value.strip()
+    return metadata
+
+
+async def get_oidc_authorize_url(
+    db: AsyncSession, callback_url: str, state: str
+) -> str:
+    client_id = await SystemConfigService.get_value(db, "oidc_client_id")
+    metadata = await _get_oidc_metadata(db)
+    authorize_endpoint = metadata.get("authorization_endpoint", "")
+    if not client_id or not authorize_endpoint:
+        raise ValueError(PROVIDER_CONFIG_PROMPTS["oidc"])
+
+    scope = await SystemConfigService.get_value(db, "oidc_scope") or "openid email profile"
+    params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": callback_url,
+        "scope": scope,
+        "state": state,
+    }
+    return authorize_endpoint + "?" + urllib.parse.urlencode(params)
+
+
+async def handle_oidc_callback(
+    db: AsyncSession, code: str, callback_url: str
+) -> Users:
+    client_id = await SystemConfigService.get_value(db, "oidc_client_id")
+    client_secret = await SystemConfigService.get_value(db, "oidc_client_secret")
+    metadata = await _get_oidc_metadata(db)
+    token_endpoint = metadata.get("token_endpoint", "")
+    userinfo_endpoint = metadata.get("userinfo_endpoint", "")
+    if not client_id or not token_endpoint or not userinfo_endpoint:
+        raise ValueError("OIDC 登录配置不完整")
+
+    token_payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": callback_url,
+        "client_id": client_id,
+    }
+    if client_secret:
+        token_payload["client_secret"] = client_secret
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        token_resp = await client.post(token_endpoint, data=token_payload)
+        if token_resp.status_code in (400, 401) and client_secret:
+            token_payload.pop("client_secret", None)
+            token_resp = await client.post(
+                token_endpoint,
+                data=token_payload,
+                auth=(client_id, client_secret),
+            )
+        token_resp.raise_for_status()
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise ValueError(f"OIDC 获取 Token 失败: {token_data}")
+
+        userinfo_resp = await client.get(
+            userinfo_endpoint,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        userinfo_resp.raise_for_status()
+        user_data = userinfo_resp.json()
+
+    sub = str(user_data.get("sub") or "")
+    username_claim = await SystemConfigService.get_value(db, "oidc_username_claim")
+    email_claim = await SystemConfigService.get_value(db, "oidc_email_claim")
+    display_claim = await SystemConfigService.get_value(db, "oidc_display_name_claim")
+
+    email = str(user_data.get(email_claim or "email") or "")
+    display_name = str(user_data.get(display_claim or "name") or "")
+    username = str(
+        user_data.get(username_claim or "preferred_username")
+        or email.split("@")[0]
+        or (f"oidc_{sub[:12]}" if sub else "")
+    )
+    username = username.strip().replace(" ", "_")
+    external_id = sub or username
+    if not username or not external_id:
+        raise ValueError("OIDC 未返回可识别的用户标识")
+
+    return await _provision_oauth_user(
+        db, username, email, display_name or username, external_id, "oidc"
+    )
+
+
 # ── 统一分发入口 ──────────────────────────────────────────────
 
-SUPPORTED_PROVIDERS = ("dingtalk", "feishu", "wecom", "cas")
+SUPPORTED_PROVIDERS = ("dingtalk", "feishu", "wecom", "cas", "oidc")
 
 _PROVIDER_ENABLED_KEY: dict[str, str] = {
     "dingtalk": "ding_login_enabled",
     "feishu":   "feishu_login_enabled",
     "wecom":    "wecom_login_enabled",
     "cas":      "cas_enabled",
+    "oidc":     "oidc_enabled",
 }
 
 _GET_URL = {
@@ -373,6 +502,7 @@ _GET_URL = {
     "feishu":   get_feishu_authorize_url,
     "wecom":    get_wecom_authorize_url,
     "cas":      get_cas_authorize_url,
+    "oidc":     get_oidc_authorize_url,
 }
 
 _HANDLE_CB = {
@@ -380,6 +510,7 @@ _HANDLE_CB = {
     "feishu":   handle_feishu_callback,
     "wecom":    handle_wecom_callback,
     "cas":      handle_cas_callback,
+    "oidc":     handle_oidc_callback,
 }
 
 

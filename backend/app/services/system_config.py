@@ -1,6 +1,6 @@
 """
 系统配置服务。
-支持：邮件、钉钉、企微、飞书、LDAP 配置 + 连通性测试。
+支持：邮件、钉钉、企微、飞书、LDAP、CAS、OIDC 配置 + 连通性测试。
 敏感字段（密码/Token）用 Fernet 加密存储。
 """
 
@@ -25,6 +25,7 @@ CONFIG_GROUPS = {
     "feishu": "飞书",
     "ldap": "LDAP 认证",
     "cas": "CAS 单点登录",
+    "oidc": "OIDC 单点登录",
     "sms": "短信验证码",
     "ai": "AI 功能",
 }
@@ -83,6 +84,18 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "cas_enabled": ("启用 CAS 登录", "cas", False, "false"),
     "cas_server_url": ("CAS 服务器地址", "cas", False, ""),
     "cas_username_attribute": ("用户名属性（留空默认 user）", "cas", False, ""),
+    # ── OIDC（OpenID Connect）───────────────────────────────
+    "oidc_enabled": ("启用 OIDC 登录", "oidc", False, "false"),
+    "oidc_issuer_url": ("Issuer 地址（支持自动发现）", "oidc", False, ""),
+    "oidc_authorization_endpoint": ("授权端点（留空使用自动发现）", "oidc", False, ""),
+    "oidc_token_endpoint": ("Token 端点（留空使用自动发现）", "oidc", False, ""),
+    "oidc_userinfo_endpoint": ("UserInfo 端点（留空使用自动发现）", "oidc", False, ""),
+    "oidc_client_id": ("Client ID", "oidc", False, ""),
+    "oidc_client_secret": ("Client Secret", "oidc", True, ""),
+    "oidc_scope": ("授权 Scope", "oidc", False, "openid email profile"),
+    "oidc_username_claim": ("用户名 Claim", "oidc", False, "preferred_username"),
+    "oidc_email_claim": ("邮箱 Claim", "oidc", False, "email"),
+    "oidc_display_name_claim": ("显示名 Claim", "oidc", False, "name"),
     # ── 短信验证码 ──────────────────────────────────────────
     "sms_enabled": ("启用短信验证码登录", "sms", False, "false"),
     "sms_provider": ("短信服务商（aliyun/tencent/custom）", "sms", False, "aliyun"),
@@ -182,6 +195,7 @@ class SystemConfigService:
             "feishu": "feishu_login_enabled",
             "wecom": "wecom_login_enabled",
             "sms": "sms_enabled",
+            "oidc": "oidc_enabled",
         }
         return {
             provider: (await SystemConfigService.get_value(db, config_key)).lower() == "true"
