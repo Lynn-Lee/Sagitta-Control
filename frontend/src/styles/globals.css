@@ -348,6 +348,21 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   background: color-mix(in srgb, var(--mode-color, #5E7CE0) 20%, transparent);
 }
 
+.sagitta-auth-form .ant-input,
+.sagitta-auth-form .ant-input-affix-wrapper,
+.sagitta-auth-form .ant-input-affix-wrapper > input.ant-input {
+  font-size: 14px;
+}
+
+.sagitta-auth-form .ant-input::placeholder,
+.sagitta-auth-form .ant-input-affix-wrapper > input.ant-input::placeholder {
+  font-size: 14px;
+}
+
+.sagitta-auth-form .ant-btn {
+  font-size: 15px;
+}
+
 .ant-modal-footer .ant-btn:not(:has(.anticon))::before,
 .ant-modal-confirm-btns .ant-btn:not(:has(.anticon))::before,
 .ant-popconfirm-buttons .ant-btn:not(:has(.anticon))::before {

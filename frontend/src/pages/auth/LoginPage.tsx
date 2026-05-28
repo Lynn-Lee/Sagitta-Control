@@ -371,7 +371,7 @@ export default function LoginPage() {
                 <span>LDAP 认证</span>
               </div>
             </div>
-            <Form onFinish={handleLdapLogin} size="large" layout="vertical">
+            <Form className="sagitta-auth-form" onFinish={handleLdapLogin} size="large" layout="vertical">
               <Form.Item name="username" rules={[{ required: true, message: '请输入 LDAP 用户名' }]}
                 style={{ marginBottom: 14 }}>
                 <Input
@@ -572,7 +572,7 @@ export default function LoginPage() {
                 </Form>
               </>
             ) : (
-              <Form form={loginForm} onFinish={handleLogin} size="large" layout="vertical">
+              <Form className="sagitta-auth-form" form={loginForm} onFinish={handleLogin} size="large" layout="vertical">
                 <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}
                   style={{ marginBottom: 14 }}>
                   <Input
