@@ -51,25 +51,25 @@ async def test_get_authorize_url_disabled(mock_db):
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="钉钉 登录未启用"),
+        pytest.raises(ValueError, match="该企业登录方式未启用。"),
     ):
         await oauth_auth.get_authorize_url("dingtalk", mock_db, "http://cb", "state")
 
 
 @pytest.mark.asyncio
-async def test_get_authorize_url_disabled_uses_display_name(mock_db):
+async def test_get_authorize_url_disabled_uses_enterprise_prompt(mock_db):
     cfg = _make_config(feishu_login_enabled="false", cas_enabled="false")
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="飞书 登录未启用"),
+        pytest.raises(ValueError, match="该企业登录方式未启用。"),
     ):
         await oauth_auth.get_authorize_url("feishu", mock_db, "http://cb", "state")
 
     with (
         patch("app.services.oauth_auth.SystemConfigService.get_value",
               side_effect=await _mock_get_value(cfg)),
-        pytest.raises(ValueError, match="CAS 登录未启用"),
+        pytest.raises(ValueError, match="该企业登录方式未启用。"),
     ):
         await oauth_auth.get_authorize_url("cas", mock_db, "http://cb", "state")
 

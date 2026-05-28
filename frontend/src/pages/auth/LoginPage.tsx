@@ -180,7 +180,6 @@ export default function LoginPage() {
   }
 
   const handleOAuth = async (type: string) => {
-    const label = OAUTH_PROVIDER_LABELS[type] || type
     if (type === 'ldap') {
       setSearchParams({ method: 'ldap' })
       setError('')
@@ -192,7 +191,7 @@ export default function LoginPage() {
       const resp = await apiClient.get(`/auth/${type}/authorize/`)
       window.location.href = resp.data.url
     } catch (e: any) {
-      setError(e.response?.data?.detail || `${label} 登录暂不可用，请联系管理员开启`)
+      setError(e.response?.data?.detail || '企业登录跳转失败')
       setOauthLoading('')
     }
   }
