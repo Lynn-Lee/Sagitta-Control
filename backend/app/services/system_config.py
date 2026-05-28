@@ -68,7 +68,6 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "feishu_enabled": ("启用飞书通知", "feishu", False, "false"),
     "feishu_login_enabled": ("启用飞书扫码登录", "feishu", False, "false"),
     # ── LDAP ──────────────────────────────────────────────────
-    "ldap_enabled": ("启用LDAP认证", "ldap", False, "false"),
     "ldap_server_uri": ("LDAP服务器地址", "ldap", False, "ldap://ldap.example.com:389"),
     "ldap_bind_dn": ("Bind DN", "ldap", False, "cn=admin,dc=example,dc=com"),
     "ldap_bind_password": ("Bind 密码", "ldap", True, ""),
@@ -80,6 +79,7 @@ CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     "ldap_attr_employee_id": ("工号属性", "ldap", False, "employeeId"),
     "ldap_attr_department": ("部门属性", "ldap", False, "department"),
     "ldap_attr_title": ("职位属性", "ldap", False, "title"),
+    "ldap_enabled": ("启用 LDAP 认证", "ldap", False, "false"),
     # ── CAS（Central Authentication Service）────────────────
     "cas_server_url": ("CAS 服务器地址", "cas", False, ""),
     "cas_username_attribute": ("用户名属性（留空默认 user）", "cas", False, ""),

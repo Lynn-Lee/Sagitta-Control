@@ -45,6 +45,7 @@ class TestConfigDefinitions:
         assert len(keys) == len(set(keys)), "存在重复的配置 key"
 
     def test_sso_enable_switches_render_after_main_fields(self):
+        assert CONFIG_ORDER["ldap_enabled"] > CONFIG_ORDER["ldap_attr_title"]
         assert CONFIG_ORDER["cas_enabled"] > CONFIG_ORDER["cas_username_attribute"]
         assert CONFIG_ORDER["oidc_enabled"] > CONFIG_ORDER["oidc_display_name_claim"]
 
