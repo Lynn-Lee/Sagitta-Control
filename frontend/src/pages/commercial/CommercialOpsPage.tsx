@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -38,7 +39,22 @@ const reportTypes = [
   { key: 'license_operations', label: 'License 操作' },
 ]
 
+const licenseStatusColor: Record<string, string> = {
+  trial: 'gold',
+  licensed: 'green',
+  expired: 'red',
+  invalid: 'red',
+}
+
+const licenseStatusLabel: Record<string, string> = {
+  trial: '试用中',
+  licensed: '正式授权',
+  expired: '已过期',
+  invalid: '无效',
+}
+
 export default function CommercialOpsPage() {
+  const navigate = useNavigate()
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
   const [acceptanceRunId, setAcceptanceRunId] = useState<number | null>(null)
   const [diagnosticId, setDiagnosticId] = useState<number | null>(null)
@@ -114,7 +130,7 @@ export default function CommercialOpsPage() {
   const handleAlertAction = async (id: number, action: 'ack' | 'silence' | 'close') => {
     if (action === 'ack') await commercialApi.ackAlert(id)
     if (action === 'silence') await commercialApi.silenceAlert(id, 60)
-    if (action === 'close') await commercialApi.closeAlert(id, '商业运营页面关闭')
+    if (action === 'close') await commercialApi.closeAlert(id, '交付与支持页面关闭')
     message.success('告警状态已更新')
     const data = await commercialApi.alertEvents({ page_size: 50 })
     setAlerts(data.items || [])
@@ -141,7 +157,7 @@ export default function CommercialOpsPage() {
       <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
         <Space>
           <SafetyCertificateOutlined style={{ fontSize: 22, color: '#165DFF' }} />
-          <Typography.Title level={4} style={{ margin: 0 }}>商业运营</Typography.Title>
+          <Typography.Title level={4} style={{ margin: 0 }}>交付与支持</Typography.Title>
         </Space>
         <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} loading={loading} onClick={loadAll}>刷新</Button>
       </Space>
@@ -293,9 +309,14 @@ export default function CommercialOpsPage() {
                     <Descriptions.Item label="版本">{about?.version || '-'}</Descriptions.Item>
                     <Descriptions.Item label="部署模式">{about?.deployment_mode || '-'}</Descriptions.Item>
                     <Descriptions.Item label="授权项目">{about ? `${about.project}（${about.project_code}）` : '-'}</Descriptions.Item>
-                    <Descriptions.Item label="License">{about?.license?.status || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="客户 ID">{about?.license?.customer_id || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="部署指纹">{about?.deployment_fingerprint || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="License">
+                      <Space size={8} wrap>
+                        <Tag color={licenseStatusColor[about?.license?.status || ''] || 'default'}>
+                          {licenseStatusLabel[about?.license?.status || ''] || about?.license?.status || '-'}
+                        </Tag>
+                        <Button size="small" onClick={() => navigate('/system/license')}>前往授权管理</Button>
+                      </Space>
+                    </Descriptions.Item>
                     <Descriptions.Item label="支持邮箱">{about?.support?.email || '-'}</Descriptions.Item>
                     <Descriptions.Item label="授权中心">{about?.support?.license_server || '-'}</Descriptions.Item>
                   </Descriptions>

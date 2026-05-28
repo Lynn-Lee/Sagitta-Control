@@ -211,11 +211,16 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/system/user-groups', icon: <MenuIcon component={UserGroupMenuSvg} label="用户组管理" />, label: '用户组管理' },
       { key: '/system/approval-flows', icon: <ApartmentOutlined />, label: '审批流管理' },
       { key: '/system/config', icon: <MenuIcon component={SystemConfigMenuSvg} label="系统配置" />, label: '系统配置' },
-      { key: '/system/license', icon: <SafetyCertificateOutlined />, label: '授权管理' },
       { key: '/masking', icon: <EyeInvisibleOutlined />, label: '数据脱敏规则' },
     ],
   },
-  { key: '/commercial', icon: <CustomerServiceOutlined />, label: '商业运营', permission: 'system_config_manage' },
+  {
+    key: 'commercial-group', icon: <CustomerServiceOutlined />, label: '商业交付', permission: 'system_config_manage',
+    children: [
+      { key: '/system/license', icon: <SafetyCertificateOutlined />, label: 'License 授权' },
+      { key: '/commercial', icon: <CustomerServiceOutlined />, label: '交付与支持' },
+    ],
+  },
   { key: '/audit', icon: <AuditOutlined />, label: '审计日志', permission: 'menu_audit' },
 ]
 

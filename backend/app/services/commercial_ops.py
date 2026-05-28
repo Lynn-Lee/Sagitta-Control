@@ -35,12 +35,12 @@ from app.services.system_config import SystemConfigService
 
 ONBOARDING_STEPS = [
     {"key": "branding", "label": "品牌配置", "path": "/system/config"},
-    {"key": "license", "label": "License 激活", "path": "/system/license"},
+    {"key": "license", "label": "License 授权", "path": "/system/license"},
     {"key": "auth", "label": "认证方式", "path": "/system/config"},
     {"key": "notification", "label": "通知渠道", "path": "/system/config"},
     {"key": "first_instance", "label": "首个实例", "path": "/instance"},
     {"key": "governance", "label": "资源组/用户组/审批流", "path": "/system/groups"},
-    {"key": "acceptance", "label": "验收报告", "path": "/commercial/delivery"},
+    {"key": "acceptance", "label": "验收报告", "path": "/commercial"},
 ]
 
 RETENTION_DEFAULTS = {
