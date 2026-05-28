@@ -14,9 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.approval_flow import ApprovalFlow
+from app.models.archive import ArchiveJob
 from app.models.instance import Instance, InstanceDatabase
 from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
-from app.models.query import QueryLog, QueryPrivilege
+from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
 from app.models.role import UserGroup
 from app.models.system import (
     DeliveryAcceptanceRun,
@@ -26,6 +27,7 @@ from app.models.system import (
     SystemConfig,
 )
 from app.models.user import ResourceGroup, Users
+from app.models.workflow import SqlWorkflow
 from app.services.license import (
     LICENSE_PROJECT_CODE,
     LICENSE_PROJECT_NAME,
@@ -351,6 +353,86 @@ class CommercialOpsService:
         }
 
     @staticmethod
+    async def commercial_readiness(db: AsyncSession, license_state: dict[str, Any] | None = None) -> dict[str, Any]:
+        license_state = license_state or await LicenseService.status(db)
+        checks = [
+            {
+                "key": "license",
+                "label": "License 可用",
+                "ok": license_state.get("status") in {"trial", "licensed"},
+                "blocking": True,
+                "detail": license_state.get("reason") or "未获取到授权状态",
+                "path": "/system/license",
+            },
+            {
+                "key": "license_activation_ready",
+                "label": "正式授权材料",
+                "ok": bool(license_state.get("activation_customer_id") and license_state.get("activation_deployment_fingerprint")),
+                "blocking": False,
+                "detail": "客户 ID 与正式激活部署指纹可用于授权中心签发",
+                "path": "/system/license",
+            },
+            {
+                "key": "instance",
+                "label": "至少一个实例",
+                "ok": await CommercialOpsService._scalar_count(db, Instance, Instance.is_active.is_(True)) > 0,
+                "blocking": True,
+                "detail": "需要接入客户同构测试实例",
+                "path": "/instance",
+            },
+            {
+                "key": "governance",
+                "label": "治理配置",
+                "ok": (
+                    await CommercialOpsService._scalar_count(db, ResourceGroup) > 0
+                    and await CommercialOpsService._scalar_count(db, UserGroup) > 0
+                    and await CommercialOpsService._scalar_count(db, ApprovalFlow) > 0
+                ),
+                "blocking": True,
+                "detail": "资源组、用户组和审批流均需完成",
+                "path": "/system/groups",
+            },
+            {
+                "key": "notification",
+                "label": "通知链路",
+                "ok": await CommercialOpsService._notification_configured(db),
+                "blocking": False,
+                "detail": "建议至少配置邮件、飞书、钉钉或企微中的一种",
+                "path": "/system/config",
+            },
+            {
+                "key": "acceptance",
+                "label": "交付验收",
+                "ok": await CommercialOpsService._scalar_count(db, DeliveryAcceptanceRun) > 0,
+                "blocking": False,
+                "detail": "建议生成一次客户现场验收报告",
+                "path": "/commercial",
+            },
+        ]
+        failed_blockers = [item for item in checks if item["blocking"] and not item["ok"]]
+        failed_optional = [item for item in checks if not item["blocking"] and not item["ok"]]
+        if failed_blockers:
+            status = "blocked"
+            conclusion = "阻塞"
+            summary = "核心交付条件未完成，暂不建议进入商业推广或客户验收。"
+        elif failed_optional:
+            status = "needs_configuration"
+            conclusion = "需补配置"
+            summary = "核心链路已具备，建议补齐通知、正式授权材料或验收报告后推广。"
+        else:
+            status = "ready"
+            conclusion = "可推广"
+            summary = "试用、授权、实例治理和验收材料已形成闭环。"
+        return {
+            "status": status,
+            "conclusion": conclusion,
+            "summary": summary,
+            "score": round(sum(1 for item in checks if item["ok"]) / len(checks) * 100),
+            "checks": checks,
+            "action_items": [item for item in checks if not item["ok"]],
+        }
+
+    @staticmethod
     async def runtime_payload(db: AsyncSession, license_source: str = "") -> dict[str, Any]:
         if not hasattr(db, "execute"):
             failed_collects = 0
@@ -366,6 +448,13 @@ class CommercialOpsService:
             "health": "warning" if failed_collects else "ok",
             "failed_monitor_collect_configs": failed_collects,
         }
+
+    @staticmethod
+    async def _notification_configured(db: AsyncSession) -> bool:
+        for key in ("ding_enabled", "wecom_enabled", "feishu_enabled"):
+            if (await SystemConfigService.get_value(db, key)).lower() == "true":
+                return True
+        return bool(await SystemConfigService.get_value(db, "mail_host"))
 
     @staticmethod
     async def onboarding_status(db: AsyncSession) -> dict[str, Any]:
@@ -385,14 +474,7 @@ class CommercialOpsService:
             if (await SystemConfigService.get_value(db, key)).lower() == "true":
                 auth_enabled = True
                 break
-        notification_enabled = False
-        for key in ("ding_enabled", "wecom_enabled", "feishu_enabled"):
-            if (await SystemConfigService.get_value(db, key)).lower() == "true":
-                notification_enabled = True
-                break
-        notification_enabled = notification_enabled or bool(
-            await SystemConfigService.get_value(db, "mail_host")
-        )
+        notification_enabled = await CommercialOpsService._notification_configured(db)
 
         system_hints = {
             "branding": bool(await SystemConfigService.get_value(db, "platform_name")),
@@ -411,7 +493,22 @@ class CommercialOpsService:
         for step in ONBOARDING_STEPS:
             key = step["key"]
             done = key in completed or bool(system_hints.get(key))
-            items.append({**step, "completed": done, "auto_detected": bool(system_hints.get(key))})
+            reason = {
+                "branding": "已配置平台品牌" if system_hints.get(key) else "请确认平台名称、Logo 与客户现场展示口径",
+                "license": "已完成正式授权" if system_hints.get(key) else "试用可继续，但转正式前需完成在线或离线授权",
+                "auth": "已配置企业认证入口" if system_hints.get(key) else "建议启用 LDAP、CAS、OIDC 或企业应用登录",
+                "notification": "已配置通知渠道" if system_hints.get(key) else "建议至少打通邮件、飞书、钉钉或企微中的一种",
+                "first_instance": "已接入数据库实例" if system_hints.get(key) else "请接入一个生产同构测试实例",
+                "governance": "治理对象已配置" if system_hints.get(key) else "请完成资源组、用户组和审批流配置",
+                "acceptance": "已生成验收报告" if system_hints.get(key) else "建议生成 Markdown/JSON 验收报告留档",
+            }.get(key, "")
+            items.append({
+                **step,
+                "completed": done,
+                "auto_detected": bool(system_hints.get(key)),
+                "status": "done" if done else "todo",
+                "reason": reason,
+            })
         return {
             "steps": items,
             "completed_count": sum(1 for item in items if item["completed"]),
@@ -466,6 +563,11 @@ class CommercialOpsService:
         await add("健康检查", True, "后端服务可访问")
         license_state = await LicenseService.status(db)
         await add("License 状态", license_state["status"] in {"trial", "licensed"}, license_state["reason"])
+        await add(
+            "正式授权材料",
+            bool(license_state.get("activation_customer_id") and license_state.get("activation_deployment_fingerprint")),
+            f"customer_id={license_state.get('activation_customer_id') or '-'}",
+        )
         branding = await SystemConfigService.get_branding(db)
         await add("品牌配置", bool(branding.get("platform_name")), branding.get("platform_name") or "未配置")
         await add("用户数量", await CommercialOpsService._scalar_count(db, Users) > 0, "已创建用户")
@@ -473,6 +575,16 @@ class CommercialOpsService:
         await add("资源组", await CommercialOpsService._scalar_count(db, ResourceGroup) > 0, "已创建资源组")
         await add("用户组", await CommercialOpsService._scalar_count(db, UserGroup) > 0, "已创建用户组")
         await add("审批流", await CommercialOpsService._scalar_count(db, ApprovalFlow) > 0, "已创建审批流")
+        await add("通知链路", await CommercialOpsService._notification_configured(db), "至少一个通知渠道已配置")
+        await add("SQL 工单链路", await CommercialOpsService._scalar_count(db, SqlWorkflow) > 0, "已存在 SQL 工单记录")
+        await add("查询权限链路", await CommercialOpsService._scalar_count(db, QueryPrivilegeApply) > 0, "已存在查询权限申请记录")
+        await add("在线查询链路", await CommercialOpsService._scalar_count(db, QueryLog) > 0, "已存在在线查询记录")
+        await add("数据归档链路", await CommercialOpsService._scalar_count(db, ArchiveJob) > 0, "已存在归档作业记录")
+        await add(
+            "监控采集",
+            await CommercialOpsService._scalar_count(db, MonitorMetricSnapshot) > 0,
+            "已存在监控指标快照",
+        )
         await add("审计日志", await CommercialOpsService._scalar_count(db, OperationLog) > 0, "审计日志可查询")
 
         instance_id = options.get("instance_id")
@@ -496,12 +608,18 @@ class CommercialOpsService:
             await add("实例链路检查", True, "未选择实例，已跳过", skipped=True)
 
         failed = [item for item in checks if not item["ok"] and not item["skipped"]]
+        readiness = await CommercialOpsService.commercial_readiness(db, license_state)
+        if failed:
+            readiness["status"] = "blocked"
+            readiness["conclusion"] = "阻塞"
+            readiness["summary"] = "验收检查存在失败项，请补齐后再进入客户推广或正式验收。"
         report = {
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
             "generated_at": _now().isoformat(),
             "generated_by": user.get("username", ""),
             "status": "failed" if failed else "success",
+            "readiness": readiness,
             "summary": {
                 "passed": sum(1 for item in checks if item["ok"] and not item["skipped"]),
                 "failed": len(failed),
@@ -533,6 +651,8 @@ class CommercialOpsService:
             f"- 生成时间：{report.get('generated_at')}",
             f"- 生成人：{report.get('generated_by') or '-'}",
             f"- 状态：{report.get('status')}",
+            f"- 推广结论：{report.get('readiness', {}).get('conclusion', '-')}",
+            f"- 结论说明：{report.get('readiness', {}).get('summary', '-')}",
             "",
             "## 汇总",
             "",
@@ -843,6 +963,11 @@ class CommercialOpsService:
     @staticmethod
     async def support_about(db: AsyncSession) -> dict[str, Any]:
         license_status = await LicenseService.status(db)
+        usage = await CommercialOpsService.usage_payload(db)
+        runtime = await CommercialOpsService.runtime_payload(
+            db, str(license_status.get("source") or "")
+        )
+        readiness = await CommercialOpsService.commercial_readiness(db, license_status)
         return {
             "version": "2.1.3",
             "project": LICENSE_PROJECT_NAME,
@@ -851,10 +976,9 @@ class CommercialOpsService:
             "app_env": settings.APP_ENV,
             "deployment_fingerprint": license_status.get("deployment_fingerprint") or "",
             "license": license_status,
-            "usage": await CommercialOpsService.usage_payload(db),
-            "runtime": await CommercialOpsService.runtime_payload(
-                db, str(license_status.get("source") or "")
-            ),
+            "usage": usage,
+            "runtime": runtime,
+            "readiness": readiness,
             "docs": [
                 {"label": "用户使用手册", "path": "/docs/user_manual.md"},
                 {"label": "运维管理手册", "path": "/docs/operations_guide.md"},

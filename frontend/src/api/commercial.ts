@@ -1,7 +1,15 @@
 import apiClient from './client'
 
 export type OnboardingStatus = {
-  steps: Array<{ key: string; label: string; path: string; completed: boolean; auto_detected: boolean }>
+  steps: Array<{
+    key: string
+    label: string
+    path: string
+    completed: boolean
+    auto_detected: boolean
+    status: string
+    reason: string
+  }>
   completed_count: number
   total: number
   is_complete: boolean
@@ -37,6 +45,56 @@ export type RetentionPolicy = {
   items: Array<{ key: string; label: string; days: number; default_days: number }>
 }
 
+export type ReadinessCheck = {
+  key: string
+  label: string
+  ok: boolean
+  blocking: boolean
+  detail: string
+  path: string
+}
+
+export type SupportAbout = {
+  version: string
+  deployment_mode: string
+  project: string
+  project_code: string
+  deployment_fingerprint: string
+  license: {
+    status: string
+    reason: string
+    is_trial: boolean
+    customer_id: string
+    activation_customer_id: string
+    activation_deployment_fingerprint: string
+    company_name: string
+    expires_at?: string | null
+    days_remaining?: number | null
+    warning_level?: string
+  }
+  usage: {
+    active_users: number
+    active_instances: number
+    db_type_distribution: Record<string, number>
+  }
+  runtime: {
+    health: string
+    app_env: string
+    deployment_mode: string
+    failed_monitor_collect_configs: number
+  }
+  readiness: {
+    status: string
+    conclusion: string
+    summary: string
+    score: number
+    checks: ReadinessCheck[]
+    action_items: ReadinessCheck[]
+  }
+  docs: Array<{ label: string; path: string }>
+  support: { email: string; license_server: string }
+}
+
 export const commercialApi = {
   onboardingStatus: () => apiClient.get<OnboardingStatus>('/system/onboarding/status').then(r => r.data),
   completeStep: (step: string) => apiClient.post<OnboardingStatus>(`/system/onboarding/steps/${step}/complete`).then(r => r.data),
@@ -51,7 +109,7 @@ export const commercialApi = {
   cleanupRetention: (category: string) =>
     apiClient.post('/system/compliance/retention-policy/cleanup', { category }).then(r => r.data),
   engineMatrix: () => apiClient.get('/system/support/engine-matrix').then(r => r.data),
-  supportAbout: () => apiClient.get('/system/support/about').then(r => r.data),
+  supportAbout: () => apiClient.get<SupportAbout>('/system/support/about').then(r => r.data),
   alertEvents: (params?: { status?: string; instance_id?: number; page?: number; page_size?: number }) =>
     apiClient.get<{ total: number; items: AlertEvent[] }>('/monitor/alerts/events', { params }).then(r => r.data),
   ackAlert: (id: number) => apiClient.post(`/monitor/alerts/events/${id}/ack`).then(r => r.data),

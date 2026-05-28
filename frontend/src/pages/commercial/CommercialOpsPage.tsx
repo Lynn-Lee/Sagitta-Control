@@ -21,13 +21,15 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CopyOutlined,
   CloudDownloadOutlined,
   FileDoneOutlined,
+  RightOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   ToolOutlined,
 } from '@ant-design/icons'
-import { commercialApi, type AlertEvent, type OnboardingStatus } from '@/api/commercial'
+import { commercialApi, type AlertEvent, type OnboardingStatus, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
 
 const { Text, Paragraph } = Typography
@@ -53,6 +55,12 @@ const licenseStatusLabel: Record<string, string> = {
   invalid: '无效',
 }
 
+const readinessColor: Record<string, string> = {
+  ready: 'green',
+  needs_configuration: 'orange',
+  blocked: 'red',
+}
+
 export default function CommercialOpsPage() {
   const navigate = useNavigate()
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
@@ -60,7 +68,7 @@ export default function CommercialOpsPage() {
   const [diagnosticId, setDiagnosticId] = useState<number | null>(null)
   const [report, setReport] = useState<any>(null)
   const [matrix, setMatrix] = useState<any>(null)
-  const [about, setAbout] = useState<any>(null)
+  const [about, setAbout] = useState<SupportAbout | null>(null)
   const [retention, setRetention] = useState<any>(null)
   const [alerts, setAlerts] = useState<AlertEvent[]>([])
   const [loading, setLoading] = useState(false)
@@ -136,6 +144,28 @@ export default function CommercialOpsPage() {
     setAlerts(data.items || [])
   }
 
+  const copyText = async (value: string, successText: string) => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+    message.success(successText)
+  }
+
+  const goPath = (path: string) => {
+    if (!path) return
+    navigate(path)
+  }
+
   const downloadReport = async (kind: 'md' | 'json') => {
     if (!acceptanceRunId) return
     await commercialApi.downloadFile(
@@ -152,6 +182,12 @@ export default function CommercialOpsPage() {
     )
   }
 
+  const renderReadinessAction = (item: ReadinessCheck) => (
+    <Button size="small" icon={<RightOutlined />} onClick={() => goPath(item.path)}>
+      去处理
+    </Button>
+  )
+
   return (
     <div>
       <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
@@ -161,6 +197,89 @@ export default function CommercialOpsPage() {
         </Space>
         <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} loading={loading} onClick={loadAll}>刷新</Button>
       </Space>
+
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} lg={8}>
+          <Card>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Text strong>推广就绪度</Text>
+                <Tag color={readinessColor[about?.readiness?.status || ''] || 'default'}>
+                  {about?.readiness?.conclusion || '-'}
+                </Tag>
+              </Space>
+              <Progress
+                percent={about?.readiness?.score || 0}
+                status={about?.readiness?.status === 'blocked' ? 'exception' : 'normal'}
+              />
+              <Text type="secondary">{about?.readiness?.summary || '正在读取商业交付状态'}</Text>
+            </Space>
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Text strong>试用与授权</Text>
+                <Tag color={licenseStatusColor[about?.license?.status || ''] || 'default'}>
+                  {licenseStatusLabel[about?.license?.status || ''] || about?.license?.status || '-'}
+                </Tag>
+              </Space>
+              <Descriptions size="small" column={1}>
+                <Descriptions.Item label="客户 ID">{about?.license?.activation_customer_id || about?.license?.customer_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="剩余天数">{about?.license?.days_remaining ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="到期时间">{about?.license?.expires_at || '-'}</Descriptions.Item>
+              </Descriptions>
+              <Space wrap>
+                <Button className="sagitta-action-btn sagitta-action-btn--copy" size="small" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>
+                  复制正式指纹
+                </Button>
+                <Button size="small" icon={<RightOutlined />} onClick={() => navigate('/system/license')}>授权管理</Button>
+              </Space>
+            </Space>
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Text strong>客户环境用量</Text>
+              <Descriptions size="small" column={1}>
+                <Descriptions.Item label="活跃用户">{about?.usage?.active_users ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="活跃实例">{about?.usage?.active_instances ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="采集失败">{about?.runtime?.failed_monitor_collect_configs ?? '-'}</Descriptions.Item>
+              </Descriptions>
+              <Space wrap>
+                {Object.entries(about?.usage?.db_type_distribution || {}).map(([dbType, count]) => (
+                  <Tag key={dbType} color="blue">{dbType}: {count}</Tag>
+                ))}
+                {!Object.keys(about?.usage?.db_type_distribution || {}).length && <Text type="secondary">暂无实例分布</Text>}
+              </Space>
+            </Space>
+          </Card>
+        </Col>
+        {!!about?.readiness?.action_items?.length && (
+          <Col span={24}>
+            <Alert
+              type={about.readiness.status === 'blocked' ? 'error' : 'warning'}
+              showIcon
+              message="推广前待处理项"
+              description={(
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {about.readiness.action_items.map(item => (
+                    <Space key={item.key} style={{ width: '100%', justifyContent: 'space-between' }} align="start">
+                      <span>
+                        <Text strong>{item.label}</Text>
+                        <Text type="secondary">：{item.detail}</Text>
+                      </span>
+                      {renderReadinessAction(item)}
+                    </Space>
+                  ))}
+                </Space>
+              )}
+            />
+          </Col>
+        )}
+      </Row>
 
       <Tabs
         items={[
@@ -178,12 +297,21 @@ export default function CommercialOpsPage() {
                         {(onboarding?.steps || []).map(step => (
                           <Col xs={24} md={8} key={step.key}>
                             <Card size="small">
-                              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                <Space>
-                                  <CheckCircleOutlined style={{ color: step.completed ? '#00A870' : '#A0AEC0' }} />
-                                  <Text>{step.label}</Text>
+                              <Space direction="vertical" style={{ width: '100%' }}>
+                                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                  <Space>
+                                    <CheckCircleOutlined style={{ color: step.completed ? '#00A870' : '#A0AEC0' }} />
+                                    <Text>{step.label}</Text>
+                                  </Space>
+                                  <Tag color={step.completed ? 'green' : 'orange'}>
+                                    {step.auto_detected ? '自动检测' : step.completed ? '手动确认' : '未完成'}
+                                  </Tag>
                                 </Space>
-                                <Button size="small" disabled={step.completed} onClick={() => commercialApi.completeStep(step.key).then(setOnboarding)}>完成</Button>
+                                <Text type="secondary">{step.reason}</Text>
+                                <Space>
+                                  <Button size="small" icon={<RightOutlined />} onClick={() => goPath(step.path)}>去配置</Button>
+                                  <Button size="small" disabled={step.completed} onClick={() => commercialApi.completeStep(step.key).then(setOnboarding)}>手动完成</Button>
+                                </Space>
                               </Space>
                             </Card>
                           </Col>
@@ -309,6 +437,9 @@ export default function CommercialOpsPage() {
                     <Descriptions.Item label="版本">{about?.version || '-'}</Descriptions.Item>
                     <Descriptions.Item label="部署模式">{about?.deployment_mode || '-'}</Descriptions.Item>
                     <Descriptions.Item label="授权项目">{about ? `${about.project}（${about.project_code}）` : '-'}</Descriptions.Item>
+                    <Descriptions.Item label="运行状态">
+                      <Tag color={about?.runtime?.health === 'ok' ? 'green' : 'orange'}>{about?.runtime?.health || '-'}</Tag>
+                    </Descriptions.Item>
                     <Descriptions.Item label="License">
                       <Space size={8} wrap>
                         <Tag color={licenseStatusColor[about?.license?.status || ''] || 'default'}>
@@ -319,6 +450,12 @@ export default function CommercialOpsPage() {
                     </Descriptions.Item>
                     <Descriptions.Item label="支持邮箱">{about?.support?.email || '-'}</Descriptions.Item>
                     <Descriptions.Item label="授权中心">{about?.support?.license_server || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="部署指纹" span={2}>
+                      <Space wrap>
+                        <Text code copyable={false}>{about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '-'}</Text>
+                        <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>复制</Button>
+                      </Space>
+                    </Descriptions.Item>
                   </Descriptions>
                   <Space wrap style={{ marginTop: 12 }}>
                     {(about?.docs || []).map((doc: any) => (

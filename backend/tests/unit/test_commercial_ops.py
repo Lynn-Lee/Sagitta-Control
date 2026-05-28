@@ -21,6 +21,10 @@ def test_acceptance_markdown_renders_check_results():
         "generated_at": "2026-05-28T00:00:00+00:00",
         "generated_by": "admin",
         "status": "success",
+        "readiness": {
+            "conclusion": "可推广",
+            "summary": "试用、授权、实例治理和验收材料已形成闭环。",
+        },
         "summary": {"passed": 1, "failed": 0, "skipped": 1},
         "checks": [
             {"name": "健康检查", "ok": True, "detail": "ok"},
@@ -31,6 +35,7 @@ def test_acceptance_markdown_renders_check_results():
     markdown = CommercialOpsService.acceptance_markdown(report)
 
     assert "SagittaDB 商业交付验收报告" in markdown
+    assert "推广结论：可推广" in markdown
     assert "PASS" in markdown
     assert "SKIP" in markdown
 
