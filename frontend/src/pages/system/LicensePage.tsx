@@ -246,9 +246,9 @@ export default function LicensePage() {
         description={status?.needs_renewal ? '请及时完成续期或联网刷新，避免到期后核心功能被限制。' : status?.reason || '正在检查当前部署的授权状态'}
       />
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={14}>
-          <Card title="当前授权" loading={loading}>
+      <Row gutter={[16, 16]} align="stretch">
+        <Col xs={24} lg={14} style={{ display: 'flex' }}>
+          <Card title="当前授权" loading={loading} style={{ width: '100%', height: '100%' }}>
             <Descriptions column={1} size="small">
               <Descriptions.Item label="状态">
                 <Tag color={statusColor[status?.status || ''] || 'default'}>
@@ -303,8 +303,8 @@ export default function LicensePage() {
           </Card>
         </Col>
 
-        <Col xs={24} lg={10}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Col xs={24} lg={10} style={{ display: 'flex' }}>
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Card loading={loading}>
               <Statistic
                 title="剩余天数"
@@ -319,7 +319,7 @@ export default function LicensePage() {
             <Card loading={loading}>
               <Statistic title="来源" value={status?.source || '-'} />
             </Card>
-            <Card title="权益与额度" loading={loading}>
+            <Card title="权益与额度" loading={loading} style={{ flex: 1 }}>
               <div style={{ marginBottom: 12 }}>
                 <Text type="secondary">功能模块</Text>
                 <div style={{ marginTop: 8 }}>
@@ -339,7 +339,7 @@ export default function LicensePage() {
                 </div>
               </div>
             </Card>
-          </Space>
+          </div>
         </Col>
 
         <Col xs={24}>
