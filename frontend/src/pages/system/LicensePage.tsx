@@ -247,27 +247,6 @@ export default function LicensePage() {
       />
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} md={8}>
-          <Card loading={loading}>
-            <Statistic
-              title="剩余天数"
-              value={status?.days_remaining ?? 0}
-              suffix="天"
-              valueStyle={{ color: status?.status === 'expired' ? '#cf1322' : undefined }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card loading={loading}>
-            <Statistic title="版本" value={status?.edition || '-'} />
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card loading={loading}>
-            <Statistic title="来源" value={status?.source || '-'} />
-          </Card>
-        </Col>
-
         <Col xs={24} lg={14}>
           <Card title="当前授权" loading={loading}>
             <Descriptions column={1} size="small">
@@ -325,26 +304,50 @@ export default function LicensePage() {
         </Col>
 
         <Col xs={24} lg={10}>
-          <Card title="权益与额度" loading={loading}>
-            <div style={{ marginBottom: 12 }}>
-              <Text type="secondary">功能模块</Text>
-              <div style={{ marginTop: 8 }}>
-                {(status?.features || []).map((feature) => (
-                  <Tag key={feature} color="blue" style={{ marginBottom: 6 }}>{feature}</Tag>
-                ))}
-                {!status?.features?.length && <Text type="secondary">-</Text>}
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Row gutter={[12, 12]}>
+              <Col xs={24} sm={8} lg={24} xl={8}>
+                <Card loading={loading}>
+                  <Statistic
+                    title="剩余天数"
+                    value={status?.days_remaining ?? 0}
+                    suffix="天"
+                    valueStyle={{ color: status?.status === 'expired' ? '#cf1322' : undefined }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={8} lg={24} xl={8}>
+                <Card loading={loading}>
+                  <Statistic title="版本" value={status?.edition || '-'} />
+                </Card>
+              </Col>
+              <Col xs={24} sm={8} lg={24} xl={8}>
+                <Card loading={loading}>
+                  <Statistic title="来源" value={status?.source || '-'} />
+                </Card>
+              </Col>
+            </Row>
+            <Card title="权益与额度" loading={loading}>
+              <div style={{ marginBottom: 12 }}>
+                <Text type="secondary">功能模块</Text>
+                <div style={{ marginTop: 8 }}>
+                  {(status?.features || []).map((feature) => (
+                    <Tag key={feature} color="blue" style={{ marginBottom: 6 }}>{feature}</Tag>
+                  ))}
+                  {!status?.features?.length && <Text type="secondary">-</Text>}
+                </div>
               </div>
-            </div>
-            <div>
-              <Text type="secondary">额度限制</Text>
-              <div style={{ marginTop: 8 }}>
-                {Object.entries(status?.limits || {}).map(([key, value]) => (
-                  <Tag key={key} color="purple" style={{ marginBottom: 6 }}>{key}: {String(value)}</Tag>
-                ))}
-                {!Object.keys(status?.limits || {}).length && <Text type="secondary">不限</Text>}
+              <div>
+                <Text type="secondary">额度限制</Text>
+                <div style={{ marginTop: 8 }}>
+                  {Object.entries(status?.limits || {}).map(([key, value]) => (
+                    <Tag key={key} color="purple" style={{ marginBottom: 6 }}>{key}: {String(value)}</Tag>
+                  ))}
+                  {!Object.keys(status?.limits || {}).length && <Text type="secondary">不限</Text>}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </Space>
         </Col>
 
         <Col xs={24}>
