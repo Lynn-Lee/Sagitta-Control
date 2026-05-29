@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="${VERSION:?VERSION is required, e.g. 2.1.4}"
+VERSION="${VERSION:?VERSION is required, e.g. 2.2.0}"
 PACKAGE_NAME="${PACKAGE_NAME:-SagittaDB-Enterprise-v${VERSION}}"
 DIST_DIR="${DIST_DIR:-dist-commercial}"
 SBOM_DIR="${SBOM_DIR:-${DIST_DIR}/sbom}"

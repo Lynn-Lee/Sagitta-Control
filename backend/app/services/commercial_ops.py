@@ -39,7 +39,7 @@ from app.services.license import (
 from app.services.role import RoleService
 from app.services.system_config import SystemConfigService
 
-COMMERCIAL_VERSION = "2.1.4"
+COMMERCIAL_VERSION = "2.2.0"
 DEMO_RESOURCE_GROUP_NAME = "commercial_trial_rg"
 DEMO_USER_GROUP_NAME = "commercial_trial_team"
 DEMO_APPROVAL_FLOW_NAME = "商业试用标准审批流"
@@ -99,6 +99,18 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
             "deploy/customer/upgrade.sh",
             f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}/upgrade.sh",
             "upgrade.sh",
+        ],
+        "path": "/commercial",
+    },
+    {
+        "key": "customer_go_live_scripts",
+        "label": "客户上线脚本",
+        "name": "客户上线脚本",
+        "blocking": True,
+        "kind": "all_executable",
+        "paths": [
+            "deploy/customer/prepare-go-live-env.sh",
+            "deploy/customer/go-live-check.sh",
         ],
         "path": "/commercial",
     },
@@ -712,7 +724,7 @@ class CommercialOpsService:
                 db, MonitorCollectConfig, MonitorCollectConfig.last_collect_status == "failed"
             )
         return {
-            "version": "2.1.4",
+            "version": "2.2.0",
             "app_env": settings.APP_ENV,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",
             "license_source": license_source,
@@ -1519,7 +1531,7 @@ class CommercialOpsService:
             {
                 "generated_at": _now().isoformat(),
                 "generated_by": user.get("username", ""),
-                "version": "2.1.4",
+                "version": "2.2.0",
                 "app_env": settings.APP_ENV,
                 "alembic_version": alembic_version,
                 "license": latest_license,
@@ -1757,7 +1769,7 @@ class CommercialOpsService:
         )
         readiness = await CommercialOpsService.commercial_readiness(db, license_status)
         return {
-            "version": "2.1.4",
+            "version": "2.2.0",
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",

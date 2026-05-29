@@ -3,7 +3,7 @@
 > 企业级多引擎数据库管控平台
 > 矢向数据，精准管控
 
-SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.1 商业部署版 + v2-lite 授权体系**。
+SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.2 商业部署版 + v2-lite 授权体系**。
 
 ## 核心能力
 
@@ -150,15 +150,15 @@ npm run build
 
 ## 商业交付
 
-当前版本：`v2.1 商业部署版 + v2-lite 授权体系`。
-当前商业部署版本：`2.1.4`。
+当前版本：`v2.2 商业部署版 + v2-lite 授权体系`。
+当前商业部署版本：`2.2.0`。
 状态：正式版商业交付。
 
 v2.1 重点增强 Oracle 引擎观测能力：会话监控优先使用 RAC 友好的 `GV$SESSION/GV$PROCESS/GV$SQL` 组合，SQL 洞察新增 Oracle SQL Monitor、AWR SQLStat、Cursor Cache 和当前会话 SQL 降级链路，并补充等待事件、阻塞会话、长事务和长操作摘要。所有 Oracle 诊断采集均使用 `python-oracledb` 参数化只读查询；权限不足时返回 warning 并自动降级，不执行 kill、dump、baseline、profile、patch 等高风险诊断动作。
 
 v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查询、归档、工单等页面的操作按钮、搜索入口、导入导出和弹窗确认按钮样式；常规按钮统一为 36px 高和图标 + 文字结构，并按主操作、查看/管理/刷新、编辑、导入导出、中性操作、危险操作规划语义色；登录页第三方接入入口改为纯图标按钮并通过悬停提示说明“使用 XXX 登录”，LDAP/CAS/OIDC 保持大写，钉钉、飞书、企业微信使用中文展示名，企业入口点击后的未启用/未配置提示与 DataFusionX-Enterprise 对齐，例如 `飞书登录未启用或 App ID 未配置。`、`CAS 登录未启用或服务器地址未配置。`、`OIDC 登录未启用或 Client ID / Issuer 未配置。`，LDAP 登录模式使用更紧凑一致的返回图标和认证标题块，并与账号密码登录表单保持一致的输入框和按钮字号；补充多处图标按钮文案与危险操作视觉层级，并优化全局按钮/弹窗/表格工具区细节，让客户生产环境的管理界面更一致、更易扫描。
 
-v2.1.4 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.1.4 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
+v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.2.0 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
 
@@ -167,6 +167,8 @@ v2.1.4 已完成商业发布链路补强：客户部署包、sha256、Ed25519 �
 商业交付闭环已内置到产品：管理员可在 `商业交付` → `交付与支持` 页面完成实施交付向导、生成 Markdown/JSON 验收报告、导出脱敏诊断包、查看合规报表、处理告警事件和确认引擎支持矩阵。在线激活和联网刷新会向授权中心上报 usage/runtime 摘要，便于客户成功、续费和支持排障。
 
 商业试用初始化已内置到交付页：管理员可点击 `初始化试用环境`，幂等创建商业试用资源组、用户组、标准审批流和样例审计记录；若现场已有活跃数据库实例，会进一步生成 SQL 工单、查询权限申请、在线查询、归档作业和监控快照演示数据，并自动生成一次验收报告。该流程不会伪造活跃实例或保存真实数据库密码，未接入实例时会保留“首个实例”待处理项。
+
+客户包新增正式推广前硬门禁：`prepare-go-live-env.sh` 会为客户现场生成生产随机密钥和稳定部署 ID，`go-live-check.sh` 会严格校验生产环境变量、正式 License、客户 ID、部署指纹、活跃实例、实施向导、验收报告、运行健康和推广就绪度。该脚本通过后，才视为客户现场具备正式推广上线条件；任一失败项都应先完成配置或补验收。
 
 发布机制与 DataFusionX 对齐：源码 `main` 分支只触发快速 CI 和版本记录，不自动发布商业包；推送 `release/**` 分支生成 RC 候选商业镜像和部署包，但不默认同步 Public-Releases；推送正式 `vX.Y.Z` 标签生成最终商业交付包并同步到 `Lynn-Lee/Public-Releases/products/sagittadb/`。手动触发商业发布时默认只生成临时包，只有显式勾选发布才同步公开发布仓库。
 

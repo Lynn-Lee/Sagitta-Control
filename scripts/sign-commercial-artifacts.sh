@@ -29,12 +29,15 @@ cosign_args=(--timeout "${COSIGN_TIMEOUT}")
 if [[ -n "${COSIGN_KEY:-}" ]]; then
   cosign_args+=(--key "${COSIGN_KEY}")
 fi
+if [[ "${COSIGN_USE_SIGNING_CONFIG:-false}" != "true" ]]; then
+  cosign_args+=(--use-signing-config=false)
+fi
 
 "${PYTHON_BIN}" tools/sign_manifest.py \
   --root backend \
   --version "${VERSION}" \
   --out "${MANIFEST_OUT}" \
-  app
+  app alembic.ini
 
 cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-backend:${VERSION}"
 cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-frontend:${VERSION}"
@@ -47,7 +50,7 @@ for component in backend frontend; do
   fi
   image="${IMAGE_REPOSITORY}-${component}:${VERSION}"
   cosign sign-blob --yes "${cosign_args[@]}" --bundle "${sbom}.bundle" "${sbom}"
-  cosign attest --yes "${cosign_args[@]}" --type cyclonedx --predicate "${sbom}" "${image}"
+  cosign attest --yes "${cosign_args[@]}" --new-bundle-format=false --type cyclonedx --predicate "${sbom}" "${image}"
 done
 
 "${PYTHON_BIN}" - <<'PY' "${PACKAGE_ZIP}"

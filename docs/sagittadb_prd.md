@@ -1,7 +1,7 @@
 # SagittaDB 矢准数据产品设计文档
 
-> 文档版本：v2.1
-> 适用版本：SagittaDB v2.1 商业部署版 + v2-lite 授权体系
+> 文档版本：v2.2
+> 适用版本：SagittaDB v2.2 商业部署版 + v2-lite 授权体系
 > 目标读者：客户决策人、售前、产品经理、实施工程师、DBA、研发负责人、审计负责人
 
 ## 1. 产品定位
@@ -309,7 +309,7 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 运维管理手册。
 - 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
-当前商业部署版本为 `2.1.4`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
+当前商业部署版本为 `2.2.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
 
 v2.1 商业版重点补强 Oracle 可观测性：实时会话支持 RAC 实例号、OS 进程、module/action、client identifier、等待分类、阻塞实例、PGA 和 SQL child 信息；SQL 洞察新增 `oracle_sql_monitor`、`oracle_awr_sqlstat`、`oracle_cursor_cache` 来源，并按 SQL Monitor、AWR、游标缓存、当前会话顺序自动降级。Oracle 监控保持只读诊断边界，权限不足时返回 warning，不引入破坏性诊断动作。
 

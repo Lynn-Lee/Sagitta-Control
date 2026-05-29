@@ -1,7 +1,7 @@
 # SagittaDB 运维文档
 
-> 文档版本：v2.1
-> 适用版本：SagittaDB v2.1 商业部署版 + v2-lite 授权体系
+> 文档版本：v2.2
+> 适用版本：SagittaDB v2.2 商业部署版 + v2-lite 授权体系
 > 目标读者：运维工程师、DBA、DevOps、系统管理员
 
 ## 1. 运维范围
@@ -243,7 +243,7 @@ COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagittadb/backups bash depl
 ```bash
 bash deploy/update-prod.sh                  # 默认部署 origin/main
 bash deploy/update-prod.sh --ref origin/main
-bash deploy/update-prod.sh --ref v2.1.4
+bash deploy/update-prod.sh --ref v2.2.0
 bash deploy/update-prod.sh --ref <commit_sha>
 ```
 
@@ -439,9 +439,11 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 产品内 `商业交付` → `交付与支持` 页面已沉淀同类非破坏性验收能力，页面顶部会汇总推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、数据库类型分布和监控采集失败数；推广前待处理项可直接跳转到对应配置页，并区分阻塞项与建议补齐项。页面提供 `初始化试用环境`，可幂等创建商业试用资源组、用户组、标准审批流和样例审计记录；如已接入活跃实例，会补充 SQL 工单、查询权限申请、在线查询、归档作业和监控快照演示数据并自动生成验收报告。该流程不会伪造活跃实例或保存真实数据库密码，未接入实例时仍需按客户现场信息完成首个实例配置。页面会自检备份脚本、恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料；容器运行态如果无法直接访问宿主机交付目录，会使用随后端打包的 `commercial_delivery_manifest.json` 作为已验证发布清单兜底。建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。验收报告会输出 `可推广`、`需补配置` 或 `阻塞` 结论；诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
 
+客户现场进入正式推广或客户验收前，先在客户包目录执行 `./prepare-go-live-env.sh --customer-id <customer_id>` 生成生产随机密钥和稳定部署 ID，再完成正式 License、实例、治理、通知和验收报告配置。最后执行 `./go-live-check.sh --api-base-url http://<server>:8000 --frontend-url http://<server>/ --username <admin> --password '<password>'` 作为硬门禁；管理员启用 2FA 时改用 `--token <access_token>`。该脚本会把默认密钥、试用 License、客户 ID 不一致、无活跃实例、实施向导未完成、推广就绪度非 `ready`、监控采集失败和待处理项全部判为失败。
+
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `2.1.4`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.2.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

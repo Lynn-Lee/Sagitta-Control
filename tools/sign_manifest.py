@@ -57,12 +57,18 @@ def iter_files(root: Path, paths: list[str]) -> list[Path]:
         except ValueError as exc:
             raise SystemExit(f"path outside root: {item}") from exc
         if path.is_dir():
-            result.extend(sorted(p for p in path.rglob("*") if p.is_file()))
+            result.extend(sorted(p for p in path.rglob("*") if p.is_file() and not should_ignore(p, root)))
         elif path.is_file():
-            result.append(path)
+            if not should_ignore(path, root):
+                result.append(path)
         else:
             raise SystemExit(f"path not found: {item}")
     return sorted(set(result))
+
+
+def should_ignore(path: Path, root: Path) -> bool:
+    relative = path.relative_to(root)
+    return "__pycache__" in relative.parts or path.suffix in {".pyc", ".pyo"}
 
 
 def main() -> int:

@@ -16,6 +16,8 @@ from pathlib import Path
 PACKAGE_FILES = {
     "deploy/customer/docker-compose.yml": "docker-compose.yml",
     "deploy/customer/.env.example": ".env.example",
+    "deploy/customer/prepare-go-live-env.sh": "prepare-go-live-env.sh",
+    "deploy/customer/go-live-check.sh": "go-live-check.sh",
     "deploy/customer/upgrade.sh": "upgrade.sh",
     "deploy/customer/verify-license.sh": "verify-license.sh",
     "deploy/customer/LEGAL-NOTICE.md": "LEGAL-NOTICE.md",
@@ -43,7 +45,8 @@ CUSTOMER_README_TEMPLATE = """# SagittaDB Enterprise v__SAGITTADB_VERSION__
 
 ```bash
 cp .env.example .env
-# 编辑 .env，替换所有 CHANGE_ME 值。
+./prepare-go-live-env.sh --customer-id <customer_id>
+# 按现场信息确认 .env 中的 License、域名、端口和通知配置。
 docker compose pull
 docker compose up -d postgres redis
 docker compose run --rm backend alembic upgrade head
@@ -52,6 +55,18 @@ docker compose ps
 ```
 
 前端服务健康后，访问 `http://<server>/`。
+
+首次进入客户验收或正式推广前，必须执行严格上线门禁：
+
+```bash
+./go-live-check.sh \
+  --api-base-url http://<server>:8000 \
+  --frontend-url http://<server>/ \
+  --username <admin> \
+  --password '<password>'
+```
+
+该脚本要求生产密钥、正式 License、客户 ID、部署指纹、至少一个活跃实例、实施交付向导、验收报告、运行健康和推广就绪度全部通过。若管理员启用了 2FA，请改用 `--token <access_token>`。
 
 ## Kubernetes / Helm 部署
 
@@ -152,7 +167,7 @@ def copy_package_files(repo_root: Path, package_dir: Path) -> None:
         shutil.copytree(repo_root / src, package_dir / dest)
     (package_dir / "README.md").write_text(CUSTOMER_README_TEMPLATE, encoding="utf-8")
 
-    for script in ("upgrade.sh", "verify-license.sh"):
+    for script in ("prepare-go-live-env.sh", "go-live-check.sh", "upgrade.sh", "verify-license.sh"):
         path = package_dir / script
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

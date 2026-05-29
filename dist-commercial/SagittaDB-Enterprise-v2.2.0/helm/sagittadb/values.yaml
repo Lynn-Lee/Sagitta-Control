@@ -7,8 +7,8 @@ fullnameOverride: ""
 # ─── 镜像配置 ──────────────────────────────────────────────────────────────────
 image:
   registry: ghcr.io
-  repository: your-org/sagittadb
-  tag: "1.0.0"
+  repository: lynn-lee/sagittadb-backend
+  tag: "2.2.0"
   pullPolicy: IfNotPresent
 
 # ─── 后端（FastAPI）────────────────────────────────────────────────────────────
@@ -74,8 +74,8 @@ frontend:
   replicaCount: 2
   image:
     registry: ghcr.io
-    repository: your-org/sagittadb-frontend
-    tag: "1.0.0"
+    repository: lynn-lee/sagittadb-frontend
+    tag: "2.2.0"
     pullPolicy: IfNotPresent
   resources:
     requests:

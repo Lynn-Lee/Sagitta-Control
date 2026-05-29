@@ -1,0 +1,90 @@
+# ─── 生产环境覆盖值 ────────────────────────────────────────────────────────────
+# 用法: helm upgrade --install sagittadb ./sagittadb \
+#         -f values-prod.yaml \
+#         --set app.secretKey=$SECRET_KEY \
+#         --set app.fernetKey=$FERNET_KEY \
+#         --set externalDatabase.password=$DB_PASSWORD \
+#         --set externalRedis.password=$REDIS_PASSWORD
+
+app:
+  env: production
+  debug: false
+  logLevel: WARNING
+  accessTokenExpireMinutes: 30
+  refreshTokenExpireDays: 3
+
+backend:
+  replicaCount: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 60
+
+celeryWorker:
+  replicaCount: 3
+  concurrency: 8
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  replicaCount: 2
+
+# 生产环境使用托管数据库（RDS / Cloud SQL）
+postgresql:
+  enabled: false
+
+externalDatabase:
+  host: "sagittadb-prod.cluster-xxxxx.ap-southeast-1.rds.amazonaws.com"
+  port: 5432
+  database: sagittadb
+  username: sagitta
+  # password：通过 --set 或 sealed-secret 设置
+
+# 生产环境使用 ElastiCache / Cloud Redis
+redis:
+  enabled: false
+
+externalRedis:
+  host: "sagittadb-prod.xxxxx.0001.apse1.cache.amazonaws.com"
+  port: 6379
+  db: 0
+  # password：通过 --set 或 sealed-secret 设置
+
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: sagittadb.yourdomain.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend: backend
+        - path: /
+          pathType: Prefix
+          backend: frontend
+  tls:
+    - secretName: sagittadb-prod-tls
+      hosts:
+        - sagittadb.yourdomain.com
+
+persistence:
+  storageClass: "gp3"
+  size: 50Gi
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [sagittadb]
+          topologyKey: kubernetes.io/hostname
