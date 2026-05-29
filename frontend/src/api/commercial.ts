@@ -25,6 +25,16 @@ export type AcceptanceRun = {
   completed_at?: string | null
 }
 
+export type TrialBootstrapResult = {
+  status: string
+  created: string[]
+  updated: string[]
+  skipped: string[]
+  acceptance_run?: AcceptanceRun | null
+  onboarding: OnboardingStatus
+  readiness: SupportAbout['readiness']
+}
+
 export type AlertEvent = {
   id: number
   instance_id: number
@@ -98,6 +108,7 @@ export type SupportAbout = {
 export const commercialApi = {
   onboardingStatus: () => apiClient.get<OnboardingStatus>('/system/onboarding/status').then(r => r.data),
   completeStep: (step: string) => apiClient.post<OnboardingStatus>(`/system/onboarding/steps/${step}/complete`).then(r => r.data),
+  bootstrapTrial: () => apiClient.post<TrialBootstrapResult>('/system/onboarding/trial-bootstrap').then(r => r.data),
   createAcceptanceRun: (data: { instance_id?: number | null; db_name?: string }) =>
     apiClient.post<AcceptanceRun>('/system/delivery/acceptance-runs', data).then(r => r.data),
   createDiagnosticBundle: () =>

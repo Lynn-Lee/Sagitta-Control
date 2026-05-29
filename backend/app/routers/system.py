@@ -1103,6 +1103,26 @@ async def complete_onboarding_step(
     return data
 
 
+@router.post("/onboarding/trial-bootstrap", summary="一键初始化商业试用环境")
+async def bootstrap_trial_environment(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_perm("system_config_manage")),
+):
+    result = await CommercialOpsService.bootstrap_trial_environment(db, user)
+    created_count = len(result.get("created") or [])
+    updated_count = len(result.get("updated") or [])
+    await AuditLogService.write(
+        db,
+        user,
+        action="bootstrap_trial_environment",
+        module="delivery",
+        detail=f"初始化商业试用环境：新增 {created_count} 项，更新 {updated_count} 项",
+        request=request,
+    )
+    return result
+
+
 @router.post("/delivery/acceptance-runs", summary="创建商业交付验收报告")
 async def create_acceptance_run(
     data: AcceptanceRunRequest,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
@@ -15,12 +15,12 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.approval_flow import ApprovalFlow
-from app.models.archive import ArchiveJob
+from app.models.approval_flow import ApprovalFlow, ApprovalFlowNode
+from app.models.archive import ArchiveJob, ArchiveJobStatus
 from app.models.instance import Instance, InstanceDatabase
 from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
 from app.models.query import QueryLog, QueryPrivilege, QueryPrivilegeApply
-from app.models.role import UserGroup
+from app.models.role import UserGroup, group_resource_group, user_group_member
 from app.models.system import (
     DeliveryAcceptanceRun,
     DiagnosticBundle,
@@ -28,16 +28,21 @@ from app.models.system import (
     OperationLog,
     SystemConfig,
 )
-from app.models.user import ResourceGroup, Users
-from app.models.workflow import SqlWorkflow
+from app.models.user import ResourceGroup, Users, instance_resource_group
+from app.models.workflow import SqlWorkflow, SqlWorkflowContent, WorkflowStatus
 from app.services.license import (
     LICENSE_PROJECT_CODE,
     LICENSE_PROJECT_NAME,
     LicenseService,
 )
+from app.services.role import RoleService
 from app.services.system_config import SystemConfigService
 
 COMMERCIAL_VERSION = "2.1.4"
+DEMO_RESOURCE_GROUP_NAME = "commercial_trial_rg"
+DEMO_USER_GROUP_NAME = "commercial_trial_team"
+DEMO_APPROVAL_FLOW_NAME = "商业试用标准审批流"
+DEMO_MARKER = "commercial_trial_bootstrap"
 
 ONBOARDING_STEPS = [
     {"key": "branding", "label": "品牌配置", "path": "/system/config"},
@@ -734,6 +739,487 @@ class CommercialOpsService:
             )
         await db.commit()
         return await CommercialOpsService.onboarding_status(db)
+
+    @staticmethod
+    async def _ensure_system_config(
+        db: AsyncSession,
+        key: str,
+        value: str,
+        description: str,
+        group: str = "basic",
+    ) -> tuple[bool, str]:
+        item = (
+            await db.execute(select(SystemConfig).where(SystemConfig.config_key == key))
+        ).scalar_one_or_none()
+        if item:
+            if str(item.config_value or "").strip():
+                return False, f"{key} 已存在，未覆盖"
+            item.config_value = value
+            item.is_encrypted = False
+            item.description = item.description or description
+            item.group = item.group or group
+            return True, f"{key} 已补齐"
+        db.add(
+            SystemConfig(
+                config_key=key,
+                config_value=value,
+                is_encrypted=False,
+                description=description,
+                group=group,
+            )
+        )
+        return True, f"{key} 已创建"
+
+    @staticmethod
+    async def _association_exists(db: AsyncSession, table: Any, **values: int) -> bool:
+        stmt = select(table)
+        for key, value in values.items():
+            stmt = stmt.where(getattr(table.c, key) == value)
+        return (await db.execute(stmt.limit(1))).first() is not None
+
+    @staticmethod
+    async def _first_active_instance(db: AsyncSession) -> Instance | None:
+        return (
+            await db.execute(
+                select(Instance)
+                .where(Instance.is_active.is_(True))
+                .order_by(Instance.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    @staticmethod
+    async def _first_actor(db: AsyncSession, user: dict[str, Any]) -> Users | None:
+        user_id = user.get("id")
+        if user_id:
+            actor = (
+                await db.execute(select(Users).where(Users.id == int(user_id)))
+            ).scalar_one_or_none()
+            if actor:
+                return actor
+        username = str(user.get("username") or "")
+        if username:
+            actor = (
+                await db.execute(select(Users).where(Users.username == username))
+            ).scalar_one_or_none()
+            if actor:
+                return actor
+        return (
+            await db.execute(
+                select(Users)
+                .where(Users.is_active.is_(True))
+                .order_by(Users.is_superuser.desc(), Users.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    @staticmethod
+    async def bootstrap_trial_environment(db: AsyncSession, user: dict[str, Any]) -> dict[str, Any]:
+        """幂等初始化商业试用/演示环境。
+
+        该流程只创建治理模板和可解释的样例记录；不会伪造活跃数据库实例或写入真实密码。
+        如果客户现场已经接入活跃实例，则补充基于该实例的演示链路数据。
+        """
+
+        created: list[str] = []
+        updated: list[str] = []
+        skipped: list[str] = []
+
+        def record(changed: bool, detail: str) -> None:
+            (updated if changed else skipped).append(detail)
+
+        await RoleService.init_builtin_roles(db)
+        skipped.append("内置角色和权限码已确认")
+
+        actor = await CommercialOpsService._first_actor(db, user)
+        actor_id = actor.id if actor else int(user.get("id") or 0)
+        actor_username = (actor.username if actor else str(user.get("username") or "admin")) or "admin"
+        actor_display = (actor.display_name if actor else actor_username) or actor_username
+
+        changed, detail = await CommercialOpsService._ensure_system_config(
+            db,
+            "platform_name",
+            "SagittaDB",
+            "平台名称",
+        )
+        record(changed, detail)
+
+        rg = (
+            await db.execute(
+                select(ResourceGroup).where(ResourceGroup.group_name == DEMO_RESOURCE_GROUP_NAME)
+            )
+        ).scalar_one_or_none()
+        if not rg:
+            rg = ResourceGroup(
+                group_name=DEMO_RESOURCE_GROUP_NAME,
+                group_name_cn="商业试用资源组",
+                is_active=True,
+            )
+            db.add(rg)
+            await db.flush()
+            created.append("商业试用资源组")
+        elif not rg.is_active:
+            rg.is_active = True
+            updated.append("商业试用资源组已重新启用")
+        else:
+            skipped.append("商业试用资源组已存在")
+
+        ug = (
+            await db.execute(select(UserGroup).where(UserGroup.name == DEMO_USER_GROUP_NAME))
+        ).scalar_one_or_none()
+        if not ug:
+            ug = UserGroup(
+                name=DEMO_USER_GROUP_NAME,
+                name_cn="商业试用团队",
+                description="用于商业试用、销售演示和客户现场验收的默认团队",
+                leader_id=actor_id or None,
+                is_active=True,
+            )
+            db.add(ug)
+            await db.flush()
+            created.append("商业试用团队")
+        else:
+            changed_ug = False
+            if not ug.is_active:
+                ug.is_active = True
+                changed_ug = True
+            if actor_id and not ug.leader_id:
+                ug.leader_id = actor_id
+                changed_ug = True
+            (updated if changed_ug else skipped).append(
+                "商业试用团队已更新" if changed_ug else "商业试用团队已存在"
+            )
+
+        if not await CommercialOpsService._association_exists(
+            db,
+            group_resource_group,
+            group_id=ug.id,
+            resource_group_id=rg.id,
+        ):
+            await db.execute(
+                group_resource_group.insert().values(group_id=ug.id, resource_group_id=rg.id)
+            )
+            created.append("商业试用团队已关联资源组")
+        else:
+            skipped.append("商业试用团队资源范围已存在")
+
+        if actor_id and not await CommercialOpsService._association_exists(
+            db,
+            user_group_member,
+            user_id=actor_id,
+            group_id=ug.id,
+        ):
+            await db.execute(user_group_member.insert().values(user_id=actor_id, group_id=ug.id))
+            created.append("当前管理员已加入商业试用团队")
+        elif actor_id:
+            skipped.append("当前管理员已在商业试用团队")
+
+        flow = (
+            await db.execute(
+                select(ApprovalFlow)
+                .where(ApprovalFlow.name == DEMO_APPROVAL_FLOW_NAME)
+                .order_by(ApprovalFlow.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if not flow:
+            flow = ApprovalFlow(
+                name=DEMO_APPROVAL_FLOW_NAME,
+                description="商业试用默认审批流：任一具备 SQL 审核权限的人员可处理",
+                is_active=True,
+                created_by=actor_username,
+                created_by_id=actor_id or None,
+            )
+            db.add(flow)
+            await db.flush()
+            db.add(
+                ApprovalFlowNode(
+                    flow_id=flow.id,
+                    order=1,
+                    node_name="DBA 审核",
+                    approver_type="any_reviewer",
+                    approver_ids="[]",
+                )
+            )
+            created.append("商业试用标准审批流")
+        elif not flow.is_active:
+            flow.is_active = True
+            updated.append("商业试用标准审批流已重新启用")
+        else:
+            skipped.append("商业试用标准审批流已存在")
+
+        instance = await CommercialOpsService._first_active_instance(db)
+        db_name = (instance.db_name if instance and instance.db_name else "demo") if instance else ""
+        if instance:
+            if not await CommercialOpsService._association_exists(
+                db,
+                instance_resource_group,
+                instance_id=instance.id,
+                resource_group_id=rg.id,
+            ):
+                await db.execute(
+                    instance_resource_group.insert().values(
+                        instance_id=instance.id,
+                        resource_group_id=rg.id,
+                    )
+                )
+                created.append(f"实例 {instance.instance_name} 已关联商业试用资源组")
+            else:
+                skipped.append(f"实例 {instance.instance_name} 已在商业试用资源组")
+
+            if not (
+                await db.execute(
+                    select(SqlWorkflow)
+                    .where(
+                        SqlWorkflow.workflow_name == "商业试用 SQL 上线演示",
+                        SqlWorkflow.engineer == actor_username,
+                    )
+                    .order_by(SqlWorkflow.id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none():
+                workflow = SqlWorkflow(
+                    workflow_name="商业试用 SQL 上线演示",
+                    group_id=rg.id,
+                    group_name=rg.group_name_cn or rg.group_name,
+                    instance_id=instance.id,
+                    db_name=db_name,
+                    syntax_type=2,
+                    is_backup=True,
+                    engineer=actor_username,
+                    engineer_display=actor_display,
+                    engineer_id=actor_id,
+                    status=WorkflowStatus.PENDING_REVIEW,
+                    flow_id=flow.id,
+                    audit_auth_groups=str(flow.id),
+                )
+                db.add(workflow)
+                await db.flush()
+                db.add(
+                    SqlWorkflowContent(
+                        workflow_id=workflow.id,
+                        sql_content="UPDATE orders SET status = 'ARCHIVED' WHERE created_at < '2025-01-01';",
+                        review_content=json.dumps(
+                            {"source": DEMO_MARKER, "risk_level": "medium"},
+                            ensure_ascii=False,
+                        ),
+                        risk_plan=json.dumps(
+                            {"rollback": "使用备份表或 binlog 恢复受影响订单状态"},
+                            ensure_ascii=False,
+                        ),
+                        risk_remark="商业试用样例，不会自动执行。",
+                    )
+                )
+                created.append("SQL 工单演示记录")
+            else:
+                skipped.append("SQL 工单演示记录已存在")
+
+            if not (
+                await db.execute(
+                    select(QueryPrivilegeApply)
+                    .where(
+                        QueryPrivilegeApply.title == "商业试用查询权限申请",
+                        QueryPrivilegeApply.user_id == actor_id,
+                    )
+                    .order_by(QueryPrivilegeApply.id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none():
+                db.add(
+                    QueryPrivilegeApply(
+                        title="商业试用查询权限申请",
+                        user_id=actor_id,
+                        instance_id=instance.id,
+                        resource_group_id=rg.id,
+                        group_id=rg.id,
+                        scope_type="database",
+                        db_name=db_name,
+                        valid_date=date.today() + timedelta(days=30),
+                        limit_num=100,
+                        apply_reason="商业试用演示：研发申请临时查询订单库。",
+                        risk_level="low",
+                        risk_summary="只读查询，限制返回行数。",
+                        status=0,
+                        audit_auth_groups=str(flow.id),
+                        flow_id=flow.id,
+                    )
+                )
+                created.append("查询权限申请演示记录")
+            else:
+                skipped.append("查询权限申请演示记录已存在")
+
+            if not (
+                await db.execute(
+                    select(QueryLog)
+                    .where(
+                        QueryLog.username == actor_username,
+                        QueryLog.sqllog == "SELECT id, status FROM orders LIMIT 20;",
+                    )
+                    .order_by(QueryLog.id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none():
+                db.add(
+                    QueryLog(
+                        user_id=actor_id,
+                        instance_id=instance.id,
+                        db_name=db_name,
+                        sqllog="SELECT id, status FROM orders LIMIT 20;",
+                        operation_type="execute",
+                        username=actor_username,
+                        instance_name=instance.instance_name,
+                        db_type=instance.db_type,
+                        client_ip="127.0.0.1",
+                        effect_row=20,
+                        cost_time_ms=86,
+                        priv_check=True,
+                    )
+                )
+                created.append("在线查询演示记录")
+            else:
+                skipped.append("在线查询演示记录已存在")
+
+            if not (
+                await db.execute(
+                    select(ArchiveJob)
+                    .where(
+                        ArchiveJob.source_instance_id == instance.id,
+                        ArchiveJob.source_table == "orders",
+                        ArchiveJob.created_by == actor_username,
+                    )
+                    .order_by(ArchiveJob.id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none():
+                db.add(
+                    ArchiveJob(
+                        status=ArchiveJobStatus.PENDING_REVIEW,
+                        archive_mode="purge",
+                        source_instance_id=instance.id,
+                        source_db=db_name,
+                        source_table="orders",
+                        condition="created_at < '2025-01-01'",
+                        batch_size=1000,
+                        estimated_rows=12000,
+                        apply_reason="商业试用演示：历史订单归档清理。",
+                        risk_plan=json.dumps(
+                            {"backup": "执行前导出影响范围，保留 7 天恢复窗口"},
+                            ensure_ascii=False,
+                        ),
+                        risk_level="medium",
+                        risk_summary="批量归档需确认业务低峰期和备份策略。",
+                        created_by=actor_username,
+                        created_by_id=actor_id,
+                    )
+                )
+                created.append("归档作业演示记录")
+            else:
+                skipped.append("归档作业演示记录已存在")
+
+            if not (
+                await db.execute(
+                    select(MonitorMetricSnapshot)
+                    .where(
+                        MonitorMetricSnapshot.instance_id == instance.id,
+                        MonitorMetricSnapshot.version == "commercial-demo",
+                    )
+                    .order_by(MonitorMetricSnapshot.id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none():
+                db.add(
+                    MonitorMetricSnapshot(
+                        instance_id=instance.id,
+                        collected_at=_now(),
+                        status="success",
+                        is_up=True,
+                        version="commercial-demo",
+                        uptime_seconds=86400,
+                        current_connections=18,
+                        active_sessions=3,
+                        max_connections=500,
+                        connection_usage=0.036,
+                        qps=128.5,
+                        tps=42.0,
+                        slow_queries=2,
+                        error_count=0,
+                        lock_waits=1,
+                        total_size_bytes=32 * 1024 * 1024 * 1024,
+                        extra_metrics={"source": DEMO_MARKER},
+                    )
+                )
+                created.append("监控指标演示快照")
+            else:
+                skipped.append("监控指标演示快照已存在")
+        else:
+            skipped.append("未发现活跃实例，已跳过实例链路演示数据")
+
+        if not (
+            await db.execute(
+                select(OperationLog)
+                .where(
+                    OperationLog.action == "commercial_trial_bootstrap_sample",
+                    OperationLog.username == actor_username,
+                )
+                .order_by(OperationLog.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none():
+            db.add(
+                OperationLog(
+                    user_id=actor_id,
+                    username=actor_username,
+                    action="commercial_trial_bootstrap_sample",
+                    module="delivery",
+                    detail="商业试用环境初始化样例审计记录",
+                    result="success",
+                )
+            )
+            created.append("审计演示记录")
+        else:
+            skipped.append("审计演示记录已存在")
+
+        await db.commit()
+
+        existing_runs = (
+            await db.execute(
+                select(DeliveryAcceptanceRun)
+                .where(DeliveryAcceptanceRun.created_by == actor_username)
+                .order_by(DeliveryAcceptanceRun.id.desc())
+                .limit(20)
+            )
+        ).scalars().all()
+        run = next(
+            (
+                item
+                for item in existing_runs
+                if (item.options or {}).get("source") == DEMO_MARKER
+            ),
+            None,
+        )
+        if not run:
+            run = await CommercialOpsService.create_acceptance_run(
+                db,
+                user,
+                {
+                    "source": DEMO_MARKER,
+                    "instance_id": instance.id if instance else None,
+                    "db_name": db_name,
+                },
+            )
+            created.append("商业试用验收报告")
+        else:
+            skipped.append("商业试用验收报告已存在")
+
+        return {
+            "status": "success",
+            "created": created,
+            "updated": updated,
+            "skipped": skipped,
+            "acceptance_run": CommercialOpsService.run_to_dict(run),
+            "onboarding": await CommercialOpsService.onboarding_status(db),
+            "readiness": await CommercialOpsService.commercial_readiness(db),
+        }
 
     @staticmethod
     async def create_acceptance_run(

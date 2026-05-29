@@ -34,6 +34,7 @@ import {
   PauseCircleOutlined,
   RightOutlined,
   ReloadOutlined,
+  RocketOutlined,
   SafetyCertificateOutlined,
   SaveOutlined,
   SettingOutlined,
@@ -84,6 +85,8 @@ export default function CommercialOpsPage() {
   const [alerts, setAlerts] = useState<AlertEvent[]>([])
   const [activeTab, setActiveTab] = useState('onboarding')
   const [loading, setLoading] = useState(false)
+  const [bootstrapping, setBootstrapping] = useState(false)
+  const [bootstrapResult, setBootstrapResult] = useState<{ created: string[]; updated: string[]; skipped: string[] } | null>(null)
   const [form] = Form.useForm()
   const [retentionForm] = Form.useForm()
   const deliveryActionsRef = useRef<HTMLDivElement>(null)
@@ -122,6 +125,26 @@ export default function CommercialOpsPage() {
     setAcceptanceRunId(run.id)
     message.success('验收报告已生成')
     await loadAll()
+  }
+
+  const bootstrapTrial = async () => {
+    setBootstrapping(true)
+    try {
+      const result = await commercialApi.bootstrapTrial()
+      setBootstrapResult({
+        created: result.created || [],
+        updated: result.updated || [],
+        skipped: result.skipped || [],
+      })
+      setOnboarding(result.onboarding)
+      if (result.acceptance_run?.id) {
+        setAcceptanceRunId(result.acceptance_run.id)
+      }
+      message.success('商业试用环境已初始化')
+      await loadAll()
+    } finally {
+      setBootstrapping(false)
+    }
   }
 
   const createDiagnostic = async () => {
@@ -317,7 +340,24 @@ export default function CommercialOpsPage() {
                   <Card>
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <Text strong>实施进度</Text>
-                      <Progress percent={onboarding ? Math.round((onboarding.completed_count / onboarding.total) * 100) : 0} />
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Progress style={{ flex: 1 }} percent={onboarding ? Math.round((onboarding.completed_count / onboarding.total) * 100) : 0} />
+                        <Button type="primary" icon={<RocketOutlined />} loading={bootstrapping} onClick={bootstrapTrial}>初始化试用环境</Button>
+                      </Space>
+                      {bootstrapResult && (
+                        <Alert
+                          type="success"
+                          showIcon
+                          message="试用环境初始化完成"
+                          description={
+                            <Space direction="vertical" size={4}>
+                              <Text>新增 {bootstrapResult.created.length} 项，更新 {bootstrapResult.updated.length} 项，跳过 {bootstrapResult.skipped.length} 项。</Text>
+                              {!!bootstrapResult.created.length && <Text type="secondary">新增：{bootstrapResult.created.slice(0, 6).join('、')}</Text>}
+                              {!!bootstrapResult.skipped.length && <Text type="secondary">跳过：{bootstrapResult.skipped.slice(0, 6).join('、')}</Text>}
+                            </Space>
+                          }
+                        />
+                      )}
                       <Row gutter={[12, 12]}>
                         {(onboarding?.steps || []).map(step => (
                           <Col xs={24} md={8} key={step.key}>
