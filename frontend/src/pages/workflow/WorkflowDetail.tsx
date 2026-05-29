@@ -139,7 +139,7 @@ export default function WorkflowDetail() {
           <Space wrap>
           {wf.can_audit && <>
             {isHighRisk && (
-              <Text type="danger" style={{ fontSize: 12 }}>
+              <Text type="danger">
                 高风险申请，请先查看风险预案
               </Text>
             )}
@@ -187,7 +187,7 @@ export default function WorkflowDetail() {
           <Descriptions.Item label="提交人">{wf.engineer_display || wf.engineer}</Descriptions.Item>
           <Descriptions.Item label="目标实例">
             <Space size={4}>
-              <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>ID:{wf.instance_id}</Text>
+              <Text style={{ fontFamily: 'monospace' }}>ID:{wf.instance_id}</Text>
               {wf.instance_name && <Tag color="blue">{wf.instance_name}</Tag>}
             </Space>
           </Descriptions.Item>

@@ -386,11 +386,11 @@ export default function WorkflowSubmit() {
                   showSearch
                   popupMatchSelectWidth={false}
                   optionFilterProp="children"
-                  notFoundContent={<Text type="secondary" style={{fontSize:12}}>暂无数据库，请在实例管理→数据库管理中添加</Text>}
+                  notFoundContent={<Text type="secondary">暂无数据库，请在实例管理→数据库管理中添加</Text>}
                 >
 {dbItems.map((d) => (
                     <Option key={d.db_name} value={d.db_name} title={d.db_name}>
-                      {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}{d.remark ? <Text type="secondary" style={{fontSize:11}}> ({d.remark})</Text> : ''}
+                      {d.db_name}{!d.is_active && <Tag color="default" style={{ marginLeft: 4}}>已禁用</Tag>}{d.remark ? <Text type="secondary"> ({d.remark})</Text> : ''}
                     </Option>
                   ))}
               </Select>
@@ -440,10 +440,10 @@ export default function WorkflowSubmit() {
       <SectionCard title="SQL 内容" bodyPadding={0}
         extra={
           <Space wrap>
-            <Button size="small" icon={<RobotOutlined />} onClick={() => setAiModalOpen(true)}>
+            <Button icon={<RobotOutlined />} onClick={() => setAiModalOpen(true)}>
               AI 生成 SQL
             </Button>
-            <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<CheckCircleOutlined />} loading={checking} onClick={handleCheck}>SQL 预检查</Button>
+            <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<CheckCircleOutlined />} loading={checking} onClick={handleCheck}>SQL 预检查</Button>
           </Space>
         }>
         <Editor height="300px" defaultLanguage="sql" value={sql}
@@ -545,7 +545,7 @@ export default function WorkflowSubmit() {
               {selectedTemplate ? (
                 <Space direction="vertical" size={14} style={{ width: '100%' }}>
                   <Space wrap>
-                    <Text strong style={{ fontSize: 16 }}>{selectedTemplate.template_name}</Text>
+                    <Text strong>{selectedTemplate.template_name}</Text>
                     <Tag color={selectedTemplate.is_active ? 'success' : 'default'}>
                       {selectedTemplate.is_active ? '启用' : '停用'}
                     </Tag>

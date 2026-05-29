@@ -421,10 +421,10 @@ const UserGroupManagement: React.FC = () => {
       title: '操作', width: 160,
       render: (_: any, record: any) => (
         <Space>
-          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => void openEdit(record.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => void openEdit(record.id)}>
             编辑
           </Button>
-          <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteMut.mutate(record.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />} onClick={() => deleteMut.mutate(record.id)}>
             删除
           </Button>
         </Space>
@@ -772,19 +772,19 @@ const UserGroupManagement: React.FC = () => {
         <Space size={12} wrap style={{ display: 'flex', marginBottom: 16 }}>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">总行数</Text>
-            <div><Text strong style={{ fontSize: 20 }}>{importResult?.total ?? 0}</Text></div>
+            <div><Text strong>{importResult?.total ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">新增</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#1677ff' }}>{importResult?.created ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#1677ff' }}>{importResult?.created ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">更新</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">失败</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#ff4d4f' }}>{importResult?.failed ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#ff4d4f' }}>{importResult?.failed ?? 0}</Text></div>
           </Card>
         </Space>
         {importResult?.failed ? (

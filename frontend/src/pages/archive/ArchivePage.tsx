@@ -366,7 +366,7 @@ export default function ArchivePage() {
       dataIndex: 'id',
       width: 120,
       render: (_: number, job: ArchiveJob) => (
-        <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openJob(job)}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openJob(job)}>
           #{displayJobNo(job)}
         </Button>
       ),
@@ -405,26 +405,25 @@ export default function ArchivePage() {
       render: (_: unknown, job: ArchiveJob) => (
         <Space direction="vertical" size={6}>
           {job.status === 'pending_review' && job.risk_level === 'high' && !job.can_audit && (
-            <Text type="danger" style={{ fontSize: 12 }}>高风险待审批</Text>
+            <Text type="danger">高风险待审批</Text>
           )}
           <Space size={4} wrap>
-            <Button size="small" icon={<EyeOutlined />} onClick={() => openJob(job)}>查看详情</Button>
+            <Button icon={<EyeOutlined />} onClick={() => openJob(job)}>查看详情</Button>
             {job.can_audit && (
-              <Button size="small" type="primary" danger={job.risk_level === 'high'} icon={<CheckOutlined />} onClick={() => openJob(job, 'approval')}>
+              <Button type="primary" danger={job.risk_level === 'high'} icon={<CheckOutlined />} onClick={() => openJob(job, 'approval')}>
                 审批处理
               </Button>
             )}
             {job.workflow_id && (
               <Link to={`/workflow/${job.workflow_id}`}>
-                <Button size="small" icon={<FileTextOutlined />}>查看工单</Button>
+                <Button icon={<FileTextOutlined />}>查看工单</Button>
               </Link>
             )}
-            {canStart(job) && <Button size="small" type="primary" icon={<PlayCircleOutlined />} loading={actionMut.isPending} onClick={() => openExecuteModal(job)}>执行处理</Button>}
-            {canPause(job) && <Button size="small" icon={<PauseCircleOutlined />} loading={actionMut.isPending} onClick={() => actionMut.mutate({ id: job.id, action: 'pause' })}>暂停</Button>}
-            {canResume(job) && <Button size="small" icon={<CaretRightOutlined />} loading={actionMut.isPending} onClick={() => actionMut.mutate({ id: job.id, action: 'resume' })}>继续</Button>}
+            {canStart(job) && <Button type="primary" icon={<PlayCircleOutlined />} loading={actionMut.isPending} onClick={() => openExecuteModal(job)}>执行处理</Button>}
+            {canPause(job) && <Button icon={<PauseCircleOutlined />} loading={actionMut.isPending} onClick={() => actionMut.mutate({ id: job.id, action: 'pause' })}>暂停</Button>}
+            {canResume(job) && <Button icon={<CaretRightOutlined />} loading={actionMut.isPending} onClick={() => actionMut.mutate({ id: job.id, action: 'resume' })}>继续</Button>}
             {canCancelApplication(job) && (
               <Button
-                size="small"
                 className="sagitta-action-btn sagitta-action-btn--danger"
                 danger
                 icon={<StopOutlined />}
@@ -446,7 +445,6 @@ export default function ArchivePage() {
             )}
             {canCancelJobControl(job) && (
               <Button
-                size="small"
                 className="sagitta-action-btn sagitta-action-btn--danger"
                 danger
                 icon={<StopOutlined />}
@@ -559,7 +557,7 @@ export default function ArchivePage() {
                         </Col>
                         <Col xs={24} md={12}>
                           <Form.Item name="source_table" label="源表" rules={[{ required: true }]}>
-                            <Input placeholder="order_logs" />
+                            <Input placeholder="如：order_logs" />
                           </Form.Item>
                         </Col>
                       </Row>

@@ -276,7 +276,7 @@ export default function WorkflowTemplatePage() {
         return (
           <Space direction="vertical" size={0}>
             <Text>{instance ? instance.instance_name : '不指定实例'}</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary">
               {record.db_name || '不指定数据库'}
               {instance ? ` · ${formatDbTypeLabel(instance.db_type)}` : ''}
             </Text>
@@ -306,7 +306,6 @@ export default function WorkflowTemplatePage() {
             code
             style={{
               display: 'block',
-              fontSize: 12,
               color: '#1558A8',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -346,20 +345,20 @@ export default function WorkflowTemplatePage() {
       fixed: 'right' as const,
       render: (_: unknown, record: WorkflowTemplateItem) => (
         <Space size={4} wrap>
-          <Button size="small" type="primary" icon={<CopyOutlined />} onClick={() => handleUseTemplate(record)}>
+          <Button type="primary" icon={<CopyOutlined />} onClick={() => handleUseTemplate(record)}>
             使用
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => { setPreviewData(record); setPreviewOpen(true) }}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => { setPreviewData(record); setPreviewOpen(true) }}>
             预览
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => cloneMut.mutate(record.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => cloneMut.mutate(record.id)}>
             复制
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(record)}>
             编辑
           </Button>
           <Popconfirm title="确认删除此模板？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(record.id)}>
-            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>

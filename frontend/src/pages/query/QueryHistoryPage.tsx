@@ -112,7 +112,7 @@ export default function QueryHistoryPage() {
       render: (_: unknown, row: QueryLogItem) => (
         <Space direction="vertical" size={0}>
           <Text strong ellipsis style={{ maxWidth: 190 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             {formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}
           </Text>
         </Space>
@@ -155,7 +155,7 @@ export default function QueryHistoryPage() {
       title: 'IP',
       dataIndex: 'client_ip',
       width: 130,
-      render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v || '—'}</Text>,
+      render: (v: string) => <Text type="secondary">{v || '—'}</Text>,
     },
     {
       title: '结果',
@@ -170,13 +170,12 @@ export default function QueryHistoryPage() {
       width: 260,
       render: (_: unknown, row: QueryLogItem) => (
         <Space size={4}>
-          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} size="small" onClick={() => setSqlDetail(row)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => setSqlDetail(row)}>
             查看
           </Button>
           <Button
             className="sagitta-action-btn sagitta-action-btn--copy"
             icon={<CopyOutlined />}
-            size="small"
             onClick={async () => {
               await navigator.clipboard.writeText(row.sqllog)
               msgApi.success('SQL 已复制')
@@ -187,7 +186,6 @@ export default function QueryHistoryPage() {
           <Button
             className="sagitta-action-btn sagitta-action-btn--neutral"
             icon={row.is_favorite ? <StarFilled /> : <StarOutlined />}
-            size="small"
             loading={favoriteMut.isPending}
             onClick={() => favoriteMut.mutate(row.id)}
           >

@@ -107,7 +107,7 @@ export default function DataDictPage() {
 
   const renderNoWrapText = (
     value?: string | number | null,
-    options?: { code?: boolean; placeholder?: string; fontSize?: number }
+    options?: { code?: boolean; placeholder?: string }
   ) => {
     const text = value === null || value === undefined || value === ''
       ? ''
@@ -118,12 +118,12 @@ export default function DataDictPage() {
 
     const content = options?.code
       ? (
-        <Text code style={{ fontSize: options?.fontSize || 12, whiteSpace: 'nowrap' }}>
+        <Text code style={{ whiteSpace: 'nowrap' }}>
           {text}
         </Text>
       )
       : (
-        <Text style={{ fontSize: options?.fontSize || 12, whiteSpace: 'nowrap' }}>
+        <Text style={{ whiteSpace: 'nowrap' }}>
           {text}
         </Text>
       )
@@ -173,7 +173,6 @@ export default function DataDictPage() {
         <TableOutlined style={{ color: '#1558A8' }} />
         <Tooltip title={t}>
           <Text style={{
-            fontSize: 13,
             display: 'inline-block',
             maxWidth: 180,
             overflow: 'hidden',
@@ -286,8 +285,8 @@ export default function DataDictPage() {
       }},
     { title: '默认值', dataIndex: 'column_default', key: 'column_default', width: 180, ellipsis: true,
       render: (v: any) => v !== null && v !== undefined && v !== ''
-        ? renderNoWrapText(String(v), { code: true, fontSize: 11 })
-        : <Text type="secondary" style={{ fontSize: 11 }}>NULL</Text> },
+        ? renderNoWrapText(String(v), { code: true })
+        : <Text type="secondary">NULL</Text> },
     { title: '约束标记', dataIndex: 'badges', key: 'badges', width: 260,
       render: (badges: Array<{ key: string; label: string; color: string; icon?: 'key'; tooltip?: string }>) => (
         badges?.length ? (
@@ -419,7 +418,7 @@ export default function DataDictPage() {
             showSearch optionFilterProp="label">
             {instances?.items?.map((i: any) => (
               <Option key={i.id} value={i.id} label={i.instance_name} title={i.instance_name}>
-                <Tag color="blue" style={{ fontSize: 11 }}>{formatDbTypeLabel(i.db_type)}</Tag>
+                <Tag color="blue">{formatDbTypeLabel(i.db_type)}</Tag>
                 {i.instance_name}
               </Option>
             ))}
@@ -436,14 +435,14 @@ export default function DataDictPage() {
                 disabled={!dbItem.is_active && !canSelectDisabledDb}
               >
                 {dbItem.db_name}
-                {!dbItem.is_active && <Tag color="default" style={{ marginLeft: 4, fontSize: 10 }}>已禁用</Tag>}
-                {dbItem.remark ? <Text type="secondary" style={{ fontSize: 11 }}> ({dbItem.remark})</Text> : null}
+                {!dbItem.is_active && <Tag color="default" style={{ marginLeft: 4 }}>已禁用</Tag>}
+                {dbItem.remark ? <Text type="secondary"> ({dbItem.remark})</Text> : null}
               </Option>
             ))}
           </Select>
           {tableLoading && <Spin size="small" />}
           {tables.length > 0 && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary">
               共 {tables.length} 张表
               {tableKeyword.trim() && `，匹配 ${filteredTables.length} 张`}
               {selectedTable && `，已选：${selectedTable}`}

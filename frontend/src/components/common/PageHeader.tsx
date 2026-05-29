@@ -37,7 +37,7 @@ export default function PageHeader({
           : title}
         {meta ? (
           typeof meta === 'string'
-            ? <Text type="secondary" style={{ fontSize: 13 }}>{meta}</Text>
+            ? <Text type="secondary">{meta}</Text>
             : meta
         ) : null}
       </Space>

@@ -196,7 +196,6 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                       description: totpStep === 0 ? (
                         <Button
                           type="primary"
-                          size="small"
                           icon={<PlayCircleOutlined />}
                           loading={setup2faMut.isPending}
                           onClick={() => setup2faMut.mutate(undefined)}
@@ -210,7 +209,7 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                       title: '扫描二维码',
                       description: totpStep === 1 && totpUri ? (
                         <Space direction="vertical" size={8} style={{ marginTop: 8 }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
+                          <Text type="secondary">
                             使用 Google Authenticator 或 Authy 扫描下方二维码：
                           </Text>
                           <QRCode value={totpUri} size={160} />
@@ -235,7 +234,6 @@ export default function ProfileSettingsContent({ compact = false }: ProfileSetti
                           />
                           <Button
                             type="primary"
-                            size="small"
                             icon={<CheckCircleOutlined />}
                             loading={verify2faMut.isPending}
                             disabled={totpCode.length < 6}

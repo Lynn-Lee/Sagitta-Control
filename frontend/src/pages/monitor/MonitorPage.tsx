@@ -207,7 +207,7 @@ function topSqlHeader(title: string, unit?: string) {
   return (
     <span style={{ whiteSpace: 'nowrap' }}>
       {title}
-      {unit ? <Text type="secondary" style={{ fontSize: 12 }}> ({unit})</Text> : null}
+      {unit ? <Text type="secondary"> ({unit})</Text> : null}
     </span>
   )
 }
@@ -723,7 +723,7 @@ export default function MonitorPage() {
       width: 220,
       render: (_: any, row: MonitorInstance) => (
         <Space direction="vertical" size={0}>
-          <Button className="sagitta-action-btn sagitta-action-btn--inspect" size="small" icon={<BarChartOutlined />} style={{ fontWeight: 600 }} onClick={() => showInstanceMonitor(row.instance_id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BarChartOutlined />} style={{ fontWeight: 600 }} onClick={() => showInstanceMonitor(row.instance_id)}>
             {row.instance_name}
           </Button>
           <Space size={4}>
@@ -752,7 +752,7 @@ export default function MonitorPage() {
       title: '慢查询',
       width: 110,
       render: (_: any, row: MonitorInstance) => (
-        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<AlertOutlined />} size="small" onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sql') }}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<AlertOutlined />} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sql') }}>
           {formatMetric(row.latest?.slow_queries)}
         </Button>
       ),
@@ -761,7 +761,7 @@ export default function MonitorPage() {
       title: '锁/长事务',
       width: 120,
       render: (_: any, row: MonitorInstance) => (
-        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<FieldTimeOutlined />} size="small" onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sessions') }}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<FieldTimeOutlined />} onClick={(event) => { event.stopPropagation(); openWorkbench(row.instance_id, 'sessions') }}>
           {formatMetric((row.latest?.lock_waits || 0) + (row.latest?.long_transactions || 0))}
         </Button>
       ),
@@ -901,7 +901,6 @@ export default function MonitorPage() {
             <AntTooltip title="复制完整 SQL">
               <Button
                 className="sagitta-action-btn sagitta-action-btn--copy"
-                size="small"
                 icon={<CopyOutlined />}
                 onClick={() => copyTopSql(sql)}
               >

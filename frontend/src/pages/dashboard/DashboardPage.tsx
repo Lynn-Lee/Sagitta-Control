@@ -172,7 +172,7 @@ function SmallRangeSelector({
 }) {
   return (
     <Space size={8} align="center">
-      <Text type="secondary" style={{ fontSize: 12 }}>
+      <Text type="secondary">
         {scopeLabel || '我的数据'}
       </Text>
       <Select
@@ -190,7 +190,7 @@ function SmallRangeSelector({
           </Option>
         ))}
       </Select>
-      <Text type="secondary" style={{ fontSize: 12 }}>
+      <Text type="secondary">
         自定义
       </Text>
       <InputNumber
@@ -286,7 +286,7 @@ export function QueryDashboardPage() {
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             统计按当前用户可见的查询业务范围聚合；治理失败次数包含查询执行失败，以及查询权限申请/审批失败。
           </Text>
         </div>
@@ -484,7 +484,7 @@ export function WorkflowDashboardPage() {
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             统计按当前用户可见的工单业务范围聚合；审批相关排行展示的是当前范围内工单涉及的审批处理情况，不等同于当前登录人的个人审批工作量。
           </Text>
         </div>
@@ -772,7 +772,7 @@ export function ArchiveDashboardPage() {
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             统计当前用户可见的数据归档任务；处理行数按归档作业记录汇总，停止或取消只影响后续批次。
           </Text>
         </div>
@@ -957,13 +957,13 @@ export function InstanceDashboardPage() {
         title="实例与库概览"
         style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginTop: 20 }}
         extra={
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             {instanceOverview?.scope?.label || '可见资源范围'}
           </Text>
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             统计当前用户权限范围内可见的实例，以及已同步到平台的库/Schema 数量；库/Schema 按已启用和已禁用分别汇总。
           </Text>
         </div>

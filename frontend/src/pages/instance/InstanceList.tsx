@@ -99,8 +99,8 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
     {
       title: '同步时间', dataIndex: 'sync_at', width: 140,
       render: (v: string) => v
-        ? <Text type="secondary" style={{ fontSize: 11 }}>{new Date(v).toLocaleString('zh-CN')}</Text>
-        : <Text type="secondary" style={{ fontSize: 11 }}>手动添加</Text>,
+        ? <Text type="secondary">{new Date(v).toLocaleString('zh-CN')}</Text>
+        : <Text type="secondary">手动添加</Text>,
     },
     {
       title: '操作', width: 90,
@@ -111,7 +111,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
           cancelText="取消"
           onConfirm={() => deleteMut.mutate(r.id)}
         >
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
+          <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
             删除
           </Button>
         </Popconfirm>
@@ -123,18 +123,18 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
     <div>
       {msgCtx}
       <Space style={{ marginBottom: 12 }}>
-        <Button type="primary" size="small" icon={<PlusOutlined />}
+        <Button type="primary" icon={<PlusOutlined />}
           onClick={() => setAddModalOpen(true)}>
           手动添加{dbLabel}
         </Button>
-        <Button size="small" icon={<SyncOutlined />} loading={syncMut.isPending}
+        <Button icon={<SyncOutlined />} loading={syncMut.isPending}
           onClick={() => { setSyncResult(null); syncMut.mutate() }}>
           从实例自动同步
         </Button>
-        <Button size="small" className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()}>
+        <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={() => refetch()}>
           刷新
         </Button>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Text type="secondary">
           共 {data?.total ?? 0} 个{dbLabel}
         </Text>
       </Space>
@@ -269,7 +269,7 @@ export default function InstanceList() {
       render: (v: string, r: InstanceItem) => (
         <Space direction="vertical" size={0}>
           <Text strong>{v}</Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>{r.host}:{r.port}</Text>
+          <Text type="secondary">{r.host}:{r.port}</Text>
         </Space>
       ),
     },
@@ -306,7 +306,7 @@ export default function InstanceList() {
         const tr = testResults[r.id]
         return (
           <Space size={4}>
-            <Button size="small" icon={<ApiOutlined />} loading={tr?.loading}
+            <Button icon={<ApiOutlined />} loading={tr?.loading}
               onClick={() => handleTest(r.id)}>测试</Button>
             {tr && !tr.loading && (
               tr.success
@@ -321,10 +321,10 @@ export default function InstanceList() {
       title: '操作', width: 230,
       render: (_: any, r: InstanceItem) => (
         <Space size={4}>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--manage" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)}>
             管理数据库
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
             编辑
           </Button>
           <Popconfirm
@@ -333,7 +333,7 @@ export default function InstanceList() {
             cancelText="取消"
             onConfirm={() => deleteMut.mutate(r.id)}
           >
-            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />} disabled={!r.is_active}>
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />} disabled={!r.is_active}>
               停用
             </Button>
           </Popconfirm>
@@ -423,7 +423,7 @@ export default function InstanceList() {
           )}
           <Space style={{ width: '100%', display: 'flex' }}>
             <Form.Item name="host" label="主机地址" rules={[{ required: true, message: '请输入主机地址' }]} style={{ flex: 2 }}>
-              <Input placeholder="hostname 或 IP" />
+              <Input placeholder="主机名或 IP" />
             </Form.Item>
             <Form.Item name="port" label="端口" rules={[{ required: true, message: '请输入端口' }]} style={{ flex: 1 }}>
               <InputNumber style={{ width: '100%' }} min={1} max={65535} />

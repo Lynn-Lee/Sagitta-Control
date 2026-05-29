@@ -31,7 +31,6 @@ const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth =
   (name: string, r: any) => (
     <Tooltip title={name}>
       <Button
-        size="small"
         className="sagitta-action-btn sagitta-action-btn--inspect"
         icon={<EyeOutlined />}
         onClick={() => navigate(`/workflow/${r.id}`)}
@@ -46,19 +45,18 @@ const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth =
   )
 
 const renderInstance = (_: unknown, r: any) => (
-  <Text style={{ fontSize: 12, fontWeight: 500 }}>
+  <Text style={{ fontWeight: 500 }}>
     {r.instance_name || <Text type="secondary">ID:{r.instance_id}</Text>}
   </Text>
 )
 
 const renderDbName = (v?: string) =>
-  v ? <Text style={{ fontSize: 12 }}>{v}</Text> : <Text type="secondary">—</Text>
+  v ? <Text>{v}</Text> : <Text type="secondary">—</Text>
 
 const renderAuditChain = (v?: string, maxWidth = 420) => (
   <Tooltip title={v || '—'}>
     <Text
       style={{
-        fontSize: 12,
         color: '#5f6470',
         display: 'inline-block',
         maxWidth,
@@ -142,8 +140,8 @@ const renderExecutionInfo = (_: unknown, r: any) => {
       <Tag color={color} style={{ width: 'fit-content', marginInlineEnd: 0 }}>
         {EXECUTION_MODE_LABEL[r.execute_mode] || r.execute_mode}
       </Tag>
-      {r.scheduled_execute_at && <Text type="secondary" style={{ fontSize: 12 }}>{renderDate(r.scheduled_execute_at)}</Text>}
-      {r.external_executed_at && <Text type="secondary" style={{ fontSize: 12 }}>{renderDate(r.external_executed_at)}</Text>}
+      {r.scheduled_execute_at && <Text type="secondary">{renderDate(r.scheduled_execute_at)}</Text>}
+      {r.external_executed_at && <Text type="secondary">{renderDate(r.external_executed_at)}</Text>}
     </Space>
   )
 }
@@ -210,7 +208,6 @@ export default function WorkflowList() {
     title: 'ID', dataIndex: 'id', width: 65,
     render: (id) => (
       <Button
-        size="small"
         className="sagitta-action-btn sagitta-action-btn--inspect"
         icon={<EyeOutlined />}
         onClick={() => navigate(`/workflow/${id}`)}
@@ -225,7 +222,7 @@ export default function WorkflowList() {
     title: '操作', width: 150, fixed: 'right',
     render: (_, r) => (
       <Space size={4}>
-        <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => navigate(`/workflow/${r.id}`)}>详情</Button>
         {activeTab === 'mine' && r.can_cancel && (
           <Popconfirm
             title="确认取消此工单？"
@@ -234,7 +231,7 @@ export default function WorkflowList() {
             cancelText="返回"
             onConfirm={() => cancelMut.mutate(r.id)}
           >
-            <Button size="small" className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<StopOutlined />} loading={cancelMut.isPending}>
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<StopOutlined />} loading={cancelMut.isPending}>
               取消
             </Button>
           </Popconfirm>
@@ -377,7 +374,7 @@ export default function WorkflowList() {
           >
             {instanceData?.items?.map((i: any) => (
               <Option key={i.id} value={i.id} label={i.instance_name}>
-                <Tag color="blue" style={{ fontSize: 11 }}>{formatDbTypeLabel(i.db_type)}</Tag>
+                <Tag color="blue">{formatDbTypeLabel(i.db_type)}</Tag>
                 {i.instance_name}
               </Option>
             ))}

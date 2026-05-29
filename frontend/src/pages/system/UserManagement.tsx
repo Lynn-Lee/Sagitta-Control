@@ -354,7 +354,7 @@ export default function UserManagement() {
       render: (n, r) => (
         <Space direction="vertical" size={0}>
           <Text strong>{n}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{r.display_name}</Text>
+          <Text type="secondary">{r.display_name}</Text>
         </Space>
       ),
     },
@@ -399,7 +399,7 @@ export default function UserManagement() {
     { title: '用户组', dataIndex: 'user_groups', width: 180, render: (ugs: any[]) => {
       if (!ugs || !ugs.length) return <Text type="secondary">—</Text>
       return <Space wrap size={[4, 4]}>{ugs.map((ug: any) => (
-        <Tag key={ug.id} color="cyan" style={{ fontSize: 12 }}>{ug.name_cn || ug.name}</Tag>
+        <Tag key={ug.id} color="cyan">{ug.name_cn || ug.name}</Tag>
       ))}</Space>
     }},
     {
@@ -422,7 +422,7 @@ export default function UserManagement() {
       width: 160,
       render: (_, r) => (
         <Space>
-          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => void openEditWithLatestGroups(r)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => void openEditWithLatestGroups(r)}>
             编辑
           </Button>
           <Popconfirm
@@ -431,7 +431,7 @@ export default function UserManagement() {
             okText="删除"
             cancelText="取消"
           >
-            <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -727,19 +727,19 @@ export default function UserManagement() {
         <Space size={12} wrap style={{ display: 'flex', marginBottom: 16 }}>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">总行数</Text>
-            <div><Text strong style={{ fontSize: 20 }}>{importResult?.total ?? 0}</Text></div>
+            <div><Text strong>{importResult?.total ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">新增</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#1677ff' }}>{importResult?.created ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#1677ff' }}>{importResult?.created ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">更新</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">失败</Text>
-            <div><Text strong style={{ fontSize: 20, color: '#ff4d4f' }}>{importResult?.failed ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#ff4d4f' }}>{importResult?.failed ?? 0}</Text></div>
           </Card>
         </Space>
         {importResult?.failed ? (

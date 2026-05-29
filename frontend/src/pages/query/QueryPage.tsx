@@ -242,7 +242,7 @@ export default function QueryPage() {
 
   const resultColumns = [
     {
-      title: 'row_num',
+      title: '行号',
       dataIndex: '__rowNo',
       key: '__rowNo',
       width: 96,
@@ -380,7 +380,7 @@ export default function QueryPage() {
             {instanceData?.items?.map((inst: any) => (
               <Option key={inst.id} value={inst.id} label={inst.instance_name} style={{ whiteSpace: 'normal', wordBreak: 'break-all' }}>
                 <Space>
-                  <Tag color="blue" style={{ fontSize: 11 }}>{formatDbTypeLabel(inst.db_type)}</Tag>
+                  <Tag color="blue">{formatDbTypeLabel(inst.db_type)}</Tag>
                   {inst.instance_name}
                 </Space>
               </Option>
@@ -392,12 +392,12 @@ export default function QueryPage() {
             optionFilterProp="children">
             {(dbData?.databases || []).map((d: any) => (
               <Option key={d.db_name} value={d.db_name} title={d.db_name}>
-                {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}
+                {d.db_name}{!d.is_active && <Tag color="default" style={{ marginLeft: 4}}>已禁用</Tag>}
               </Option>
             ))}
           </Select>
           <Space>
-            <Text type="secondary" style={{ fontSize: 13 }}>行数上限</Text>
+            <Text type="secondary">行数上限</Text>
             <InputNumber min={1} max={100000} value={limitNum}
               onChange={(v) => v && setLimitNum(v)} style={{ width: 90 }} />
           </Space>
@@ -438,10 +438,10 @@ export default function QueryPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <Space size={8}>
                   <AppstoreOutlined style={{ color: '#1558A8' }} />
-                  <Text strong style={{ fontSize: 15 }}>表浏览器</Text>
+                  <Text strong>表浏览器</Text>
                   {allTables.length > 0 && <Tag>{allTables.length}</Tag>}
                 </Space>
-                <Button size="small" className="sagitta-action-btn sagitta-action-btn--manage" icon={<TableOutlined />} onClick={handleInsertTableName} disabled={!selectedTable}>
+                <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<TableOutlined />} onClick={handleInsertTableName} disabled={!selectedTable}>
                   插入表名
                 </Button>
               </div>
@@ -539,10 +539,10 @@ export default function QueryPage() {
             }}
             >
               <Space size={8}>
-                <Text strong style={{ fontSize: 15 }}>SQL 编辑器</Text>
+                <Text strong>SQL 编辑器</Text>
                 {selectedTable ? <Tag color="blue">{selectedTable}</Tag> : null}
               </Space>
-              <Text type="secondary" style={{ fontSize: 12 }}>
+              <Text type="secondary">
                 在这里编写和执行查询语句
               </Text>
             </div>
@@ -618,7 +618,7 @@ export default function QueryPage() {
                         ]}
                       />
                       {displayedDdl && (
-                        <Button size="small" icon={<CopyOutlined />} onClick={handleCopyDdl}>
+                        <Button icon={<CopyOutlined />} onClick={handleCopyDdl}>
                           复制 DDL
                         </Button>
                       )}

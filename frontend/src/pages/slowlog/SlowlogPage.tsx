@@ -370,7 +370,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       render: (_, row) => (
         <Space direction="vertical" size={0} style={{ minWidth: 0, width: '100%' }}>
           <Text strong ellipsis style={{ maxWidth: '100%' }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}</Text>
+          <Text type="secondary">{formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}</Text>
         </Space>
       ),
     },
@@ -425,10 +425,10 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 150,
       render: (_, row) => (
         <Space size={4}>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openLogDetail(row)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openLogDetail(row)}>
             查看
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openLogDetail(row, true)}>
             诊断
           </Button>
         </Space>
@@ -444,7 +444,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       render: (_, row) => (
         <Space direction="vertical" size={0}>
           <Text strong ellipsis style={{ maxWidth: 210 }}>{row.group_name}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             {instanceId ? (row.instance_name || '当前实例') : formatDbTypeLabel(row.db_type)}
           </Text>
         </Space>
@@ -465,7 +465,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 110,
       render: (_, row) => (
         <Button
-          size="small"
           className="sagitta-action-btn sagitta-action-btn--inspect"
           icon={<SearchOutlined />}
           onClick={() => {
@@ -499,11 +498,11 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       render: (_, row) => (
         <Space direction="vertical" size={0}>
           <Text strong ellipsis style={{ maxWidth: 210 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             {formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}
           </Text>
           {(row.instance_count > 1 || row.database_count > 1) && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary">
               覆盖 {row.instance_count || 0} 实例 / {row.database_count || 0} 库
             </Text>
           )}
@@ -532,13 +531,13 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 210,
       render: (_, row) => (
         <Space size={4}>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<SearchOutlined />} onClick={() => setSampleFingerprint(row.sql_fingerprint)}>
             样本
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => openFingerprintDetail(row.sql_fingerprint, false, row)}>
             查看
           </Button>
-          <Button size="small" className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<BulbOutlined />} disabled={!canAnalyze} loading={diagnoseMut.isPending} onClick={() => openFingerprintDetail(row.sql_fingerprint, true, row)}>
             诊断
           </Button>
         </Space>
@@ -566,7 +565,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 110,
       render: (_: any, row: any) => (
         <Button
-          size="small"
           className="sagitta-action-btn sagitta-action-btn--inspect"
           icon={<BulbOutlined />}
           disabled={!canAnalyze || !instanceId || !getRealtimeSql(row)}
@@ -650,7 +648,6 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
             </Space>
             <Text strong>{result.summary}</Text>
             <Button
-              size="small"
               className="sagitta-action-btn sagitta-action-btn--copy"
               icon={<CopyOutlined />}
               onClick={() => navigator.clipboard.writeText(result.sql).then(() => msgApi.success('SQL 已复制'))}

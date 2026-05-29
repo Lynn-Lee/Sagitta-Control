@@ -271,7 +271,6 @@ export default function LicensePage() {
                     <Text style={{ wordBreak: 'break-all' }}>{status.deployment_fingerprint}</Text>
                     <Button
                       className="sagitta-action-btn sagitta-action-btn--copy"
-                      size="small"
                       icon={<CopyOutlined />}
                       onClick={() => handleCopyText(status.deployment_fingerprint || '', '当前授权部署指纹已复制')}
                     >
@@ -286,7 +285,6 @@ export default function LicensePage() {
                     <Text style={{ wordBreak: 'break-all' }}>{status.activation_deployment_fingerprint}</Text>
                     <Button
                       className="sagitta-action-btn sagitta-action-btn--copy"
-                      size="small"
                       icon={<CopyOutlined />}
                       onClick={() => handleCopyText(status.activation_deployment_fingerprint || '', '当前激活部署指纹已复制')}
                     >
@@ -390,7 +388,6 @@ export default function LicensePage() {
                       addonAfter={(
                         <Button
                           className="sagitta-action-btn sagitta-action-btn--copy"
-                          size="small"
                           icon={<CopyOutlined />}
                           disabled={!activationFingerprint}
                           onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}

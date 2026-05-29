@@ -135,7 +135,7 @@ export default function ApprovalFlowPage() {
             <ApartmentOutlined style={{ color: '#165DFF' }} />
             <Text strong>{r.name}</Text>
           </Space>
-          {r.description && <Text type="secondary" style={{ fontSize: 12 }}>{r.description}</Text>}
+          {r.description && <Text type="secondary">{r.description}</Text>}
         </Space>
       ),
     },
@@ -171,7 +171,7 @@ export default function ApprovalFlowPage() {
       title: '操作', key: 'actions', width: 160,
       render: (_: unknown, r: any) => (
         <Space>
-          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r.id)}>
             编辑
           </Button>
           {r.is_active && (
@@ -180,7 +180,7 @@ export default function ApprovalFlowPage() {
               onConfirm={() => deactivateMut.mutate(r.id)}
               okText="停用" cancelText="取消" okButtonProps={{ danger: true }}
             >
-              <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<StopOutlined />}>
+              <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<StopOutlined />}>
                 停用
               </Button>
             </Popconfirm>
@@ -264,7 +264,7 @@ export default function ApprovalFlowPage() {
           </Form.Item>
 
           <Form.Item label="审批节点" style={{ marginBottom: 0 }}>
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
               节点按顺序逐级审批，所有节点通过后工单才会进入执行队列。
             </Text>
           </Form.Item>
@@ -288,7 +288,7 @@ export default function ApprovalFlowPage() {
                         <Button
                           className="sagitta-action-btn sagitta-action-btn--danger"
                           icon={<DeleteOutlined />}
-                          danger size="small"
+                          danger
                           onClick={() => remove(field.name)}
                         >
                           删除
@@ -336,14 +336,14 @@ export default function ApprovalFlowPage() {
                         const type = form.getFieldValue(['nodes', index, 'approver_type'])
                         if (type === 'any_reviewer') {
                           return (
-                            <Text type="secondary" style={{ fontSize: 12 }}>
+                            <Text type="secondary">
                               拥有 <Tag color="orange">sql_review</Tag> 权限的任意用户均可审批
                             </Text>
                           )
                         }
                         if (type === 'manager') {
                           return (
-                            <Text type="secondary" style={{ fontSize: 12 }}>
+                            <Text type="secondary">
                               自动使用申请人的直属上级作为审批人
                             </Text>
                           )

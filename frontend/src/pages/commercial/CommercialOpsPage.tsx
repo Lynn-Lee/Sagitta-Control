@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
@@ -88,7 +88,7 @@ export default function CommercialOpsPage() {
   const [retentionForm] = Form.useForm()
   const deliveryActionsRef = useRef<HTMLDivElement>(null)
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true)
     try {
       const [onboardingData, matrixData, alertData, aboutData, retentionData] = await Promise.all([
@@ -107,11 +107,11 @@ export default function CommercialOpsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [retentionForm])
 
   useEffect(() => {
     loadAll()
-  }, [])
+  }, [loadAll])
 
   const createAcceptance = async () => {
     const values = form.getFieldsValue()

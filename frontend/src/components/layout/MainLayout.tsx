@@ -169,7 +169,7 @@ type NavItem = NonNullable<MenuProps['items']>[number] & {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    key: 'dashboard-group', icon: <DashboardOutlined />, label: 'Dashboard', permission: 'menu_dashboard',
+    key: 'dashboard-group', icon: <DashboardOutlined />, label: '数据看板', permission: 'menu_dashboard',
     children: [
       { key: '/dashboard/query', icon: <MenuIcon component={QueryMenuSvg} label="在线查询概览" />, label: '在线查询概览' },
       { key: '/dashboard/workflow', icon: <MenuIcon component={SqlWorkflowMenuSvg} label="SQL 工单概览" />, label: 'SQL 工单概览' },
@@ -462,7 +462,6 @@ export default function MainLayout() {
                 textAlign: 'center',
               }}>
                 <Text style={{
-                  fontSize: 10,
                   fontFamily: "'JetBrains Mono', monospace",
                   color: '#C9CDD4',
                   letterSpacing: '0.5px',
@@ -507,7 +506,7 @@ export default function MainLayout() {
               message="密码即将到期"
               description={`当前密码将在 ${user.days_until_password_expiry ?? 0} 天后到期，请尽快修改密码，避免影响登录。`}
               action={
-                <Button size="small" type="primary" icon={<KeyOutlined />} onClick={() => setChangePasswordModalOpen(true)}>
+                <Button type="primary" icon={<KeyOutlined />} onClick={() => setChangePasswordModalOpen(true)}>
                   立即修改
                 </Button>
               }

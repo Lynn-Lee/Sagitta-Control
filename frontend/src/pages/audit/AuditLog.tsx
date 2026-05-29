@@ -71,7 +71,7 @@ export default function AuditLog() {
     { title: '详情', dataIndex: 'detail', width: 340, ellipsis: true },
     {
       title: 'IP', dataIndex: 'ip_address', width: 130,
-      render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v || '—'}</Text>,
+      render: (v: string) => <Text type="secondary">{v || '—'}</Text>,
     },
     {
       title: '结果', dataIndex: 'result', width: 80,

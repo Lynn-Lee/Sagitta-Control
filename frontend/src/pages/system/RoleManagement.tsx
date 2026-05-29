@@ -129,12 +129,12 @@ const RoleManagement: React.FC = () => {
       title: '操作', width: 160,
       render: (_: any, record: any) => (
         <Space>
-          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(record.id)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(record.id)}>
             编辑
           </Button>
           {!record.is_system && (
             <Popconfirm title="确认删除此角色？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(record.id)}>
-              <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+              <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
                 删除
               </Button>
             </Popconfirm>

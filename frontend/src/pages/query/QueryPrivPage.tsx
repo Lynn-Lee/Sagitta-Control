@@ -321,7 +321,6 @@ export default function QueryPrivPage() {
       width: 90,
       render: (_: any, r: any) => (
         <Button
-          size="small"
           danger
           icon={<DeleteOutlined />}
           loading={revokeMut.isPending}
@@ -353,7 +352,6 @@ export default function QueryPrivPage() {
       width: 110,
       render: (_: any, r: any) => r.can_revoke ? (
         <Button
-          size="small"
           danger
           icon={<DeleteOutlined />}
           loading={revokeMut.isPending}
@@ -437,13 +435,12 @@ export default function QueryPrivPage() {
       render: (_: any, r: any) => r.status === 0 && r.can_audit ? (
         <Space direction="vertical" size={6}>
           {r.risk_level === 'high' && (
-            <Text type="danger" style={{ fontSize: 12 }}>
+            <Text type="danger">
               高风险申请，请先查看风险说明
             </Text>
           )}
           <Space size={8} wrap>
             <Button
-              size="small"
               type="primary"
               danger={r.risk_level === 'high'}
               icon={<CheckOutlined />}
@@ -452,7 +449,6 @@ export default function QueryPrivPage() {
               通过
             </Button>
             <Button
-              size="small"
               danger
               icon={<CloseOutlined />}
               onClick={() => auditMut.mutate({ apply_id: r.id, action: 'reject' })}
@@ -463,7 +459,6 @@ export default function QueryPrivPage() {
         </Space>
       ) : r.can_cancel ? (
         <Button
-          size="small"
           icon={<CloseOutlined />}
           loading={cancelApplyMut.isPending}
           onClick={() => {
@@ -674,7 +669,7 @@ export default function QueryPrivPage() {
               popupMatchSelectWidth={false} style={{ minWidth: 180 }} optionFilterProp="children">
                 {(dbData?.items || []).map((d: any) => (
                   <Option key={d.db_name} value={d.db_name} title={d.db_name}>
-                    {d.db_name}{!d.is_active && <Tag color="default" style={{marginLeft: 4, fontSize: 10}}>已禁用</Tag>}
+                    {d.db_name}{!d.is_active && <Tag color="default" style={{ marginLeft: 4}}>已禁用</Tag>}
                   </Option>
                 ))}
               </Select>

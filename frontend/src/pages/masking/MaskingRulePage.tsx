@@ -118,7 +118,7 @@ function PreviewPanel({ form }: { form: any }) {
       <Space>
         <Input value={previewValue} onChange={e => setPreviewValue(e.target.value)}
           style={{ width: 200 }} placeholder="输入测试数据" />
-        <Button className="sagitta-action-btn sagitta-action-btn--inspect" size="small" icon={<EyeOutlined />} loading={loading} onClick={handlePreview}>
+        <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} loading={loading} onClick={handlePreview}>
           预览效果
         </Button>
       </Space>
@@ -202,15 +202,15 @@ export default function MaskingRulePage() {
     { title: '规则名称', dataIndex: 'rule_name', width: 220, render: (v: string, r: any) => (
       <Space direction="vertical" size={0}>
         <Text strong>{v}</Text>
-        {r.description && <Text type="secondary" style={{ fontSize: 11 }}>{r.description}</Text>}
+        {r.description && <Text type="secondary">{r.description}</Text>}
       </Space>
     )},
     { title: '脱敏类型', dataIndex: 'rule_type', width: 100,
       render: (v: string) => <Tag color={RULE_TYPE_COLORS[v] || 'default'}>{v}</Tag> },
     { title: '适用范围', key: 'scope', width: 220, render: (_: any, r: any) => (
       <Space direction="vertical" size={0}>
-        <Text style={{ fontSize: 12 }}>列名：<Text code style={{ fontSize: 11 }}>{r.column_name}</Text></Text>
-        <Text style={{ fontSize: 11 }} type="secondary">
+        <Text>列名：<Text code>{r.column_name}</Text></Text>
+        <Text type="secondary">
           {r.instance_id ? `实例ID:${r.instance_id} ` : '全部实例 '}
           库:{r.db_name} 表:{r.table_name}
         </Text>
@@ -223,11 +223,11 @@ export default function MaskingRulePage() {
       render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '—' },
     { title: '操作', width: 160, render: (_: any, r: any) => (
       <Space>
-        <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+        <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
           编辑
         </Button>
         <Popconfirm title="确认删除此规则？" okText="删除" cancelText="取消" onConfirm={() => deleteMut.mutate(r.id)}>
-          <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+          <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
             删除
           </Button>
         </Popconfirm>

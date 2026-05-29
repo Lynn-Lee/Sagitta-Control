@@ -195,7 +195,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
     ...(isOracle ? [
       { title: '模块', dataIndex: 'module', width: 130, ellipsis: true },
-      { title: 'Action', dataIndex: 'action', width: 130, ellipsis: true },
+      { title: '操作', dataIndex: 'action', width: 130, ellipsis: true },
     ] as ColumnsType<SessionItem> : []),
     { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
     { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
@@ -229,7 +229,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       width: 300,
       ellipsis: true,
       render: (v: string, row) => v
-        ? <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} size="small" onClick={() => setSqlDetail(row)}>{v}</Button>
+        ? <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => setSqlDetail(row)}>{v}</Button>
         : <Text type="secondary">-</Text>,
     },
     { title: '等待事件', dataIndex: 'event', width: 180, ellipsis: true },
@@ -255,7 +255,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
             okText="终止"
             cancelText="取消"
           >
-            <Button size="small" danger icon={<StopOutlined />} loading={killMut.isPending}>终止</Button>
+            <Button danger icon={<StopOutlined />} loading={killMut.isPending}>终止</Button>
           </Popconfirm>
         )
       },
@@ -350,7 +350,7 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
             <Text strong>{selectedInstance ? `${selectedInstance.instance_name} / ${formatDbTypeLabel(selectedInstance.db_type)}` : '请选择实例'}</Text>
           )}
           <Button icon={<ReloadOutlined />} onClick={() => refetch()} disabled={!instanceId}>刷新</Button>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary">
             在线 {processData?.total ?? 0} 个会话{hideIdle ? `，当前显示 ${onlineItems.length} 个非空闲会话` : ''}
           </Text>
           <Switch checked={hideIdle} onChange={setHideIdle} checkedChildren="隐藏空闲" unCheckedChildren="显示全部" />

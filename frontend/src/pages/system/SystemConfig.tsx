@@ -138,7 +138,7 @@ function TestButton({
 
   return (
     <Space direction="vertical" size={4}>
-      <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={icon ?? <ApiOutlined />} loading={loading} onClick={handleTest} size="small">
+      <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={icon ?? <ApiOutlined />} loading={loading} onClick={handleTest}>
         {label}
       </Button>
       {result && (
@@ -250,7 +250,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Space size={4}>
                 <span>{item.description}</span>
                 {isSensitive && (
-                  <Text style={{ fontSize: 10, color: '#fa8c16', border: '1px solid #fa8c16', borderRadius: 2, padding: '0 4px' }}>
+                  <Text style={{ color: '#fa8c16', border: '1px solid #fa8c16', borderRadius: 2, padding: '0 4px' }}>
                     加密存储
                   </Text>
                 )}

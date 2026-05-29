@@ -158,7 +158,7 @@ export default function ResourceGroupManagement() {
       render: (_: any, r: any) => (
         <Space direction="vertical" size={0}>
           <Text strong>{r.group_name}</Text>
-          {r.group_name_cn && <Text type="secondary" style={{ fontSize: 12 }}>{r.group_name_cn}</Text>}
+          {r.group_name_cn && <Text type="secondary">{r.group_name_cn}</Text>}
         </Space>
       ),
     },
@@ -170,13 +170,13 @@ export default function ResourceGroupManagement() {
         return (
           <Space wrap size={[4, 4]}>
             {instances.map((inst: any) => (
-              <Tag key={inst.id} color={dbTypeColor[inst.db_type] || '#666'} style={{ fontSize: 12 }}>
+              <Tag key={inst.id} color={dbTypeColor[inst.db_type] || '#666'}>
                 <DatabaseOutlined style={{ marginRight: 4 }} />
                 {inst.instance_name}
-                <Text type="secondary" style={{ fontSize: 11, marginLeft: 6, color: 'rgba(255,255,255,0.82)' }}>
+                <Text type="secondary" style={{ marginLeft: 6, color: 'rgba(255,255,255,0.82)' }}>
                   {formatDbTypeLabel(inst.db_type)}
                 </Text>
-                <Text type="secondary" style={{ fontSize: 11, marginLeft: 4, color: 'rgba(255,255,255,0.7)' }}>
+                <Text type="secondary" style={{ marginLeft: 4, color: 'rgba(255,255,255,0.7)' }}>
                   {inst.host}:{inst.port}
                 </Text>
               </Tag>
@@ -189,7 +189,7 @@ export default function ResourceGroupManagement() {
       title: '关联用户组', dataIndex: 'user_group_count', width: 260,
       render: (v: number, r: any) => (
         <Space direction="vertical" size={4}>
-          <Button className="sagitta-action-btn sagitta-action-btn--manage" size="small" icon={<TeamOutlined />} onClick={() => openMembers(r)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<TeamOutlined />} onClick={() => openMembers(r)}>
             管理 {v} 个
           </Button>
           {!!r.user_groups?.length && (
@@ -210,12 +210,12 @@ export default function ResourceGroupManagement() {
       title: '操作', width: 160,
       render: (_: any, r: any) => (
         <Space>
-          <Button className="sagitta-action-btn sagitta-action-btn--edit" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+          <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
             编辑
           </Button>
           <Popconfirm title="确认删除？" okText="删除" cancelText="取消"
             onConfirm={() => deleteMut.mutate(r.id)}>
-            <Button className="sagitta-action-btn sagitta-action-btn--danger" size="small" danger icon={<DeleteOutlined />}>
+            <Button className="sagitta-action-btn sagitta-action-btn--danger" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -330,8 +330,8 @@ export default function ResourceGroupManagement() {
       >
         <div style={{ marginTop: 16 }}>
           <div style={{ marginBottom: 24 }}>
-            <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>关联用户组</Text>
-            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>关联用户组</Text>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
               这是 v2-lite 的间接授权链路：用户组关联后，组内所有成员自动获得此资源组下实例的访问权限：
             </Text>
             <Transfer
@@ -349,8 +349,8 @@ export default function ResourceGroupManagement() {
           </div>
 
           <div>
-            <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>当前成员（通过用户组自动获取）</Text>
-            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>当前成员（通过用户组自动获取）</Text>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
               成员由关联的用户组自动产生，无需手动添加：
             </Text>
             <div style={{ maxHeight: 200, overflow: 'auto', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12 }}>
