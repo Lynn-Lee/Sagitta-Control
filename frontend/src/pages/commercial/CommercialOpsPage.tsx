@@ -20,14 +20,25 @@ import {
   message,
 } from 'antd'
 import {
+  BellOutlined,
   CheckCircleOutlined,
+  CloseCircleOutlined,
+  CloseOutlined,
   CopyOutlined,
   CloudDownloadOutlined,
+  DeleteOutlined,
+  ExportOutlined,
   FileDoneOutlined,
+  FileSearchOutlined,
+  KeyOutlined,
+  PauseCircleOutlined,
   RightOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  SaveOutlined,
+  SettingOutlined,
   ToolOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { commercialApi, type AlertEvent, type OnboardingStatus, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
@@ -35,10 +46,10 @@ import TableEmptyState from '@/components/common/TableEmptyState'
 const { Text, Paragraph } = Typography
 
 const reportTypes = [
-  { key: 'high_risk_operations', label: '高风险操作' },
-  { key: 'query_export', label: '查询导出' },
-  { key: 'permission_changes', label: '权限变更' },
-  { key: 'license_operations', label: 'License 操作' },
+  { key: 'high_risk_operations', label: '高风险操作', icon: <WarningOutlined />, className: 'sagitta-action-btn--danger' },
+  { key: 'query_export', label: '查询导出', icon: <ExportOutlined />, className: 'sagitta-action-btn--download' },
+  { key: 'permission_changes', label: '权限变更', icon: <KeyOutlined />, className: 'sagitta-action-btn--inspect' },
+  { key: 'license_operations', label: 'License 操作', icon: <SafetyCertificateOutlined />, className: 'sagitta-action-btn--manage' },
 ]
 
 const licenseStatusColor: Record<string, string> = {
@@ -192,7 +203,7 @@ export default function CommercialOpsPage() {
   }
 
   const renderReadinessAction = (item: ReadinessCheck) => (
-    <Button size="small" icon={<RightOutlined />} onClick={() => goPath(item.path)}>
+    <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<RightOutlined />} onClick={() => goPath(item.path)}>
       去处理
     </Button>
   )
@@ -240,10 +251,10 @@ export default function CommercialOpsPage() {
                 <Descriptions.Item label="到期时间">{about?.license?.expires_at || '-'}</Descriptions.Item>
               </Descriptions>
               <Space wrap>
-                <Button className="sagitta-action-btn sagitta-action-btn--copy" size="small" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>
+                <Button className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>
                   复制正式指纹
                 </Button>
-                <Button size="small" icon={<RightOutlined />} onClick={() => navigate('/system/license')}>授权管理</Button>
+                <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<SafetyCertificateOutlined />} onClick={() => navigate('/system/license')}>授权管理</Button>
               </Space>
             </Space>
           </Card>
@@ -296,7 +307,7 @@ export default function CommercialOpsPage() {
         items={[
           {
             key: 'onboarding',
-            label: '实施交付',
+            label: <Space size={6}><ToolOutlined />实施交付</Space>,
             children: (
               <Row gutter={[16, 16]}>
                 <Col span={24}>
@@ -320,8 +331,8 @@ export default function CommercialOpsPage() {
                                 </Space>
                                 <Text type="secondary">{step.reason}</Text>
                                 <Space>
-                                  <Button size="small" icon={<RightOutlined />} onClick={() => goPath(step.path)}>去配置</Button>
-                                  <Button size="small" disabled={step.completed} onClick={() => commercialApi.completeStep(step.key).then(setOnboarding)}>手动完成</Button>
+                                  <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<SettingOutlined />} onClick={() => goPath(step.path)}>去配置</Button>
+                                  <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} disabled={step.completed} onClick={() => commercialApi.completeStep(step.key).then(setOnboarding)}>手动完成</Button>
                                 </Space>
                               </Space>
                             </Card>
@@ -345,18 +356,18 @@ export default function CommercialOpsPage() {
                           <Button icon={<FileDoneOutlined />} type="primary" onClick={createAcceptance}>生成验收报告</Button>
                         </Form.Item>
                         <Form.Item>
-                          <Button icon={<ToolOutlined />} onClick={createDiagnostic}>生成诊断包</Button>
+                          <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<ToolOutlined />} onClick={createDiagnostic}>生成诊断包</Button>
                         </Form.Item>
                       </Form>
                       <Space style={{ marginTop: 16 }}>
                         {acceptanceRunId && (
                           <>
-                            <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('md')}>下载 Markdown</Button>
-                            <Button icon={<CloudDownloadOutlined />} onClick={() => downloadReport('json')}>下载 JSON</Button>
+                            <Button className="sagitta-action-btn sagitta-action-btn--download" icon={<CloudDownloadOutlined />} onClick={() => downloadReport('md')}>下载 Markdown</Button>
+                            <Button className="sagitta-action-btn sagitta-action-btn--download" icon={<CloudDownloadOutlined />} onClick={() => downloadReport('json')}>下载 JSON</Button>
                           </>
                         )}
                         {diagnosticId && (
-                          <Button icon={<CloudDownloadOutlined />} onClick={downloadDiagnostic}>下载诊断包</Button>
+                          <Button className="sagitta-action-btn sagitta-action-btn--download" icon={<CloudDownloadOutlined />} onClick={downloadDiagnostic}>下载诊断包</Button>
                         )}
                       </Space>
                     </Card>
@@ -367,12 +378,12 @@ export default function CommercialOpsPage() {
           },
           {
             key: 'compliance',
-            label: '合规报表',
+            label: <Space size={6}><FileSearchOutlined />合规报表</Space>,
             children: (
               <Card>
                 <Space wrap style={{ marginBottom: 16 }}>
                   {reportTypes.map(item => (
-                    <Button key={item.key} onClick={() => loadReport(item.key)}>{item.label}</Button>
+                    <Button key={item.key} className={`sagitta-action-btn ${item.className}`} icon={item.icon} onClick={() => loadReport(item.key)}>{item.label}</Button>
                   ))}
                 </Space>
                 {report ? (
@@ -391,7 +402,7 @@ export default function CommercialOpsPage() {
                       </Form.Item>
                     ))}
                     <Form.Item>
-                      <Button type="primary" onClick={saveRetention}>保存</Button>
+                      <Button type="primary" icon={<SaveOutlined />} onClick={saveRetention}>保存</Button>
                     </Form.Item>
                   </Form>
                   <Space wrap style={{ marginTop: 12 }}>
@@ -399,9 +410,13 @@ export default function CommercialOpsPage() {
                       <Popconfirm
                         key={item.key}
                         title={`清理超过 ${item.days} 天的${item.label}？`}
+                        okText="清理"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true, icon: <DeleteOutlined /> }}
+                        cancelButtonProps={{ icon: <CloseOutlined /> }}
                         onConfirm={() => cleanupRetention(item.key)}
                       >
-                        <Button size="small">清理{item.label}</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--danger" icon={<DeleteOutlined />}>清理{item.label}</Button>
                       </Popconfirm>
                     ))}
                   </Space>
@@ -411,7 +426,7 @@ export default function CommercialOpsPage() {
           },
           {
             key: 'alerts',
-            label: '告警中心',
+            label: <Space size={6}><BellOutlined />告警中心</Space>,
             children: (
               <Table
                 dataSource={alerts}
@@ -427,12 +442,12 @@ export default function CommercialOpsPage() {
                   { title: '最近触发', dataIndex: 'last_seen_at' },
                   {
                     title: '操作',
-                    width: 210,
+                    width: 270,
                     render: (_, row) => (
                       <Space>
-                        <Button size="small" onClick={() => handleAlertAction(row.id, 'ack')}>确认</Button>
-                        <Button size="small" onClick={() => handleAlertAction(row.id, 'silence')}>静默</Button>
-                        <Button size="small" danger onClick={() => handleAlertAction(row.id, 'close')}>关闭</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} onClick={() => handleAlertAction(row.id, 'ack')}>确认</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<PauseCircleOutlined />} onClick={() => handleAlertAction(row.id, 'silence')}>静默</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseCircleOutlined />} onClick={() => handleAlertAction(row.id, 'close')}>关闭</Button>
                       </Space>
                     ),
                   },
@@ -442,7 +457,7 @@ export default function CommercialOpsPage() {
           },
           {
             key: 'support',
-            label: '支持与关于',
+            label: <Space size={6}><SafetyCertificateOutlined />支持与关于</Space>,
             children: (
               <Space direction="vertical" style={{ width: '100%' }} size={16}>
                 <Card title="支持与关于">
@@ -458,7 +473,7 @@ export default function CommercialOpsPage() {
                         <Tag color={licenseStatusColor[about?.license?.status || ''] || 'default'}>
                           {licenseStatusLabel[about?.license?.status || ''] || about?.license?.status || '-'}
                         </Tag>
-                        <Button size="small" onClick={() => navigate('/system/license')}>前往授权管理</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<SafetyCertificateOutlined />} onClick={() => navigate('/system/license')}>前往授权管理</Button>
                       </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="支持邮箱">{about?.support?.email || '-'}</Descriptions.Item>
@@ -466,7 +481,7 @@ export default function CommercialOpsPage() {
                     <Descriptions.Item label="部署指纹" span={2}>
                       <Space wrap>
                         <Text code copyable={false}>{about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '-'}</Text>
-                        <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>复制</Button>
+                        <Button className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>复制</Button>
                       </Space>
                     </Descriptions.Item>
                   </Descriptions>

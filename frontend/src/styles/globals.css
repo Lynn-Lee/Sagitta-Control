@@ -150,6 +150,31 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   font-size: 14px;
 }
 
+.ant-input,
+.ant-input-number,
+.ant-picker,
+.ant-select-single .ant-select-selector {
+  height: var(--button-height) !important;
+  min-height: var(--button-height) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 14px !important;
+}
+
+.ant-input-number-input,
+.ant-picker-input > input,
+.ant-select-single .ant-select-selector .ant-select-selection-item,
+.ant-select-single .ant-select-selector .ant-select-selection-placeholder {
+  height: calc(var(--button-height) - 2px) !important;
+  line-height: calc(var(--button-height) - 2px) !important;
+  font-size: 14px !important;
+}
+
+.ant-input::placeholder,
+.ant-input-number-input::placeholder,
+.ant-picker-input > input::placeholder {
+  font-size: 14px;
+}
+
 .ant-btn-primary {
   color: #fff !important;
   background: var(--color-primary) !important;
