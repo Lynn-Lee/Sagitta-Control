@@ -305,28 +305,20 @@ export default function LicensePage() {
 
         <Col xs={24} lg={10}>
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Row gutter={[12, 12]}>
-              <Col xs={24} sm={8} lg={24} xl={8}>
-                <Card loading={loading}>
-                  <Statistic
-                    title="剩余天数"
-                    value={status?.days_remaining ?? 0}
-                    suffix="天"
-                    valueStyle={{ color: status?.status === 'expired' ? '#cf1322' : undefined }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8} lg={24} xl={8}>
-                <Card loading={loading}>
-                  <Statistic title="版本" value={status?.edition || '-'} />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8} lg={24} xl={8}>
-                <Card loading={loading}>
-                  <Statistic title="来源" value={status?.source || '-'} />
-                </Card>
-              </Col>
-            </Row>
+            <Card loading={loading}>
+              <Statistic
+                title="剩余天数"
+                value={status?.days_remaining ?? 0}
+                suffix="天"
+                valueStyle={{ color: status?.status === 'expired' ? '#cf1322' : undefined }}
+              />
+            </Card>
+            <Card loading={loading}>
+              <Statistic title="版本" value={status?.edition || '-'} />
+            </Card>
+            <Card loading={loading}>
+              <Statistic title="来源" value={status?.source || '-'} />
+            </Card>
             <Card title="权益与额度" loading={loading}>
               <div style={{ marginBottom: 12 }}>
                 <Text type="secondary">功能模块</Text>
