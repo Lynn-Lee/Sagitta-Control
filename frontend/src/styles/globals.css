@@ -151,6 +151,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .ant-input,
+.ant-input-affix-wrapper,
 .ant-input-number,
 .ant-picker,
 .ant-select-single .ant-select-selector {
@@ -161,6 +162,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .ant-input-number-input,
+.ant-input-affix-wrapper > input.ant-input,
 .ant-picker-input > input,
 .ant-select-single .ant-select-selector .ant-select-selection-item,
 .ant-select-single .ant-select-selector .ant-select-selection-placeholder {
@@ -170,9 +172,17 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .ant-input::placeholder,
+.ant-input-affix-wrapper > input.ant-input::placeholder,
 .ant-input-number-input::placeholder,
 .ant-picker-input > input::placeholder {
   font-size: 14px;
+}
+
+.ant-input-affix-wrapper {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .ant-btn-primary {
@@ -392,6 +402,16 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .sagitta-auth-form .ant-input-affix-wrapper,
 .sagitta-auth-form .ant-input-affix-wrapper > input.ant-input {
   font-size: 14px;
+}
+
+.sagitta-auth-form .ant-input-affix-wrapper {
+  height: 46px !important;
+  min-height: 46px !important;
+}
+
+.sagitta-auth-form .ant-input-affix-wrapper > input.ant-input {
+  height: 44px !important;
+  line-height: 44px !important;
 }
 
 .sagitta-auth-form .ant-input::placeholder,
