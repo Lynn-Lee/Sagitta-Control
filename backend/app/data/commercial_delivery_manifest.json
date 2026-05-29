@@ -1,0 +1,71 @@
+{
+  "version": "2.1.4",
+  "generated_at": "2026-05-29T00:00:00+08:00",
+  "source": "scripts/validate-commercial-release-materials.sh",
+  "materials": [
+    {
+      "path": "deploy/backup/backup-postgres.sh",
+      "executable": true
+    },
+    {
+      "path": "deploy/backup/restore-postgres.sh",
+      "executable": true
+    },
+    {
+      "path": "deploy/customer/upgrade.sh",
+      "executable": true
+    },
+    {
+      "path": "dist-commercial/SagittaDB-Enterprise-v2.1.4/upgrade.sh",
+      "executable": true
+    },
+    {
+      "path": "scripts/validate-commercial-build-context.sh",
+      "executable": true
+    },
+    {
+      "path": "scripts/validate-commercial-images.sh",
+      "executable": true
+    },
+    {
+      "path": "scripts/generate-commercial-sbom.sh",
+      "executable": true
+    },
+    {
+      "path": "scripts/sign-commercial-artifacts.sh",
+      "executable": true
+    },
+    {
+      "path": "dist-commercial/SagittaDB-Enterprise-v2.1.4.zip.sha256",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/SagittaDB-Enterprise-v2.1.4.zip.sig.json",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json.sha256",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json.bundle",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-frontend-2.1.4.cyclonedx.json",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-frontend-2.1.4.cyclonedx.json.sha256",
+      "executable": false
+    },
+    {
+      "path": "dist-commercial/sbom/sagittadb-frontend-2.1.4.cyclonedx.json.bundle",
+      "executable": false
+    }
+  ]
+}

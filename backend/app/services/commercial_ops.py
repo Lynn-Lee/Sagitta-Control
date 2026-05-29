@@ -6,6 +6,7 @@ import csv
 import json
 import os
 from datetime import UTC, date, datetime, timedelta
+from fnmatch import fnmatch
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,7 @@ DEMO_RESOURCE_GROUP_NAME = "commercial_trial_rg"
 DEMO_USER_GROUP_NAME = "commercial_trial_team"
 DEMO_APPROVAL_FLOW_NAME = "商业试用标准审批流"
 DEMO_MARKER = "commercial_trial_bootstrap"
+DELIVERY_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "commercial_delivery_manifest.json"
 
 ONBOARDING_STEPS = [
     {"key": "branding", "label": "品牌配置", "path": "/system/config"},
@@ -432,6 +434,29 @@ class CommercialOpsService:
         return Path.cwd()
 
     @staticmethod
+    def _load_delivery_manifest() -> dict[str, Any] | None:
+        manifest_path = Path(os.getenv("COMMERCIAL_DELIVERY_MANIFEST") or DELIVERY_MANIFEST_PATH)
+        if not manifest_path.exists():
+            return None
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        if data.get("version") != COMMERCIAL_VERSION or not isinstance(data.get("materials"), list):
+            return None
+        return data
+
+    @staticmethod
+    def _manifest_materials(manifest: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+        if not manifest:
+            return {}
+        materials: dict[str, dict[str, Any]] = {}
+        for item in manifest.get("materials", []):
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                materials[item["path"]] = item
+        return materials
+
+    @staticmethod
     def _preflight_detail(ok: bool, ready: list[str], missing: list[str], non_executable: list[str]) -> str:
         if ok:
             return "已就绪：" + "、".join(ready)
@@ -443,7 +468,11 @@ class CommercialOpsService:
         return "；".join(parts) or "未满足交付自检要求"
 
     @staticmethod
-    def _evaluate_preflight_definition(root: Path, definition: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_preflight_definition(
+        root: Path,
+        definition: dict[str, Any],
+        manifest: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         paths = [str(item) for item in definition["paths"]]
         kind = str(definition["kind"])
         ready: list[str] = []
@@ -485,6 +514,48 @@ class CommercialOpsService:
                 missing = []
                 non_executable = []
 
+        manifest_materials = CommercialOpsService._manifest_materials(manifest)
+        if not ok and manifest_materials:
+            manifest_ready: list[str] = []
+            manifest_missing: list[str] = []
+            manifest_non_executable: list[str] = []
+            if kind == "glob":
+                for pattern in paths:
+                    matches = sorted(path for path in manifest_materials if fnmatch(path, pattern))
+                    if matches:
+                        manifest_ready.extend(matches[:3])
+                    else:
+                        manifest_missing.append(pattern)
+                ok = not manifest_missing
+            elif kind == "all_executable":
+                for relative in paths:
+                    item = manifest_materials.get(relative)
+                    if not item:
+                        manifest_missing.append(relative)
+                    elif not item.get("executable", False):
+                        manifest_non_executable.append(relative)
+                    else:
+                        manifest_ready.append(relative)
+                ok = not manifest_missing and not manifest_non_executable
+            else:
+                for relative in paths:
+                    item = manifest_materials.get(relative)
+                    if not item:
+                        manifest_missing.append(relative)
+                        continue
+                    if kind == "executable" and not item.get("executable", False):
+                        manifest_non_executable.append(relative)
+                        continue
+                    manifest_ready.append(relative)
+                ok = bool(manifest_ready)
+            if ok:
+                ready = [f"{item}（发布清单）" for item in manifest_ready]
+                missing = []
+                non_executable = []
+            else:
+                missing = manifest_missing or missing
+                non_executable = manifest_non_executable or non_executable
+
         return {
             "key": definition["key"],
             "label": definition["label"],
@@ -496,10 +567,19 @@ class CommercialOpsService:
         }
 
     @staticmethod
-    def delivery_preflight(root: Path | None = None) -> dict[str, Any]:
+    def delivery_preflight(
+        root: Path | None = None,
+        manifest: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         base = root or CommercialOpsService._project_root()
+        if manifest is not None:
+            manifest_data = manifest
+        elif root is None:
+            manifest_data = CommercialOpsService._load_delivery_manifest()
+        else:
+            manifest_data = None
         checks = [
-            CommercialOpsService._evaluate_preflight_definition(base, definition)
+            CommercialOpsService._evaluate_preflight_definition(base, definition, manifest_data)
             for definition in DELIVERY_PREFLIGHT_DEFINITIONS
         ]
         failed_blockers = [item for item in checks if item["blocking"] and not item["ok"]]

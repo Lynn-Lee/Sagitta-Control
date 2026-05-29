@@ -82,6 +82,32 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
     assert all(item["ok"] for item in result["checks"])
 
 
+def test_delivery_preflight_can_use_release_manifest(tmp_path):
+    manifest = {
+        "version": "2.1.4",
+        "materials": [
+            {"path": "deploy/backup/backup-postgres.sh", "executable": True},
+            {"path": "deploy/backup/restore-postgres.sh", "executable": True},
+            {"path": "deploy/customer/upgrade.sh", "executable": True},
+            {"path": "scripts/validate-commercial-build-context.sh", "executable": True},
+            {"path": "scripts/validate-commercial-images.sh", "executable": True},
+            {"path": "scripts/generate-commercial-sbom.sh", "executable": True},
+            {"path": "scripts/sign-commercial-artifacts.sh", "executable": True},
+            {"path": "dist-commercial/SagittaDB-Enterprise-v2.1.4.zip.sha256", "executable": False},
+            {"path": "dist-commercial/SagittaDB-Enterprise-v2.1.4.zip.sig.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json.sha256", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.1.4.cyclonedx.json.bundle", "executable": False},
+        ],
+    }
+
+    result = CommercialOpsService.delivery_preflight(tmp_path, manifest=manifest)
+
+    assert result["status"] == "ready"
+    assert all(item["ok"] for item in result["checks"])
+    assert "发布清单" in result["checks"][0]["detail"]
+
+
 def test_build_rows_file_json_export():
     content, media_type, filename = CommercialOpsService.build_rows_file(
         [{"username": "admin", "action": "activate_license"}],
