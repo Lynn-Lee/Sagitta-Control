@@ -63,11 +63,12 @@ def verify_startup_integrity() -> None:
 
     integrity_required = settings.APP_INTEGRITY_REQUIRED or settings.SAGITTADB_COMMERCIAL_BUILD
     manifest_path = Path(settings.APP_INTEGRITY_MANIFEST)
-    if not manifest_path.exists():
-        if integrity_required:
-            raise IntegrityError(f"完整性 Manifest 不存在：{manifest_path}")
-        logger.info("integrity_manifest_missing_skip path=%s", manifest_path)
+    if not integrity_required:
+        logger.info("startup_integrity_skip required=false manifest=%s", manifest_path)
         return
+
+    if not manifest_path.exists():
+        raise IntegrityError(f"完整性 Manifest 不存在：{manifest_path}")
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
