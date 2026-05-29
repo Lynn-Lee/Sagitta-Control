@@ -904,7 +904,7 @@ export default function LoginPage() {
         lineHeight: 1.8,
       }}>
         <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
-        <div>{branding.platform_name} v2.1.3 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>{branding.platform_name} v2.1.4 · Full Engine Compatibility, End-to-End Observability</div>
       </div>
     </div>
   )

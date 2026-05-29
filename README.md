@@ -151,12 +151,14 @@ npm run build
 ## 商业交付
 
 当前版本：`v2.1 商业部署版 + v2-lite 授权体系`。
-当前商业部署版本：`2.1.3`。
+当前商业部署版本：`2.1.4`。
 状态：正式版商业交付。
 
 v2.1 重点增强 Oracle 引擎观测能力：会话监控优先使用 RAC 友好的 `GV$SESSION/GV$PROCESS/GV$SQL` 组合，SQL 洞察新增 Oracle SQL Monitor、AWR SQLStat、Cursor Cache 和当前会话 SQL 降级链路，并补充等待事件、阻塞会话、长事务和长操作摘要。所有 Oracle 诊断采集均使用 `python-oracledb` 参数化只读查询；权限不足时返回 warning 并自动降级，不执行 kill、dump、baseline、profile、patch 等高风险诊断动作。
 
 v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查询、归档、工单等页面的操作按钮、搜索入口、导入导出和弹窗确认按钮样式；常规按钮统一为 36px 高和图标 + 文字结构，并按主操作、查看/管理/刷新、编辑、导入导出、中性操作、危险操作规划语义色；登录页第三方接入入口改为纯图标按钮并通过悬停提示说明“使用 XXX 登录”，LDAP/CAS/OIDC 保持大写，钉钉、飞书、企业微信使用中文展示名，企业入口点击后的未启用/未配置提示与 DataFusionX-Enterprise 对齐，例如 `飞书登录未启用或 App ID 未配置。`、`CAS 登录未启用或服务器地址未配置。`、`OIDC 登录未启用或 Client ID / Issuer 未配置。`，LDAP 登录模式使用更紧凑一致的返回图标和认证标题块，并与账号密码登录表单保持一致的输入框和按钮字号；补充多处图标按钮文案与危险操作视觉层级，并优化全局按钮/弹窗/表格工具区细节，让客户生产环境的管理界面更一致、更易扫描。
+
+v2.1.4 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.1.4 交付预检结果为 `ready`。
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
 

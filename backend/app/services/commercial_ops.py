@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
@@ -35,6 +37,8 @@ from app.services.license import (
 )
 from app.services.system_config import SystemConfigService
 
+COMMERCIAL_VERSION = "2.1.4"
+
 ONBOARDING_STEPS = [
     {"key": "branding", "label": "品牌配置", "path": "/system/config"},
     {"key": "license", "label": "License 授权", "path": "/system/license"},
@@ -58,6 +62,89 @@ RETENTION_LABELS = {
     "notification_log": "通知日志",
     "diagnostic_sampling": "诊断采样",
 }
+
+DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
+    {
+        "key": "backup_script",
+        "label": "备份脚本",
+        "name": "备份脚本",
+        "blocking": True,
+        "kind": "executable",
+        "paths": ["deploy/backup/backup-postgres.sh", "backup-postgres.sh"],
+        "path": "/commercial",
+    },
+    {
+        "key": "restore_script",
+        "label": "恢复脚本",
+        "name": "恢复脚本",
+        "blocking": True,
+        "kind": "executable",
+        "paths": ["deploy/backup/restore-postgres.sh", "restore-postgres.sh"],
+        "path": "/commercial",
+    },
+    {
+        "key": "upgrade_script",
+        "label": "升级回滚脚本",
+        "name": "升级回滚脚本",
+        "blocking": True,
+        "kind": "executable",
+        "paths": [
+            "deploy/customer/upgrade.sh",
+            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}/upgrade.sh",
+            "upgrade.sh",
+        ],
+        "path": "/commercial",
+    },
+    {
+        "key": "commercial_guard_scripts",
+        "label": "商业构建门禁脚本",
+        "name": "商业构建门禁脚本",
+        "blocking": True,
+        "kind": "all_executable",
+        "paths": [
+            "scripts/validate-commercial-build-context.sh",
+            "scripts/validate-commercial-images.sh",
+            "scripts/generate-commercial-sbom.sh",
+            "scripts/sign-commercial-artifacts.sh",
+        ],
+        "path": "/commercial",
+    },
+    {
+        "key": "customer_package_checksum",
+        "label": "客户包 sha256",
+        "name": "客户包 sha256",
+        "blocking": False,
+        "kind": "file",
+        "paths": [f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sha256"],
+        "path": "/commercial",
+    },
+    {
+        "key": "customer_package_signature",
+        "label": "客户包签名",
+        "name": "客户包签名",
+        "blocking": False,
+        "kind": "file",
+        "paths": [
+            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sig.json",
+            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.asc",
+            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sig",
+        ],
+        "path": "/commercial",
+    },
+    {
+        "key": "sbom_materials",
+        "label": "SBOM 与签名材料",
+        "name": "SBOM 与签名材料",
+        "blocking": False,
+        "kind": "glob",
+        "paths": [
+            "dist-commercial/sbom/*.cyclonedx.json",
+            "dist-commercial/sbom/*.cyclonedx.json.sha256",
+            "dist-commercial/sbom/*.cyclonedx.json.bundle",
+        ],
+        "path": "/commercial",
+    },
+]
 
 ENGINE_MATRIX: list[dict[str, Any]] = [
     {
@@ -332,6 +419,93 @@ class CommercialOpsService:
         return int((await db.execute(stmt)).scalar_one() or 0)
 
     @staticmethod
+    def _project_root() -> Path:
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            if (parent / "backend").exists() and (parent / "frontend").exists():
+                return parent
+        return Path.cwd()
+
+    @staticmethod
+    def _preflight_detail(ok: bool, ready: list[str], missing: list[str], non_executable: list[str]) -> str:
+        if ok:
+            return "已就绪：" + "、".join(ready)
+        parts = []
+        if missing:
+            parts.append("未找到：" + "、".join(missing))
+        if non_executable:
+            parts.append("不可执行：" + "、".join(non_executable))
+        return "；".join(parts) or "未满足交付自检要求"
+
+    @staticmethod
+    def _evaluate_preflight_definition(root: Path, definition: dict[str, Any]) -> dict[str, Any]:
+        paths = [str(item) for item in definition["paths"]]
+        kind = str(definition["kind"])
+        ready: list[str] = []
+        missing: list[str] = []
+        non_executable: list[str] = []
+
+        if kind == "glob":
+            for pattern in paths:
+                matches = sorted(root.glob(pattern))
+                if matches:
+                    ready.extend(str(path.relative_to(root)) for path in matches[:3])
+                    if len(matches) > 3:
+                        ready.append(f"{pattern} 等 {len(matches)} 个文件")
+                else:
+                    missing.append(pattern)
+            ok = not missing
+        elif kind == "all_executable":
+            for relative in paths:
+                path = root / relative
+                if not path.exists():
+                    missing.append(relative)
+                elif not os.access(path, os.X_OK):
+                    non_executable.append(relative)
+                else:
+                    ready.append(relative)
+            ok = not missing and not non_executable
+        else:
+            for relative in paths:
+                path = root / relative
+                if not path.exists():
+                    missing.append(relative)
+                    continue
+                if kind == "executable" and not os.access(path, os.X_OK):
+                    non_executable.append(relative)
+                    continue
+                ready.append(relative)
+            ok = bool(ready)
+            if ok:
+                missing = []
+                non_executable = []
+
+        return {
+            "key": definition["key"],
+            "label": definition["label"],
+            "name": definition["name"],
+            "ok": ok,
+            "blocking": bool(definition["blocking"]),
+            "detail": CommercialOpsService._preflight_detail(ok, ready, missing, non_executable),
+            "path": definition["path"],
+        }
+
+    @staticmethod
+    def delivery_preflight(root: Path | None = None) -> dict[str, Any]:
+        base = root or CommercialOpsService._project_root()
+        checks = [
+            CommercialOpsService._evaluate_preflight_definition(base, definition)
+            for definition in DELIVERY_PREFLIGHT_DEFINITIONS
+        ]
+        failed_blockers = [item for item in checks if item["blocking"] and not item["ok"]]
+        failed_optional = [item for item in checks if not item["blocking"] and not item["ok"]]
+        return {
+            "root": str(base),
+            "status": "blocked" if failed_blockers else "needs_configuration" if failed_optional else "ready",
+            "checks": checks,
+        }
+
+    @staticmethod
     async def usage_payload(db: AsyncSession) -> dict[str, Any]:
         if not hasattr(db, "execute"):
             return {"active_users": 0, "active_instances": 0, "db_type_distribution": {}}
@@ -409,6 +583,18 @@ class CommercialOpsService:
                 "path": "/commercial",
             },
         ]
+        delivery_preflight = CommercialOpsService.delivery_preflight()
+        checks.extend(
+            {
+                "key": f"delivery_{item['key']}",
+                "label": item["label"],
+                "ok": item["ok"],
+                "blocking": item["blocking"],
+                "detail": item["detail"],
+                "path": item["path"],
+            }
+            for item in delivery_preflight["checks"]
+        )
         failed_blockers = [item for item in checks if item["blocking"] and not item["ok"]]
         failed_optional = [item for item in checks if not item["blocking"] and not item["ok"]]
         if failed_blockers:
@@ -441,7 +627,7 @@ class CommercialOpsService:
                 db, MonitorCollectConfig, MonitorCollectConfig.last_collect_status == "failed"
             )
         return {
-            "version": "2.1.3",
+            "version": "2.1.4",
             "app_env": settings.APP_ENV,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",
             "license_source": license_source,
@@ -557,8 +743,20 @@ class CommercialOpsService:
     ) -> DeliveryAcceptanceRun:
         checks: list[dict[str, Any]] = []
 
-        async def add(name: str, ok: bool, detail: str, skipped: bool = False) -> None:
-            checks.append({"name": name, "ok": ok, "detail": detail, "skipped": skipped})
+        async def add(
+            name: str,
+            ok: bool,
+            detail: str,
+            skipped: bool = False,
+            required: bool = True,
+        ) -> None:
+            checks.append({
+                "name": name,
+                "ok": ok,
+                "detail": detail,
+                "skipped": skipped,
+                "required": required,
+            })
 
         await add("健康检查", True, "后端服务可访问")
         license_state = await LicenseService.status(db)
@@ -586,6 +784,13 @@ class CommercialOpsService:
             "已存在监控指标快照",
         )
         await add("审计日志", await CommercialOpsService._scalar_count(db, OperationLog) > 0, "审计日志可查询")
+        for item in CommercialOpsService.delivery_preflight()["checks"]:
+            await add(
+                item["name"],
+                bool(item["ok"]),
+                str(item["detail"]),
+                required=bool(item["blocking"]),
+            )
 
         instance_id = options.get("instance_id")
         db_name = str(options.get("db_name") or "").strip()
@@ -607,12 +812,25 @@ class CommercialOpsService:
         else:
             await add("实例链路检查", True, "未选择实例，已跳过", skipped=True)
 
-        failed = [item for item in checks if not item["ok"] and not item["skipped"]]
+        failed = [
+            item
+            for item in checks
+            if item.get("required", True) and not item["ok"] and not item["skipped"]
+        ]
+        warnings = [
+            item
+            for item in checks
+            if not item.get("required", True) and not item["ok"] and not item["skipped"]
+        ]
         readiness = await CommercialOpsService.commercial_readiness(db, license_state)
         if failed:
             readiness["status"] = "blocked"
             readiness["conclusion"] = "阻塞"
             readiness["summary"] = "验收检查存在失败项，请补齐后再进入客户推广或正式验收。"
+        elif warnings:
+            readiness["status"] = "needs_configuration"
+            readiness["conclusion"] = "需补配置"
+            readiness["summary"] = "核心链路可验收，建议补齐发布签名、SBOM 或客户包材料后再推广。"
         report = {
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
@@ -623,6 +841,7 @@ class CommercialOpsService:
             "summary": {
                 "passed": sum(1 for item in checks if item["ok"] and not item["skipped"]),
                 "failed": len(failed),
+                "warnings": len(warnings),
                 "skipped": sum(1 for item in checks if item["skipped"]),
             },
             "checks": checks,
@@ -657,10 +876,11 @@ class CommercialOpsService:
             "## 汇总",
             "",
             *_markdown_table(
-                ["通过", "失败", "跳过"],
+                ["通过", "失败", "需补配置", "跳过"],
                 [[
                     report.get("summary", {}).get("passed", 0),
                     report.get("summary", {}).get("failed", 0),
+                    report.get("summary", {}).get("warnings", 0),
                     report.get("summary", {}).get("skipped", 0),
                 ]],
             ),
@@ -671,7 +891,9 @@ class CommercialOpsService:
                 ["结果", "检查项", "说明"],
                 [
                     [
-                        "SKIP" if item.get("skipped") else ("PASS" if item.get("ok") else "FAIL"),
+                        "SKIP"
+                        if item.get("skipped")
+                        else ("PASS" if item.get("ok") else ("FAIL" if item.get("required", True) else "WARN")),
                         item.get("name", ""),
                         item.get("detail", ""),
                     ]
@@ -731,7 +953,7 @@ class CommercialOpsService:
             {
                 "generated_at": _now().isoformat(),
                 "generated_by": user.get("username", ""),
-                "version": "2.1.3",
+                "version": "2.1.4",
                 "app_env": settings.APP_ENV,
                 "alembic_version": alembic_version,
                 "license": latest_license,
@@ -969,7 +1191,7 @@ class CommercialOpsService:
         )
         readiness = await CommercialOpsService.commercial_readiness(db, license_status)
         return {
-            "version": "2.1.3",
+            "version": "2.1.4",
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",

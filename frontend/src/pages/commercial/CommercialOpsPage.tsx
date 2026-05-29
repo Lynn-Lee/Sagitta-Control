@@ -289,6 +289,9 @@ export default function CommercialOpsPage() {
                     <Space key={item.key} style={{ width: '100%', justifyContent: 'space-between' }} align="start">
                       <span>
                         <Text strong>{item.label}</Text>
+                        <Tag color={item.blocking ? 'red' : 'orange'} style={{ marginLeft: 8 }}>
+                          {item.blocking ? '阻塞' : '建议'}
+                        </Tag>
                         <Text type="secondary">：{item.detail}</Text>
                       </span>
                       {renderReadinessAction(item)}

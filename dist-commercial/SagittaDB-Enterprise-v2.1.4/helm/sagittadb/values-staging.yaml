@@ -1,0 +1,43 @@
+# ─── Staging 环境覆盖值 ────────────────────────────────────────────────────────
+# 用法: helm upgrade --install sagittadb ./sagittadb -f values-staging.yaml
+
+app:
+  env: staging
+  debug: false
+  logLevel: DEBUG
+
+backend:
+  replicaCount: 1
+
+celeryWorker:
+  replicaCount: 1
+  concurrency: 2
+
+frontend:
+  replicaCount: 1
+
+ingress:
+  hosts:
+    - host: staging.sagittadb.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend: backend
+        - path: /
+          pathType: Prefix
+          backend: frontend
+
+postgresql:
+  primary:
+    persistence:
+      size: 5Gi
+
+redis:
+  master:
+    persistence:
+      size: 1Gi
+  replica:
+    replicaCount: 0
+
+persistence:
+  size: 5Gi

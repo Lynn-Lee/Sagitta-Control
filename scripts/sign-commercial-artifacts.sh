@@ -6,6 +6,8 @@ IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io
 PACKAGE_ZIP="${PACKAGE_ZIP:-dist-commercial/SagittaDB-Enterprise-v${VERSION}.zip}"
 MANIFEST_OUT="${MANIFEST_OUT:-backend/COMMERCIAL-MANIFEST.json}"
 SBOM_DIR="${SBOM_DIR:-dist-commercial/sbom}"
+PYTHON_BIN="${PYTHON:-}"
+COSIGN_TIMEOUT="${COSIGN_TIMEOUT:-10m}"
 
 # cosign 用于签名已推送镜像的 digest；下面生成的 JSON 签名用于保护
 # 会在镜像仓库之外流转的客户部署包。
@@ -13,31 +15,42 @@ if ! command -v cosign >/dev/null 2>&1; then
   echo "cosign is required for image signing" >&2
   exit 1
 fi
+if [[ -z "${PYTHON_BIN}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+  else
+    echo "python3 or python is required for artifact signing" >&2
+    exit 1
+  fi
+fi
+cosign_args=(--timeout "${COSIGN_TIMEOUT}")
+if [[ -n "${COSIGN_KEY:-}" ]]; then
+  cosign_args+=(--key "${COSIGN_KEY}")
+fi
 
-python tools/sign_manifest.py \
+"${PYTHON_BIN}" tools/sign_manifest.py \
   --root backend \
   --version "${VERSION}" \
   --out "${MANIFEST_OUT}" \
   app
 
-cosign sign --yes "${IMAGE_REPOSITORY}-backend:${VERSION}"
-cosign sign --yes "${IMAGE_REPOSITORY}-frontend:${VERSION}"
+cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-backend:${VERSION}"
+cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-frontend:${VERSION}"
 
-if [[ -d "${SBOM_DIR}" ]]; then
-  shopt -s nullglob
-  for sbom in "${SBOM_DIR}"/*.cyclonedx.json; do
-    cosign sign-blob --yes --bundle "${sbom}.bundle" "${sbom}"
-    component="$(basename "${sbom}")"
-    case "${component}" in
-      sagittadb-backend-*) image="${IMAGE_REPOSITORY}-backend:${VERSION}" ;;
-      sagittadb-frontend-*) image="${IMAGE_REPOSITORY}-frontend:${VERSION}" ;;
-      *) continue ;;
-    esac
-    cosign attest --yes --type cyclonedx --predicate "${sbom}" "${image}"
-  done
-fi
+for component in backend frontend; do
+  sbom="${SBOM_DIR}/sagittadb-${component}-${VERSION}.cyclonedx.json"
+  if [[ ! -s "${sbom}" ]]; then
+    echo "Required SBOM is missing or empty: ${sbom}" >&2
+    exit 1
+  fi
+  image="${IMAGE_REPOSITORY}-${component}:${VERSION}"
+  cosign sign-blob --yes "${cosign_args[@]}" --bundle "${sbom}.bundle" "${sbom}"
+  cosign attest --yes "${cosign_args[@]}" --type cyclonedx --predicate "${sbom}" "${image}"
+done
 
-python - <<'PY' "${PACKAGE_ZIP}"
+"${PYTHON_BIN}" - <<'PY' "${PACKAGE_ZIP}"
 import base64
 import hashlib
 import json

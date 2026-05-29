@@ -28,6 +28,7 @@ def test_acceptance_markdown_renders_check_results():
         "summary": {"passed": 1, "failed": 0, "skipped": 1},
         "checks": [
             {"name": "健康检查", "ok": True, "detail": "ok"},
+            {"name": "客户包签名", "ok": False, "detail": "未生成", "required": False},
             {"name": "实例链路检查", "ok": True, "detail": "跳过", "skipped": True},
         ],
     }
@@ -37,7 +38,48 @@ def test_acceptance_markdown_renders_check_results():
     assert "SagittaDB 商业交付验收报告" in markdown
     assert "推广结论：可推广" in markdown
     assert "PASS" in markdown
+    assert "WARN" in markdown
     assert "SKIP" in markdown
+
+
+def test_delivery_preflight_requires_backup_restore_and_upgrade_scripts(tmp_path):
+    result = CommercialOpsService.delivery_preflight(tmp_path)
+    action_keys = {item["key"] for item in result["checks"] if item["blocking"] and not item["ok"]}
+
+    assert result["status"] == "blocked"
+    assert {"backup_script", "restore_script", "upgrade_script"}.issubset(action_keys)
+
+
+def test_delivery_preflight_detects_release_materials(tmp_path):
+    files = [
+        "deploy/backup/backup-postgres.sh",
+        "deploy/backup/restore-postgres.sh",
+        "deploy/customer/upgrade.sh",
+        "scripts/validate-commercial-build-context.sh",
+        "scripts/validate-commercial-images.sh",
+        "scripts/generate-commercial-sbom.sh",
+        "scripts/sign-commercial-artifacts.sh",
+    ]
+    for relative in files:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        path.chmod(0o755)
+
+    release_dir = tmp_path / "dist-commercial"
+    release_dir.mkdir()
+    (release_dir / "SagittaDB-Enterprise-v2.1.4.zip.sha256").write_text("checksum\n", encoding="utf-8")
+    (release_dir / "SagittaDB-Enterprise-v2.1.4.zip.sig.json").write_text("{}", encoding="utf-8")
+    sbom_dir = release_dir / "sbom"
+    sbom_dir.mkdir()
+    (sbom_dir / "sagittadb-backend-2.1.4.cyclonedx.json").write_text("{}", encoding="utf-8")
+    (sbom_dir / "sagittadb-backend-2.1.4.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
+    (sbom_dir / "sagittadb-backend-2.1.4.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
+
+    result = CommercialOpsService.delivery_preflight(tmp_path)
+
+    assert result["status"] == "ready"
+    assert all(item["ok"] for item in result["checks"])
 
 
 def test_build_rows_file_json_export():

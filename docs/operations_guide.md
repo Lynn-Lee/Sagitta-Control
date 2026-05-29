@@ -243,7 +243,7 @@ COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagittadb/backups bash depl
 ```bash
 bash deploy/update-prod.sh                  # 默认部署 origin/main
 bash deploy/update-prod.sh --ref origin/main
-bash deploy/update-prod.sh --ref v2.1.3
+bash deploy/update-prod.sh --ref v2.1.4
 bash deploy/update-prod.sh --ref <commit_sha>
 ```
 
@@ -437,14 +437,14 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
 
-产品内 `商业交付` → `交付与支持` 页面已沉淀同类非破坏性验收能力，页面顶部会汇总推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、数据库类型分布和监控采集失败数；推广前待处理项可直接跳转到对应配置页。建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。验收报告会输出 `可推广`、`需补配置` 或 `阻塞` 结论；诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
+产品内 `商业交付` → `交付与支持` 页面已沉淀同类非破坏性验收能力，页面顶部会汇总推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、数据库类型分布和监控采集失败数；推广前待处理项可直接跳转到对应配置页，并区分阻塞项与建议补齐项。页面会自检备份脚本、恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料。建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。验收报告会输出 `可推广`、`需补配置` 或 `阻塞` 结论；诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
 
-当前商业部署版本为 `2.1.3`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.1.4`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 
-商业发布流水线应先使用 `scripts/validate-commercial-build-context.sh` 检查根级 `.dockerignore`，再使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/validate-commercial-images.sh` 检查真实镜像文件系统，使用 `scripts/generate-commercial-sbom.sh` 生成 CycloneDX SBOM，并使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像、SBOM 和客户部署包进行签名；交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。后端商业镜像构建必须通过源码残留门禁：`/app/app` 下除 `__init__.py` 外不得存在 `.py`、`.pyc` 或 `.pyo`；前端商业镜像不得包含 `.map` 或 `sourceMappingURL`。
+商业发布流水线应先使用 `scripts/validate-commercial-build-context.sh` 检查根级 `.dockerignore`，再使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/validate-commercial-images.sh` 检查真实镜像文件系统，使用 `scripts/generate-commercial-sbom.sh` 生成 CycloneDX SBOM，并使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像、SBOM 和客户部署包进行签名；签名后必须执行 `scripts/validate-commercial-release-materials.sh`，确认客户包、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且校验通过。交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。后端商业镜像构建必须通过源码残留门禁：`/app/app` 下除 `__init__.py` 外不得存在 `.py`、`.pyc` 或 `.pyo`；前端商业镜像不得包含 `.map` 或 `sourceMappingURL`。
 
 提交与发布策略参考 DataFusionX：`main` 只触发源码 CI 和版本记录；`release/**` 生成 RC 候选商业包和固定版本镜像，但不默认同步公开仓库；正式 `vX.Y.Z` tag 生成最终商业交付包并同步 `Lynn-Lee/Public-Releases/products/sagittadb/`；手动商业发布默认只生成临时包，除非显式勾选发布。商业部署包默认不上传为 Actions artifact，如需临时留存可设置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。

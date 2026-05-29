@@ -26,7 +26,7 @@ permissions:
 env:
   PRODUCT_CODE: sagittadb
   PRODUCT_NAME: SagittaDB Enterprise
-  COMMERCIAL_BASE_VERSION: "2.1.3"
+  COMMERCIAL_BASE_VERSION: "2.1.4"
   PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Public-Releases
   PUBLIC_PRODUCT_DIR: products/sagittadb
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
@@ -178,6 +178,16 @@ jobs:
           SBOM_DIR="dist-commercial/sbom" \
           scripts/sign-commercial-artifacts.sh
 
+      - name: 校验商业发布材料
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}" \
+          PACKAGE_NAME="${{ steps.release.outputs.package_name }}" \
+          DIST_DIR="dist-commercial" \
+          SBOM_DIR="dist-commercial/sbom" \
+          scripts/validate-commercial-release-materials.sh
+
       - name: 上传商业部署包
         if: ${{ vars.ENABLE_COMMERCIAL_RELEASE_ARTIFACT == 'true' }}
         uses: actions/upload-artifact@v4
@@ -187,6 +197,7 @@ jobs:
             dist-commercial/*.zip
             dist-commercial/*.zip.sha256
             dist-commercial/*.zip.sig.json
+            dist-commercial/sbom/*
           if-no-files-found: error
 
       - name: 检出公开发布仓库
@@ -264,7 +275,9 @@ jobs:
           test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sha256"
           test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
           test -f "${product_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${product_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
           test -f "${product_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${product_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
 
           (
             cd "${product_dir}/releases/${release_dir}"

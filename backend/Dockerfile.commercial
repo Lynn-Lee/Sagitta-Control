@@ -81,7 +81,10 @@ RUN set -eux; \
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /app /app
 
-RUN adduser --disabled-password --gecos "" --uid 1000 appuser && chown -R appuser:appuser /app
+RUN find /app -type d -name '__pycache__' -prune -exec rm -rf {} + && \
+    find /app -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete && \
+    adduser --disabled-password --gecos "" --uid 1000 appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
