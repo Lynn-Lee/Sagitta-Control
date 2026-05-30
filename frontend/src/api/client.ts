@@ -9,6 +9,28 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+const AUTH_SUBMIT_PATHS = new Set([
+  '/auth/login/',
+  '/auth/ldap/',
+  '/auth/sms/login/',
+  '/auth/2fa/login/verify/',
+  '/auth/password/change-required/',
+])
+
+const normalizeApiPath = (url?: string) => {
+  if (!url) return ''
+  try {
+    const pathname = new URL(url, window.location.origin).pathname
+    return pathname.replace(/^\/api\/v1/, '') || '/'
+  } catch {
+    return url.replace(/^\/api\/v1/, '')
+  }
+}
+
+const isAuthSubmitRequest = (config?: InternalAxiosRequestConfig) => (
+  AUTH_SUBMIT_PATHS.has(normalizeApiPath(config?.url))
+)
+
 // ─── 请求拦截器：自动注入 JWT ────────────────────────────────
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -35,7 +57,11 @@ apiClient.interceptors.response.use(
       _retry?: boolean
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthSubmitRequest(originalRequest)
+    ) {
       const { refreshToken, setTokens, logout } = useAuthStore.getState()
 
       if (!refreshToken) {

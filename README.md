@@ -81,6 +81,9 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 
 | 文档 | 用途 |
 |---|---|
+| [正式商业推广文案](docs/commercial_promotion_copy.md) | 面向官网、销售、试用邀请和商业推广材料的产品价值与宣传口径。 |
+| [商业版产品使用手册](docs/commercial_product_manual.md) | 面向试用客户和培训场景的正式用户操作指南。 |
+| [商业版运维部署维护升级文档](docs/commercial_ops_deployment_guide.md) | 面向客户运维、实施和 DevOps 的部署、授权、巡检、备份、升级和回滚指南。 |
 | [产品设计文档](docs/sagittadb_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
 | [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
