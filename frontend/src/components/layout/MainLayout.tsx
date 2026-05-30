@@ -527,6 +527,7 @@ export default function MainLayout() {
             trigger={['click']}
             open={notificationOpen}
             onOpenChange={setNotificationOpen}
+            destroyOnHidden
           >
             <Tooltip title="通知">
               <Badge count={unreadCount} size="small" overflowCount={99}>
