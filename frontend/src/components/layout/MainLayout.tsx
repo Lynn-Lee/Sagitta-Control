@@ -255,6 +255,7 @@ export default function MainLayout() {
   const [menuOpenKeys, setMenuOpenKeys] = useState<string[]>([])
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
+  const [notificationOpen, setNotificationOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -272,6 +273,7 @@ export default function MainLayout() {
       // 尽力通知后端；无论是否成功，本地登录态都要清理。
     } finally {
       logout()
+      queryClient.removeQueries({ queryKey: ['system-notifications'] })
     }
 
     if (provider === 'cas') {
@@ -289,14 +291,15 @@ export default function MainLayout() {
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true, onClick: handleLogout },
   ]
 
+  const notificationQueryScope = useMemo(() => ['system-notifications', user?.id] as const, [user?.id])
   const { data: unreadCountData } = useQuery({
-    queryKey: ['system-notifications', 'unread-count'],
+    queryKey: [...notificationQueryScope, 'unread-count'],
     queryFn: notificationApi.unreadCount,
     enabled: Boolean(user),
     refetchInterval: 30_000,
   })
   const { data: notificationList } = useQuery({
-    queryKey: ['system-notifications', 'recent'],
+    queryKey: [...notificationQueryScope, 'recent'],
     queryFn: () => notificationApi.list({ page: 1, page_size: 8 }),
     enabled: Boolean(user),
     refetchInterval: 30_000,
@@ -304,19 +307,20 @@ export default function MainLayout() {
   const markReadMutation = useMutation({
     mutationFn: notificationApi.markRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['system-notifications'] })
+      queryClient.invalidateQueries({ queryKey: notificationQueryScope })
     },
   })
   const markAllReadMutation = useMutation({
     mutationFn: notificationApi.markAllRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['system-notifications'] })
+      queryClient.invalidateQueries({ queryKey: notificationQueryScope })
     },
   })
   const unreadCount = unreadCountData?.count || 0
   const recentNotifications = notificationList?.items || []
 
   const handleNotificationClick: MenuProps['onClick'] = async ({ key }) => {
+    setNotificationOpen(false)
     if (key === 'read-all') {
       await markAllReadMutation.mutateAsync()
       return
@@ -521,6 +525,8 @@ export default function MainLayout() {
             menu={{ items: notificationMenuItems, onClick: handleNotificationClick }}
             placement="bottomRight"
             trigger={['click']}
+            open={notificationOpen}
+            onOpenChange={setNotificationOpen}
           >
             <Tooltip title="通知">
               <Badge count={unreadCount} size="small" overflowCount={99}>
