@@ -404,13 +404,17 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   font-size: 14px;
 }
 
+.sagitta-auth-form {
+  --sagitta-auth-input-bg: #303752;
+}
+
 .sagitta-auth-form .ant-input-affix-wrapper {
   height: 46px !important;
   min-height: 46px !important;
   width: 100%;
   overflow: hidden;
   color: #fff !important;
-  background: rgba(255,255,255,0.06) !important;
+  background: var(--sagitta-auth-input-bg) !important;
   border-color: rgba(255,255,255,0.1) !important;
 }
 
@@ -427,7 +431,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .sagitta-auth-form .ant-input-affix-wrapper-focused,
 .sagitta-auth-form .ant-input-affix-wrapper:focus,
 .sagitta-auth-form .ant-input-affix-wrapper:hover {
-  background: rgba(255,255,255,0.06) !important;
+  background: var(--sagitta-auth-input-bg) !important;
   border-color: rgba(22,93,255,0.7) !important;
   box-shadow: 0 0 0 3px rgba(22,93,255,0.18) !important;
 }
@@ -443,7 +447,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   -webkit-text-fill-color: #fff !important;
   caret-color: #fff;
   transition: background-color 9999s ease-out;
-  box-shadow: 0 0 0 1000px rgba(255,255,255,0.06) inset !important;
+  box-shadow: 0 0 0 1000px var(--sagitta-auth-input-bg) inset !important;
 }
 
 .sagitta-auth-form .ant-input::placeholder,

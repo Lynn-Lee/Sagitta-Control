@@ -76,7 +76,7 @@ export default function LoginPage() {
   const [twoFactorMode, setTwoFactorMode] = useState(false)
   const [twoFactorLoading, setTwoFactorLoading] = useState(false)
   const [twoFactorToken, setTwoFactorToken] = useState('')
-  const [authMethods, setAuthMethods] = useState<Record<LoginMethod, boolean>>(DEFAULT_AUTH_METHODS)
+  const [authMethods, setAuthMethods] = useState<Record<LoginMethod, boolean> | null>(null)
   const [smsSending, setSmsSending] = useState(false)
   const [smsLoginLoading, setSmsLoginLoading] = useState(false)
   const [smsCountdown, setSmsCountdown] = useState(0)
@@ -94,7 +94,7 @@ export default function LoginPage() {
   const isLdap = method === 'ldap'
   const isSms = method === 'sms'
   const visibleLoginMethods = useMemo(
-    () => (Object.keys(authMethods) as LoginMethod[]).filter((key) => authMethods[key]),
+    () => authMethods ? (Object.keys(authMethods) as LoginMethod[]).filter((key) => authMethods[key]) : [],
     [authMethods],
   )
 
@@ -809,7 +809,7 @@ export default function LoginPage() {
               </Form>
             )}
 
-            {visibleLoginMethods.length > 0 && (
+            {authMethods && visibleLoginMethods.length > 0 && (
               <>
                 {/* ── 第三方登录 ── */}
                 <Divider style={{
