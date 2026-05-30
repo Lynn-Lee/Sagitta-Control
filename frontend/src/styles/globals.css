@@ -407,11 +407,43 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .sagitta-auth-form .ant-input-affix-wrapper {
   height: 46px !important;
   min-height: 46px !important;
+  width: 100%;
+  overflow: hidden;
+  color: #fff !important;
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
 }
 
 .sagitta-auth-form .ant-input-affix-wrapper > input.ant-input {
   height: 44px !important;
   line-height: 44px !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #fff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.sagitta-auth-form .ant-input-affix-wrapper-focused,
+.sagitta-auth-form .ant-input-affix-wrapper:focus,
+.sagitta-auth-form .ant-input-affix-wrapper:hover {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(22,93,255,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(22,93,255,0.18) !important;
+}
+
+.sagitta-auth-form .ant-input-password-icon,
+.sagitta-auth-form .ant-input-prefix {
+  flex: 0 0 auto;
+}
+
+.sagitta-auth-form input.ant-input:-webkit-autofill,
+.sagitta-auth-form input.ant-input:-webkit-autofill:hover,
+.sagitta-auth-form input.ant-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff !important;
+  caret-color: #fff;
+  transition: background-color 9999s ease-out;
+  box-shadow: 0 0 0 1000px rgba(255,255,255,0.06) inset !important;
 }
 
 .sagitta-auth-form .ant-input::placeholder,
