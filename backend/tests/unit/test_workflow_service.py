@@ -39,6 +39,50 @@ class TestWorkflowStatus:
     def test_int_comparison_works(self):
         """整数枚举应与整数直接可比（替代 1.x 字符串比较）。"""
         assert WorkflowStatus.PENDING_REVIEW == 0
+
+
+class TestApprovalNotifications:
+    @pytest.mark.asyncio
+    async def test_intermediate_pass_only_notifies_next_approver(self):
+        db = AsyncMock()
+        workflow = SimpleNamespace(
+            id=42,
+            status=WorkflowStatus.PENDING_REVIEW,
+            engineer_id=1,
+            workflow_name="上线变更",
+            engineer="applicant",
+            engineer_display="申请人",
+            instance_id=1,
+            db_name="prod",
+        )
+        audit = SimpleNamespace(
+            id=9,
+            workflow_type=int(WorkflowType.SQL),
+            audit_auth_groups_info=json.dumps(
+                [
+                    {"order": 1, "node_id": 11, "node_name": "一级审批", "status": AuditStatus.PENDING},
+                    {"order": 2, "node_id": 12, "node_name": "二级审批", "status": AuditStatus.PENDING},
+                ],
+                ensure_ascii=False,
+            ),
+        )
+
+        with (
+            patch("app.services.audit.AuditService._check_approver_permission", AsyncMock()),
+            patch("app.services.audit.AuditService._write_log", AsyncMock()),
+            patch("app.services.audit.AuditService._enqueue_workflow_event") as enqueue_event,
+        ):
+            result = await AuditService._do_pass(
+                db,
+                workflow,
+                audit,
+                {"id": 2, "username": "leader"},
+                "",
+            )
+
+        assert result["status"] == WorkflowStatus.PENDING_REVIEW
+        assert [call.args[2] for call in enqueue_event.call_args_list] == ["approval_pending"]
+        assert json.loads(audit.audit_auth_groups_info)[0]["status"] == AuditStatus.PASSED
         assert WorkflowStatus.PENDING_REVIEW == 0
         assert WorkflowStatus.FINISH != WorkflowStatus.EXCEPTION
 

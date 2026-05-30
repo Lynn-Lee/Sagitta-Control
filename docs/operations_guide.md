@@ -407,10 +407,11 @@ Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。�
 
 排查顺序：
 
-1. 检查 `notify` 队列是否正常。
-2. 检查系统配置中的邮件、钉钉、飞书、企微参数。
-3. 检查用户资料中的 `email`、`dingtalk_user_id`、`feishu_open_id`、`wecom_userid`。
-4. 查看 `notification_delivery_log` 中的失败原因。
+1. 先确认顶部 `通知` 入口是否生成站内通知；站内通知存在但外部未送达，说明审批事件已触发，需要继续排查外部渠道。
+2. 检查 `notify` 队列是否正常。
+3. 检查系统配置中的邮件、钉钉、飞书、企微参数。
+4. 检查用户资料中的 `email`、`dingtalk_user_id`、`feishu_open_id`、`wecom_userid`。
+5. 查看 `notification_delivery_log` 中的失败原因。
 
 ## 10. 安全运维检查表
 

@@ -6,7 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.models.system import SystemNotification
 from app.services.notify import STATUS_DESC, STATUS_NOTICE, NotifyService
+from app.services.notify import NotificationTarget
 
 # ── 辅助 Mock ────────────────────────────────────────────────
 
@@ -212,6 +214,49 @@ class TestNotifyWorkflow:
                 status=7,
                 operator="admin",
             )
+
+
+class TestSystemNotification:
+    @pytest.mark.asyncio
+    async def test_send_event_writes_system_notification_before_external_delivery(self):
+        db = MagicMock()
+        db.commit = AsyncMock()
+        target = NotificationTarget(
+            id=7,
+            username="approver",
+            display_name="审批人",
+            email="",
+            dingtalk_user_id="",
+            feishu_open_id="",
+            wecom_userid="",
+        )
+        payload = {
+            "event_type": "approval_pending",
+            "subject_type": "workflow",
+            "subject_id": 42,
+            "app_type": "SQL 工单",
+            "title": "上线变更",
+            "applicant_name": "申请人",
+            "detail_path": "/workflow/42",
+        }
+
+        external_send = AsyncMock()
+        with (
+            patch("app.services.notify.NotifyService._load_config", AsyncMock(return_value={})),
+            patch("app.services.notify.NotifyService.resolve_targets", AsyncMock(return_value=[target])),
+            patch("app.services.notify.NotifyService._send_to_user", external_send),
+        ):
+            await NotifyService.send_event(db, payload)
+
+        added = db.add.call_args.args[0]
+        assert isinstance(added, SystemNotification)
+        assert added.recipient_user_id == 7
+        assert added.event_type == "approval_pending"
+        assert added.subject_type == "workflow"
+        assert added.subject_id == 42
+        assert added.detail_path == "/workflow/42"
+        assert "待审批提醒" in added.title
+        assert external_send.await_count == 1
 
 
 # ── 状态常量 ──────────────────────────────────────────────────

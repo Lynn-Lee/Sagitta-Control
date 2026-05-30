@@ -27,6 +27,7 @@ from app.models.system import (  # noqa: F401
     LicenseRecord,
     NotificationDeliveryLog,
     OperationLog,
+    SystemNotification,
     SystemConfig,
 )
 from app.models.user import Permission, ResourceGroup, Users  # noqa: F401
@@ -80,6 +81,7 @@ __all__ = [
     "SystemConfig",
     "OperationLog",
     "NotificationDeliveryLog",
+    "SystemNotification",
     "LicenseRecord",
     "DeliveryAcceptanceRun",
     "DiagnosticBundle",

@@ -80,6 +80,34 @@ class NotificationDeliveryLog(BaseModel):
     )
 
 
+class SystemNotification(BaseModel):
+    """站内通知。"""
+
+    __tablename__ = "system_notification"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    recipient_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sql_users.id", ondelete="CASCADE"), nullable=False, comment="收件用户ID"
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, comment="通知事件")
+    subject_type: Mapped[str] = mapped_column(String(30), default="", comment="对象类型")
+    subject_id: Mapped[int] = mapped_column(Integer, default=0, comment="对象ID")
+    title: Mapped[str] = mapped_column(String(200), default="", comment="通知标题")
+    content: Mapped[str] = mapped_column(Text, default="", comment="通知内容")
+    detail_path: Mapped[str] = mapped_column(String(500), default="", comment="跳转路径")
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否已读")
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="已读时间"
+    )
+
+    __table_args__ = (
+        Index("ix_sys_notify_recipient_read", "recipient_user_id", "is_read"),
+        Index("ix_sys_notify_subject", "subject_type", "subject_id"),
+        Index("ix_sys_notify_event", "event_type"),
+        Index("ix_sys_notify_tenant", "tenant_id"),
+    )
+
+
 class LicenseRecord(BaseModel):
     """商业授权记录。"""
 

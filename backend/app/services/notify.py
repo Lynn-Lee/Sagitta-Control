@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from email.mime.text import MIMEText
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.role import (
@@ -28,7 +28,7 @@ from app.models.role import (
     role_permission,
     user_group_member,
 )
-from app.models.system import NotificationDeliveryLog
+from app.models.system import NotificationDeliveryLog, SystemNotification
 from app.models.user import Permission, Users
 
 logger = logging.getLogger(__name__)
@@ -133,8 +133,106 @@ class NotifyService:
 
         subject, content = NotifyService._render(payload, config)
         for target in targets:
+            await NotifyService._write_system_notification(db, payload, subject, content, target)
             await svc._send_to_user(db, payload, subject, content, target)
         await db.commit()
+
+    # ── 站内通知 ─────────────────────────────────────────────
+
+    @staticmethod
+    async def list_system_notifications(
+        db: AsyncSession,
+        user_id: int,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        unread_only: bool = False,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        stmt = select(SystemNotification).where(SystemNotification.recipient_user_id == user_id)
+        if unread_only:
+            stmt = stmt.where(SystemNotification.is_read.is_(False))
+        total_result = await db.execute(select(func.count()).select_from(stmt.subquery()))
+        total = int(total_result.scalar() or 0)
+        result = await db.execute(
+            stmt.order_by(SystemNotification.created_at.desc(), SystemNotification.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return total, [NotifyService._serialize_system_notification(item) for item in result.scalars().all()]
+
+    @staticmethod
+    async def unread_count(db: AsyncSession, user_id: int) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(SystemNotification)
+            .where(
+                SystemNotification.recipient_user_id == user_id,
+                SystemNotification.is_read.is_(False),
+            )
+        )
+        return int(result.scalar() or 0)
+
+    @staticmethod
+    async def mark_read(db: AsyncSession, user_id: int, notification_id: int) -> bool:
+        item = await db.get(SystemNotification, notification_id)
+        if not item or item.recipient_user_id != user_id:
+            return False
+        if not item.is_read:
+            item.is_read = True
+            item.read_at = datetime.now(UTC)
+            await db.commit()
+        return True
+
+    @staticmethod
+    async def mark_all_read(db: AsyncSession, user_id: int) -> int:
+        result = await db.execute(
+            select(SystemNotification).where(
+                SystemNotification.recipient_user_id == user_id,
+                SystemNotification.is_read.is_(False),
+            )
+        )
+        items = result.scalars().all()
+        now = datetime.now(UTC)
+        for item in items:
+            item.is_read = True
+            item.read_at = now
+        await db.commit()
+        return len(items)
+
+    @staticmethod
+    async def _write_system_notification(
+        db: AsyncSession,
+        payload: dict[str, Any],
+        title: str,
+        content: str,
+        target: NotificationTarget,
+    ) -> None:
+        db.add(
+            SystemNotification(
+                recipient_user_id=target.id,
+                event_type=payload.get("event_type", ""),
+                subject_type=payload.get("subject_type", ""),
+                subject_id=int(payload.get("subject_id") or 0),
+                title=title[:200],
+                content=content,
+                detail_path=str(payload.get("detail_path") or "")[:500],
+            )
+        )
+
+    @staticmethod
+    def _serialize_system_notification(item: SystemNotification) -> dict[str, Any]:
+        return {
+            "id": item.id,
+            "event_type": item.event_type,
+            "subject_type": item.subject_type,
+            "subject_id": item.subject_id,
+            "title": item.title,
+            "content": item.content,
+            "detail_path": item.detail_path,
+            "is_read": item.is_read,
+            "created_at": item.created_at.isoformat() if item.created_at else "",
+            "read_at": item.read_at.isoformat() if item.read_at else None,
+        }
 
     # ── 收件人解析 ───────────────────────────────────────────
 

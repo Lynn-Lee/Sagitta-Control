@@ -253,6 +253,26 @@ class MonitorService:
         db.add(apply)
         await db.commit()
         await db.refresh(apply)
+        from app.services.notify import NotifyService
+
+        instance = await db.get(Instance, apply.instance_id)
+        NotifyService.enqueue_event(
+            {
+                "event_type": "approval_pending",
+                "subject_type": "monitor_privilege",
+                "subject_id": apply.id,
+                "app_type": "监控权限申请",
+                "title": apply.title,
+                "applicant_id": apply.user_id,
+                "applicant_name": user.get("display_name") or user.get("username") or str(apply.user_id),
+                "instance_id": apply.instance_id,
+                "instance_name": instance.instance_name if instance else "",
+                "permission": "observability_collect_manage",
+                "exclude_user_ids": [apply.user_id],
+                "remark": "监控权限申请已提交，待审批",
+                "detail_path": "/monitor",
+            }
+        )
         return apply
 
     @staticmethod
@@ -282,6 +302,27 @@ class MonitorService:
             apply.status = 2
         await db.commit()
         await db.refresh(apply)
+        from app.services.notify import NotifyService
+
+        applicant = await db.get(Users, apply.user_id)
+        instance = await db.get(Instance, apply.instance_id)
+        NotifyService.enqueue_event(
+            {
+                "event_type": "approval_passed" if action == "pass" else "approval_rejected",
+                "subject_type": "monitor_privilege",
+                "subject_id": apply.id,
+                "app_type": "监控权限申请",
+                "title": apply.title,
+                "applicant_id": apply.user_id,
+                "applicant_name": (applicant.display_name or applicant.username) if applicant else str(apply.user_id),
+                "user_ids": [apply.user_id],
+                "instance_id": apply.instance_id,
+                "instance_name": instance.instance_name if instance else "",
+                "operator_name": operator.get("display_name") or operator.get("username") or "",
+                "remark": remark or ("监控权限申请已审批通过" if action == "pass" else "监控权限申请已驳回"),
+                "detail_path": "/monitor",
+            }
+        )
         return apply
 
     @staticmethod

@@ -251,14 +251,6 @@ class AuditService:
 
         await AuditService._write_log(db, audit.id, operator, OP_PASS, remark=remark or msg)
         await db.commit()
-        AuditService._enqueue_workflow_event(
-            workflow,
-            audit,
-            "approval_passed",
-            user_ids=[workflow.engineer_id],
-            operator=operator,
-            remark=remark or msg,
-        )
         if next_pending:
             AuditService._enqueue_workflow_event(
                 workflow,
@@ -269,6 +261,14 @@ class AuditService:
                 remark=msg,
             )
         else:
+            AuditService._enqueue_workflow_event(
+                workflow,
+                audit,
+                "approval_passed",
+                user_ids=[workflow.engineer_id],
+                operator=operator,
+                remark=remark or msg,
+            )
             AuditService._enqueue_workflow_event(
                 workflow,
                 audit,

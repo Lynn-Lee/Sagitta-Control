@@ -826,6 +826,66 @@ class RetentionCleanupRequest(BaseModel):
     category: str
 
 
+# ═══════════════════════════════════════════════════════════
+# 站内通知
+# ═══════════════════════════════════════════════════════════
+
+
+@router.get("/notifications/", summary="我的站内通知")
+async def list_my_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    unread_only: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    from app.services.notify import NotifyService
+
+    total, items = await NotifyService.list_system_notifications(
+        db,
+        user_id=user["id"],
+        page=page,
+        page_size=page_size,
+        unread_only=unread_only,
+    )
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@router.get("/notifications/unread-count/", summary="我的未读通知数")
+async def get_my_notification_unread_count(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    from app.services.notify import NotifyService
+
+    return {"count": await NotifyService.unread_count(db, user["id"])}
+
+
+@router.post("/notifications/read-all/", summary="全部通知标记已读")
+async def mark_all_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    from app.services.notify import NotifyService
+
+    count = await NotifyService.mark_all_read(db, user["id"])
+    return {"status": 0, "msg": "已全部标记为已读", "data": {"count": count}}
+
+
+@router.post("/notifications/{notification_id}/read/", summary="通知标记已读")
+async def mark_notification_read(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    from app.services.notify import NotifyService
+
+    ok = await NotifyService.mark_read(db, user["id"], notification_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="通知不存在")
+    return {"status": 0, "msg": "已标记为已读"}
+
+
 @router.get("/config/", summary="获取系统配置（按分组）")
 async def get_system_config(
     db: AsyncSession = Depends(get_db),

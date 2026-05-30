@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip, Drawer, Grid, Alert } from 'antd'
 import type { MenuProps } from 'antd'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   default as Icon,
   DashboardOutlined, SettingOutlined, AuditOutlined, BellOutlined,
@@ -11,6 +12,7 @@ import {
   CustomerServiceOutlined,
 } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
+import { notificationApi, type SystemNotification } from '@/api/system'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal'
 import ProfileSettingsModal from '@/components/auth/ProfileSettingsModal'
 import { useAuthStore } from '@/store/auth'
@@ -167,6 +169,29 @@ type NavItem = NonNullable<MenuProps['items']>[number] & {
   children?: NavItem[]
 }
 
+const formatNotificationTime = (value: string) => {
+  if (!value) return ''
+  try {
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value))
+  } catch {
+    return ''
+  }
+}
+
+const notificationPreview = (content: string) => (
+  content
+    .replace(/\*\*/g, '')
+    .split('\n')
+    .filter((line) => line && !line.startsWith('时间：') && !line.startsWith('[查看详情]'))
+    .slice(1, 3)
+    .join(' · ')
+)
+
 const NAV_ITEMS: NavItem[] = [
   {
     key: 'dashboard-group', icon: <DashboardOutlined />, label: '数据看板', permission: 'menu_dashboard',
@@ -232,6 +257,7 @@ export default function MainLayout() {
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { user, logout, authProvider } = useAuthStore()
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const screens = useBreakpoint()
@@ -262,6 +288,114 @@ export default function MainLayout() {
     { type: 'divider' },
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true, onClick: handleLogout },
   ]
+
+  const { data: unreadCountData } = useQuery({
+    queryKey: ['system-notifications', 'unread-count'],
+    queryFn: notificationApi.unreadCount,
+    enabled: Boolean(user),
+    refetchInterval: 30_000,
+  })
+  const { data: notificationList } = useQuery({
+    queryKey: ['system-notifications', 'recent'],
+    queryFn: () => notificationApi.list({ page: 1, page_size: 8 }),
+    enabled: Boolean(user),
+    refetchInterval: 30_000,
+  })
+  const markReadMutation = useMutation({
+    mutationFn: notificationApi.markRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system-notifications'] })
+    },
+  })
+  const markAllReadMutation = useMutation({
+    mutationFn: notificationApi.markAllRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system-notifications'] })
+    },
+  })
+  const unreadCount = unreadCountData?.count || 0
+  const recentNotifications = notificationList?.items || []
+
+  const handleNotificationClick: MenuProps['onClick'] = async ({ key }) => {
+    if (key === 'read-all') {
+      await markAllReadMutation.mutateAsync()
+      return
+    }
+    const id = Number(String(key).replace('notification-', ''))
+    const item = recentNotifications.find((notice) => notice.id === id)
+    if (!item) return
+    if (!item.is_read) {
+      await markReadMutation.mutateAsync(item.id)
+    }
+    if (item.detail_path) {
+      navigate(item.detail_path)
+    }
+  }
+
+  const notificationMenuItems = useMemo<MenuProps['items']>(() => {
+    const items: MenuProps['items'] = [
+      {
+        key: 'notification-header',
+        disabled: true,
+        label: (
+          <div style={{ width: 320, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong>通知</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{unreadCount} 条未读</Text>
+          </div>
+        ),
+      },
+      { type: 'divider' },
+    ]
+
+    if (recentNotifications.length === 0) {
+      items.push({
+        key: 'notification-empty',
+        disabled: true,
+        label: <Text type="secondary">暂无通知</Text>,
+      })
+    } else {
+      recentNotifications.forEach((notice: SystemNotification) => {
+        items.push({
+          key: `notification-${notice.id}`,
+          label: (
+            <div style={{ width: 320, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 7,
+                  marginTop: 7,
+                  flex: '0 0 auto',
+                  background: notice.is_read ? '#D9D9D9' : '#165DFF',
+                }}
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <Text strong={!notice.is_read} ellipsis style={{ maxWidth: 230 }}>
+                    {notice.title}
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 12, flex: '0 0 auto' }}>
+                    {formatNotificationTime(notice.created_at)}
+                  </Text>
+                </div>
+                <Text type="secondary" ellipsis style={{ display: 'block', fontSize: 12 }}>
+                  {notificationPreview(notice.content) || '点击查看详情'}
+                </Text>
+              </div>
+            </div>
+          ),
+        })
+      })
+    }
+
+    items.push({ type: 'divider' })
+    items.push({
+      key: 'read-all',
+      disabled: unreadCount === 0 || markAllReadMutation.isPending,
+      label: '全部已读',
+    })
+    return items
+  }, [markAllReadMutation.isPending, recentNotifications, unreadCount])
 
   const selectedMenuKey = useMemo(() => {
     const leafKeys = NAV_ITEMS.flatMap((item) => item.children?.map((child) => child.key as string) ?? [item.key as string])
@@ -383,14 +517,20 @@ export default function MainLayout() {
 
         {/* 右侧：通知 + 用户 */}
         <Space size={4}>
-          <Tooltip title="通知">
-            <Badge count={0} size="small">
-              <Button icon={<BellOutlined />}
-                style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
-                通知
-              </Button>
-            </Badge>
-          </Tooltip>
+          <Dropdown
+            menu={{ items: notificationMenuItems, onClick: handleNotificationClick }}
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Tooltip title="通知">
+              <Badge count={unreadCount} size="small" overflowCount={99}>
+                <Button icon={<BellOutlined />}
+                  style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                  通知
+                </Button>
+              </Badge>
+            </Tooltip>
+          </Dropdown>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
             <div
               className="header-user-trigger"

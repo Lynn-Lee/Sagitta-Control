@@ -117,6 +117,39 @@ export const permissionApi = {
   list: () => apiClient.get('/system/permissions/').then(r => r.data),
 }
 
+// ── 站内通知 ──────────────────────────────────────────────────
+export type SystemNotification = {
+  id: number
+  event_type: string
+  subject_type: string
+  subject_id: number
+  title: string
+  content: string
+  detail_path: string
+  is_read: boolean
+  created_at: string
+  read_at?: string | null
+}
+
+export const notificationApi = {
+  list: (params?: { page?: number; page_size?: number; unread_only?: boolean }) =>
+    apiClient.get('/system/notifications/', { params }).then(r => r.data as {
+      total: number
+      page: number
+      page_size: number
+      items: SystemNotification[]
+    }),
+
+  unreadCount: () =>
+    apiClient.get('/system/notifications/unread-count/').then(r => r.data as { count: number }),
+
+  markRead: (id: number) =>
+    apiClient.post(`/system/notifications/${id}/read/`).then(r => r.data),
+
+  markAllRead: () =>
+    apiClient.post('/system/notifications/read-all/').then(r => r.data),
+}
+
 // ── 角色 ──────────────────────────────────────────────────────
 export const roleApi = {
   list: (params?: { page?: number; page_size?: number; is_active?: boolean }) =>

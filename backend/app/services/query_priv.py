@@ -1073,21 +1073,6 @@ class QueryPrivService:
 
                     NotifyService.enqueue_event(
                         {
-                            "event_type": "approval_passed",
-                            "subject_type": "query_privilege",
-                            "subject_id": apply.id,
-                            "app_type": "查询权限申请",
-                            "title": getattr(apply, "title", f"查询权限申请#{apply.id}"),
-                            "applicant_id": apply.user_id,
-                            "user_ids": [apply.user_id],
-                            "db_name": apply.db_name,
-                            "table_name": apply.table_name,
-                            "remark": remark or "当前审批节点已通过",
-                            "detail_path": "/query/privileges",
-                        }
-                    )
-                    NotifyService.enqueue_event(
-                        {
                             "event_type": "approval_pending",
                             "subject_type": "query_privilege",
                             "subject_id": apply.id,
