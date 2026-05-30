@@ -28,6 +28,7 @@ type ImportResult = {
   created: number
   updated: number
   failed: number
+  auto_created_user_groups?: number
   import_headers?: string[]
   errors: ImportErrorRow[]
 }
@@ -191,16 +192,18 @@ export default function UserManagement() {
     onSuccess: (resp: any) => {
       qc.invalidateQueries({ queryKey: ['users'] })
       const data = resp?.data as ImportResult
+      const autoCreatedGroups = data?.auto_created_user_groups ?? 0
       setImportOpen(false)
       setImportFile(null)
       importForm.resetFields()
       setImportResult(data)
       setImportResultOpen(true)
+      qc.invalidateQueries({ queryKey: ['all-user-groups'] })
       if (data?.failed) {
         const firstError = data.errors?.[0]?.error ? `，首条错误：${data.errors[0].error}` : ''
-        msgApi.warning(`导入完成：新增 ${data.created}，更新 ${data.updated}，失败 ${data.failed}${firstError}`)
+        msgApi.warning(`导入完成：新增 ${data.created}，更新 ${data.updated}，失败 ${data.failed}，自动创建用户组 ${autoCreatedGroups}${firstError}`)
       } else {
-        msgApi.success(`导入完成：新增 ${data?.created ?? 0}，更新 ${data?.updated ?? 0}`)
+        msgApi.success(`导入完成：新增 ${data?.created ?? 0}，更新 ${data?.updated ?? 0}，自动创建用户组 ${autoCreatedGroups}`)
       }
     },
     onError: (e: any) => {
@@ -656,7 +659,7 @@ export default function UserManagement() {
           >
             <Input.Password placeholder={`例如 ${IMPORT_DEFAULT_PASSWORD}`} />
           </Form.Item>
-          <Form.Item label="导入文件" required extra="支持 .xlsx 或 .csv。推荐优先下载 Excel 模板，模板内附带“字段说明”sheet，可直接查看每列填写规则和示例值。">
+          <Form.Item label="导入文件" required extra="支持 .xlsx 或 .csv。若用户组不存在，导入时会自动创建并使用表格中的用户组名作为显示名称。">
             <Dragger
               accept=".xlsx,.csv"
               maxCount={1}
@@ -736,6 +739,10 @@ export default function UserManagement() {
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">更新</Text>
             <div><Text strong style={{ color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
+          </Card>
+          <Card size="small" style={{ minWidth: 150 }}>
+            <Text type="secondary">自动创建用户组</Text>
+            <div><Text strong style={{ color: '#13c2c2' }}>{importResult?.auto_created_user_groups ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">失败</Text>

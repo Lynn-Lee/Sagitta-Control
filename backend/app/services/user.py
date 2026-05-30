@@ -201,7 +201,7 @@ USER_IMPORT_FIELD_DOCS = [
     {
         "field": "user_groups",
         "required": "否",
-        "description": "用户组标识或中文名，多个值可用分号/逗号分隔，且用户组必须已存在。",
+        "description": "用户组标识或中文名，多个值可用分号/逗号分隔；导入时会自动创建不存在的用户组，显示名称使用表格中的用户组名。",
         "example": "开发组;默认组用户组",
     },
     {
@@ -770,12 +770,16 @@ class UserService:
 
         created = 0
         updated = 0
+        auto_created_user_groups = 0
         errors: list[dict[str, object]] = []
         for index, row in enumerate(rows, start=2):
             normalized_row = row["normalized"]
             raw_row = row["raw"]
             try:
-                changed = await UserService._upsert_imported_user(db, normalized_row, default_password)
+                changed, created_group_count = await UserService._upsert_imported_user(
+                    db, normalized_row, default_password
+                )
+                auto_created_user_groups += created_group_count
                 if changed == "created":
                     created += 1
                 else:
@@ -805,6 +809,7 @@ class UserService:
             "created": created,
             "updated": updated,
             "failed": len(errors),
+            "auto_created_user_groups": auto_created_user_groups,
             "import_headers": import_headers,
             "errors": errors,
         }
@@ -863,7 +868,7 @@ class UserService:
         db: AsyncSession,
         row: dict[str, str],
         default_password: str,
-    ) -> str:
+    ) -> tuple[str, int]:
         username = row.get("username", "").strip()
         if not username:
             raise AppException("username / 用户名 不能为空", code=400)
@@ -874,7 +879,9 @@ class UserService:
             raw_manager_username=row.get("manager_username", ""),
             raw_manager_display_name=row.get("manager_display_name", ""),
         )
-        user_group_ids = await UserService._resolve_user_group_ids(db, row.get("user_groups", ""))
+        user_group_ids, created_groups = await UserService._resolve_user_group_ids(
+            db, row.get("user_groups", ""), auto_create_missing=True
+        )
         row_password = (row.get("password") or "").strip()
 
         existing = await UserService.get_by_username(db, username)
@@ -905,7 +912,7 @@ class UserService:
                 existing.password = hash_password(row_password)
                 # 将导入重置的密码标记为“初始密码”，要求用户下次登录时修改。
                 existing.password_changed_at = existing.created_at
-            return "updated"
+            return "updated", len(created_groups)
 
         await UserService.create_user(
             db,
@@ -928,7 +935,7 @@ class UserService:
             ),
             auto_commit=False,
         )
-        return "created"
+        return "created", len(created_groups)
 
     @staticmethod
     async def _resolve_role_id(db: AsyncSession, raw_role: str) -> int | None:
@@ -983,10 +990,15 @@ class UserService:
         )
 
     @staticmethod
-    async def _resolve_user_group_ids(db: AsyncSession, raw_groups: str) -> list[int]:
-        group_names = _split_multi_value(raw_groups)
+    async def _resolve_user_group_ids(
+        db: AsyncSession,
+        raw_groups: str,
+        *,
+        auto_create_missing: bool = False,
+    ) -> tuple[list[int], list[str]]:
+        group_names = list(dict.fromkeys(_split_multi_value(raw_groups)))
         if not group_names:
-            return []
+            return [], []
         result = await db.execute(
             select(UserGroup.id, UserGroup.name, UserGroup.name_cn).where(
                 (UserGroup.name.in_(group_names)) | (UserGroup.name_cn.in_(group_names))
@@ -1001,8 +1013,20 @@ class UserService:
         }
         missing = [name for name in group_names if name not in found_names]
         if missing:
-            raise AppException(f"用户组不存在: {', '.join(missing)}", code=400)
-        return [row.id for row in resolved]
+            if not auto_create_missing:
+                raise AppException(f"用户组不存在: {', '.join(missing)}", code=400)
+            for group_name in missing:
+                group = UserGroup(
+                    name=group_name,
+                    name_cn=group_name,
+                    description="由用户导入自动创建",
+                    is_active=True,
+                )
+                db.add(group)
+                await db.flush()
+                resolved.append(group)
+                logger.info("user_group_auto_created_from_user_import: %s", group_name)
+        return [row.id for row in resolved], missing
 
     @staticmethod
     def _role_model():
