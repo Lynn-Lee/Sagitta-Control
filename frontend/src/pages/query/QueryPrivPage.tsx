@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
-import { PlusOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Tabs, Tooltip, Grid } from 'antd'
+import { PlusOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { queryApi } from '@/api/query'
@@ -67,6 +67,7 @@ export default function QueryPrivPage() {
   const [managePageSize, setManagePageSize] = useState(20)
   const [revokedPage, setRevokedPage] = useState(1)
   const [revokedPageSize, setRevokedPageSize] = useState(20)
+  const [detailTarget, setDetailTarget] = useState<any>(null)
   const [msgApi, msgCtx] = message.useMessage()
 
   useEffect(() => {
@@ -380,7 +381,22 @@ export default function QueryPrivPage() {
   ]
 
   const applyColumns = [
-    { title: 'ID', dataIndex: 'id', width: 60 },
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      width: 90,
+      align: 'center',
+      render: (id: number, record: any) => (
+        <Button
+          className="sagitta-action-btn sagitta-action-btn--inspect"
+          icon={<EyeOutlined />}
+          onClick={() => setDetailTarget(record)}
+          style={{ fontFamily: 'monospace', minWidth: 76, width: 76 }}
+        >
+          #{id}
+        </Button>
+      ),
+    },
     { title: '标题', dataIndex: 'title', width: 220, ellipsis: true },
     {
       title: '目标实例', dataIndex: 'instance_name', width: 180,
@@ -531,7 +547,7 @@ export default function QueryPrivPage() {
       label: `申请记录（${applyData?.total ?? 0}）`,
       children: (
         <Table dataSource={applyData?.items} columns={applyColumns as any}
-          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1840 }}
+          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1870 }}
           pagination={remotePagination(applyData?.total, applyPage, applyPageSize, setApplyPage, setApplyPageSize, '条申请')} />
       ),
     },
@@ -545,7 +561,7 @@ export default function QueryPrivPage() {
           rowKey="id"
           size="small"
           tableLayout="fixed"
-          scroll={{ x: 2100 }}
+          scroll={{ x: 2130 }}
           pagination={remotePagination(auditData?.total, auditPage, auditPageSize, setAuditPage, setAuditPageSize, '条记录')}
         />
       ),
@@ -609,6 +625,37 @@ export default function QueryPrivPage() {
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Tabs items={tabItems} />
       </Card>
+
+      <Modal
+        title={detailTarget ? `查询权限申请 #${detailTarget.id}` : '查询权限申请'}
+        open={!!detailTarget}
+        onCancel={() => setDetailTarget(null)}
+        footer={null}
+        width={720}
+      >
+        {detailTarget && (
+          <Descriptions column={2} size="small" bordered>
+            <Descriptions.Item label="标题" span={2}>{detailTarget.title || '—'}</Descriptions.Item>
+            <Descriptions.Item label="目标实例">{detailTarget.instance_name || instanceNameMap.get(detailTarget.instance_id) || `实例#${detailTarget.instance_id}`}</Descriptions.Item>
+            <Descriptions.Item label="申请人">{detailTarget.applicant_name || detailTarget.applicant_username || '—'}</Descriptions.Item>
+            <Descriptions.Item label="申请数据库">{detailTarget.db_name || '—'}</Descriptions.Item>
+            <Descriptions.Item label="范围">
+              <Tag color={SCOPE_META[detailTarget.scope_type]?.color || 'default'}>{SCOPE_META[detailTarget.scope_type]?.label || detailTarget.scope_type || '—'}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="表名">{detailTarget.table_name || (detailTarget.scope_type === 'instance' ? '全实例' : '全库')}</Descriptions.Item>
+            <Descriptions.Item label="行数限制">{detailTarget.limit_num ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="有效期">{detailTarget.valid_date || '—'}</Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <Tag color={STATUS_MAP[detailTarget.status]?.color || 'default'}>{STATUS_MAP[detailTarget.status]?.label || '—'}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="风险">{renderRiskTag(detailTarget.risk_level, detailTarget.risk_summary)}</Descriptions.Item>
+            <Descriptions.Item label="当前节点">{detailTarget.current_node_name || '—'}</Descriptions.Item>
+            <Descriptions.Item label="提交时间" span={2}>{detailTarget.created_at ? dayjs(detailTarget.created_at).format('YYYY-MM-DD HH:mm') : '—'}</Descriptions.Item>
+            <Descriptions.Item label="申请理由" span={2}>{detailTarget.apply_reason || '—'}</Descriptions.Item>
+            <Descriptions.Item label="审批链路" span={2}>{detailTarget.approval_progress || '—'}</Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
 
       <Modal title="申请查询权限" open={applyModalOpen}
         maskClosable={false}
