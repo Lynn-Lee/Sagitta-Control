@@ -205,13 +205,13 @@ export default function WorkflowList() {
   }
 
   const idColumn: ColumnsType<any>[number] = {
-    title: 'ID', dataIndex: 'id', width: 65,
+    title: 'ID', dataIndex: 'id', width: 90, align: 'center',
     render: (id) => (
       <Button
         className="sagitta-action-btn sagitta-action-btn--inspect"
         icon={<EyeOutlined />}
         onClick={() => navigate(`/workflow/${id}`)}
-        style={{ fontFamily: 'monospace' }}
+        style={{ fontFamily: 'monospace', minWidth: 76, width: 76 }}
       >
         #{id}
       </Button>
@@ -242,7 +242,7 @@ export default function WorkflowList() {
 
   const mineColumns: ColumnsType<any> = [
     idColumn,
-    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
+    { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 290, render: renderWorkflowName(navigate, 260) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
@@ -256,7 +256,7 @@ export default function WorkflowList() {
 
   const auditColumns: ColumnsType<any> = [
     idColumn,
-    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
+    { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
     { title: '申请人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
     { title: '工单名称', dataIndex: 'workflow_name', width: 255, render: renderWorkflowName(navigate, 225) },
     { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
@@ -271,7 +271,7 @@ export default function WorkflowList() {
 
   const executeColumns: ColumnsType<any> = [
     idColumn,
-    { title: '类型', dataIndex: 'workflow_type_label', width: 105, align: 'center', render: renderWorkflowType },
+    { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 340, render: renderWorkflowName(navigate, 310) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
@@ -416,7 +416,7 @@ export default function WorkflowList() {
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
           tableLayout="fixed"
-          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1885 : activeTab === 'execute' ? 1815 : 1745 }}
+          scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1920 : activeTab === 'execute' ? 1850 : 1780 }}
           pagination={getTablePaginationConfig({
             total: data?.total,
             current: page,

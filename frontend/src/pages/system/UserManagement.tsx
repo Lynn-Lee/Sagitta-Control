@@ -291,7 +291,11 @@ export default function UserManagement() {
     setStatuses([])
   }
 
-  const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
+  const filterGridColumns = isMobile
+    ? '1fr'
+    : screens.xl
+      ? 'minmax(300px, 1.45fr) repeat(5, minmax(130px, 1fr)) minmax(180px, 1.05fr) minmax(112px, auto)'
+      : 'repeat(2, minmax(0, 1fr))'
   const handleExport = (exportFormat: 'xlsx' | 'csv') => {
     if (exportScope === 'selected' && !selectedRowKeys.length) {
       msgApi.warning('当前导出范围为“勾选结果”，请先勾选要导出的用户')
@@ -476,12 +480,20 @@ export default function UserManagement() {
         )}
       />
       <FilterCard marginBottom={16}>
-        <Space wrap size={[12, 12]} style={{ display: 'flex' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: filterGridColumns,
+            gap: 12,
+            alignItems: 'center',
+            width: '100%',
+          }}
+        >
           <Input.Search
             placeholder="搜索用户名 / 显示名 / 邮箱 / 电话号码"
             allowClear
             enterButton={<><SearchOutlined />搜索</>}
-            style={{ width: filterWidth(320) }}
+            style={{ width: '100%' }}
             value={search}
             onSearch={handleSearch}
             onChange={e => {
@@ -497,7 +509,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="角色"
-            style={{ width: filterWidth(180) }}
+            style={{ width: '100%' }}
             options={roleOptions}
             value={roleIds}
             onChange={(value) => handleFilterChange(setRoleIds, value)}
@@ -506,7 +518,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="用户组"
-            style={{ width: filterWidth(200) }}
+            style={{ width: '100%' }}
             options={groupOptions}
             value={userGroupIds}
             onChange={(value) => handleFilterChange(setUserGroupIds, value)}
@@ -515,7 +527,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="部门"
-            style={{ width: filterWidth(180) }}
+            style={{ width: '100%' }}
             options={departmentOptions}
             value={departments}
             onChange={(value) => handleFilterChange(setDepartments, value)}
@@ -524,7 +536,7 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="职位"
-            style={{ width: filterWidth(180) }}
+            style={{ width: '100%' }}
             options={titleOptions}
             value={titles}
             onChange={(value) => handleFilterChange(setTitles, value)}
@@ -533,13 +545,13 @@ export default function UserManagement() {
             mode="multiple"
             allowClear
             placeholder="状态"
-            style={{ width: filterWidth(160) }}
+            style={{ width: '100%' }}
             options={statusOptions}
             value={statuses}
             onChange={(value) => handleFilterChange(setStatuses, value)}
           />
           <Select
-            style={{ width: filterWidth(180) }}
+            style={{ width: '100%' }}
             options={[
               { value: 'filtered', label: '导出当前筛选结果' },
               { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
@@ -547,10 +559,10 @@ export default function UserManagement() {
             value={exportScope}
             onChange={setExportScope}
           />
-          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>
+          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={{ width: '100%' }}>
             重置筛选
           </Button>
-        </Space>
+        </div>
         <div style={{ marginTop: 12 }}>
           <Space wrap size={[8, 8]} style={{
             display: 'flex',

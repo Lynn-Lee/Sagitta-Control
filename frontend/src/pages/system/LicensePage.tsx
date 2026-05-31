@@ -343,8 +343,8 @@ export default function LicensePage() {
         <Col xs={24}>
           <Card title="在线激活与续期">
             <Form layout="vertical">
-              <Row gutter={12}>
-                <Col xs={24} md={10}>
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={12}>
                   <Form.Item label="激活码">
                     <Input
                       value={activationCode}
@@ -353,7 +353,7 @@ export default function LicensePage() {
                     />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={8}>
+                <Col xs={24} md={12}>
                   <Form.Item label="客户 ID">
                     <Input
                       value={customerId}
@@ -362,9 +362,9 @@ export default function LicensePage() {
                     />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={6}>
-                  <Form.Item label=" ">
-                    <Space>
+                <Col xs={24}>
+                  <Form.Item style={{ marginBottom: 8 }}>
+                    <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
                       <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleActivate} loading={activating}>
                         在线激活
                       </Button>
@@ -381,21 +381,23 @@ export default function LicensePage() {
                 </Col>
                 <Col xs={24} md={18}>
                   <Form.Item label="正式激活部署指纹" validateStatus={fingerprintError ? 'error' : undefined} help={fingerprintError || undefined}>
-                    <Input
-                      value={activationFingerprint}
-                      readOnly
-                      placeholder={customerId.trim() ? (fingerprintLoading ? '正在计算' : '请输入有效客户 ID') : '输入客户 ID 后自动生成'}
-                      addonAfter={(
-                        <Button
-                          className="sagitta-action-btn sagitta-action-btn--copy"
-                          icon={<CopyOutlined />}
-                          disabled={!activationFingerprint}
-                          onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}
-                        >
-                          复制
-                        </Button>
-                      )}
-                    />
+                    <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                      <Input
+                        value={activationFingerprint}
+                        readOnly
+                        placeholder={customerId.trim() ? (fingerprintLoading ? '正在计算' : '请输入有效客户 ID') : '输入客户 ID 后自动生成'}
+                        style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <Button
+                        className="sagitta-action-btn sagitta-action-btn--copy"
+                        icon={<CopyOutlined />}
+                        disabled={!activationFingerprint}
+                        onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}
+                        style={{ flex: '0 0 auto', boxShadow: 'none' }}
+                      >
+                        复制
+                      </Button>
+                    </div>
                   </Form.Item>
                 </Col>
               </Row>
