@@ -62,6 +62,21 @@ class TestNormalizeColumnRow:
             "column_key": "",
         }
 
+    def test_mongo_sample_field_alias(self):
+        cols = ["field", "type"]
+        row = ("email", "str")
+
+        result = InstanceService._normalize_column_row(row, cols=cols)
+
+        assert result == {
+            "column_name": "email",
+            "column_type": "str",
+            "is_nullable": "YES",
+            "column_default": None,
+            "column_comment": "",
+            "column_key": "",
+        }
+
 
 class TestNormalizeConstraintRow:
     def test_mysql_constraint_row(self):

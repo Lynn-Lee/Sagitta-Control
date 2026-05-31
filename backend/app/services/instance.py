@@ -338,7 +338,7 @@ class InstanceService:
 
         lowered = {str(key).lower(): value for key, value in raw.items()}
         normalized = {
-            "column_name": lowered.get("column_name") or lowered.get("name") or "",
+            "column_name": lowered.get("column_name") or lowered.get("name") or lowered.get("field") or "",
             "column_type": (
                 lowered.get("column_type")
                 or lowered.get("data_type")
