@@ -861,6 +861,56 @@ async def get_my_notification_unread_count(
     return {"count": await NotifyService.unread_count(db, user["id"])}
 
 
+@router.get("/notifications/delivery-log/", summary="通知投递日志")
+async def list_notification_delivery_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    event_type: str | None = None,
+    subject_type: str | None = None,
+    subject_id: int | None = Query(None, ge=0),
+    channel: str | None = Query(None, pattern="^(feishu|wecom|dingtalk|mail|none)$"),
+    status: str | None = Query(None, pattern="^(sent|failed|skipped|pending)$"),
+    recipient_user_id: int | None = Query(None, ge=1),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    from app.services.notify import NotifyService
+
+    total, items = await NotifyService.list_delivery_logs(
+        db,
+        page=page,
+        page_size=page_size,
+        event_type=event_type,
+        subject_type=subject_type,
+        subject_id=subject_id,
+        channel=channel,
+        status=status,
+        recipient_user_id=recipient_user_id,
+    )
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@router.get("/notifications/missing-external-ids/", summary="外部通知账号缺失检查")
+async def list_notification_missing_external_ids(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    approval_only: bool = True,
+    missing_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_perm("system_config_manage")),
+):
+    from app.services.notify import NotifyService
+
+    total, items = await NotifyService.list_missing_external_ids(
+        db,
+        approval_only=approval_only,
+        missing_only=missing_only,
+        page=page,
+        page_size=page_size,
+    )
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
 @router.post("/notifications/read-all/", summary="全部通知标记已读")
 async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),

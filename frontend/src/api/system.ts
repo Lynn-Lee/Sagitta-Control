@@ -131,6 +131,32 @@ export type SystemNotification = {
   read_at?: string | null
 }
 
+export type NotificationDeliveryLog = {
+  id: number
+  event_type: string
+  subject_type: string
+  subject_id: number
+  channel: string
+  recipient_user_id?: number | null
+  recipient: string
+  status: string
+  error: string
+  created_at: string
+  username: string
+  display_name: string
+}
+
+export type MissingExternalNotificationIds = {
+  id: number
+  username: string
+  display_name: string
+  email: string
+  dingtalk_user_id: string
+  feishu_open_id: string
+  wecom_userid: string
+  missing_channels: string[]
+}
+
 export const notificationApi = {
   list: (params?: { page?: number; page_size?: number; unread_only?: boolean }) =>
     apiClient.get('/system/notifications/', { params }).then(r => r.data as {
@@ -142,6 +168,36 @@ export const notificationApi = {
 
   unreadCount: () =>
     apiClient.get('/system/notifications/unread-count/').then(r => r.data as { count: number }),
+
+  deliveryLog: (params?: {
+    page?: number
+    page_size?: number
+    event_type?: string
+    subject_type?: string
+    subject_id?: number
+    channel?: 'feishu' | 'wecom' | 'dingtalk' | 'mail' | 'none'
+    status?: 'sent' | 'failed' | 'skipped' | 'pending'
+    recipient_user_id?: number
+  }) =>
+    apiClient.get('/system/notifications/delivery-log/', { params }).then(r => r.data as {
+      total: number
+      page: number
+      page_size: number
+      items: NotificationDeliveryLog[]
+    }),
+
+  missingExternalIds: (params?: {
+    page?: number
+    page_size?: number
+    approval_only?: boolean
+    missing_only?: boolean
+  }) =>
+    apiClient.get('/system/notifications/missing-external-ids/', { params }).then(r => r.data as {
+      total: number
+      page: number
+      page_size: number
+      items: MissingExternalNotificationIds[]
+    }),
 
   markRead: (id: number) =>
     apiClient.post(`/system/notifications/${id}/read/`).then(r => r.data),

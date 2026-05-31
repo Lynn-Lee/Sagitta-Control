@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.approval_flow import ApprovalFlow, ApprovalFlowNode
 from app.models.role import (
     Role,
     group_resource_group,
@@ -138,6 +139,120 @@ class NotifyService:
         await db.commit()
 
     # ── 站内通知 ─────────────────────────────────────────────
+
+    @staticmethod
+    async def list_delivery_logs(
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        event_type: str | None = None,
+        subject_type: str | None = None,
+        subject_id: int | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        recipient_user_id: int | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        stmt = select(NotificationDeliveryLog)
+        if event_type:
+            stmt = stmt.where(NotificationDeliveryLog.event_type == event_type)
+        if subject_type:
+            stmt = stmt.where(NotificationDeliveryLog.subject_type == subject_type)
+        if subject_id is not None:
+            stmt = stmt.where(NotificationDeliveryLog.subject_id == subject_id)
+        if channel:
+            stmt = stmt.where(NotificationDeliveryLog.channel == channel)
+        if status:
+            stmt = stmt.where(NotificationDeliveryLog.status == status)
+        if recipient_user_id is not None:
+            stmt = stmt.where(NotificationDeliveryLog.recipient_user_id == recipient_user_id)
+
+        total_result = await db.execute(select(func.count()).select_from(stmt.subquery()))
+        total = int(total_result.scalar() or 0)
+        result = await db.execute(
+            stmt.order_by(NotificationDeliveryLog.created_at.desc(), NotificationDeliveryLog.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        logs = list(result.scalars().all())
+        user_ids = {item.recipient_user_id for item in logs if item.recipient_user_id}
+        users_by_id: dict[int, Users] = {}
+        if user_ids:
+            users_result = await db.execute(select(Users).where(Users.id.in_(user_ids)))
+            users_by_id = {user.id: user for user in users_result.scalars().all()}
+
+        return total, [
+            {
+                "id": item.id,
+                "event_type": item.event_type,
+                "subject_type": item.subject_type,
+                "subject_id": item.subject_id,
+                "channel": item.channel,
+                "recipient_user_id": item.recipient_user_id,
+                "recipient": item.recipient,
+                "status": item.status,
+                "error": item.error,
+                "created_at": item.created_at.isoformat() if item.created_at else "",
+                "username": users_by_id[item.recipient_user_id].username
+                if item.recipient_user_id in users_by_id
+                else "",
+                "display_name": users_by_id[item.recipient_user_id].display_name
+                if item.recipient_user_id in users_by_id
+                else "",
+            }
+            for item in logs
+        ]
+
+    @staticmethod
+    async def list_missing_external_ids(
+        db: AsyncSession,
+        *,
+        approval_only: bool = True,
+        missing_only: bool = True,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        target_user_ids: set[int] | None = None
+        if approval_only:
+            target_user_ids = await NotifyService._approval_related_user_ids(db)
+            if not target_user_ids:
+                return 0, []
+
+        stmt = select(Users).where(Users.is_active.is_(True))
+        if target_user_ids is not None:
+            stmt = stmt.where(Users.id.in_(target_user_ids))
+
+        result = await db.execute(stmt.order_by(Users.id))
+        rows: list[dict[str, Any]] = []
+        for user in result.scalars().all():
+            missing_channels = [
+                channel
+                for channel, value in (
+                    ("dingtalk", user.dingtalk_user_id),
+                    ("feishu", user.feishu_open_id),
+                    ("wecom", user.wecom_userid),
+                    ("mail", user.email),
+                )
+                if not value
+            ]
+            if missing_only and not missing_channels:
+                continue
+            rows.append(
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "display_name": user.display_name or user.username,
+                    "email": user.email or "",
+                    "dingtalk_user_id": user.dingtalk_user_id or "",
+                    "feishu_open_id": user.feishu_open_id or "",
+                    "wecom_userid": user.wecom_userid or "",
+                    "missing_channels": missing_channels,
+                }
+            )
+
+        total = len(rows)
+        start = (page - 1) * page_size
+        return total, rows[start:start + page_size]
 
     @staticmethod
     async def list_system_notifications(
@@ -316,6 +431,49 @@ class NotifyService:
             .distinct()
         )
         return set(result.scalars().all())
+
+    @staticmethod
+    async def _approval_related_user_ids(db: AsyncSession) -> set[int]:
+        ids = await NotifyService._user_ids_by_permissions(
+            db,
+            [
+                "sql_review",
+                "query_review",
+                "archive_review",
+                "observability_collect_manage",
+                "sql_execute",
+                "archive_execute",
+            ],
+        )
+
+        result = await db.execute(
+            select(ApprovalFlowNode)
+            .join(ApprovalFlow, ApprovalFlow.id == ApprovalFlowNode.flow_id)
+            .where(ApprovalFlow.is_active.is_(True))
+        )
+        for node in result.scalars().all():
+            if node.approver_type == "users":
+                import json
+
+                try:
+                    ids.update(int(uid) for uid in json.loads(node.approver_ids or "[]"))
+                except (TypeError, ValueError):
+                    continue
+            elif node.approver_type == "user_group" and node.approver_group_id:
+                group_result = await db.execute(
+                    select(user_group_member.c.user_id)
+                    .where(user_group_member.c.group_id == node.approver_group_id)
+                )
+                ids.update(group_result.scalars().all())
+            elif node.approver_type == "role" and node.approver_role_id:
+                role_result = await db.execute(
+                    select(Users.id).where(Users.role_id == node.approver_role_id)
+                )
+                ids.update(role_result.scalars().all())
+
+        manager_result = await db.execute(select(Users.manager_id).where(Users.manager_id.is_not(None)))
+        ids.update(manager_result.scalars().all())
+        return ids
 
     @staticmethod
     def _target_from_user(user: Users) -> NotificationTarget:

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.system import SystemNotification
+from app.models.system import NotificationDeliveryLog, SystemNotification
 from app.services.notify import STATUS_DESC, STATUS_NOTICE, NotifyService
 from app.services.notify import NotificationTarget
 
@@ -257,6 +257,101 @@ class TestSystemNotification:
         assert added.detail_path == "/workflow/42"
         assert "待审批提醒" in added.title
         assert external_send.await_count == 1
+
+
+class TestPreciseAppNotification:
+    @pytest.mark.asyncio
+    async def test_app_success_does_not_send_fallback_mail(self):
+        db = MagicMock()
+        svc = NotifyService(config={"feishu_enabled": "true"})
+        target = NotificationTarget(
+            id=7,
+            username="approver",
+            display_name="审批人",
+            email="approver@example.com",
+            dingtalk_user_id="",
+            feishu_open_id="ou_123",
+            wecom_userid="",
+        )
+
+        with (
+            patch.object(svc, "_send_feishu_user", AsyncMock(return_value={"code": 0})) as feishu_send,
+            patch.object(svc, "_send_mail", AsyncMock()) as mail_send,
+        ):
+            await svc._send_to_user(db, {"event_type": "approval_pending"}, "标题", "内容", target)
+
+        logs = [call.args[0] for call in db.add.call_args_list]
+        assert feishu_send.await_count == 1
+        assert mail_send.await_count == 0
+        assert any(
+            isinstance(item, NotificationDeliveryLog)
+            and item.channel == "feishu"
+            and item.status == "sent"
+            and item.recipient == "ou_123"
+            for item in logs
+        )
+
+    @pytest.mark.asyncio
+    async def test_app_failure_uses_mail_fallback(self):
+        db = MagicMock()
+        svc = NotifyService(config={"feishu_enabled": "true"})
+        target = NotificationTarget(
+            id=7,
+            username="approver",
+            display_name="审批人",
+            email="approver@example.com",
+            dingtalk_user_id="",
+            feishu_open_id="ou_123",
+            wecom_userid="",
+        )
+
+        with (
+            patch.object(svc, "_send_feishu_user", AsyncMock(side_effect=RuntimeError("boom"))),
+            patch.object(svc, "_send_mail", AsyncMock(return_value=None)) as mail_send,
+        ):
+            await svc._send_to_user(db, {"event_type": "approval_pending"}, "标题", "内容", target)
+
+        logs = [call.args[0] for call in db.add.call_args_list]
+        assert mail_send.await_count == 1
+        assert any(
+            isinstance(item, NotificationDeliveryLog)
+            and item.channel == "feishu"
+            and item.status == "failed"
+            and "boom" in item.error
+            for item in logs
+        )
+        assert any(
+            isinstance(item, NotificationDeliveryLog)
+            and item.channel == "mail"
+            and item.status == "sent"
+            and item.recipient == "approver@example.com"
+            for item in logs
+        )
+
+    @pytest.mark.asyncio
+    async def test_missing_external_ids_and_email_write_skipped_log(self):
+        db = MagicMock()
+        svc = NotifyService(config={"feishu_enabled": "true", "wecom_enabled": "true", "ding_enabled": "true"})
+        target = NotificationTarget(
+            id=7,
+            username="approver",
+            display_name="审批人",
+            email="",
+            dingtalk_user_id="",
+            feishu_open_id="",
+            wecom_userid="",
+        )
+
+        await svc._send_to_user(db, {"event_type": "approval_pending"}, "标题", "内容", target)
+
+        logs = [call.args[0] for call in db.add.call_args_list]
+        assert any(
+            isinstance(item, NotificationDeliveryLog)
+            and item.channel == "none"
+            and item.status == "skipped"
+            and "未配置外部通知账号或邮箱" in item.error
+            for item in logs
+        )
 
 
 # ── 状态常量 ──────────────────────────────────────────────────
