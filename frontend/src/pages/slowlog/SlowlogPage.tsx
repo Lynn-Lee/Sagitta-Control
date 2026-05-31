@@ -77,7 +77,7 @@ const SEVERITY_COLOR: Record<string, string> = {
 const sourceLabel = (source: string) => SOURCE_LABELS[source] || source
 const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD HH:mm:ss') : '—'
 const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
-const TREND_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1', '#13c2c2']
+const TREND_COLORS = ['#165DFF', '#00B42A', '#FF7D00', '#C41D7F', '#6F42C1', '#08979C']
 
 const renderSourceTag = (source?: string) => {
   const value = source || ''
@@ -1055,8 +1055,8 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
                     <XAxis dataKey="bucket" tick={{ fontSize: 11 }} minTickGap={24} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <ChartTooltip />
-                    <Line type="monotone" dataKey="count" name="次数" stroke="#1677ff" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="avg_duration_ms" name="平均耗时(ms)" stroke="#fa8c16" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="count" name="次数" stroke="#165DFF" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="avg_duration_ms" name="平均耗时(ms)" stroke="#FF7D00" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

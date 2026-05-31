@@ -250,7 +250,7 @@ function ConfigGroup({ group, items, form }: { group: string; items: any[]; form
               <Space size={4}>
                 <span>{item.description}</span>
                 {isSensitive && (
-                  <Text style={{ color: '#fa8c16', border: '1px solid #fa8c16', borderRadius: 2, padding: '0 4px' }}>
+                  <Text style={{ color: '#FF7D00', border: '1px solid #FF7D00', borderRadius: 2, padding: '0 4px' }}>
                     加密存储
                   </Text>
                 )}

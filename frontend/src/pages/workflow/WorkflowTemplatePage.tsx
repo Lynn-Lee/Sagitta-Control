@@ -306,7 +306,7 @@ export default function WorkflowTemplatePage() {
             code
             style={{
               display: 'block',
-              color: '#1558A8',
+              color: '#165DFF',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               lineHeight: 1.45,
@@ -331,7 +331,7 @@ export default function WorkflowTemplatePage() {
       title: '使用次数',
       dataIndex: 'use_count',
       width: 90,
-      render: (value: number) => <Badge count={value} showZero color="#1558A8" />,
+      render: (value: number) => <Badge count={value} showZero color="#165DFF" />,
     },
     {
       title: '更新时间',

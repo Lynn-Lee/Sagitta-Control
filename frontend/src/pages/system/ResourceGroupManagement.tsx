@@ -136,7 +136,7 @@ export default function ResourceGroupManagement() {
   const dbTypeColor: Record<string, string> = {
     mysql: '#4479A1', pgsql: '#336791', postgresql: '#336791',
     oracle: '#F80000', mongodb: '#47A248', redis: '#DC382D',
-    clickhouse: '#FFCC00', mssql: '#CC2927', elasticsearch: '#FEC514',
+    clickhouse: '#AD6800', mssql: '#CC2927', elasticsearch: '#AD6800',
     cassandra: '#1287B1', doris: '#4A90D9', tidb: '#E2231A',
   }
 

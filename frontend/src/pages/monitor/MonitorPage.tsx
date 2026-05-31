@@ -1133,11 +1133,11 @@ export default function MonitorPage() {
                                   <XAxis dataKey="time" />
                                   <YAxis />
                                   <Tooltip formatter={formatTrendTooltip} />
-                                  <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#1677ff" dot={false} />
-                                  <Line type="monotone" dataKey="qps" name="QPS" stroke="#52c41a" dot={false} />
-                                  <Line type="monotone" dataKey="tps" name="TPS" stroke="#13c2c2" dot={false} />
-                                  <Line type="monotone" dataKey="slow_queries" name="本次慢查询" stroke="#fa8c16" dot={false} />
-                                  <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#722ed1" dot={false} />
+                                  <Line type="monotone" dataKey="current_connections" name="连接数" stroke="#165DFF" dot={false} />
+                                  <Line type="monotone" dataKey="qps" name="QPS" stroke="#00B42A" dot={false} />
+                                  <Line type="monotone" dataKey="tps" name="TPS" stroke="#08979C" dot={false} />
+                                  <Line type="monotone" dataKey="slow_queries" name="本次慢查询" stroke="#FF7D00" dot={false} />
+                                  <Line type="monotone" dataKey="size_gb" name="容量GB" stroke="#6F42C1" dot={false} />
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>

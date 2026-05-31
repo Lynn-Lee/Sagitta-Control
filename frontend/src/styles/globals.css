@@ -381,7 +381,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   align-items: center;
   justify-content: center;
   border-radius: 7px;
-  background: color-mix(in srgb, var(--mode-color, #5E7CE0) 20%, transparent);
+  background: color-mix(in srgb, var(--mode-color, #165DFF) 20%, transparent);
 }
 
 .sagitta-login-error-alert {

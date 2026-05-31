@@ -43,37 +43,58 @@ const RANGE_OPTIONS = [7, 14, 30, 60]
 const DASHBOARD_CHART_HEIGHT = 300
 const DASHBOARD_GRID_STROKE = 'rgba(0,0,0,0.06)'
 const DASHBOARD_CARD_STYLE = { borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }
-const TOP_USER_COLORS = ['#1558A8', '#4C8DFF', '#13c2c2', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96', '#2f54eb', '#7cb305', '#fa541c']
-const WORKFLOW_TOP_COLORS = ['#2F54EB', '#1890FF', '#13C2C2', '#52C41A', '#FA8C16', '#EB2F96', '#722ED1', '#A0D911', '#FA541C', '#1677FF']
+const CHART_COLORS = {
+  primary: '#165DFF',
+  primaryDeep: '#0E42C1',
+  cyan: '#08979C',
+  success: '#00B42A',
+  warning: '#FF7D00',
+  error: '#F53F3F',
+  purple: '#6F42C1',
+  gray: '#86909C',
+  lime: '#7CB305',
+  magenta: '#C41D7F',
+}
+const TOP_USER_COLORS = [
+  CHART_COLORS.primary,
+  CHART_COLORS.primaryDeep,
+  CHART_COLORS.cyan,
+  CHART_COLORS.success,
+  CHART_COLORS.warning,
+  CHART_COLORS.purple,
+  CHART_COLORS.magenta,
+  CHART_COLORS.lime,
+]
+const WORKFLOW_TOP_COLORS = TOP_USER_COLORS
 const QUERY_GOVERNANCE_COLORS = {
-  pendingStock: '#6F42C1',
-  failure: '#E53935',
-  masked: '#14B8A6',
-  approved: '#52C41A',
-  rejected: '#FA8C16',
-  revoked: '#8C8C8C',
+  pendingStock: CHART_COLORS.purple,
+  failure: CHART_COLORS.error,
+  masked: CHART_COLORS.cyan,
+  approved: CHART_COLORS.success,
+  rejected: CHART_COLORS.warning,
+  revoked: CHART_COLORS.gray,
 }
 const WORKFLOW_COLORS = {
-  submit: '#1558A8',
-  approved: '#52C41A',
-  rejected: '#FA8C16',
-  cancel: '#A0A0A0',
-  executeFailed: '#E53935',
-  queued: '#722ED1',
-  running: '#1677FF',
-  success: '#13C2C2',
-  pendingStock: '#6F42C1',
+  submit: CHART_COLORS.primary,
+  approved: CHART_COLORS.success,
+  rejected: CHART_COLORS.warning,
+  cancel: CHART_COLORS.gray,
+  executeFailed: CHART_COLORS.error,
+  queued: CHART_COLORS.purple,
+  running: CHART_COLORS.primary,
+  success: CHART_COLORS.cyan,
+  pendingStock: CHART_COLORS.purple,
 }
 const ARCHIVE_COLORS = {
-  submit: '#1558A8',
-  success: '#52C41A',
-  failed: '#E53935',
-  canceled: '#8C8C8C',
-  scheduled: '#722ED1',
-  running: '#1677FF',
-  rows: '#13C2C2',
-  risk: '#FA8C16',
-  activeStock: '#6F42C1',
+  submit: CHART_COLORS.primary,
+  success: CHART_COLORS.success,
+  failed: CHART_COLORS.error,
+  canceled: CHART_COLORS.gray,
+  scheduled: CHART_COLORS.purple,
+  running: CHART_COLORS.primary,
+  rows: CHART_COLORS.cyan,
+  risk: CHART_COLORS.warning,
+  activeStock: CHART_COLORS.purple,
 }
 
 type OverviewResponse = {
@@ -256,14 +277,14 @@ export function QueryDashboardPage() {
   }, [queryOverview])
 
   const queryCards = [
-    { title: `${queryRangeLabel}查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: '#1558A8' },
-    { title: `${queryRangeLabel}查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: '#722ed1' },
-    { title: `${queryRangeLabel}治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: '#f5222d' },
-    { title: `${queryRangeLabel}命中脱敏次数`, value: queryOverview?.cards?.period_masked_count ?? 0, icon: <SafetyCertificateOutlined />, color: '#13c2c2' },
-    { title: '待审批查询权限申请数', value: queryOverview?.cards?.pending_query_priv_apply_count ?? 0, icon: <LockOutlined />, color: '#fa8c16' },
-    { title: `${queryRangeLabel}已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
-    { title: `${queryRangeLabel}已驳回查询权限申请数`, value: queryOverview?.cards?.rejected_query_priv_apply_count ?? 0, icon: <CloseCircleOutlined />, color: '#ff4d4f' },
-    { title: `${queryRangeLabel}撤销查询权限数`, value: queryOverview?.cards?.revoked_query_privilege_count ?? 0, icon: <DeleteOutlined />, color: '#8c8c8c' },
+    { title: `${queryRangeLabel}查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: CHART_COLORS.primary },
+    { title: `${queryRangeLabel}查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: CHART_COLORS.purple },
+    { title: `${queryRangeLabel}治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.error },
+    { title: `${queryRangeLabel}命中脱敏次数`, value: queryOverview?.cards?.period_masked_count ?? 0, icon: <SafetyCertificateOutlined />, color: CHART_COLORS.cyan },
+    { title: '待审批查询权限申请数', value: queryOverview?.cards?.pending_query_priv_apply_count ?? 0, icon: <LockOutlined />, color: CHART_COLORS.warning },
+    { title: `${queryRangeLabel}已通过查询权限申请数`, value: queryOverview?.cards?.approved_query_priv_apply_count ?? 0, icon: <CheckCircleOutlined />, color: CHART_COLORS.success },
+    { title: `${queryRangeLabel}已驳回查询权限申请数`, value: queryOverview?.cards?.rejected_query_priv_apply_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.error },
+    { title: `${queryRangeLabel}撤销查询权限数`, value: queryOverview?.cards?.revoked_query_privilege_count ?? 0, icon: <DeleteOutlined />, color: CHART_COLORS.gray },
   ]
 
   const pendingStockTooltipFormatter = (value: number | string) => [`${value}`, '截至当日结束待审批存量']
@@ -316,8 +337,8 @@ export function QueryDashboardPage() {
                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="query_count" stroke="#1558A8" name="查询次数" strokeWidth={2} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="query_user_count" stroke="#722ed1" name="查询用户数" strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="query_count" stroke={CHART_COLORS.primary} name="查询次数" strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="query_user_count" stroke={CHART_COLORS.purple} name="查询用户数" strokeWidth={2} dot={{ r: 2 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -454,16 +475,16 @@ export function WorkflowDashboardPage() {
   }, [workflowOverview])
 
   const workflowCards = [
-    { title: `${workflowRangeLabel}提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: '#1558A8' },
-    { title: `${workflowRangeLabel}审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: '#52c41a' },
-    { title: `${workflowRangeLabel}审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: '#fa8c16' },
-    { title: '待审批工单数', value: workflowOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: '#722ed1' },
-    { title: '队列中工单数', value: workflowOverview?.cards?.queued_count ?? 0, icon: <ClockCircleOutlined />, color: '#722ed1' },
-    { title: '执行中工单数', value: workflowOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: '#1677FF' },
-    { title: `${workflowRangeLabel}执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: '#13C2C2' },
-    { title: `${workflowRangeLabel}执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: '#E53935' },
-    { title: `${workflowRangeLabel}取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: '#A0A0A0' },
-    { title: `${workflowRangeLabel}完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: '#2F54EB' },
+    { title: `${workflowRangeLabel}提交工单数`, value: workflowOverview?.cards?.today_submit_count ?? 0, icon: <FileTextOutlined />, color: CHART_COLORS.primary },
+    { title: `${workflowRangeLabel}审批通过工单数`, value: workflowOverview?.cards?.today_approved_count ?? 0, icon: <CheckCircleOutlined />, color: CHART_COLORS.success },
+    { title: `${workflowRangeLabel}审批驳回工单数`, value: workflowOverview?.cards?.today_rejected_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.warning },
+    { title: '待审批工单数', value: workflowOverview?.cards?.pending_count ?? 0, icon: <LockOutlined />, color: CHART_COLORS.purple },
+    { title: '队列中工单数', value: workflowOverview?.cards?.queued_count ?? 0, icon: <ClockCircleOutlined />, color: CHART_COLORS.purple },
+    { title: '执行中工单数', value: workflowOverview?.cards?.running_count ?? 0, icon: <ThunderboltOutlined />, color: CHART_COLORS.primary },
+    { title: `${workflowRangeLabel}执行成功工单数`, value: workflowOverview?.cards?.today_execute_success_count ?? 0, icon: <CheckCircleOutlined />, color: CHART_COLORS.cyan },
+    { title: `${workflowRangeLabel}执行失败工单数`, value: workflowOverview?.cards?.today_execute_failed_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.error },
+    { title: `${workflowRangeLabel}取消工单数`, value: workflowOverview?.cards?.today_cancel_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.gray },
+    { title: `${workflowRangeLabel}完成工单总数`, value: workflowOverview?.cards?.today_finished_count ?? 0, icon: <FileDoneOutlined />, color: CHART_COLORS.primaryDeep },
   ]
 
   return (
@@ -943,10 +964,10 @@ export function InstanceDashboardPage() {
   })
 
   const instanceCards = [
-    { title: '可见实例数', value: instanceOverview?.cards?.visible_instance_count ?? 0, icon: <DatabaseOutlined />, color: '#1558A8' },
-    { title: '已同步库/Schema数', value: instanceOverview?.cards?.synced_database_count ?? 0, icon: <AppstoreOutlined />, color: '#1677FF' },
-    { title: '已启用库/Schema数', value: instanceOverview?.cards?.enabled_database_count ?? 0, icon: <CheckCircleOutlined />, color: '#52C41A' },
-    { title: '已禁用库/Schema数', value: instanceOverview?.cards?.disabled_database_count ?? 0, icon: <StopOutlined />, color: '#FA8C16' },
+    { title: '可见实例数', value: instanceOverview?.cards?.visible_instance_count ?? 0, icon: <DatabaseOutlined />, color: CHART_COLORS.primary },
+    { title: '已同步库/Schema数', value: instanceOverview?.cards?.synced_database_count ?? 0, icon: <AppstoreOutlined />, color: CHART_COLORS.primary },
+    { title: '已启用库/Schema数', value: instanceOverview?.cards?.enabled_database_count ?? 0, icon: <CheckCircleOutlined />, color: CHART_COLORS.success },
+    { title: '已禁用库/Schema数', value: instanceOverview?.cards?.disabled_database_count ?? 0, icon: <StopOutlined />, color: CHART_COLORS.warning },
   ]
 
   return (
@@ -1033,7 +1054,7 @@ export function InstanceDashboardPage() {
                           {buildTopChartData(instanceOverview.instance_status_distribution, 'count').map((item, index) => (
                             <Cell
                               key={index}
-                              fill={String(item.label).includes('禁用') ? '#FA8C16' : '#52C41A'}
+                              fill={String(item.label).includes('禁用') ? CHART_COLORS.warning : CHART_COLORS.success}
                             />
                           ))}
                         </Bar>
@@ -1062,7 +1083,7 @@ export function InstanceDashboardPage() {
                           {buildTopChartData(instanceOverview.database_status_distribution, 'count').map((item, index) => (
                             <Cell
                               key={index}
-                              fill={String(item.label).includes('禁用') ? '#FA8C16' : '#52C41A'}
+                              fill={String(item.label).includes('禁用') ? CHART_COLORS.warning : CHART_COLORS.success}
                             />
                           ))}
                         </Bar>

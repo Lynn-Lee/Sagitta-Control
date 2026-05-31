@@ -170,7 +170,7 @@ export default function DataDictPage() {
   const treeData = filteredTables.map(t => ({
     key: t, title: (
       <Space size={4}>
-        <TableOutlined style={{ color: '#1558A8' }} />
+        <TableOutlined style={{ color: '#165DFF' }} />
         <Tooltip title={t}>
           <Text style={{
             display: 'inline-block',

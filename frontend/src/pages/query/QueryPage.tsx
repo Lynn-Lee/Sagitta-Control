@@ -437,7 +437,7 @@ export default function QueryPage() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <Space size={8}>
-                  <AppstoreOutlined style={{ color: '#1558A8' }} />
+                  <AppstoreOutlined style={{ color: '#165DFF' }} />
                   <Text strong>表浏览器</Text>
                   {allTables.length > 0 && <Tag>{allTables.length}</Tag>}
                 </Space>
@@ -502,7 +502,7 @@ export default function QueryPage() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             background: selectedTable === tableName ? 'rgba(21, 88, 168, 0.12)' : '#F5F7FA',
-                            color: selectedTable === tableName ? '#1558A8' : '#8c8c8c',
+                            color: selectedTable === tableName ? '#165DFF' : '#8c8c8c',
                             flexShrink: 0,
                           }}
                           >
@@ -514,7 +514,7 @@ export default function QueryPage() {
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              color: selectedTable === tableName ? '#1558A8' : '#1F2329',
+                              color: selectedTable === tableName ? '#165DFF' : '#1F2329',
                               fontWeight: selectedTable === tableName ? 600 : 400,
                             }}
                           >
@@ -603,7 +603,7 @@ export default function QueryPage() {
                   }}
                   >
                     <Space size={8} wrap>
-                      <DatabaseOutlined style={{ color: '#1558A8' }} />
+                      <DatabaseOutlined style={{ color: '#165DFF' }} />
                       <Text strong>{selectedTable || '未选择表'}</Text>
                       {tableDdlData?.source === 'generated' && <Tag color="gold">生成DDL</Tag>}
                     </Space>

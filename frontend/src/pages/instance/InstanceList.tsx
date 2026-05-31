@@ -310,7 +310,7 @@ export default function InstanceList() {
               onClick={() => handleTest(r.id)}>测试</Button>
             {tr && !tr.loading && (
               tr.success
-                ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ? <CheckCircleOutlined style={{ color: '#00B42A' }} />
                 : <Tooltip title={tr.message}><CloseCircleOutlined style={{ color: '#f5222d' }} /></Tooltip>
             )}
           </Space>

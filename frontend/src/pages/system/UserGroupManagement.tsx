@@ -727,8 +727,8 @@ const UserGroupManagement: React.FC = () => {
               style={{
                 minWidth: 168,
                 whiteSpace: 'nowrap',
-                background: '#1677ff',
-                borderColor: '#1677ff',
+                background: '#165DFF',
+                borderColor: '#165DFF',
                 color: '#ffffff',
               }}
               onClick={() => void handleDownloadTemplate('xlsx')}
@@ -776,15 +776,15 @@ const UserGroupManagement: React.FC = () => {
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">新增</Text>
-            <div><Text strong style={{ color: '#1677ff' }}>{importResult?.created ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#165DFF' }}>{importResult?.created ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">更新</Text>
-            <div><Text strong style={{ color: '#52c41a' }}>{importResult?.updated ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#00B42A' }}>{importResult?.updated ?? 0}</Text></div>
           </Card>
           <Card size="small" style={{ minWidth: 110 }}>
             <Text type="secondary">失败</Text>
-            <div><Text strong style={{ color: '#ff4d4f' }}>{importResult?.failed ?? 0}</Text></div>
+            <div><Text strong style={{ color: '#F53F3F' }}>{importResult?.failed ?? 0}</Text></div>
           </Card>
         </Space>
         {importResult?.failed ? (

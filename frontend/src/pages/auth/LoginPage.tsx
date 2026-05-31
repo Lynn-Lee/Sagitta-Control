@@ -339,7 +339,7 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#111A2E',
+      background: '#0F172A',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -350,10 +350,10 @@ export default function LoginPage() {
       overflow: 'hidden',
     }}>
 
-      {/* 背景光晕 — 靛紫主光 */}
+      {/* 背景光晕 — 品牌蓝主光 */}
       <div style={{
         position: 'absolute', width: 680, height: 680,
-        background: 'radial-gradient(circle, rgba(79,70,229,0.20) 0%, transparent 68%)',
+        background: 'radial-gradient(circle, rgba(22,93,255,0.20) 0%, transparent 68%)',
         top: '50%', left: '50%',
         transform: 'translate(-50%, -52%)',
         pointerEvents: 'none',
@@ -377,8 +377,8 @@ export default function LoginPage() {
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `
-          linear-gradient(rgba(79,70,229,0.035) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(79,70,229,0.035) 1px, transparent 1px)
+          linear-gradient(rgba(22,93,255,0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(22,93,255,0.035) 1px, transparent 1px)
         `,
         backgroundSize: '60px 60px',
         pointerEvents: 'none',
@@ -390,7 +390,7 @@ export default function LoginPage() {
         width: '100%',
         maxWidth: 420,
         background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(79,70,229,0.22)',
+        border: '1px solid rgba(22,93,255,0.22)',
         borderRadius: 20,
         padding: '44px 40px 36px',
         backdropFilter: 'blur(24px)',
@@ -400,7 +400,7 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             display: 'inline-block',
-            filter: 'drop-shadow(0 0 28px rgba(79,70,229,0.55))',
+            filter: 'drop-shadow(0 0 28px rgba(22,93,255,0.48))',
             marginBottom: 16,
           }}>
             <BrandLogo logoUrl={branding.platform_logo_url} size={80} color="#165DFF" />
@@ -416,7 +416,7 @@ export default function LoginPage() {
           <div style={{
             fontFamily: "'Noto Sans SC', sans-serif",
             fontWeight: 500, fontSize: 13,
-            color: '#818CF8',           /* 改为靛紫-200，与背景光晕一致 */
+            color: '#8FB3FF',
             letterSpacing: '7px', marginTop: 7, textAlign: 'center',
           }}>
             矢 准 数 据
@@ -459,7 +459,7 @@ export default function LoginPage() {
                 />
               </Tooltip>
               <div className="sagitta-login-mode-title">
-                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#5E7CE0' } as React.CSSProperties}>
+                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#165DFF' } as React.CSSProperties}>
                   <PlatformIcon src="/icons/ldap.svg" alt="LDAP" size={20} />
                 </span>
                 <span>LDAP 认证</span>
@@ -484,7 +484,7 @@ export default function LoginPage() {
                   prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
                   placeholder="LDAP 密码"
                   iconRender={v => v
-                    ? <EyeTwoTone twoToneColor="#5E7CE0" />
+                    ? <EyeTwoTone twoToneColor="#165DFF" />
                     : <EyeInvisibleOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />
                   }
                   style={{
@@ -500,9 +500,9 @@ export default function LoginPage() {
                   icon={<LoginOutlined />}
                   style={{
                     height: 46, borderRadius: 8,
-                    background: '#5E7CE0', border: 'none',
+                    background: '#165DFF', border: 'none',
                     fontWeight: 600, fontSize: 15, letterSpacing: '1px',
-                    boxShadow: '0 4px 20px rgba(94,124,224,0.45)',
+                    boxShadow: '0 4px 20px rgba(22,93,255,0.38)',
                   }}
                 >
                   LDAP 登 录
@@ -524,7 +524,7 @@ export default function LoginPage() {
                 />
               </Tooltip>
               <div className="sagitta-login-mode-title">
-                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#1677FF' } as React.CSSProperties}>
+                <span className="sagitta-login-mode-icon" style={{ '--mode-color': '#165DFF' } as React.CSSProperties}>
                   <PlatformIcon src="/icons/sms.svg" alt="短信验证码" size={20} />
                 </span>
                 <span>短信验证码</span>
@@ -595,7 +595,7 @@ export default function LoginPage() {
                   icon={<LoginOutlined />}
                   style={{
                     height: 46, borderRadius: 8,
-                    background: '#1677FF', border: 'none',
+                    background: '#165DFF', border: 'none',
                     fontWeight: 600, fontSize: 15, letterSpacing: '1px',
                     boxShadow: '0 4px 20px rgba(22,119,255,0.42)',
                   }}
@@ -834,7 +834,7 @@ export default function LoginPage() {
                   {authMethods.ldap && (
                     <OAuthBtn
                       icon={<PlatformIcon src="/icons/ldap.svg" alt="LDAP" />}
-                      label={OAUTH_PROVIDER_LABELS.ldap} color="#5E7CE0"
+                      label={OAUTH_PROVIDER_LABELS.ldap} color="#165DFF"
                       onClick={() => handleOAuth('ldap')}
                     />
                   )}
@@ -857,7 +857,7 @@ export default function LoginPage() {
                   {authMethods.sms && (
                     <OAuthBtn
                       icon={<PlatformIcon src="/icons/sms.svg" alt="短信验证码" />}
-                      label={OAUTH_PROVIDER_LABELS.sms} color="#1677FF"
+                      label={OAUTH_PROVIDER_LABELS.sms} color="#165DFF"
                       onClick={() => handleOAuth('sms')}
                     />
                   )}
