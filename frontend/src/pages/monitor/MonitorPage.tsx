@@ -403,6 +403,37 @@ const ENGINE_DIAGNOSTIC_PANELS: Record<string, EngineDiagnosticPanel[]> = {
   clickhouse: [{ key: 'clickhouse', label: 'ClickHouse 专属', render: context => <ClickHouseEnginePanel {...context} /> }],
 }
 
+const GENERIC_WORKBENCH_TAB_KEYS = new Set([
+  'overview',
+  'trend',
+  'databases',
+  'tables',
+  'sessions',
+  'sql',
+  'replication',
+  'waits',
+  'capacity-growth',
+  'alerts',
+  'diagnosis',
+])
+
+const ENGINE_DIAGNOSTIC_TAB_KEYS = new Set(
+  Object.values(ENGINE_DIAGNOSTIC_PANELS).flatMap(panels => panels.map(panel => panel.key)),
+)
+
+function firstEngineDiagnosticTabKey(dbType: string | undefined) {
+  return ENGINE_DIAGNOSTIC_PANELS[(dbType || '').toLowerCase()]?.[0]?.key
+}
+
+function resolveWorkbenchTabForDbType(tabKey: string | null | undefined, dbType: string | undefined) {
+  const currentKey = tabKey || 'overview'
+  if (GENERIC_WORKBENCH_TAB_KEYS.has(currentKey)) return currentKey
+  const currentEngineTab = firstEngineDiagnosticTabKey(dbType)
+  if (currentEngineTab === currentKey) return currentKey
+  if (ENGINE_DIAGNOSTIC_TAB_KEYS.has(currentKey)) return currentEngineTab || 'overview'
+  return 'overview'
+}
+
 function getEngineDiagnosticTabs(dbType: string | undefined, context: EnginePanelContext): TabsProps['items'] {
   return (ENGINE_DIAGNOSTIC_PANELS[(dbType || '').toLowerCase()] || []).map(panel => ({
     key: panel.key,
@@ -425,7 +456,7 @@ export default function MonitorPage() {
   const requestedView = searchParams.get('view')
   const requestedInstanceId = Number(searchParams.get('instance_id') || 0) || null
   const [mainTab, setMainTab] = useState(requestedView ? 'monitor' : 'instance-overview')
-  const [workbenchTab, setWorkbenchTab] = useState(requestedView === 'sessions' ? 'sessions' : requestedView === 'sql' ? 'sql' : 'overview')
+  const [workbenchTab, setWorkbenchTab] = useState(requestedView || 'overview')
   const [selectedId, setSelectedId] = useState<number | null>(requestedInstanceId)
   const [dbTypeFilter, setDbTypeFilter] = useState<string | undefined>()
   const [riskFilter, setRiskFilter] = useState<string | undefined>()
@@ -546,12 +577,9 @@ export default function MonitorPage() {
 
   useEffect(() => {
     if (requestedInstanceId) setSelectedId(requestedInstanceId)
-    if (requestedView === 'sessions') {
+    if (requestedView) {
       setMainTab('monitor')
-      setWorkbenchTab('sessions')
-    } else if (requestedView === 'sql') {
-      setMainTab('monitor')
-      setWorkbenchTab('sql')
+      setWorkbenchTab(requestedView)
     }
   }, [requestedInstanceId, requestedView])
 
@@ -1089,6 +1117,17 @@ export default function MonitorPage() {
   const currentDbType = (active?.db_type || detail?.instance?.db_type || '').toLowerCase()
   const metricGroups = engineDetail?.metric_groups || latest?.metric_groups || latest?.extra_metrics || {}
   const engineDiagnosticTabs = getEngineDiagnosticTabs(currentDbType, { metricGroups, isMobile }) || []
+  const activeWorkbenchTab = currentDbType ? resolveWorkbenchTabForDbType(workbenchTab, currentDbType) : workbenchTab
+
+  useEffect(() => {
+    if (!currentDbType) return
+    const nextTab = resolveWorkbenchTabForDbType(workbenchTab, currentDbType)
+    if (nextTab === workbenchTab) return
+    setWorkbenchTab(nextTab)
+    if (mainTab === 'monitor' && activeId) {
+      setSearchParams({ instance_id: String(activeId), view: nextTab })
+    }
+  }, [activeId, currentDbType, mainTab, setSearchParams, workbenchTab])
 
   return (
     <div>
@@ -1224,7 +1263,7 @@ export default function MonitorPage() {
                 {latest?.error && <Alert type="error" showIcon message="最近采集失败" description={latest.error} />}
 
                 <Tabs
-                  activeKey={workbenchTab}
+                  activeKey={activeWorkbenchTab}
                   onChange={(key) => {
                     setWorkbenchTab(key)
                     if (activeId) {
