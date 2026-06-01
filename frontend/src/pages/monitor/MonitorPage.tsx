@@ -169,6 +169,14 @@ function formatRateMetric(value?: number | string | null, suffix = '') {
   return `${numberValue.toFixed(2)}${suffix}`
 }
 
+function formatPercent(value?: number | string | null) {
+  if (value === null || value === undefined || value === '') return '暂无数据'
+  const numberValue = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numberValue)) return String(value)
+  const percent = numberValue <= 1 ? numberValue * 100 : numberValue
+  return `${percent.toFixed(2)}%`
+}
+
 function formatTrendTooltip(value: any, name: string, item?: any) {
   const dataKey = item?.dataKey
   if (dataKey === 'size_gb') return [value === null || value === undefined ? '暂无数据' : `${formatMetric(value)} GB`, '容量']
@@ -940,6 +948,15 @@ export default function MonitorPage() {
     { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
   ]
 
+  const clickHouseDiskColumns = [
+    { title: '磁盘', dataIndex: 'name', width: 160 },
+    { title: '路径', dataIndex: 'path', ellipsis: true },
+    { title: '使用率', dataIndex: 'used_pct', width: 160, render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
+    { title: '已用', dataIndex: 'used_space', width: 140, render: formatBytes },
+    { title: '总量', dataIndex: 'total_space', width: 140, render: formatBytes },
+    { title: '保留空间', dataIndex: 'keep_free_space', width: 140, render: formatBytes },
+  ]
+
   return (
     <div>
       {msgCtx}
@@ -1323,6 +1340,75 @@ export default function MonitorPage() {
                               { title: '单位', dataIndex: 'unit' },
                               { title: '计算时间', dataIndex: 'time_computed', render: formatTime },
                             ]} locale={{ emptyText: <TableEmptyState title="暂无 Data Guard 数据" /> }} />
+                          </Space>
+                        ),
+                      },
+                    ] : []),
+                    ...((active?.db_type || detail?.instance?.db_type) === 'redis' ? [
+                      {
+                        key: 'redis',
+                        label: 'Redis 专属',
+                        children: (
+                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                              <MetricCard title="内存使用率" value={formatPercent(engineDetail?.metric_groups?.memory?.memory_usage)} />
+                              <MetricCard title="已用内存" value={formatBytes(engineDetail?.metric_groups?.memory?.used_memory)} />
+                              <MetricCard title="缓存命中率" value={formatPercent(engineDetail?.metric_groups?.stats?.keyspace_hit_rate)} />
+                              <MetricCard title="Ops/sec" value={formatRateMetric(engineDetail?.metric_groups?.stats?.instantaneous_ops_per_sec)} />
+                              <MetricCard title="连接客户端" value={engineDetail?.metric_groups?.connections?.current} />
+                              <MetricCard title="阻塞客户端" value={engineDetail?.metric_groups?.connections?.blocked_clients} danger={(engineDetail?.metric_groups?.connections?.blocked_clients || 0) > 0} />
+                              <MetricCard title="Key 淘汰" value={engineDetail?.metric_groups?.stats?.evicted_keys} danger={(engineDetail?.metric_groups?.stats?.evicted_keys || 0) > 0} />
+                              <MetricCard title="拒绝连接" value={engineDetail?.metric_groups?.stats?.rejected_connections} danger={(engineDetail?.metric_groups?.stats?.rejected_connections || 0) > 0} />
+                            </div>
+                            <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+                              <Descriptions.Item label="角色">{formatMetric(engineDetail?.metric_groups?.replication?.role)}</Descriptions.Item>
+                              <Descriptions.Item label="从库数量">{formatMetric(engineDetail?.metric_groups?.replication?.connected_slaves)}</Descriptions.Item>
+                              <Descriptions.Item label="主从链路">{formatMetric(engineDetail?.metric_groups?.replication?.master_link_status || '不适用')}</Descriptions.Item>
+                              <Descriptions.Item label="总命令数">{formatMetric(engineDetail?.metric_groups?.stats?.total_commands_processed)}</Descriptions.Item>
+                              <Descriptions.Item label="命中次数">{formatMetric(engineDetail?.metric_groups?.stats?.keyspace_hits)}</Descriptions.Item>
+                              <Descriptions.Item label="未命中次数">{formatMetric(engineDetail?.metric_groups?.stats?.keyspace_misses)}</Descriptions.Item>
+                              <Descriptions.Item label="过期 Key">{formatMetric(engineDetail?.metric_groups?.stats?.expired_keys)}</Descriptions.Item>
+                              <Descriptions.Item label="内存碎片率">{formatMetric(engineDetail?.metric_groups?.memory?.mem_fragmentation_ratio)}</Descriptions.Item>
+                              <Descriptions.Item label="峰值内存">{formatBytes(engineDetail?.metric_groups?.memory?.used_memory_peak)}</Descriptions.Item>
+                            </Descriptions>
+                          </Space>
+                        ),
+                      },
+                    ] : []),
+                    ...((active?.db_type || detail?.instance?.db_type) === 'clickhouse' ? [
+                      {
+                        key: 'clickhouse',
+                        label: 'ClickHouse 专属',
+                        children: (
+                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                              <MetricCard title="当前查询" value={engineDetail?.metric_groups?.queries?.active} />
+                              <MetricCard title="连接数" value={engineDetail?.metric_groups?.connections?.current} />
+                              <MetricCard title="内存使用率" value={formatPercent(engineDetail?.metric_groups?.memory?.memory_usage)} />
+                              <MetricCard title="已用内存" value={formatBytes(engineDetail?.metric_groups?.memory?.used_memory)} />
+                              <MetricCard title="总查询数" value={engineDetail?.metric_groups?.counters?.queries} />
+                              <MetricCard title="失败查询" value={engineDetail?.metric_groups?.counters?.errors} danger={(engineDetail?.metric_groups?.counters?.errors || 0) > 0} />
+                              <MetricCard title="延迟写入" value={engineDetail?.metric_groups?.queries?.delayed_inserts} danger={(engineDetail?.metric_groups?.queries?.delayed_inserts || 0) > 0} />
+                              <MetricCard title="拒绝写入" value={engineDetail?.metric_groups?.queries?.rejected_inserts} danger={(engineDetail?.metric_groups?.queries?.rejected_inserts || 0) > 0} />
+                            </div>
+                            <Table
+                              dataSource={engineDetail?.metric_groups?.disks || []}
+                              columns={clickHouseDiskColumns}
+                              rowKey={(row: any) => row.name}
+                              size="small"
+                              scroll={{ x: 980 }}
+                              pagination={false}
+                              locale={{ emptyText: <TableEmptyState title="暂无磁盘指标" /> }}
+                            />
+                            <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+                              <Descriptions.Item label="Select 查询">{formatMetric(engineDetail?.metric_groups?.counters?.select_queries)}</Descriptions.Item>
+                              <Descriptions.Item label="Insert 查询">{formatMetric(engineDetail?.metric_groups?.counters?.insert_queries)}</Descriptions.Item>
+                              <Descriptions.Item label="最大连接">{formatMetric(engineDetail?.metric_groups?.connections?.max_connections)}</Descriptions.Item>
+                              <Descriptions.Item label="可用内存">{formatBytes(engineDetail?.metric_groups?.memory?.available_memory)}</Descriptions.Item>
+                              <Descriptions.Item label="系统总内存">{formatBytes(engineDetail?.metric_groups?.memory?.total_memory)}</Descriptions.Item>
+                              <Descriptions.Item label="读操作计数">{formatMetric(engineDetail?.metric_groups?.counters?.read_ops)}</Descriptions.Item>
+                              <Descriptions.Item label="写操作计数">{formatMetric(engineDetail?.metric_groups?.counters?.write_ops)}</Descriptions.Item>
+                            </Descriptions>
                           </Space>
                         ),
                       },

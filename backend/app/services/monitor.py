@@ -728,6 +728,34 @@ class MonitorService:
                 score -= 12
                 reasons.append(f"连接使用率 {pct}%")
 
+        memory_usage = MonitorService._coerce_float((extra.get("memory") or {}).get("memory_usage"))
+        if memory_usage is not None:
+            pct = round(memory_usage * 100)
+            if memory_usage >= 0.9:
+                score -= 25
+                reasons.append(f"内存使用率 {pct}%")
+            elif memory_usage >= 0.75:
+                score -= 12
+                reasons.append(f"内存使用率 {pct}%")
+
+        engine_stats = extra.get("stats") or {}
+        hit_rate = MonitorService._coerce_float(engine_stats.get("keyspace_hit_rate"))
+        if hit_rate is not None and hit_rate < 0.8:
+            score -= 8
+            reasons.append(f"缓存命中率 {round(hit_rate * 100)}%")
+        evicted_keys = MonitorService._coerce_float(engine_stats.get("evicted_keys"))
+        if evicted_keys and evicted_keys > 0:
+            score -= 8
+            reasons.append(f"Redis 已发生 {int(evicted_keys)} 次 Key 淘汰")
+        delayed_inserts = MonitorService._coerce_float(engine_stats.get("delayed_inserts"))
+        rejected_inserts = MonitorService._coerce_float(engine_stats.get("rejected_inserts"))
+        if delayed_inserts and delayed_inserts > 0:
+            score -= 8
+            reasons.append(f"ClickHouse 延迟写入 {int(delayed_inserts)}")
+        if rejected_inserts and rejected_inserts > 0:
+            score -= 12
+            reasons.append(f"ClickHouse 拒绝写入 {int(rejected_inserts)}")
+
         lock_waits = int(snapshot.get("lock_waits") or 0)
         if lock_waits > 0:
             score -= min(20, 8 + lock_waits * 2)
@@ -763,6 +791,18 @@ class MonitorService:
             if usage_pct is not None and usage_pct >= 80:
                 score -= 10
                 reasons.append(f"{name} 表空间 {round(usage_pct)}%")
+                break
+
+        for item in extra.get("disks") or []:
+            usage_pct = MonitorService._coerce_float(item.get("used_pct"))
+            name = item.get("name") or "磁盘"
+            if usage_pct is not None and usage_pct >= 90:
+                score -= 20
+                reasons.append(f"{name} 磁盘 {round(usage_pct)}%")
+                break
+            if usage_pct is not None and usage_pct >= 80:
+                score -= 10
+                reasons.append(f"{name} 磁盘 {round(usage_pct)}%")
                 break
 
         fra = extra.get("fra") or {}
@@ -1082,6 +1122,9 @@ class MonitorService:
         tablespaces = extra.get("tablespaces") or []
         if any((MonitorService._coerce_float(item.get("used_pct")) or 0) >= 80 for item in tablespaces):
             return True
+        disks = extra.get("disks") or []
+        if any((MonitorService._coerce_float(item.get("used_pct")) or 0) >= 80 for item in disks):
+            return True
         fra = extra.get("fra") or {}
         return (MonitorService._coerce_float(fra.get("used_pct")) or 0) >= 80
 
@@ -1128,6 +1171,9 @@ class MonitorService:
             "rules": (cfg.alert_rules_override if cfg else {}) or {},
             "defaults": {
                 "connection_usage": {"operator": ">=", "threshold": 0.8, "duration_count": 3},
+                "memory_usage": {"operator": ">=", "threshold": 0.85, "duration_count": 2},
+                "redis_keyspace_hit_rate": {"operator": "<", "threshold": 0.8, "duration_count": 3},
+                "clickhouse_disk_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
                 "replication_lag_seconds": {"operator": ">=", "threshold": 60, "duration_count": 2},
                 "tablespace_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
                 "fra_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},

@@ -28,12 +28,49 @@ class FakeClient:
     def __init__(self):
         self.queries: list[tuple[str, dict | None]] = []
 
+    def command(self, sql):
+        if "version()" in sql:
+            return "24.8.1"
+        if "uptime()" in sql:
+            return 3600
+        return None
+
     def query(self, sql, parameters=None):
         self.queries.append((sql, parameters))
         if "FROM system.tables" in sql:
             return FakeQueryResult([("id", "id, created_at")])
         if "FROM system.data_skipping_indices" in sql:
             return FakeQueryResult([("idx_status", "status", "set(100)")])
+        if "FROM system.metrics" in sql:
+            return FakeQueryResult(
+                [
+                    ("HTTPConnection", 2),
+                    ("TCPConnection", 3),
+                    ("Query", 4),
+                    ("DelayedInserts", 1),
+                ]
+            )
+        if "FROM system.events" in sql:
+            return FakeQueryResult(
+                [
+                    ("Query", 1200),
+                    ("SelectQuery", 1000),
+                    ("InsertQuery", 200),
+                    ("FailedQuery", 3),
+                ]
+            )
+        if "FROM system.asynchronous_metrics" in sql:
+            return FakeQueryResult(
+                [
+                    ("MemoryTracking", 1024),
+                    ("OSMemoryTotal", 4096),
+                    ("OSMemoryAvailable", 2048),
+                ]
+            )
+        if "FROM system.disks" in sql:
+            return FakeQueryResult([("default", "/var/lib/clickhouse/", 1024, 4096, 0)])
+        if "FROM system.settings" in sql:
+            return FakeQueryResult([("max_connections", "100")])
         return FakeQueryResult([])
 
 
@@ -93,3 +130,19 @@ async def test_clickhouse_sql_activity_converts_elapsed_seconds(monkeypatch):
     assert rs.rows[0]["source"] == "clickhouse_activity"
     assert rs.rows[0]["source_ref"] == "clickhouse:q1"
     assert rs.rows[0]["duration_ms"] == 2500
+
+
+@pytest.mark.asyncio
+async def test_clickhouse_collect_metrics_maps_engine_specific_groups():
+    engine = _engine(FakeClient())
+
+    metrics = await engine.collect_metrics()
+
+    assert metrics["health"]["up"] == 1
+    assert metrics["version"]["value"] == "24.8.1"
+    assert metrics["connections"]["current"] == 5
+    assert metrics["connections"]["active_sessions"] == 4
+    assert metrics["memory"]["memory_usage"] == 0.25
+    assert metrics["stats"]["error_count"] == 3
+    assert metrics["counters"]["queries"] == 1200
+    assert metrics["disks"][0]["used_pct"] == 75.0

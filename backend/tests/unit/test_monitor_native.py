@@ -101,6 +101,38 @@ def test_evaluate_health_scores_oracle_tablespace_and_fra_risk():
     assert "FRA 使用率 86%" in health["risk_reasons"]
 
 
+def test_evaluate_health_scores_redis_and_clickhouse_engine_risks():
+    redis_health = MonitorService.evaluate_health(
+        {
+            "is_up": True,
+            "status": "success",
+            "extra_metrics": {
+                "memory": {"memory_usage": 0.91},
+                "stats": {"keyspace_hit_rate": 0.5, "evicted_keys": 2},
+            },
+        },
+        "success",
+    )
+    clickhouse_health = MonitorService.evaluate_health(
+        {
+            "is_up": True,
+            "status": "success",
+            "extra_metrics": {
+                "stats": {"delayed_inserts": 1, "rejected_inserts": 1},
+                "disks": [{"name": "default", "used_pct": 92}],
+            },
+        },
+        "success",
+    )
+
+    assert "内存使用率 91%" in redis_health["risk_reasons"]
+    assert "缓存命中率 50%" in redis_health["risk_reasons"]
+    assert "Redis 已发生 2 次 Key 淘汰" in redis_health["risk_reasons"]
+    assert "ClickHouse 延迟写入 1" in clickhouse_health["risk_reasons"]
+    assert "ClickHouse 拒绝写入 1" in clickhouse_health["risk_reasons"]
+    assert "default 磁盘 92%" in clickhouse_health["risk_reasons"]
+
+
 def test_apply_delta_rates_prefers_interval_counters():
     previous = MonitorMetricSnapshot(
         instance_id=1,

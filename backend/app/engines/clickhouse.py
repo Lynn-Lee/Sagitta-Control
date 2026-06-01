@@ -337,20 +337,177 @@ class ClickHouseEngine:
         )
 
     async def collect_metrics(self) -> dict:
+        missing_groups: dict[str, str] = {}
         try:
             client = self._client()
-            m = {
-                row[0]: row[1]
-                for row in client.query(
-                    "SELECT metric,value FROM system.metrics LIMIT 50"
+            version = ""
+            uptime_seconds = 0
+            try:
+                version = str(client.command("SELECT version()") or "")
+                uptime_seconds = int(float(client.command("SELECT uptime()") or 0))
+            except Exception as exc:
+                missing_groups["version"] = str(exc)
+
+            metrics: dict[str, Any] = {}
+            try:
+                metrics = {
+                    str(row[0]): row[1]
+                    for row in client.query("SELECT metric, value FROM system.metrics").result_rows
+                }
+            except Exception as exc:
+                missing_groups["metrics"] = str(exc)
+
+            events: dict[str, Any] = {}
+            try:
+                event_names = [
+                    "Query",
+                    "SelectQuery",
+                    "InsertQuery",
+                    "FailedQuery",
+                    "RejectedInserts",
+                    "DelayedInserts",
+                    "ReadBufferFromFileDescriptorRead",
+                    "WriteBufferFromFileDescriptorWrite",
+                ]
+                events = {
+                    str(row[0]): row[1]
+                    for row in client.query(
+                        "SELECT event, value FROM system.events WHERE event IN {events:Array(String)}",
+                        parameters={"events": event_names},
+                    ).result_rows
+                }
+            except Exception as exc:
+                missing_groups["events"] = str(exc)
+
+            asynchronous_metrics: dict[str, Any] = {}
+            try:
+                async_names = [
+                    "MemoryTracking",
+                    "OSMemoryAvailable",
+                    "OSMemoryTotal",
+                    "MaxPartCountForPartition",
+                    "ReplicasMaxAbsoluteDelay",
+                    "ReplicasSumQueueSize",
+                    "ReplicasMaxQueueSize",
+                ]
+                asynchronous_metrics = {
+                    str(row[0]): row[1]
+                    for row in client.query(
+                        "SELECT metric, value FROM system.asynchronous_metrics "
+                        "WHERE metric IN {metrics:Array(String)}",
+                        parameters={"metrics": async_names},
+                    ).result_rows
+                }
+            except Exception as exc:
+                missing_groups["asynchronous_metrics"] = str(exc)
+
+            disks: list[dict[str, Any]] = []
+            try:
+                disk_rows = client.query(
+                    "SELECT name, path, free_space, total_space, keep_free_space "
+                    "FROM system.disks ORDER BY name"
                 ).result_rows
+                disks = [
+                    {
+                        "name": row[0],
+                        "path": row[1],
+                        "free_space": row[2],
+                        "total_space": row[3],
+                        "used_space": max(int(row[3] or 0) - int(row[2] or 0), 0),
+                        "used_pct": round(
+                            (max(int(row[3] or 0) - int(row[2] or 0), 0) / int(row[3])) * 100,
+                            2,
+                        )
+                        if int(row[3] or 0)
+                        else 0,
+                        "keep_free_space": row[4],
+                    }
+                    for row in disk_rows
+                ]
+            except Exception as exc:
+                missing_groups["disks"] = str(exc)
+
+            settings: dict[str, Any] = {}
+            try:
+                settings = {
+                    str(row[0]): row[1]
+                    for row in client.query(
+                        "SELECT name, value FROM system.settings "
+                        "WHERE name IN ('max_connections', 'max_concurrent_queries')"
+                    ).result_rows
+                }
+            except Exception as exc:
+                missing_groups["settings"] = str(exc)
+
+            current_connections = sum(
+                int(metrics.get(name) or 0)
+                for name in ("HTTPConnection", "TCPConnection", "MySQLConnection", "PostgreSQLConnection")
+            )
+            active_queries = int(metrics.get("Query") or 0)
+            memory_used = int(
+                asynchronous_metrics.get("MemoryTracking")
+                or metrics.get("MemoryTracking")
+                or 0
+            )
+            memory_total = int(asynchronous_metrics.get("OSMemoryTotal") or 0)
+            memory_usage = round(memory_used / memory_total, 4) if memory_total else None
+            return {
+                "health": {"up": 1},
+                "version": {"value": version},
+                "uptime_seconds": uptime_seconds,
+                "connections": {
+                    "current": current_connections,
+                    "active_sessions": active_queries,
+                    "max_connections": settings.get("max_connections"),
+                },
+                "queries": {
+                    "active": active_queries,
+                    "delayed_inserts": metrics.get("DelayedInserts", 0),
+                    "rejected_inserts": metrics.get("RejectedInserts", 0),
+                },
+                "stats": {
+                    "error_count": events.get("FailedQuery", 0),
+                    "failed_queries_total": events.get("FailedQuery", 0),
+                    "delayed_inserts": metrics.get("DelayedInserts", 0),
+                    "rejected_inserts": metrics.get("RejectedInserts", 0),
+                },
+                "memory": {
+                    "used_memory": memory_used,
+                    "total_memory": memory_total,
+                    "memory_usage": memory_usage,
+                    "available_memory": asynchronous_metrics.get("OSMemoryAvailable"),
+                },
+                "counters": {
+                    "queries": events.get("Query", 0),
+                    "select_queries": events.get("SelectQuery", 0),
+                    "insert_queries": events.get("InsertQuery", 0),
+                    "errors": events.get("FailedQuery", 0),
+                    "read_ops": events.get("ReadBufferFromFileDescriptorRead", 0),
+                    "write_ops": events.get("WriteBufferFromFileDescriptorWrite", 0),
+                },
+                "metrics": metrics,
+                "events": events,
+                "asynchronous_metrics": asynchronous_metrics,
+                "settings": settings,
+                "disks": disks,
+                "missing_groups": missing_groups,
             }
-            return {"health": {"up": 1}, "metrics": m}
         except Exception as e:
             return {"health": {"up": 0}, "error": str(e)}
 
     def get_supported_metric_groups(self) -> list:
-        return ["health", "metrics"]
+        return [
+            "health",
+            "connections",
+            "queries",
+            "stats",
+            "memory",
+            "counters",
+            "metrics",
+            "events",
+            "asynchronous_metrics",
+            "disks",
+        ]
 
     @staticmethod
     def _row_to_dict(row: Any, columns: list[str]) -> dict[str, Any]:

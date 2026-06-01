@@ -295,23 +295,58 @@ class RedisEngine:
             r = await self._get_client()
             info = await r.info("all")
             await r.aclose()
+            used_memory = int(info.get("used_memory") or 0)
+            maxmemory = int(info.get("maxmemory") or 0)
+            hits = int(info.get("keyspace_hits") or 0)
+            misses = int(info.get("keyspace_misses") or 0)
+            hit_total = hits + misses
+            hit_rate = round(hits / hit_total, 4) if hit_total else None
+            memory_usage = round(used_memory / maxmemory, 4) if maxmemory else None
             return {
                 "health": {"up": 1},
+                "version": {"value": info.get("redis_version", "")},
+                "uptime_seconds": info.get("uptime_in_seconds", 0),
+                "connections": {
+                    "current": info.get("connected_clients", 0),
+                    "blocked_clients": info.get("blocked_clients", 0),
+                    "tracking_clients": info.get("tracking_clients", 0),
+                    "max_connections": info.get("maxclients", 0) or None,
+                },
                 "memory": {
-                    "used_memory_mb": round(info.get("used_memory", 0) / 1024 / 1024, 2),
-                    "used_memory_peak_mb": round(info.get("used_memory_peak", 0) / 1024 / 1024, 2),
+                    "used_memory": used_memory,
+                    "used_memory_mb": round(used_memory / 1024 / 1024, 2),
+                    "used_memory_peak": info.get("used_memory_peak", 0),
+                    "used_memory_peak_mb": round(
+                        int(info.get("used_memory_peak") or 0) / 1024 / 1024,
+                        2,
+                    ),
+                    "maxmemory": maxmemory,
+                    "memory_usage": memory_usage,
                     "mem_fragmentation_ratio": info.get("mem_fragmentation_ratio", 0),
                 },
                 "stats": {
-                    "connected_clients": info.get("connected_clients", 0),
                     "total_commands_processed": info.get("total_commands_processed", 0),
                     "instantaneous_ops_per_sec": info.get("instantaneous_ops_per_sec", 0),
+                    "qps": info.get("instantaneous_ops_per_sec", 0),
                     "keyspace_hits": info.get("keyspace_hits", 0),
                     "keyspace_misses": info.get("keyspace_misses", 0),
+                    "keyspace_hit_rate": hit_rate,
+                    "expired_keys": info.get("expired_keys", 0),
+                    "evicted_keys": info.get("evicted_keys", 0),
+                    "rejected_connections": info.get("rejected_connections", 0),
+                    "error_count": info.get("rejected_connections", 0),
+                },
+                "counters": {
+                    "queries": info.get("total_commands_processed", 0),
+                    "errors": info.get("rejected_connections", 0),
+                    "evicted_keys": info.get("evicted_keys", 0),
+                    "expired_keys": info.get("expired_keys", 0),
                 },
                 "replication": {
                     "role": info.get("role", "unknown"),
                     "connected_slaves": info.get("connected_slaves", 0),
+                    "master_link_status": info.get("master_link_status", ""),
+                    "master_last_io_seconds_ago": info.get("master_last_io_seconds_ago", 0),
                 },
             }
         except Exception as e:

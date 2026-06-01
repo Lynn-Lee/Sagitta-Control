@@ -473,6 +473,54 @@ async def test_redis_processlist_uses_client_list(monkeypatch):
     assert rs.rows[0][11] == "redis_client_list"
 
 
+@pytest.mark.asyncio
+async def test_redis_collect_metrics_maps_info_to_monitor_groups(monkeypatch):
+    monkeypatch.setattr("app.engines.redis.decrypt_field", lambda value: value)
+
+    class FakeRedis:
+        async def info(self, section):
+            assert section == "all"
+            return {
+                "redis_version": "7.2.0",
+                "uptime_in_seconds": 3600,
+                "connected_clients": 4,
+                "blocked_clients": 1,
+                "used_memory": 1024,
+                "used_memory_peak": 2048,
+                "maxmemory": 4096,
+                "mem_fragmentation_ratio": 1.1,
+                "total_commands_processed": 1200,
+                "instantaneous_ops_per_sec": 12,
+                "keyspace_hits": 90,
+                "keyspace_misses": 10,
+                "expired_keys": 2,
+                "evicted_keys": 1,
+                "rejected_connections": 3,
+                "role": "master",
+                "connected_slaves": 1,
+            }
+
+        async def aclose(self):
+            return None
+
+    async def fake_client(self, db_name=None):
+        return FakeRedis()
+
+    monkeypatch.setattr(RedisEngine, "_get_client", fake_client)
+    engine = RedisEngine(_Instance(db_type="redis", port=6379, db_name="0"))
+
+    metrics = await engine.collect_metrics()
+
+    assert metrics["health"]["up"] == 1
+    assert metrics["version"]["value"] == "7.2.0"
+    assert metrics["connections"]["current"] == 4
+    assert metrics["memory"]["memory_usage"] == 0.25
+    assert metrics["stats"]["keyspace_hit_rate"] == 0.9
+    assert metrics["stats"]["error_count"] == 3
+    assert metrics["counters"]["queries"] == 1200
+    assert metrics["replication"]["role"] == "master"
+
+
 def test_session_collect_due_uses_instance_interval():
     now = datetime.now(UTC)
 
