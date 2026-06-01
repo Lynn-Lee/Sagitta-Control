@@ -453,24 +453,171 @@ class MongoEngine:
             client = await self.get_connection()
             db = client[self.instance.db_name or "admin"]
             server_status = await db.command("serverStatus")
-            return {
+            database = await db.command("dbStats")
+            coll_stats = await self._collection_stats(db)
+            repl_status, repl_error = await self._safe_admin_command(client, "replSetGetStatus")
+            shard_status, shard_error = await self._safe_admin_command(client, "listShards")
+            wired_tiger = server_status.get("wiredTiger", {}) or {}
+            cache = wired_tiger.get("cache", {}) if isinstance(wired_tiger, dict) else {}
+            metrics: dict[str, Any] = {
                 "health": {"up": 1},
+                "version": {"value": server_status.get("version", "")},
+                "uptime_seconds": server_status.get("uptime"),
                 "connections": {
                     "current": server_status.get("connections", {}).get("current", 0),
                     "available": server_status.get("connections", {}).get("available", 0),
+                    "active": server_status.get("connections", {}).get("active"),
                 },
                 "opcounters": server_status.get("opcounters", {}),
                 "memory": {
                     "resident_mb": server_status.get("mem", {}).get("resident", 0),
                     "virtual_mb": server_status.get("mem", {}).get("virtual", 0),
+                    "mapped_mb": server_status.get("mem", {}).get("mapped", 0),
                 },
-                "replication": {
-                    "is_primary": server_status.get("repl", {}).get("ismaster", False),
-                    "set_name": server_status.get("repl", {}).get("setName", "standalone"),
+                "database": {
+                    "name": database.get("db"),
+                    "collections": database.get("collections"),
+                    "objects": database.get("objects"),
+                    "avg_obj_size": database.get("avgObjSize"),
+                    "data_size": database.get("dataSize"),
+                    "storage_size": database.get("storageSize"),
+                    "index_size": database.get("indexSize"),
+                    "indexes": database.get("indexes"),
+                },
+                "collections": coll_stats,
+                "wired_tiger": {
+                    "cache_bytes_current": cache.get("bytes currently in the cache"),
+                    "cache_bytes_max": cache.get("maximum bytes configured"),
+                    "dirty_bytes": cache.get("tracked dirty bytes in the cache"),
+                    "pages_read": cache.get("pages read into cache"),
+                    "pages_written": cache.get("pages written from cache"),
+                },
+                "replication": self._replication_metrics(server_status, repl_status),
+                "sharding": {
+                    "enabled": isinstance(shard_status, dict) and bool(shard_status.get("shards")),
+                    "shard_count": len(shard_status.get("shards", []))
+                    if isinstance(shard_status, dict)
+                    else 0,
                 },
             }
+            missing_groups = {}
+            if repl_error:
+                missing_groups["mongo_replication"] = repl_error
+            if shard_error:
+                missing_groups["mongo_sharding"] = shard_error
+            if missing_groups:
+                metrics["missing_groups"] = missing_groups
+            return metrics
         except Exception as e:
             return {"health": {"up": 0}, "error": str(e)}
+
+    async def _collection_stats(self, db: Any, limit: int = 20) -> list[dict[str, Any]]:
+        try:
+            names = await db.list_collection_names()
+        except Exception:
+            return []
+        rows: list[dict[str, Any]] = []
+        for name in names[:limit]:
+            try:
+                stats = await db.command("collStats", name)
+            except Exception:
+                continue
+            rows.append(
+                {
+                    "name": name,
+                    "count": stats.get("count"),
+                    "size": stats.get("size"),
+                    "storage_size": stats.get("storageSize"),
+                    "index_size": stats.get("totalIndexSize"),
+                    "indexes": stats.get("nindexes"),
+                }
+            )
+        return rows
+
+    @staticmethod
+    async def _safe_admin_command(client: Any, command: str) -> tuple[dict[str, Any], str]:
+        try:
+            return await client["admin"].command(command), ""
+        except Exception as exc:
+            return {}, str(exc)
+
+    @staticmethod
+    def _replication_metrics(
+        server_status: dict[str, Any], repl_status: dict[str, Any]
+    ) -> dict[str, Any]:
+        repl = server_status.get("repl", {}) or {}
+        members = repl_status.get("members") or []
+        lag_seconds = None
+        primary_optime = None
+        for member in members:
+            if str(member.get("stateStr", "")).upper() == "PRIMARY":
+                primary_optime = member.get("optimeDate")
+                break
+        if primary_optime:
+            lags = []
+            for member in members:
+                optime = member.get("optimeDate")
+                if not optime or str(member.get("stateStr", "")).upper() == "PRIMARY":
+                    continue
+                try:
+                    lags.append(abs((primary_optime - optime).total_seconds()))
+                except Exception:
+                    continue
+            lag_seconds = max(lags) if lags else None
+        return {
+            "is_primary": repl.get("ismaster", repl.get("isWritablePrimary", False)),
+            "set_name": repl.get("setName", "standalone"),
+            "member_count": len(members),
+            "lag_seconds": lag_seconds,
+        }
+
+    async def collect_slow_queries(
+        self,
+        since: Any | None = None,
+        limit: int = 100,
+        min_duration_ms: int = 1000,
+    ) -> ResultSet:
+        rs = ResultSet()
+        try:
+            client = await self.get_connection()
+            db = client[self.instance.db_name or "admin"]
+            query: dict[str, Any] = {"millis": {"$gte": int(min_duration_ms)}}
+            cursor = db["system.profile"].find(query).sort("ts", -1).limit(int(limit))
+            docs = await cursor.to_list(length=int(limit))
+            rows = []
+            for doc in docs:
+                namespace = str(doc.get("ns") or "")
+                rows.append(
+                    {
+                        "source": "mongo_profile",
+                        "source_ref": str(doc.get("opid") or doc.get("ts") or ""),
+                        "db_name": namespace.split(".", 1)[0] if "." in namespace else "",
+                        "sql_text": json_util.dumps(doc.get("command") or doc.get("query") or {}),
+                        "duration_ms": int(doc.get("millis") or 0),
+                        "username": str(doc.get("user") or ""),
+                        "client_host": str(doc.get("client") or ""),
+                        "command": str(doc.get("op") or ""),
+                        "state": "completed",
+                    }
+                )
+            rs.column_list = [
+                "source",
+                "source_ref",
+                "db_name",
+                "sql_text",
+                "duration_ms",
+                "username",
+                "client_host",
+                "command",
+                "state",
+            ]
+            rs.rows = rows
+            rs.affected_rows = len(rows)
+            if not rows:
+                rs.warning = "MongoDB profiler 未开启或暂无超过阈值的慢操作"
+        except Exception as exc:
+            rs.warning = f"MongoDB profiler 慢操作采集不可用：{exc}"
+        return rs
 
     async def processlist(self, **kwargs: Any) -> ResultSet:
         """查看 MongoDB 当前运行操作。"""
@@ -480,15 +627,29 @@ class MongoEngine:
             db = client["admin"]
             result = await db.command("currentOp", {"active": True})
             ops = result.get("inprog", [])
-            rs.column_list = ["opid", "type", "ns", "secs_running", "desc"]
+            rs.column_list = [
+                "session_id",
+                "command",
+                "db_name",
+                "state",
+                "duration_ms",
+                "active_duration_ms",
+                "sql_text",
+                "host",
+                "program",
+            ]
             rs.rows = [
-                (
-                    str(op.get("opid", "")),
-                    op.get("type", ""),
-                    op.get("ns", ""),
-                    str(op.get("secs_running", 0)),
-                    op.get("desc", ""),
-                )
+                {
+                    "session_id": str(op.get("opid", "")),
+                    "command": op.get("op", op.get("type", "")),
+                    "db_name": str(op.get("ns", "")).split(".", 1)[0],
+                    "state": op.get("active", ""),
+                    "duration_ms": int(float(op.get("secs_running", 0) or 0) * 1000),
+                    "active_duration_ms": int(float(op.get("secs_running", 0) or 0) * 1000),
+                    "sql_text": json_util.dumps(op.get("command") or op.get("query") or {}),
+                    "host": op.get("client", ""),
+                    "program": op.get("desc", ""),
+                }
                 for op in ops[:50]
             ]
         except Exception as e:
@@ -496,4 +657,14 @@ class MongoEngine:
         return rs
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "connections", "opcounters", "memory", "replication"]
+        return [
+            "health",
+            "connections",
+            "opcounters",
+            "memory",
+            "database",
+            "collections",
+            "wired_tiger",
+            "replication",
+            "sharding",
+        ]

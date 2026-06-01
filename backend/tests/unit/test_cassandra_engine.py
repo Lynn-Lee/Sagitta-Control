@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from datetime import datetime, timezone
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 
@@ -216,7 +218,25 @@ async def test_cassandra_collect_metrics_includes_cluster_identity(monkeypatch):
 
     assert metrics["health"]["up"] == 1
     assert metrics["version"]["value"] == "4.1.5"
-    assert metrics["cluster"] == {"name": "prod-cassandra", "data_center": "dc1"}
+    assert metrics["cluster"]["name"] == "prod-cassandra"
+    assert metrics["cluster"]["data_center"] == "dc1"
+    assert metrics["cluster"]["peer_count"] == 1
+    assert metrics["tables"]["estimated_partitions"] == 0
+    assert metrics["jmx_boundary"]["status"] == "not_configured"
+
+
+def test_cassandra_row_to_dict_normalizes_json_unsafe_values():
+    row = {
+        "id": UUID("12345678-1234-5678-1234-567812345678"),
+        "created_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "nested": {"values": {UUID("87654321-4321-6789-4321-678943216789")}},
+    }
+
+    normalized = CassandraEngine._row_to_dict(row)
+
+    assert normalized["id"] == "12345678-1234-5678-1234-567812345678"
+    assert normalized["created_at"] == "2026-06-01 00:00:00+00:00"
+    assert normalized["nested"]["values"] == ["87654321-4321-6789-4321-678943216789"]
 
 
 @pytest.mark.asyncio

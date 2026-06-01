@@ -73,6 +73,14 @@ const readinessColor: Record<string, string> = {
   blocked: 'red',
 }
 
+const supportLevelColor: Record<string, string> = {
+  ga: 'green',
+  validated_minimal: 'blue',
+  read_only_metadata: 'gold',
+  experimental: 'orange',
+  backlog: 'default',
+}
+
 export default function CommercialOpsPage() {
   const navigate = useNavigate()
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
@@ -542,7 +550,12 @@ export default function CommercialOpsPage() {
                     scroll={{ x: 1200 }}
                     columns={[
                       { title: '数据库', dataIndex: 'label', fixed: 'left', width: 150 },
-                      { title: '支持等级', dataIndex: 'support_label', width: 170, render: value => <Tag color="blue">{value}</Tag> },
+                      {
+                        title: '支持等级',
+                        dataIndex: 'support_label',
+                        width: 170,
+                        render: (value, row: any) => <Tag color={supportLevelColor[row.support_level] || 'default'}>{value}</Tag>,
+                      },
                       ...Object.entries(matrix?.capability_labels || {}).map(([key, label]) => ({
                         title: label as string,
                         width: 110,

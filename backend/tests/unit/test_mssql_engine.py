@@ -187,6 +187,27 @@ async def test_mssql_collect_metrics_returns_version_database_and_session_groups
                 column_list=["session_count", "user_session_count"],
                 rows=[(14, 9)],
             )
+        if "FROM sys.dm_os_wait_stats" in sql:
+            return ResultSet(
+                column_list=["wait_type", "waiting_tasks_count", "wait_time_ms"],
+                rows=[("LCK_M_S", 2, 3000)],
+            )
+        if "blocking_session_id <> 0" in sql:
+            return ResultSet(
+                column_list=["session_id", "blocking_session_id", "wait_type", "sql_text"],
+                rows=[(52, 51, "LCK_M_X", "select * from orders")],
+            )
+        if "tempdb.sys.dm_db_file_space_usage" in sql:
+            return ResultSet(
+                column_list=["user_object_bytes", "internal_object_bytes"],
+                rows=[(1024, 2048)],
+            )
+        if "Number of Deadlocks/sec" in sql:
+            return ResultSet(column_list=["deadlocks"], rows=[(0,)])
+        if "msdb.dbo.sysjobs" in sql:
+            return ResultSet(column_list=["name", "last_status"], rows=[("nightly", "succeeded")])
+        if "sys.dm_db_missing_index_group_stats" in sql:
+            return ResultSet(column_list=["table_name", "avg_user_impact"], rows=[("orders", 92)])
         return ResultSet(error="unexpected sql")
 
     async def fake_to_thread(func, *args, **kwargs):
@@ -202,7 +223,16 @@ async def test_mssql_collect_metrics_returns_version_database_and_session_groups
     assert metrics["version"]["value"] == "16.0.1000.6"
     assert metrics["databases"]["total"] == 6
     assert metrics["sessions"]["user"] == 9
-    assert len(calls) == 3
+    assert metrics["waits"][0]["wait_type"] == "LCK_M_S"
+    assert metrics["blocking_sessions"][0]["blocking_session_id"] == 51
+    assert metrics["tempdb"]["internal_object_bytes"] == 2048
+    assert metrics["deadlocks"]["deadlocks"] == 0
+    assert metrics["jobs"][0]["name"] == "nightly"
+    assert metrics["missing_indexes"][0]["avg_user_impact"] == 92
+    waits_sql = next(sql for sql in calls if "FROM sys.dm_os_wait_stats" in sql)
+    assert "SLEEP%%" in waits_sql
+    assert "BROKER_%%" in waits_sql
+    assert len(calls) == 9
 
 
 @pytest.mark.asyncio

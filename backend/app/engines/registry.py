@@ -21,7 +21,7 @@ _REGISTRY: dict[str, str] = {
     "redis":         "app.engines.redis:RedisEngine",
     "clickhouse":    "app.engines.clickhouse:ClickHouseEngine",
     "elasticsearch": "app.engines.elasticsearch:ElasticsearchEngine",
-    "opensearch":    "app.engines.elasticsearch:OpenSearchEngine",
+    "opensearch":    "app.engines.opensearch:OpenSearchEngine",
     "mssql":         "app.engines.mssql:MssqlEngine",
     "cassandra":     "app.engines.cassandra:CassandraEngine",
     "doris":         "app.engines.doris:DorisEngine",

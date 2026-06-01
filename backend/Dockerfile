@@ -73,6 +73,9 @@ RUN pip install --no-cache-dir \
     "clickhouse-connect>=0.7.0" \
     "oracledb>=2.2.0" \
     "python-tds>=1.16.0" \
+    "elasticsearch[async]>=8.12.0,<9.0.0" \
+    "opensearch-py[async]>=2.8.0" \
+    "cassandra-driver>=3.29.0" \
     "pymongo>=4.6.0" \
     "motor>=3.3.0" \
     "structlog>=24.1.0" \

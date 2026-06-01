@@ -1,5 +1,6 @@
 import json
 
+from app.engines.registry import supported_engines
 from app.services.commercial_ops import CommercialOpsService
 from app.services.monitor import MonitorService
 
@@ -11,7 +12,23 @@ def test_engine_matrix_contains_required_capabilities():
     assert labels["connection"] == "连接测试"
     assert labels["kill_session"] == "Kill 会话"
     assert any(item["db_type"] == "mysql" and item["support_level"] == "ga" for item in matrix["items"])
-    assert any(item["support_level"] == "read_only_metadata" for item in matrix["items"])
+    assert any(
+        item["db_type"] == "pgsql" and item["label"] == "PostgreSQL" and item["support_level"] == "ga"
+        for item in matrix["items"]
+    )
+    assert not any(item["db_type"] == "postgres" for item in matrix["items"])
+    assert any(
+        item["db_type"] == "cassandra" and item["support_level"] == "read_only_metadata"
+        for item in matrix["items"]
+    )
+
+
+def test_engine_matrix_db_types_match_registered_engines():
+    matrix = CommercialOpsService.engine_matrix()
+    matrix_types = {item["db_type"] for item in matrix["items"]}
+
+    registry_types = set(supported_engines()) - {"custom_db"}
+    assert matrix_types == registry_types
 
 
 def test_acceptance_markdown_renders_check_results():

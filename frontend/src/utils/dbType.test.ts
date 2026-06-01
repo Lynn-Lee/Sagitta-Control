@@ -20,8 +20,9 @@ describe('engine support matrix', () => {
     expect(getEngineSupport('doris').status).toBe('validated_minimal')
   })
 
-  it('keeps only Cassandra in the experimental bucket', () => {
-    expect(isExperimentalDbType('cassandra')).toBe(true)
+  it('marks Cassandra as read-only metadata support', () => {
+    expect(getEngineSupport('cassandra').status).toBe('read_only_metadata')
+    expect(isExperimentalDbType('cassandra')).toBe(false)
     expect(isExperimentalDbType('elasticsearch')).toBe(false)
     expect(isExperimentalDbType('doris')).toBe(false)
   })

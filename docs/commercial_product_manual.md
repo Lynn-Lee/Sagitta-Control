@@ -153,7 +153,8 @@ Dashboard 展示当前用户权限范围内的整体概览，包括：
 | 支持等级 | 数据库类型 | 使用说明 |
 |---|---|---|
 | 标准支持 | MySQL、TiDB、PostgreSQL、MongoDB、Redis、ClickHouse、StarRocks | 可按标准链路使用连接测试、查询、工单、字典和观测。 |
-| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris、Cassandra/ScyllaDB | 按项目验证结果交付，正式接入前需在客户同构环境验证并确认交付范围。 |
+| 客户验证后交付 | Oracle、MSSQL、Elasticsearch、OpenSearch、Doris | 按项目验证结果交付；MSSQL、Elasticsearch、OpenSearch 和 Doris 已补齐观测专属适配，正式接入前需在客户同构环境验证权限、版本兼容和交付范围。 |
+| 只读/元数据边界 | Cassandra/ScyllaDB | 支持连接、元数据、表 DDL、主键/索引元数据、只读 SELECT、基础健康、peer、容量估算和 compaction 历史；DDL/DML/BATCH 工单执行不纳入标准交付，深度运行指标需 JMX/sidecar。 |
 | 定制评估 | 矩阵外数据库 | 需单独评估和实施。 |
 
 ## 5. SQL 工单
@@ -373,6 +374,13 @@ Dashboard 展示当前用户权限范围内的整体概览，包括：
 - 告警事件。
 - Redis 专属指标：内存使用率、Ops/sec、缓存命中率、Key 淘汰、拒绝连接、复制角色和慢命令。
 - ClickHouse 专属指标：当前查询、连接数、查询计数增量、失败查询、延迟/拒绝写入、内存使用、磁盘使用率和表容量。
+- StarRocks 专属指标：FE/BE/CN、Load、Routine Load、Compaction、Tablet、资源组和当前 SQL 活动。
+- Doris 专属指标：FE/BE、Load、Routine Load、Compaction、Tablet 和当前 SQL 活动。
+- MSSQL 专属指标：waits、blocking、deadlock、tempdb、job、执行计划和缺失索引建议。
+- MongoDB 专属指标：currentOp、profiler 慢操作、ReplicaSet/Sharding、WiredTiger、数据库和集合级容量。
+- Elasticsearch 专属指标：通过独立 Elasticsearch 引擎和官方客户端采集 cluster/node/index/shard、heap、thread pool、segment 和任务活动。
+- OpenSearch 专属指标：通过独立 OpenSearch 引擎、opensearch-py 客户端和 OpenSearch SQL 插件采集 cluster/node/index/shard、heap、thread pool、segment 和任务活动。
+- Cassandra/ScyllaDB 专属指标：peer、容量估算和 compaction 历史；JMX/sidecar 未接入时会提示读写延迟、tombstone、SSTable、cache、thread pool 等深度指标边界。
 
 注意事项：
 

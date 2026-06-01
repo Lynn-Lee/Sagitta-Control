@@ -406,6 +406,7 @@ class StarRocksEngine(MysqlEngine):
     async def collect_metrics(self) -> dict[str, Any]:
         health_rs = await self.query(db_name="", sql="SELECT 1 AS ok", limit_num=1)
         version = await self._read_version() if health_rs.is_success else ""
+        missing_groups: dict[str, str] = {}
         metrics: dict[str, Any] = {
             "health": {"up": 1 if health_rs.is_success else 0, "error": health_rs.error},
             "version": {"value": version},
@@ -423,18 +424,109 @@ class StarRocksEngine(MysqlEngine):
         cn_rs = await self._safe_query("SHOW PROC '/compute_nodes'")
         for key, rs in (("frontends", fe_rs), ("backends", be_rs), ("compute_nodes", cn_rs)):
             if rs.is_success:
-                cluster[key] = {"count": len(rs.rows), "rows": rs.rows}
+                cluster[key] = {"count": len(rs.rows), "rows": self._rows_to_dicts(rs)}
             elif self._is_privilege_error(rs.error):
                 cluster[key] = {
                     "warning": "当前 StarRocks 账号缺少 SYSTEM OPERATE/cluster_admin，已跳过集群节点指标"
                 }
+                missing_groups[f"starrocks_{key}"] = rs.error
             elif rs.error:
                 cluster[key] = {"warning": rs.error}
+                missing_groups[f"starrocks_{key}"] = rs.error
         metrics["cluster"] = cluster
+        load_rs = await self._safe_query("SHOW LOAD LIMIT 20")
+        routine_load_rs = await self._safe_query("SHOW ROUTINE LOAD")
+        metrics["load_jobs"] = self._summarize_state_rows(
+            load_rs,
+            state_fields=("State", "STATE", "JobState"),
+            missing_groups=missing_groups,
+            group_name="starrocks_load_jobs",
+        )
+        metrics["routine_load_jobs"] = self._summarize_state_rows(
+            routine_load_rs,
+            state_fields=("State", "STATE"),
+            missing_groups=missing_groups,
+            group_name="starrocks_routine_load_jobs",
+        )
+
+        compaction_rs = await self._safe_query("SHOW PROC '/compactions'")
+        tablet_rs = await self._safe_query("SHOW PROC '/statistic'")
+        resource_group_rs = await self._safe_query("SHOW RESOURCE GROUPS")
+        metrics["compactions"] = self._summarize_rows(
+            compaction_rs, missing_groups=missing_groups, group_name="starrocks_compactions"
+        )
+        metrics["tablets"] = self._summarize_rows(
+            tablet_rs, missing_groups=missing_groups, group_name="starrocks_tablets"
+        )
+        metrics["resource_groups"] = self._summarize_rows(
+            resource_group_rs, missing_groups=missing_groups, group_name="starrocks_resource_groups"
+        )
+        if missing_groups:
+            metrics["missing_groups"] = missing_groups
         return metrics
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "queries", "cluster", "frontends", "backends", "compute_nodes"]
+        return [
+            "health",
+            "queries",
+            "cluster",
+            "frontends",
+            "backends",
+            "compute_nodes",
+            "load_jobs",
+            "routine_load_jobs",
+            "compactions",
+            "tablets",
+            "resource_groups",
+        ]
+
+    @staticmethod
+    def _rows_to_dicts(rs: ResultSet) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for row in rs.rows:
+            if isinstance(row, dict):
+                rows.append({str(k): v for k, v in row.items()})
+            elif rs.column_list:
+                rows.append(dict(zip(rs.column_list, row, strict=False)))
+            else:
+                rows.append({"value": row})
+        return rows
+
+    @classmethod
+    def _summarize_rows(
+        cls,
+        rs: ResultSet,
+        *,
+        missing_groups: dict[str, str],
+        group_name: str,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        if not rs.is_success:
+            if rs.error:
+                missing_groups[group_name] = rs.error
+            return {"count": None, "rows": [], "warning": rs.error}
+        rows = cls._rows_to_dicts(rs)
+        return {"count": len(rows), "rows": rows[:limit]}
+
+    @classmethod
+    def _summarize_state_rows(
+        cls,
+        rs: ResultSet,
+        *,
+        state_fields: tuple[str, ...],
+        missing_groups: dict[str, str],
+        group_name: str,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        summary = cls._summarize_rows(
+            rs, missing_groups=missing_groups, group_name=group_name, limit=limit
+        )
+        counts: dict[str, int] = {}
+        for row in summary.get("rows") or []:
+            state = str(cls._row_get(row, *state_fields) or "UNKNOWN")
+            counts[state] = counts.get(state, 0) + 1
+        summary["state_counts"] = counts
+        return summary
 
     @staticmethod
     def _row_get(row: Any, *names: str) -> Any:

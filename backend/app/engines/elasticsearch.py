@@ -1,4 +1,4 @@
-"""Elasticsearch / OpenSearch 引擎适配。
+"""Elasticsearch 引擎适配。
 
 当前实现聚焦平台主链路：连接测试、索引元数据、SQL API 只读查询、
 基础健康监控。写入、工单执行和归档仍交由原生生态能力处理。
@@ -272,7 +272,7 @@ class ElasticsearchEngine:
             payload: dict[str, Any] = {"query": limited_sql, "fetch_size": max(int(limit_num or 1000), 1)}
             if parameters:
                 payload["params"] = list(parameters.values())
-            data = self._to_plain(await client.sql.query(**payload))
+            data = self._to_plain(await self._sql_query(client, payload))
             columns = data.get("columns") or []
             rs.column_list = [col.get("name", "") for col in columns if isinstance(col, dict)]
             rs.rows = data.get("rows") or []
@@ -282,6 +282,9 @@ class ElasticsearchEngine:
         finally:
             rs.cost_time = int((time.monotonic() - start) * 1000)
         return rs
+
+    async def _sql_query(self, client: Any, payload: dict[str, Any]) -> Any:
+        return await client.sql.query(**payload)
 
     def query_masking(self, db_name: str, sql: str, resultset: ResultSet) -> ResultSet:
         return resultset
@@ -320,7 +323,19 @@ class ElasticsearchEngine:
             )
             index_count = len(indices) if isinstance(indices, list) else None
             docs_count = self._sum_int_field(indices, "docs.count")
-            return {
+            node_stats, node_error = await self._safe_call(
+                lambda: client.nodes.stats(metric=["jvm", "thread_pool", "indices", "fs"])
+            )
+            thread_pool, thread_pool_error = await self._safe_call(
+                lambda: client.cat.thread_pool(format="json")
+            )
+            shards, shards_error = await self._safe_call(
+                lambda: client.cat.shards(format="json", h=["index", "shard", "prirep", "state", "node"])
+            )
+            segments, segments_error = await self._safe_call(
+                lambda: client.cat.segments(format="json", h=["index", "shard", "segment", "docs.count", "size"])
+            )
+            metrics: dict[str, Any] = {
                 "health": {"up": 1, "status": health.get("status", "")},
                 "version": {"value": (info.get("version") or {}).get("number", "")},
                 "cluster": {
@@ -335,7 +350,24 @@ class ElasticsearchEngine:
                     "docs_count": docs_count,
                     "active_primary_shards": health.get("active_primary_shards"),
                 },
+                "nodes": self._node_metrics(node_stats),
+                "thread_pool": self._thread_pool_metrics(thread_pool),
+                "shards": self._shard_metrics(shards),
+                "segments": self._segment_metrics(segments),
             }
+            missing_groups = {
+                name: error
+                for name, error in {
+                    f"{self.db_type}_nodes": node_error,
+                    f"{self.db_type}_thread_pool": thread_pool_error,
+                    f"{self.db_type}_shards": shards_error,
+                    f"{self.db_type}_segments": segments_error,
+                }.items()
+                if error
+            }
+            if missing_groups:
+                metrics["missing_groups"] = missing_groups
+            return metrics
         except Exception as exc:
             return {"health": {"up": 0, "error": str(exc)}}
 
@@ -390,7 +422,99 @@ class ElasticsearchEngine:
         return await self.query(db_name=db_name, sql=f"EXPLAIN {sql.strip().rstrip(';')}", limit_num=1)
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "cluster", "indices", "version"]
+        return [
+            "health",
+            "cluster",
+            "indices",
+            "version",
+            "nodes",
+            "thread_pool",
+            "shards",
+            "segments",
+        ]
+
+    async def _safe_call(self, producer: Any) -> tuple[Any, str]:
+        try:
+            return self._to_plain(await producer()), ""
+        except Exception as exc:
+            return {}, str(exc)
+
+    @staticmethod
+    def _node_metrics(data: Any) -> dict[str, Any]:
+        nodes = data.get("nodes", {}) if isinstance(data, dict) else {}
+        heap_used = heap_max = disk_available = disk_total = 0
+        rows = []
+        for node_id, node in nodes.items():
+            if not isinstance(node, dict):
+                continue
+            jvm_mem = ((node.get("jvm") or {}).get("mem") or {})
+            fs_total = ((node.get("fs") or {}).get("total") or {})
+            thread_pool = node.get("thread_pool") or {}
+            indices = node.get("indices") or {}
+            heap_used += int(jvm_mem.get("heap_used_in_bytes") or 0)
+            heap_max += int(jvm_mem.get("heap_max_in_bytes") or 0)
+            disk_available += int(fs_total.get("available_in_bytes") or 0)
+            disk_total += int(fs_total.get("total_in_bytes") or 0)
+            rows.append(
+                {
+                    "node_id": node_id,
+                    "name": node.get("name", ""),
+                    "heap_used_in_bytes": jvm_mem.get("heap_used_in_bytes"),
+                    "heap_max_in_bytes": jvm_mem.get("heap_max_in_bytes"),
+                    "segments_count": (indices.get("segments") or {}).get("count"),
+                    "search_query_current": ((thread_pool.get("search") or {}).get("active")),
+                    "search_rejected": ((thread_pool.get("search") or {}).get("rejected")),
+                    "write_rejected": ((thread_pool.get("write") or {}).get("rejected")),
+                }
+            )
+        return {
+            "count": len(rows),
+            "heap_usage": round(heap_used / heap_max, 4) if heap_max else None,
+            "disk_usage": round((disk_total - disk_available) / disk_total, 4)
+            if disk_total
+            else None,
+            "rows": rows,
+        }
+
+    @staticmethod
+    def _thread_pool_metrics(rows: Any) -> dict[str, Any]:
+        if not isinstance(rows, list):
+            return {"rows": []}
+        rejected = 0
+        active = 0
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            rejected += ElasticsearchEngine._safe_int(row.get("rejected"))
+            active += ElasticsearchEngine._safe_int(row.get("active"))
+            normalized.append(row)
+        return {"active": active, "rejected": rejected, "rows": normalized[:40]}
+
+    @staticmethod
+    def _shard_metrics(rows: Any) -> dict[str, Any]:
+        if not isinstance(rows, list):
+            return {"rows": []}
+        state_counts: dict[str, int] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            state = str(row.get("state") or "UNKNOWN")
+            state_counts[state] = state_counts.get(state, 0) + 1
+        return {"count": len(rows), "state_counts": state_counts, "rows": rows[:50]}
+
+    @staticmethod
+    def _segment_metrics(rows: Any) -> dict[str, Any]:
+        if not isinstance(rows, list):
+            return {"rows": []}
+        return {"count": len(rows), "rows": rows[:50]}
+
+    @staticmethod
+    def _safe_int(value: Any) -> int:
+        try:
+            return int(str(value).replace(",", ""))
+        except (TypeError, ValueError):
+            return 0
 
     @staticmethod
     def _index_pattern(value: str) -> str:
@@ -459,8 +583,3 @@ class ElasticsearchEngine:
                 )
         rows.sort(key=lambda item: int(item["duration_ms"]), reverse=True)
         return rows[: int(limit)]
-
-
-class OpenSearchEngine(ElasticsearchEngine):
-    name = "OpenSearchEngine"
-    db_type = "opensearch"

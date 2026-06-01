@@ -72,7 +72,8 @@ SagittaDB 面向多数据库环境设计，统一纳管实例、库表元数据�
 | 支持等级 | 数据库类型 | 商业推广口径 |
 |---|---|---|
 | 标准支持 | MySQL、TiDB、PostgreSQL、MongoDB、Redis、ClickHouse、StarRocks | 可按标准流程接入实例、测试连接、使用查询、工单、字典和观测主链路。 |
-| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris、Cassandra/ScyllaDB | 按项目验证结果交付，正式接入前需在客户同构环境完成验证并明确交付范围。 |
+| 客户验证后交付 | Oracle、MSSQL、Elasticsearch、OpenSearch、Doris | 按项目验证结果交付；MSSQL、Elasticsearch、OpenSearch、Doris 已补齐观测专属适配，正式接入前需在客户同构环境完成权限和版本验证并明确交付范围。 |
+| 只读/元数据边界 | Cassandra/ScyllaDB | 支持连接、元数据、只读 SELECT、基础健康、peer、容量估算和 compaction 历史；DDL/DML/BATCH 工单执行和深度运行指标不作为标准交付承诺，深度指标需接入 JMX/sidecar。 |
 | 定制评估 | 矩阵外数据库 | 需单独评估连接、权限、元数据、查询、安全边界和运维可行性。 |
 
 ### 3.4 运维可见
@@ -83,6 +84,9 @@ SagittaDB 提供观测中心、会话诊断、SQL 洞察、容量采样、采集
 
 - 查看实例健康、会话、慢 SQL、锁等待、Top SQL、容量趋势和执行计划。
 - Oracle 观测支持 RAC 友好的会话、等待事件、阻塞会话、长事务和 SQL Monitor/AWR/游标缓存降级链路。
+- StarRocks/Doris 观测支持 FE/BE/CN、Load、Compaction、Tablet 和查询活动；MSSQL 观测支持 waits、blocking、deadlock、tempdb、job 和缺失索引建议。
+- MongoDB 观测支持 currentOp、profiler 慢操作、ReplicaSet/Sharding、WiredTiger 和集合级指标；Elasticsearch 使用独立 Elasticsearch SQL API 和客户端观测 cluster/node/index/shard、heap、thread pool、segment 和任务活动；OpenSearch 使用独立 OpenSearch SQL 插件和 opensearch-py 客户端观测同类指标。
+- Cassandra/ScyllaDB 观测支持 peer、容量估算和 compaction 历史；读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需接入 JMX/sidecar。
 - MySQL 慢查询和锁等待按实时运行态展示，避免把历史累计值误判为实时风险。
 - 诊断包自动脱敏密码、Token、Secret 和连接串，便于支持流转。
 

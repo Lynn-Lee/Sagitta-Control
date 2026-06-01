@@ -49,8 +49,8 @@ SagittaDB 是企业级多引擎数据库管控平台，面向数据库变更、�
 ### 2.2 当前边界
 
 - 企业版默认 `tenant_id=1`，保留 SaaS 多租户扩展字段，但当前不提供租户计费、自助注册和租户控制台。
-- MSSQL、Oracle、Elasticsearch/OpenSearch、Doris 已有最小可用实现；其中 MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层，正式接入前需要在客户真实环境完成验证。
-- Cassandra/ScyllaDB 支持连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识；DDL/DML/BATCH 工单执行按交付边界关闭。
+- MSSQL、Oracle、Elasticsearch、OpenSearch、Doris 已有最小可用实现；其中 MSSQL、Elasticsearch、OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层。Elasticsearch 与 OpenSearch 使用独立引擎入口和客户端，正式接入前需要在客户真实环境完成验证。
+- Cassandra/ScyllaDB 按只读/元数据边界支持，覆盖连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT、基础健康、peer、容量估算和 compaction 历史；DDL/DML/BATCH 工单执行按交付边界关闭，读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需 JMX/sidecar。
 - 售前、实施和用户手册必须保持同一引擎支持口径，不得把矩阵外能力作为标准交付承诺。
 - API 文档在开发环境通过 Swagger 暴露，生产环境建议关闭或仅内网访问。
 

@@ -24,10 +24,10 @@ SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数�
 | 类型 | 当前状态 |
 |---|---|
 | MySQL / TiDB / StarRocks | 已实现连接、查询、字典、会话与 SQL 活动相关能力。 |
-| PostgreSQL | 已实现连接、查询、字典、慢 SQL、执行计划与容量相关能力。 |
+| PostgreSQL | 以实例类型 `pgsql` 接入，已实现连接、查询、字典、慢 SQL、执行计划与容量相关能力。 |
 | MongoDB / Redis / ClickHouse | 已实现核心连接、查询、数据字典和监控能力；ClickHouse 已接入 SQL 活动采集，MongoDB 支持白名单写操作工单。 |
-| Oracle / MSSQL / Elasticsearch / OpenSearch / Doris | 已有最小可用实现，其中 MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层；正式接入前建议先完成客户同构环境验证。 |
-| Cassandra / ScyllaDB | 支持连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识；DDL/DML/BATCH 工单执行按交付边界关闭。 |
+| Oracle / MSSQL / Elasticsearch / OpenSearch / Doris | 已有最小可用实现，其中 MSSQL、Elasticsearch、OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层；Elasticsearch 与 OpenSearch 使用独立引擎入口和客户端；正式接入前必须完成客户同构环境验证。 |
+| Cassandra / ScyllaDB | 只读/元数据边界支持，覆盖连接、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、只读 SELECT、基础健康、peer、容量估算和 compaction 历史；DDL/DML/BATCH 工单执行按交付边界关闭，读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需 JMX/sidecar。 |
 
 ## 技术架构
 

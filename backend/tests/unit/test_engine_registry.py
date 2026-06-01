@@ -58,6 +58,19 @@ class TestEngineRegistry:
         engine = get_engine(instance)
         assert engine.db_type == "mssql"
 
+    def test_get_elasticsearch_engine(self):
+        instance = MockInstance("elasticsearch")
+        engine = get_engine(instance)
+        assert engine.name == "ElasticsearchEngine"
+        assert engine.db_type == "elasticsearch"
+
+    def test_get_opensearch_engine(self):
+        instance = MockInstance("opensearch")
+        engine = get_engine(instance)
+        assert engine.name == "OpenSearchEngine"
+        assert engine.db_type == "opensearch"
+        assert engine.__class__.__module__ == "app.engines.opensearch"
+
     def test_unsupported_db_type_raises(self):
         instance = MockInstance("nonexistent_db")
         with pytest.raises(ValueError, match="不支持的数据库类型"):

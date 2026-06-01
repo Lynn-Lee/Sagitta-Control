@@ -136,7 +136,8 @@ class DorisEngine(MysqlEngine):
         health_rs = await self.query(db_name="", sql="SELECT 1 AS ok", limit_num=1)
         version = await self._read_version() if health_rs.is_success else ""
         process_rs = await self.processlist(command_type="ALL") if health_rs.is_success else ResultSet()
-        return {
+        missing_groups: dict[str, str] = {}
+        metrics: dict[str, Any] = {
             "health": {"up": 1 if health_rs.is_success else 0, "error": health_rs.error},
             "version": {"value": version},
             "queries": {
@@ -144,9 +145,115 @@ class DorisEngine(MysqlEngine):
                 "warning": process_rs.error if process_rs.error else "",
             },
         }
+        fe_rs = await self._safe_query("SHOW FRONTENDS")
+        be_rs = await self._safe_query("SHOW BACKENDS")
+        load_rs = await self._safe_query("SHOW LOAD LIMIT 20")
+        routine_load_rs = await self._safe_query("SHOW ROUTINE LOAD")
+        compaction_rs = await self._safe_query("SHOW PROC '/compactions'")
+        tablet_rs = await self._safe_query("SHOW PROC '/statistic'")
+        metrics["cluster"] = {
+            "frontends": self._summarize_rows(
+                fe_rs, missing_groups=missing_groups, group_name="doris_frontends"
+            ),
+            "backends": self._summarize_rows(
+                be_rs, missing_groups=missing_groups, group_name="doris_backends"
+            ),
+        }
+        metrics["load_jobs"] = self._summarize_state_rows(
+            load_rs,
+            state_fields=("State", "STATE", "JobState"),
+            missing_groups=missing_groups,
+            group_name="doris_load_jobs",
+        )
+        metrics["routine_load_jobs"] = self._summarize_state_rows(
+            routine_load_rs,
+            state_fields=("State", "STATE"),
+            missing_groups=missing_groups,
+            group_name="doris_routine_load_jobs",
+        )
+        metrics["compactions"] = self._summarize_rows(
+            compaction_rs, missing_groups=missing_groups, group_name="doris_compactions"
+        )
+        metrics["tablets"] = self._summarize_rows(
+            tablet_rs, missing_groups=missing_groups, group_name="doris_tablets"
+        )
+        if missing_groups:
+            metrics["missing_groups"] = missing_groups
+        return metrics
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "queries", "version"]
+        return [
+            "health",
+            "queries",
+            "version",
+            "cluster",
+            "load_jobs",
+            "routine_load_jobs",
+            "compactions",
+            "tablets",
+        ]
+
+    async def _safe_query(self, sql: str, db_name: str = "") -> ResultSet:
+        try:
+            return await self.query(db_name=db_name, sql=sql, limit_num=0)
+        except Exception as exc:
+            return ResultSet(error=str(exc))
+
+    @staticmethod
+    def _rows_to_dicts(rs: ResultSet) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for row in rs.rows:
+            if isinstance(row, dict):
+                rows.append({str(k): v for k, v in row.items()})
+            elif rs.column_list:
+                rows.append(dict(zip(rs.column_list, row, strict=False)))
+            else:
+                rows.append({"value": row})
+        return rows
+
+    @classmethod
+    def _summarize_rows(
+        cls,
+        rs: ResultSet,
+        *,
+        missing_groups: dict[str, str],
+        group_name: str,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        if not rs.is_success:
+            if rs.error:
+                missing_groups[group_name] = rs.error
+            return {"count": None, "rows": [], "warning": rs.error}
+        rows = cls._rows_to_dicts(rs)
+        return {"count": len(rows), "rows": rows[:limit]}
+
+    @classmethod
+    def _summarize_state_rows(
+        cls,
+        rs: ResultSet,
+        *,
+        state_fields: tuple[str, ...],
+        missing_groups: dict[str, str],
+        group_name: str,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        summary = cls._summarize_rows(
+            rs, missing_groups=missing_groups, group_name=group_name, limit=limit
+        )
+        counts: dict[str, int] = {}
+        for row in summary.get("rows") or []:
+            state = str(cls._row_get(row, *state_fields) or "UNKNOWN")
+            counts[state] = counts.get(state, 0) + 1
+        summary["state_counts"] = counts
+        return summary
+
+    @staticmethod
+    def _row_get(row: dict[str, Any], *names: str) -> Any:
+        lowered = {str(k).lower(): v for k, v in row.items()}
+        for name in names:
+            if name.lower() in lowered:
+                return lowered[name.lower()]
+        return ""
 
     @staticmethod
     def _duration_ms_from_process_row(row: dict[str, Any]) -> int:

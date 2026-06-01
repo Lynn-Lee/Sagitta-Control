@@ -2,7 +2,8 @@
 
 import pytest
 
-from app.engines.elasticsearch import ElasticsearchEngine, OpenSearchEngine
+from app.engines.elasticsearch import ElasticsearchEngine
+from app.engines.opensearch import OpenSearchEngine
 
 
 class MockInstance:

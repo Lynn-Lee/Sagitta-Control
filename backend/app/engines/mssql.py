@@ -421,14 +421,12 @@ class MssqlEngine:
         if not health_rs.is_success:
             return {"health": {"up": 0, "error": health_rs.error}}
 
-        version_rs = await asyncio.to_thread(
-            self._run_query_sync,
+        version_rs = await self._safe_run_query(
             "SELECT CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(128)) AS version",
             None,
             self._db_name,
         )
-        database_rs = await asyncio.to_thread(
-            self._run_query_sync,
+        database_rs = await self._safe_run_query(
             """
             SELECT
                 COUNT(*) AS database_count,
@@ -438,8 +436,7 @@ class MssqlEngine:
             None,
             self._db_name,
         )
-        session_rs = await asyncio.to_thread(
-            self._run_query_sync,
+        session_rs = await self._safe_run_query(
             """
             SELECT
                 COUNT(*) AS session_count,
@@ -449,11 +446,127 @@ class MssqlEngine:
             None,
             self._db_name,
         )
+        waits_rs = await self._safe_run_query(
+            """
+            SELECT TOP (10)
+                wait_type,
+                waiting_tasks_count,
+                wait_time_ms,
+                max_wait_time_ms,
+                signal_wait_time_ms
+            FROM sys.dm_os_wait_stats
+            WHERE wait_type NOT LIKE 'SLEEP%%'
+              AND wait_type NOT LIKE 'BROKER_%%'
+              AND wait_type NOT IN ('CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'LAZYWRITER_SLEEP',
+                                    'RESOURCE_QUEUE', 'SQLTRACE_BUFFER_FLUSH', 'WAITFOR')
+            ORDER BY wait_time_ms DESC
+            """,
+            None,
+            self._db_name,
+        )
+        blocking_rs = await self._safe_run_query(
+            """
+            SELECT
+                r.session_id,
+                r.blocking_session_id,
+                r.wait_type,
+                r.wait_time,
+                DB_NAME(r.database_id) AS db_name,
+                SUBSTRING(st.text, 1, 4000) AS sql_text
+            FROM sys.dm_exec_requests r
+            OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
+            WHERE r.blocking_session_id <> 0
+            ORDER BY r.wait_time DESC
+            """,
+            None,
+            self._db_name,
+        )
+        tempdb_rs = await self._safe_run_query(
+            """
+            SELECT
+                SUM(user_object_reserved_page_count) * 8 * 1024 AS user_object_bytes,
+                SUM(internal_object_reserved_page_count) * 8 * 1024 AS internal_object_bytes,
+                SUM(version_store_reserved_page_count) * 8 * 1024 AS version_store_bytes,
+                SUM(unallocated_extent_page_count) * 8 * 1024 AS free_bytes
+            FROM tempdb.sys.dm_db_file_space_usage
+            """,
+            None,
+            self._db_name,
+        )
+        deadlock_rs = await self._safe_run_query(
+            """
+            SELECT cntr_value AS deadlocks
+            FROM sys.dm_os_performance_counters
+            WHERE counter_name = 'Number of Deadlocks/sec'
+              AND instance_name = '_Total'
+            """,
+            None,
+            self._db_name,
+        )
+        jobs_rs = await self._safe_run_query(
+            """
+            SELECT TOP (20)
+                j.name,
+                CASE h.run_status
+                  WHEN 0 THEN 'failed'
+                  WHEN 1 THEN 'succeeded'
+                  WHEN 2 THEN 'retry'
+                  WHEN 3 THEN 'canceled'
+                  WHEN 4 THEN 'running'
+                  ELSE 'unknown'
+                END AS last_status,
+                h.run_date,
+                h.run_time,
+                h.message
+            FROM msdb.dbo.sysjobs j
+            OUTER APPLY (
+                SELECT TOP (1) run_status, run_date, run_time, message
+                FROM msdb.dbo.sysjobhistory h
+                WHERE h.job_id = j.job_id AND h.step_id = 0
+                ORDER BY h.instance_id DESC
+            ) h
+            ORDER BY j.name
+            """,
+            None,
+            self._db_name,
+        )
+        missing_index_rs = await self._safe_run_query(
+            """
+            SELECT TOP (10)
+                DB_NAME(mid.database_id) AS db_name,
+                OBJECT_NAME(mid.object_id, mid.database_id) AS table_name,
+                migs.avg_total_user_cost,
+                migs.avg_user_impact,
+                migs.user_seeks,
+                mid.equality_columns,
+                mid.inequality_columns,
+                mid.included_columns
+            FROM sys.dm_db_missing_index_group_stats migs
+            JOIN sys.dm_db_missing_index_groups mig ON migs.group_handle = mig.index_group_handle
+            JOIN sys.dm_db_missing_index_details mid ON mig.index_handle = mid.index_handle
+            ORDER BY migs.avg_user_impact DESC, migs.user_seeks DESC
+            """,
+            None,
+            self._db_name,
+        )
 
         version_row = self._first_row_dict(version_rs)
         database_row = self._first_row_dict(database_rs)
         session_row = self._first_row_dict(session_rs)
-        return {
+        missing_groups = self._missing_groups(
+            {
+                "mssql_version": version_rs,
+                "mssql_databases": database_rs,
+                "mssql_sessions": session_rs,
+                "mssql_waits": waits_rs,
+                "mssql_blocking": blocking_rs,
+                "mssql_tempdb": tempdb_rs,
+                "mssql_deadlocks": deadlock_rs,
+                "mssql_jobs": jobs_rs,
+                "mssql_missing_indexes": missing_index_rs,
+            }
+        )
+        metrics = {
             "health": {"up": 1},
             "version": {"value": version_row.get("version", "")},
             "databases": {
@@ -466,10 +579,55 @@ class MssqlEngine:
                 "user": session_row.get("user_session_count"),
                 "warning": session_rs.error,
             },
+            "waits": self._rows_to_dicts(waits_rs)[:10] if waits_rs.is_success else [],
+            "blocking_sessions": self._rows_to_dicts(blocking_rs)[:20]
+            if blocking_rs.is_success
+            else [],
+            "tempdb": self._first_row_dict(tempdb_rs),
+            "deadlocks": self._first_row_dict(deadlock_rs),
+            "jobs": self._rows_to_dicts(jobs_rs)[:20] if jobs_rs.is_success else [],
+            "missing_indexes": self._rows_to_dicts(missing_index_rs)[:10]
+            if missing_index_rs.is_success
+            else [],
         }
+        if missing_groups:
+            metrics["missing_groups"] = missing_groups
+        return metrics
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "version", "databases", "sessions"]
+        return [
+            "health",
+            "version",
+            "databases",
+            "sessions",
+            "waits",
+            "blocking_sessions",
+            "tempdb",
+            "deadlocks",
+            "jobs",
+            "missing_indexes",
+        ]
+
+    async def _safe_run_query(
+        self,
+        sql: str,
+        params: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+        db_name: str | None = None,
+    ) -> ResultSet:
+        try:
+            return await asyncio.to_thread(self._run_query_sync, sql, params, db_name)
+        except Exception as exc:
+            return ResultSet(error=str(exc))
+
+    @classmethod
+    def _rows_to_dicts(cls, rs: ResultSet) -> list[dict[str, Any]]:
+        if not rs.is_success:
+            return []
+        return [cls._row_to_dict(row, rs.column_list) for row in rs.rows]
+
+    @staticmethod
+    def _missing_groups(groups: dict[str, ResultSet]) -> dict[str, str]:
+        return {name: rs.error for name, rs in groups.items() if rs.error}
 
     @staticmethod
     def _row_to_dict(row: Any, columns: list[str]) -> dict[str, Any]:

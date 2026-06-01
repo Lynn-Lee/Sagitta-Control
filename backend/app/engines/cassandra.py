@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from app.core.security import decrypt_field
 from app.engines.models import ResultSet, ReviewSet, SqlItem
@@ -404,24 +406,127 @@ class CassandraEngine:
         return await self.execute(getattr(workflow, "db_name", ""), sql)
 
     async def collect_metrics(self) -> dict[str, Any]:
-        rs = await asyncio.to_thread(
-            self._run_query_sync,
-            "SELECT release_version, cluster_name, data_center FROM system.local",
-            None,
-            None,
+        rs = await self._safe_query(
+            "SELECT release_version, cluster_name, data_center FROM system.local"
+        )
+        peers_rs = await self._safe_query(
+            "SELECT peer, data_center, rack, release_version FROM system.peers"
+        )
+        size_rs = await self._safe_query(
+            """
+            SELECT keyspace_name, table_name, range_start, range_end,
+                   mean_partition_size, partitions_count
+            FROM system.size_estimates
+            LIMIT 50
+            """
+        )
+        compaction_rs = await self._safe_query(
+            """
+            SELECT id, keyspace_name, columnfamily_name, compacted_at, bytes_in, bytes_out, rows_merged
+            FROM system.compaction_history
+            LIMIT 20
+            """
         )
         first_row = rs.rows[0] if rs.is_success and rs.rows else {}
         version = str(self._dict_value(first_row, "release_version") or self._first_value(first_row) or "")
         cluster_name = str(self._dict_value(first_row, "cluster_name") or "")
         data_center = str(self._dict_value(first_row, "data_center") or "")
-        return {
+        size_rows = self._rows_to_dicts(size_rs)
+        missing_groups = self._missing_groups(
+            {
+                "cassandra_local": rs,
+                "cassandra_peers": peers_rs,
+                "cassandra_size_estimates": size_rs,
+                "cassandra_compaction_history": compaction_rs,
+                "cassandra_jmx_metrics": ResultSet(
+                    warning=(
+                        "Cassandra 深度运行指标需要 JMX/sidecar 暴露，当前 CQL 账号仅采集系统表指标"
+                    )
+                ),
+            }
+        )
+        metrics = {
             "health": {"up": 1 if rs.is_success else 0, "error": rs.error},
             "version": {"value": version},
-            "cluster": {"name": cluster_name, "data_center": data_center},
+            "cluster": {
+                "name": cluster_name,
+                "data_center": data_center,
+                "peer_count": len(peers_rs.rows) if peers_rs.is_success else None,
+                "peers": self._rows_to_dicts(peers_rs)[:20] if peers_rs.is_success else [],
+            },
+            "tables": {
+                "estimated_partitions": sum(self._safe_int(row.get("partitions_count")) for row in size_rows),
+                "estimated_bytes": sum(
+                    self._safe_int(row.get("mean_partition_size"))
+                    * self._safe_int(row.get("partitions_count"))
+                    for row in size_rows
+                ),
+                "rows": size_rows[:50],
+            },
+            "compactions": {
+                "recent_count": len(compaction_rs.rows) if compaction_rs.is_success else None,
+                "rows": self._rows_to_dicts(compaction_rs)[:20]
+                if compaction_rs.is_success
+                else [],
+            },
+            "jmx_boundary": {
+                "required_for": [
+                    "read_write_latency",
+                    "tombstone_scans",
+                    "sstables",
+                    "cache",
+                    "thread_pools",
+                    "repair",
+                ],
+                "status": "not_configured",
+            },
         }
+        if missing_groups:
+            metrics["missing_groups"] = missing_groups
+        return metrics
 
     def get_supported_metric_groups(self) -> list[str]:
-        return ["health", "version", "cluster"]
+        return [
+            "health",
+            "version",
+            "cluster",
+            "tables",
+            "compactions",
+            "jmx_boundary",
+        ]
+
+    async def _safe_query(
+        self,
+        sql: str,
+        parameters: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+    ) -> ResultSet:
+        try:
+            return await asyncio.to_thread(self._run_query_sync, sql, parameters, None)
+        except Exception as exc:
+            return ResultSet(error=str(exc))
+
+    @classmethod
+    def _rows_to_dicts(cls, rs: ResultSet) -> list[dict[str, Any]]:
+        if not rs.is_success:
+            return []
+        return [cls._row_to_dict(row) for row in rs.rows]
+
+    @staticmethod
+    def _missing_groups(groups: dict[str, ResultSet]) -> dict[str, str]:
+        missing: dict[str, str] = {}
+        for name, rs in groups.items():
+            if rs.error:
+                missing[name] = rs.error
+            elif rs.warning:
+                missing[name] = rs.warning
+        return missing
+
+    @staticmethod
+    def _safe_int(value: Any) -> int:
+        try:
+            return int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
         check = self.query_check(db_name, sql)
@@ -434,12 +539,30 @@ class CassandraEngine:
     @staticmethod
     def _row_to_dict(row: Any) -> dict[str, Any]:
         if isinstance(row, dict):
-            return row
+            return {str(key): CassandraEngine._json_safe(value) for key, value in row.items()}
         if hasattr(row, "_asdict"):
-            return dict(row._asdict())
+            return {
+                str(key): CassandraEngine._json_safe(value)
+                for key, value in row._asdict().items()
+            }
         if hasattr(row, "_fields"):
-            return {field: getattr(row, field) for field in row._fields}
-        return {"value": row}
+            return {
+                str(field): CassandraEngine._json_safe(getattr(row, field))
+                for field in row._fields
+            }
+        return {"value": CassandraEngine._json_safe(row)}
+
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, (datetime, date, UUID)):
+            return str(value)
+        if isinstance(value, dict):
+            return {str(key): CassandraEngine._json_safe(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [CassandraEngine._json_safe(item) for item in value]
+        return str(value)
 
     @staticmethod
     def _column_names(result: Any, rows: list[dict[str, Any]]) -> list[str]:

@@ -38,7 +38,7 @@ from app.schemas.slowlog import (
 from app.services.monitor import MonitorService
 
 DEFAULT_SLOW_THRESHOLD_MS = 1000
-SUPPORTED_NATIVE_TYPES = {"mysql", "pgsql", "redis"}
+SUPPORTED_NATIVE_TYPES = {"mysql", "pgsql", "redis", "mongo", "mongodb"}
 SQL_ACTIVITY_TYPES = {
     "tidb",
     "starrocks",
@@ -76,6 +76,7 @@ SOURCE_LABELS = {
     "oracle_cursor_cache": "Oracle Cursor Cache",
     "oracle_activity": "Oracle 会话/ASH",
     "mssql_activity": "MSSQL SQL 活动",
+    "mongo_profile": "MongoDB profiler 慢操作",
     "clickhouse_activity": "ClickHouse SQL 活动",
     "elasticsearch_activity": "Elasticsearch 任务活动",
     "opensearch_activity": "OpenSearch 任务活动",
@@ -978,7 +979,20 @@ class SlowLogService:
         if not sql.strip():
             raise AppException("SQL 不能为空", code=422)
         instance = await SlowLogService.get_instance_or_404(db, instance_id, user)
-        if instance.db_type not in {"mysql", "pgsql", "oracle"}:
+        if instance.db_type not in {
+            "mysql",
+            "pgsql",
+            "postgres",
+            "postgresql",
+            "oracle",
+            "tidb",
+            "starrocks",
+            "mssql",
+            "sqlserver",
+            "doris",
+            "elasticsearch",
+            "opensearch",
+        }:
             return SlowQueryExplainResponse(
                 supported=False,
                 db_type=instance.db_type,
@@ -1042,6 +1056,10 @@ class SlowLogService:
                 "oracle_awr_sqlstat",
                 "oracle_cursor_cache",
                 "oracle_activity",
+                "mssql_activity",
+                "mongo_profile",
+                "elasticsearch_activity",
+                "opensearch_activity",
             }:
                 source_ref = f"{source_ref}:{occurred.strftime('%Y%m%d%H%M')}"
 
@@ -1132,6 +1150,8 @@ class SlowLogService:
             "postgres": "pgsql_statements",
             "postgresql": "pgsql_statements",
             "redis": "redis_slowlog",
+            "mongo": "mongo_profile",
+            "mongodb": "mongo_profile",
         }.get(db_type, f"{db_type}_sql_activity")
         return saved, source, ""
 
@@ -1268,6 +1288,8 @@ class SlowLogService:
                 "mysql": "mysql_slowlog",
                 "pgsql": "pgsql_statements",
                 "redis": "redis_slowlog",
+                "mongo": "mongo_profile",
+                "mongodb": "mongo_profile",
             }.get(instance.db_type, f"{instance.db_type}_slowlog")
             sql_text = _string(
                 lowered.get("sql_text")

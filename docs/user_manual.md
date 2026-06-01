@@ -84,7 +84,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 | 支持等级 | 数据库类型 | 用户侧说明 |
 |---|---|---|
 | 正式支持 | MySQL、TiDB、PostgreSQL、MongoDB、Redis、ClickHouse、StarRocks | 可按标准流程创建实例、测试连接并进入数据字典、查询、工单和观测等主链路。 |
-| 客户验证后交付 | Oracle、MSSQL、Elasticsearch/OpenSearch、Doris、Cassandra/ScyllaDB | 已有最小可用能力；MSSQL、Elasticsearch/OpenSearch、Doris 已补齐 SQL/任务活动或基础观测兼容层。Cassandra/ScyllaDB 支持连接、元数据、表 DDL、主键/索引元数据、只读 SELECT 和基础健康/版本/集群标识，DDL/DML/BATCH 工单执行关闭。正式接入前需由实施人员在客户同构环境完成验证。 |
+| 客户验证后交付 | Oracle、MSSQL、Elasticsearch、OpenSearch、Doris | 已有最小可用能力；MSSQL 已补齐 waits、blocking、deadlock、tempdb、job、执行计划和缺失索引观测，Elasticsearch 和 OpenSearch 已拆分为独立引擎入口，分别通过 Elasticsearch SQL API 与 OpenSearch SQL 插件采集 cluster/node/index/shard、heap、thread pool、segment 和任务活动，Doris 已补齐 FE/BE、Compaction、Load Job、Tablet 和查询活动。正式接入前需由实施人员在客户同构环境完成验证。 |
+| 只读/元数据边界 | Cassandra/ScyllaDB | 支持连接、元数据、表 DDL、主键/索引元数据、只读 SELECT、基础健康、peer、容量估算和 compaction 历史；DDL/DML/BATCH 工单执行不纳入标准交付，读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需 JMX/sidecar。 |
 | 待验证 | 矩阵外新增引擎 | 页面会显示“待验证”提示；不作为标准交付能力承诺。 |
 
 如果客户项目需要矩阵外或“待验证”引擎，应单独立项评估，并在客户同构环境完成连接、元数据、查询、安全边界和运维验证。
@@ -298,6 +299,13 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - 实例诊断工作台会保留概览、性能、库容量、表容量、会话洞察、SQL 洞察、复制、等待事件、容量增长、告警和采集诊断等通用页签，并根据当前实例类型追加专属页签。
 - TiDB 专属页签展示 Token 使用率；Redis 专属页签展示内存使用率、Ops/sec、缓存命中率、Key 淘汰、拒绝连接、复制角色、客户端会话和慢命令。
 - ClickHouse 专属页签展示当前查询、连接数、查询计数增量、失败查询、延迟/拒绝写入、内存、磁盘、表容量和活动 SQL；QPS/TPS 需要至少两次采集后按计数器差值计算。
+- StarRocks 专属页签展示 FE/BE/CN、Load、Routine Load、Compaction、Tablet、资源组和当前 SQL 活动。
+- Doris 专属页签展示 FE/BE、Load、Routine Load、Compaction、Tablet 和当前 SQL 活动。
+- MSSQL 专属页签展示 waits、blocking、deadlock、tempdb、job、执行计划和缺失索引建议。
+- MongoDB 专属页签展示 currentOp、profiler 慢操作、ReplicaSet/Sharding、WiredTiger、数据库和集合级容量指标。
+- Elasticsearch 专属页签展示 Elasticsearch cluster/node/index/shard、heap、thread pool、segment 和任务活动。
+- OpenSearch 专属页签展示 OpenSearch cluster/node/index/shard、heap、thread pool、segment 和任务活动，SQL 查询走 OpenSearch SQL 插件。
+- Cassandra/ScyllaDB 专属页签展示 CQL 系统表可采集的 peer、容量估算和 compaction 历史；读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需要 JMX/sidecar。
 - Oracle 会话监控会优先展示 RAC 实例、OS PID、module/action、等待分类、阻塞实例和 PGA 信息；Top SQL 优先来自 SQL Monitor，并在 AWR 或 SQL Monitor 权限不足时自动降级到游标缓存或当前会话 SQL。
 - Kill 会话属于高风险操作，应确认业务影响后执行。
 - SQL 洞察数据依赖采集配置和目标数据库权限。

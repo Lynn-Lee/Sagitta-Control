@@ -24,7 +24,7 @@ export const DB_TYPE_LABELS: Record<string, string> = {
   'open-search': 'OpenSearch',
 }
 
-export type EngineSupportStatus = 'ga' | 'validated_minimal' | 'experimental' | 'backlog'
+export type EngineSupportStatus = 'ga' | 'validated_minimal' | 'read_only_metadata' | 'experimental' | 'backlog'
 
 export interface EngineSupportInfo {
   status: EngineSupportStatus
@@ -56,7 +56,7 @@ export const ENGINE_SUPPORT: Record<string, EngineSupportInfo> = {
     status: 'ga',
     statusLabel: '正式支持',
     supportLabel: 'v2.0 正式承诺',
-    note: '覆盖连接、库表元数据、在线查询安全控制、归档和基础观测能力。',
+    note: '覆盖连接、库表元数据、在线查询安全控制、归档、currentOp、profiler 慢操作、ReplicaSet/Sharding、WiredTiger 和集合级观测。',
   },
   redis: {
     status: 'ga',
@@ -74,7 +74,7 @@ export const ENGINE_SUPPORT: Record<string, EngineSupportInfo> = {
     status: 'ga',
     statusLabel: '正式支持',
     supportLabel: 'v2.0 正式承诺',
-    note: '覆盖连接、元数据、在线查询、SQL 工单和归档 purge 主链路。',
+    note: '覆盖连接、元数据、在线查询、SQL 工单、归档 purge、会话、执行计划、FE/BE/CN、Load、Compaction、Tablet 和资源组观测。',
   },
   oracle: {
     status: 'validated_minimal',
@@ -86,31 +86,31 @@ export const ENGINE_SUPPORT: Record<string, EngineSupportInfo> = {
     status: 'validated_minimal',
     statusLabel: '客户验证后交付',
     supportLabel: '最小可用',
-    note: '已有最小可用实现；正式接入前需在客户同构环境验证连接、元数据和执行链路。',
+    note: '已有连接、元数据、查询、会话、SQL 活动、执行计划、waits、blocking、deadlock、tempdb、job 和缺失索引观测；正式接入前需客户同构验证。',
   },
   elasticsearch: {
     status: 'validated_minimal',
     statusLabel: '客户验证后交付',
     supportLabel: '最小可用',
-    note: '覆盖连接、索引元数据、SQL API 只读查询和基础健康监控；正式交付前需在客户 ES 版本验证。',
+    note: '覆盖连接、索引元数据、SQL API 只读查询、cluster/node/index/shard、heap/GC、thread pool、segment 和任务活动；正式交付前需在客户 ES 版本验证。',
   },
   opensearch: {
     status: 'validated_minimal',
     statusLabel: '客户验证后交付',
     supportLabel: '最小可用',
-    note: '复用 Elasticsearch 适配入口；正式交付前需在目标 OpenSearch 版本验证 SQL API 兼容性。',
+    note: '使用独立 OpenSearch 适配入口和 opensearch-py 客户端，覆盖 cluster/node/index/shard、heap/GC、thread pool、segment 和任务活动；正式交付前需验证 OpenSearch SQL API 兼容性。',
   },
   cassandra: {
-    status: 'experimental',
-    statusLabel: '待验证',
-    supportLabel: '不作为 GA 承诺',
-    note: '当前仅保留骨架能力，正式支持需单独立项。',
+    status: 'read_only_metadata',
+    statusLabel: '只读/元数据',
+    supportLabel: '只读/元数据边界',
+    note: '覆盖连接、元数据、只读 SELECT、系统表健康、peer、容量估算和 compaction 历史；读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需 JMX/sidecar。',
   },
   doris: {
     status: 'validated_minimal',
     statusLabel: '客户验证后交付',
     supportLabel: '最小可用',
-    note: '覆盖 FE MySQL 协议连接、元数据、在线查询、SQL 工单基础审核和基础监控。',
+    note: '覆盖 FE MySQL 协议连接、元数据、在线查询、SQL 工单基础审核、会话、执行计划、FE/BE、Compaction、Load Job、Tablet 和查询活动观测。',
   },
 }
 
