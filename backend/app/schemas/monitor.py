@@ -153,6 +153,7 @@ class MonitorSnapshotResponse(BaseModel):
     replication_lag_seconds: int | None = None
     total_size_bytes: int | None = None
     extra_metrics: dict = {}
+    metric_groups: dict = {}
     health_score: int = 0
     risk_level: str = "attention"
     risk_label: str = "关注"

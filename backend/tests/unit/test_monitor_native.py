@@ -60,6 +60,37 @@ def test_normalize_metric_payload_preserves_partial_missing_groups():
     assert normalized["extra_metrics"]["stats"]["qps"] == 12.5
 
 
+def test_extract_metric_groups_merges_nested_and_top_level_engine_groups():
+    groups = MonitorService._extract_metric_groups(
+        {
+            "health": {"up": 1},
+            "version": {"value": "8.0"},
+            "metric_groups": {"token_usage": [{"instance": "tidb-1"}]},
+            "stats": {"qps": Decimal("12.5")},
+        }
+    )
+
+    assert groups == {
+        "token_usage": [{"instance": "tidb-1"}],
+        "stats": {"qps": 12.5},
+    }
+
+
+def test_snapshot_to_dict_exposes_metric_groups():
+    snapshot = MonitorMetricSnapshot(
+        instance_id=1,
+        collected_at=datetime(2026, 1, 1, tzinfo=UTC),
+        status="success",
+        is_up=True,
+        extra_metrics={"health": {"up": 1}, "memory": {"used_memory": Decimal("1024")}},
+    )
+
+    data = MonitorService._snapshot_to_dict(snapshot)
+
+    assert data["metric_groups"] == {"memory": {"used_memory": 1024}}
+    assert data["extra_metrics"]["memory"]["used_memory"] == Decimal("1024")
+
+
 def test_normalize_table_capacity_maps_common_engine_fields():
     row = MonitorService._normalize_table_capacity(
         1,

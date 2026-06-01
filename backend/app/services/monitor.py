@@ -69,6 +69,14 @@ class MonitorService:
         "warning": "警告",
         "critical": "严重",
     }
+    METRIC_GROUP_META_KEYS = {
+        "error",
+        "health",
+        "missing_groups",
+        "metric_groups",
+        "server_version",
+        "version",
+    }
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
@@ -667,6 +675,7 @@ class MonitorService:
 
     @staticmethod
     def _snapshot_to_dict(snap: MonitorMetricSnapshot) -> dict:
+        extra_metrics = snap.extra_metrics or {}
         data = {
             "instance_id": snap.instance_id,
             "collected_at": snap.collected_at.isoformat() if snap.collected_at else None,
@@ -688,10 +697,32 @@ class MonitorService:
             "long_transactions": snap.long_transactions,
             "replication_lag_seconds": snap.replication_lag_seconds,
             "total_size_bytes": snap.total_size_bytes,
-            "extra_metrics": snap.extra_metrics or {},
+            "extra_metrics": extra_metrics,
+            "metric_groups": MonitorService._extract_metric_groups(extra_metrics),
         }
         data.update(MonitorService.evaluate_health(data, snap.status))
         return data
+
+    @staticmethod
+    def _extract_metric_groups(extra_metrics: dict[str, Any] | None) -> dict[str, Any]:
+        """
+        Expose engine-specific metrics through one stable API field.
+
+        Engines may either return groups at the top level (current behavior) or nest
+        future groups under metric_groups. The frontend consumes this normalized map
+        for engine panels while generic monitor fields stay on the snapshot itself.
+        """
+        if not isinstance(extra_metrics, dict):
+            return {}
+        groups: dict[str, Any] = {}
+        nested_groups = extra_metrics.get("metric_groups")
+        if isinstance(nested_groups, dict):
+            groups.update(nested_groups)
+        for key, value in extra_metrics.items():
+            if key in MonitorService.METRIC_GROUP_META_KEYS:
+                continue
+            groups[key] = value
+        return MonitorService._json_safe(groups)
 
     @staticmethod
     def evaluate_health(snapshot: dict | None, collect_status: str = "not_configured") -> dict:
@@ -1147,11 +1178,7 @@ class MonitorService:
         extra = latest.get("extra_metrics") or {}
         return {
             "instance": detail["instance"],
-            "metric_groups": {
-                key: value
-                for key, value in extra.items()
-                if key not in {"health", "version", "missing_groups"}
-            },
+            "metric_groups": MonitorService._extract_metric_groups(extra),
             "missing_groups": latest.get("missing_groups") or {},
             "health": MonitorService.evaluate_health(
                 latest, (detail.get("config") or {}).get("last_collect_status", "not_configured")

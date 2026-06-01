@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { MenuProps } from 'antd'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { MenuProps, TabsProps } from 'antd'
 import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
 import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -43,6 +43,7 @@ interface MonitorSnapshot {
   replication_lag_seconds?: number | null
   total_size_bytes?: number | null
   extra_metrics?: Record<string, any>
+  metric_groups?: Record<string, any>
   health_score?: number
   risk_level?: string
   risk_label?: string
@@ -262,6 +263,152 @@ function MetricCard({ title, value, suffix, danger }: { title: string; value?: n
       <Statistic title={title} value={formatMetric(value, suffix)} valueStyle={{ fontSize: 20, color: danger ? '#cf1322' : undefined }} />
     </div>
   )
+}
+
+type EnginePanelContext = {
+  metricGroups: Record<string, any>
+  isMobile: boolean
+}
+
+type EngineDiagnosticPanel = {
+  key: string
+  label: ReactNode
+  render: (context: EnginePanelContext) => ReactNode
+}
+
+const tokenUsageColumns = [
+  { title: 'TiDB 节点', dataIndex: 'instance', width: 220 },
+  { title: '活跃会话', dataIndex: 'active_sessions', width: 120, render: (value: any) => formatMetric(value) },
+  { title: 'Sleep 会话', dataIndex: 'sleep_sessions', width: 120, render: (value: any) => formatMetric(value) },
+  { title: '总会话', dataIndex: 'total_sessions', width: 110, render: (value: any) => formatMetric(value) },
+  { title: 'Token Limit', dataIndex: 'token_limit', width: 120, render: (value: any) => formatMetric(value) },
+  { title: 'Token 使用率', dataIndex: 'token_usage_pct', width: 130, render: (value: any) => formatMetric(value, '%') },
+]
+
+const clickHouseDiskColumns = [
+  { title: '磁盘', dataIndex: 'name', width: 160 },
+  { title: '路径', dataIndex: 'path', ellipsis: true },
+  { title: '使用率', dataIndex: 'used_pct', width: 160, render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
+  { title: '已用', dataIndex: 'used_space', width: 140, render: formatBytes },
+  { title: '总量', dataIndex: 'total_space', width: 140, render: formatBytes },
+  { title: '保留空间', dataIndex: 'keep_free_space', width: 140, render: formatBytes },
+]
+
+function TidbEnginePanel({ metricGroups }: EnginePanelContext) {
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div>
+        <Title level={5} style={{ marginTop: 0 }}>TiDB Token 使用率</Title>
+        <Table dataSource={metricGroups.token_usage || []} columns={tokenUsageColumns} rowKey={(row: any, index) => `${row.instance || 'token'}-${index}`} scroll={{ x: 820 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无 Token 使用率数据" /> }} />
+      </div>
+    </Space>
+  )
+}
+
+function OracleEnginePanel({ metricGroups, isMobile }: EnginePanelContext) {
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Descriptions bordered size="small" column={isMobile ? 1 : 2}>
+        {Object.entries(metricGroups.fra || {}).map(([key, value]) => (
+          <Descriptions.Item key={key} label={`FRA ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
+        ))}
+        {Object.entries(metricGroups.archive || {}).map(([key, value]) => (
+          <Descriptions.Item key={key} label={`Archive ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
+        ))}
+      </Descriptions>
+      <Table dataSource={metricGroups.tablespaces || []} rowKey={(row: any) => row.tablespace_name} size="small" pagination={false} columns={[
+        { title: '表空间', dataIndex: 'tablespace_name' },
+        { title: '使用率', dataIndex: 'used_pct', render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
+        { title: '已用', dataIndex: 'used_bytes', render: formatBytes },
+        { title: '总量', dataIndex: 'total_bytes', render: formatBytes },
+        { title: 'Autoextend', dataIndex: 'autoextensible' },
+      ]} />
+      <Table dataSource={metricGroups.data_guard || []} rowKey={(row: any, index) => `${row.name}-${index}`} size="small" pagination={false} columns={[
+        { title: 'Data Guard 指标', dataIndex: 'name' },
+        { title: '值', dataIndex: 'value' },
+        { title: '单位', dataIndex: 'unit' },
+        { title: '计算时间', dataIndex: 'time_computed', render: formatTime },
+      ]} locale={{ emptyText: <TableEmptyState title="暂无 Data Guard 数据" /> }} />
+    </Space>
+  )
+}
+
+function RedisEnginePanel({ metricGroups, isMobile }: EnginePanelContext) {
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+        <MetricCard title="内存使用率" value={formatPercent(metricGroups.memory?.memory_usage)} />
+        <MetricCard title="已用内存" value={formatBytes(metricGroups.memory?.used_memory)} />
+        <MetricCard title="缓存命中率" value={formatPercent(metricGroups.stats?.keyspace_hit_rate)} />
+        <MetricCard title="Ops/sec" value={formatRateMetric(metricGroups.stats?.instantaneous_ops_per_sec)} />
+        <MetricCard title="连接客户端" value={metricGroups.connections?.current} />
+        <MetricCard title="阻塞客户端" value={metricGroups.connections?.blocked_clients} danger={(metricGroups.connections?.blocked_clients || 0) > 0} />
+        <MetricCard title="Key 淘汰" value={metricGroups.stats?.evicted_keys} danger={(metricGroups.stats?.evicted_keys || 0) > 0} />
+        <MetricCard title="拒绝连接" value={metricGroups.stats?.rejected_connections} danger={(metricGroups.stats?.rejected_connections || 0) > 0} />
+      </div>
+      <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+        <Descriptions.Item label="角色">{formatMetric(metricGroups.replication?.role)}</Descriptions.Item>
+        <Descriptions.Item label="从库数量">{formatMetric(metricGroups.replication?.connected_slaves)}</Descriptions.Item>
+        <Descriptions.Item label="主从链路">{formatMetric(metricGroups.replication?.master_link_status || '不适用')}</Descriptions.Item>
+        <Descriptions.Item label="总命令数">{formatMetric(metricGroups.stats?.total_commands_processed)}</Descriptions.Item>
+        <Descriptions.Item label="命中次数">{formatMetric(metricGroups.stats?.keyspace_hits)}</Descriptions.Item>
+        <Descriptions.Item label="未命中次数">{formatMetric(metricGroups.stats?.keyspace_misses)}</Descriptions.Item>
+        <Descriptions.Item label="过期 Key">{formatMetric(metricGroups.stats?.expired_keys)}</Descriptions.Item>
+        <Descriptions.Item label="内存碎片率">{formatMetric(metricGroups.memory?.mem_fragmentation_ratio)}</Descriptions.Item>
+        <Descriptions.Item label="峰值内存">{formatBytes(metricGroups.memory?.used_memory_peak)}</Descriptions.Item>
+      </Descriptions>
+    </Space>
+  )
+}
+
+function ClickHouseEnginePanel({ metricGroups, isMobile }: EnginePanelContext) {
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+        <MetricCard title="当前查询" value={metricGroups.queries?.active} />
+        <MetricCard title="连接数" value={metricGroups.connections?.current} />
+        <MetricCard title="内存使用率" value={formatPercent(metricGroups.memory?.memory_usage)} />
+        <MetricCard title="已用内存" value={formatBytes(metricGroups.memory?.used_memory)} />
+        <MetricCard title="总查询数" value={metricGroups.counters?.queries} />
+        <MetricCard title="失败查询" value={metricGroups.counters?.errors} danger={(metricGroups.counters?.errors || 0) > 0} />
+        <MetricCard title="延迟写入" value={metricGroups.queries?.delayed_inserts} danger={(metricGroups.queries?.delayed_inserts || 0) > 0} />
+        <MetricCard title="拒绝写入" value={metricGroups.queries?.rejected_inserts} danger={(metricGroups.queries?.rejected_inserts || 0) > 0} />
+      </div>
+      <Table
+        dataSource={metricGroups.disks || []}
+        columns={clickHouseDiskColumns}
+        rowKey={(row: any) => row.name}
+        size="small"
+        scroll={{ x: 980 }}
+        pagination={false}
+        locale={{ emptyText: <TableEmptyState title="暂无磁盘指标" /> }}
+      />
+      <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
+        <Descriptions.Item label="Select 查询">{formatMetric(metricGroups.counters?.select_queries)}</Descriptions.Item>
+        <Descriptions.Item label="Insert 查询">{formatMetric(metricGroups.counters?.insert_queries)}</Descriptions.Item>
+        <Descriptions.Item label="最大连接">{formatMetric(metricGroups.connections?.max_connections)}</Descriptions.Item>
+        <Descriptions.Item label="可用内存">{formatBytes(metricGroups.memory?.available_memory)}</Descriptions.Item>
+        <Descriptions.Item label="系统总内存">{formatBytes(metricGroups.memory?.total_memory)}</Descriptions.Item>
+        <Descriptions.Item label="读操作计数">{formatMetric(metricGroups.counters?.read_ops)}</Descriptions.Item>
+        <Descriptions.Item label="写操作计数">{formatMetric(metricGroups.counters?.write_ops)}</Descriptions.Item>
+      </Descriptions>
+    </Space>
+  )
+}
+
+const ENGINE_DIAGNOSTIC_PANELS: Record<string, EngineDiagnosticPanel[]> = {
+  tidb: [{ key: 'tidb', label: 'TiDB 专属', render: context => <TidbEnginePanel {...context} /> }],
+  oracle: [{ key: 'oracle', label: 'Oracle 专属', render: context => <OracleEnginePanel {...context} /> }],
+  redis: [{ key: 'redis', label: 'Redis 专属', render: context => <RedisEnginePanel {...context} /> }],
+  clickhouse: [{ key: 'clickhouse', label: 'ClickHouse 专属', render: context => <ClickHouseEnginePanel {...context} /> }],
+}
+
+function getEngineDiagnosticTabs(dbType: string | undefined, context: EnginePanelContext): TabsProps['items'] {
+  return (ENGINE_DIAGNOSTIC_PANELS[(dbType || '').toLowerCase()] || []).map(panel => ({
+    key: panel.key,
+    label: panel.label,
+    children: panel.render(context),
+  }))
 }
 
 export default function MonitorPage() {
@@ -932,15 +1079,6 @@ export default function MonitorPage() {
     { title: 'SQL', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text }}>{row.sql_text || row.sql_id || '-'}</Text> },
   ]
 
-  const tokenUsageColumns = [
-    { title: 'TiDB 节点', dataIndex: 'instance', width: 220 },
-    { title: '活跃会话', dataIndex: 'active_sessions', width: 120, render: (value: any) => formatMetric(value) },
-    { title: 'Sleep 会话', dataIndex: 'sleep_sessions', width: 120, render: (value: any) => formatMetric(value) },
-    { title: '总会话', dataIndex: 'total_sessions', width: 110, render: (value: any) => formatMetric(value) },
-    { title: 'Token Limit', dataIndex: 'token_limit', width: 120, render: (value: any) => formatMetric(value) },
-    { title: 'Token 使用率', dataIndex: 'token_usage_pct', width: 130, render: (value: any) => formatMetric(value, '%') },
-  ]
-
   const growthColumns = [
     { title: '库/Schema', dataIndex: 'db_name', width: 180 },
     { title: '增长量', dataIndex: 'growth_bytes', render: formatBytes },
@@ -948,14 +1086,9 @@ export default function MonitorPage() {
     { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
   ]
 
-  const clickHouseDiskColumns = [
-    { title: '磁盘', dataIndex: 'name', width: 160 },
-    { title: '路径', dataIndex: 'path', ellipsis: true },
-    { title: '使用率', dataIndex: 'used_pct', width: 160, render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
-    { title: '已用', dataIndex: 'used_space', width: 140, render: formatBytes },
-    { title: '总量', dataIndex: 'total_space', width: 140, render: formatBytes },
-    { title: '保留空间', dataIndex: 'keep_free_space', width: 140, render: formatBytes },
-  ]
+  const currentDbType = (active?.db_type || detail?.instance?.db_type || '').toLowerCase()
+  const metricGroups = engineDetail?.metric_groups || latest?.metric_groups || latest?.extra_metrics || {}
+  const engineDiagnosticTabs = getEngineDiagnosticTabs(currentDbType, { metricGroups, isMobile }) || []
 
   return (
     <div>
@@ -1203,12 +1336,6 @@ export default function MonitorPage() {
                       children: canViewSessions ? (
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                           <Alert type="info" showIcon message="会话洞察" description="在线会话、阻塞链、历史会话和 Oracle ASH/AWR 均使用当前实例上下文。" />
-                          {(active?.db_type || detail?.instance?.db_type) === 'tidb' && (
-                            <div>
-                              <Title level={5} style={{ marginTop: 0 }}>TiDB Token 使用率</Title>
-                              <Table dataSource={engineDetail?.metric_groups?.token_usage || []} columns={tokenUsageColumns} rowKey={(row: any, index) => `${row.instance || 'token'}-${index}`} scroll={{ x: 820 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无 Token 使用率数据" /> }} />
-                            </div>
-                          )}
                           <div>
                             <Title level={5} style={{ marginTop: 0 }}>阻塞会话</Title>
                             <Table dataSource={waitsData?.blocking_sessions || []} columns={waitColumns} rowKey={(row: any, index) => `${row.sid || row.session_id || 'session'}-${index}`} scroll={{ x: 1180 }} pagination={false} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
@@ -1313,106 +1440,7 @@ export default function MonitorPage() {
                       label: '容量增长',
                       children: <Table dataSource={growthData?.top_databases || []} columns={growthColumns} rowKey="db_name" pagination={false} locale={{ emptyText: <TableEmptyState title="暂无容量增长数据" /> }} />,
                     },
-                    ...((active?.db_type || detail?.instance?.db_type) === 'oracle' ? [
-                      {
-                        key: 'oracle',
-                        label: 'Oracle 专属',
-                        children: (
-                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                            <Descriptions bordered size="small" column={isMobile ? 1 : 2}>
-                              {Object.entries(engineDetail?.metric_groups?.fra || {}).map(([key, value]) => (
-                                <Descriptions.Item key={key} label={`FRA ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
-                              ))}
-                              {Object.entries(engineDetail?.metric_groups?.archive || {}).map(([key, value]) => (
-                                <Descriptions.Item key={key} label={`Archive ${key}`}>{formatMetric(value as any)}</Descriptions.Item>
-                              ))}
-                            </Descriptions>
-                            <Table dataSource={engineDetail?.metric_groups?.tablespaces || []} rowKey={(row: any) => row.tablespace_name} size="small" pagination={false} columns={[
-                              { title: '表空间', dataIndex: 'tablespace_name' },
-                              { title: '使用率', dataIndex: 'used_pct', render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
-                              { title: '已用', dataIndex: 'used_bytes', render: formatBytes },
-                              { title: '总量', dataIndex: 'total_bytes', render: formatBytes },
-                              { title: 'Autoextend', dataIndex: 'autoextensible' },
-                            ]} />
-                            <Table dataSource={engineDetail?.metric_groups?.data_guard || []} rowKey={(row: any, index) => `${row.name}-${index}`} size="small" pagination={false} columns={[
-                              { title: 'Data Guard 指标', dataIndex: 'name' },
-                              { title: '值', dataIndex: 'value' },
-                              { title: '单位', dataIndex: 'unit' },
-                              { title: '计算时间', dataIndex: 'time_computed', render: formatTime },
-                            ]} locale={{ emptyText: <TableEmptyState title="暂无 Data Guard 数据" /> }} />
-                          </Space>
-                        ),
-                      },
-                    ] : []),
-                    ...((active?.db_type || detail?.instance?.db_type) === 'redis' ? [
-                      {
-                        key: 'redis',
-                        label: 'Redis 专属',
-                        children: (
-                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                              <MetricCard title="内存使用率" value={formatPercent(engineDetail?.metric_groups?.memory?.memory_usage)} />
-                              <MetricCard title="已用内存" value={formatBytes(engineDetail?.metric_groups?.memory?.used_memory)} />
-                              <MetricCard title="缓存命中率" value={formatPercent(engineDetail?.metric_groups?.stats?.keyspace_hit_rate)} />
-                              <MetricCard title="Ops/sec" value={formatRateMetric(engineDetail?.metric_groups?.stats?.instantaneous_ops_per_sec)} />
-                              <MetricCard title="连接客户端" value={engineDetail?.metric_groups?.connections?.current} />
-                              <MetricCard title="阻塞客户端" value={engineDetail?.metric_groups?.connections?.blocked_clients} danger={(engineDetail?.metric_groups?.connections?.blocked_clients || 0) > 0} />
-                              <MetricCard title="Key 淘汰" value={engineDetail?.metric_groups?.stats?.evicted_keys} danger={(engineDetail?.metric_groups?.stats?.evicted_keys || 0) > 0} />
-                              <MetricCard title="拒绝连接" value={engineDetail?.metric_groups?.stats?.rejected_connections} danger={(engineDetail?.metric_groups?.stats?.rejected_connections || 0) > 0} />
-                            </div>
-                            <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
-                              <Descriptions.Item label="角色">{formatMetric(engineDetail?.metric_groups?.replication?.role)}</Descriptions.Item>
-                              <Descriptions.Item label="从库数量">{formatMetric(engineDetail?.metric_groups?.replication?.connected_slaves)}</Descriptions.Item>
-                              <Descriptions.Item label="主从链路">{formatMetric(engineDetail?.metric_groups?.replication?.master_link_status || '不适用')}</Descriptions.Item>
-                              <Descriptions.Item label="总命令数">{formatMetric(engineDetail?.metric_groups?.stats?.total_commands_processed)}</Descriptions.Item>
-                              <Descriptions.Item label="命中次数">{formatMetric(engineDetail?.metric_groups?.stats?.keyspace_hits)}</Descriptions.Item>
-                              <Descriptions.Item label="未命中次数">{formatMetric(engineDetail?.metric_groups?.stats?.keyspace_misses)}</Descriptions.Item>
-                              <Descriptions.Item label="过期 Key">{formatMetric(engineDetail?.metric_groups?.stats?.expired_keys)}</Descriptions.Item>
-                              <Descriptions.Item label="内存碎片率">{formatMetric(engineDetail?.metric_groups?.memory?.mem_fragmentation_ratio)}</Descriptions.Item>
-                              <Descriptions.Item label="峰值内存">{formatBytes(engineDetail?.metric_groups?.memory?.used_memory_peak)}</Descriptions.Item>
-                            </Descriptions>
-                          </Space>
-                        ),
-                      },
-                    ] : []),
-                    ...((active?.db_type || detail?.instance?.db_type) === 'clickhouse' ? [
-                      {
-                        key: 'clickhouse',
-                        label: 'ClickHouse 专属',
-                        children: (
-                          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                              <MetricCard title="当前查询" value={engineDetail?.metric_groups?.queries?.active} />
-                              <MetricCard title="连接数" value={engineDetail?.metric_groups?.connections?.current} />
-                              <MetricCard title="内存使用率" value={formatPercent(engineDetail?.metric_groups?.memory?.memory_usage)} />
-                              <MetricCard title="已用内存" value={formatBytes(engineDetail?.metric_groups?.memory?.used_memory)} />
-                              <MetricCard title="总查询数" value={engineDetail?.metric_groups?.counters?.queries} />
-                              <MetricCard title="失败查询" value={engineDetail?.metric_groups?.counters?.errors} danger={(engineDetail?.metric_groups?.counters?.errors || 0) > 0} />
-                              <MetricCard title="延迟写入" value={engineDetail?.metric_groups?.queries?.delayed_inserts} danger={(engineDetail?.metric_groups?.queries?.delayed_inserts || 0) > 0} />
-                              <MetricCard title="拒绝写入" value={engineDetail?.metric_groups?.queries?.rejected_inserts} danger={(engineDetail?.metric_groups?.queries?.rejected_inserts || 0) > 0} />
-                            </div>
-                            <Table
-                              dataSource={engineDetail?.metric_groups?.disks || []}
-                              columns={clickHouseDiskColumns}
-                              rowKey={(row: any) => row.name}
-                              size="small"
-                              scroll={{ x: 980 }}
-                              pagination={false}
-                              locale={{ emptyText: <TableEmptyState title="暂无磁盘指标" /> }}
-                            />
-                            <Descriptions bordered size="small" column={isMobile ? 1 : 3}>
-                              <Descriptions.Item label="Select 查询">{formatMetric(engineDetail?.metric_groups?.counters?.select_queries)}</Descriptions.Item>
-                              <Descriptions.Item label="Insert 查询">{formatMetric(engineDetail?.metric_groups?.counters?.insert_queries)}</Descriptions.Item>
-                              <Descriptions.Item label="最大连接">{formatMetric(engineDetail?.metric_groups?.connections?.max_connections)}</Descriptions.Item>
-                              <Descriptions.Item label="可用内存">{formatBytes(engineDetail?.metric_groups?.memory?.available_memory)}</Descriptions.Item>
-                              <Descriptions.Item label="系统总内存">{formatBytes(engineDetail?.metric_groups?.memory?.total_memory)}</Descriptions.Item>
-                              <Descriptions.Item label="读操作计数">{formatMetric(engineDetail?.metric_groups?.counters?.read_ops)}</Descriptions.Item>
-                              <Descriptions.Item label="写操作计数">{formatMetric(engineDetail?.metric_groups?.counters?.write_ops)}</Descriptions.Item>
-                            </Descriptions>
-                          </Space>
-                        ),
-                      },
-                    ] : []),
+                    ...engineDiagnosticTabs,
                     {
                       key: 'alerts',
                       label: '告警',
