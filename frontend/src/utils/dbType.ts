@@ -102,7 +102,7 @@ export const ENGINE_SUPPORT: Record<string, EngineSupportInfo> = {
   },
   cassandra: {
     status: 'read_only_metadata',
-    statusLabel: '只读/元数据',
+    statusLabel: '只读/元数据边界',
     supportLabel: '只读/元数据边界',
     note: '覆盖连接、元数据、只读 SELECT、系统表健康、peer、容量估算和 compaction 历史；读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需 JMX/sidecar。',
   },
