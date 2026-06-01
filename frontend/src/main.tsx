@@ -2,27 +2,11 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import dayjs from 'dayjs'
-import 'dayjs/locale/zh-cn'
 import App from './App'
+import { appLocale, zhCNValidateMessages } from '@/utils/locale'
 import '@/styles/globals.css'
-
-dayjs.locale('zh-cn')
-
-const zhCNValidateMessages = zhCN.Form?.defaultValidateMessages ?? {
-  required: '请输入${label}',
-}
-
-const appLocale = {
-  ...zhCN,
-  Pagination: {
-    ...zhCN.Pagination,
-    items_per_page: '条/页',
-  },
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
