@@ -333,7 +333,7 @@ class TestQueryPrivilegeHelpers:
 
     @pytest.mark.asyncio
     async def test_write_log_records_query_history_metadata(self):
-        db = SimpleNamespace(add=MagicMock(), commit=AsyncMock())
+        db = SimpleNamespace(add=MagicMock(), commit=AsyncMock(), refresh=AsyncMock())
 
         await QueryPrivService.write_log(
             db=db,

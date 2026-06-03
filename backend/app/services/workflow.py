@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 HIGH_RISK_SQL_SUBMIT_PERMISSION = "sql_submit_high_risk"
 HIGH_RISK_SQL_SUBMIT_ROLES = {"dba", "dba_group"}
+WORKFLOW_UNSUPPORTED_DB_TYPES = {"redis", "elasticsearch", "opensearch", "cassandra"}
 
 STATUS_DESC = {
     0: "待审核",
@@ -194,6 +195,9 @@ class WorkflowService:
         inst = inst_result.scalar_one_or_none()
         if not inst:
             raise NotFoundException(f"实例 ID={data.instance_id} 不存在")
+        db_type = (getattr(inst, "db_type", "") or "").lower()
+        if db_type in WORKFLOW_UNSUPPORTED_DB_TYPES:
+            raise AppException(f"{db_type} 当前不在 SQL 工单标准交付承诺范围内", code=400)
 
         # v2-lite：资源组由“用户可访问的资源组 ∩ 实例所属资源组”自动解析
         user_rg_ids = set(operator.get("resource_groups", []))
@@ -218,7 +222,6 @@ class WorkflowService:
             nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, data.flow_id)
             nodes_snapshot = WorkflowService._decorate_snapshot_for_applicant(nodes_snapshot, operator)
 
-        db_type = getattr(inst, "db_type", "") or ""
         risk_plan = RiskPlanService.build_workflow_plan(db_type, data.db_name, data.sql_content)
         is_privileged_high_risk_sql = (
             risk_plan.level == "high"

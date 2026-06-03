@@ -1,0 +1,2921 @@
+{
+  "generated_at": "2026-06-01T14:18:35",
+  "temporary_resource_group_added_instance_ids": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "matrix": {
+    "levels": {
+      "ga": "GA 正式支持",
+      "validated_minimal": "客户验证后交付",
+      "read_only_metadata": "只读/元数据边界",
+      "experimental": "实验性",
+      "backlog": "暂不承诺"
+    },
+    "capability_labels": {
+      "connection": "连接测试",
+      "schema": "数据字典",
+      "query": "在线查询",
+      "workflow": "SQL 工单",
+      "archive": "归档",
+      "monitor": "观测",
+      "session": "会话诊断",
+      "explain": "执行计划",
+      "kill_session": "Kill 会话"
+    },
+    "items": [
+      {
+        "db_type": "mysql",
+        "label": "MySQL",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": true,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": true
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "pgsql",
+        "label": "PostgreSQL",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": true,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "tidb",
+        "label": "TiDB",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": true,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "按 MySQL 兼容链路验收"
+      },
+      {
+        "db_type": "starrocks",
+        "label": "StarRocks",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": true,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "clickhouse",
+        "label": "ClickHouse",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": false,
+          "monitor": true,
+          "session": false,
+          "explain": false,
+          "kill_session": false
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "mongo",
+        "label": "MongoDB",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": true,
+          "monitor": true,
+          "session": true,
+          "explain": false,
+          "kill_session": false
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "redis",
+        "label": "Redis",
+        "support_level": "ga",
+        "support_label": "GA 正式支持",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": false,
+          "archive": false,
+          "monitor": true,
+          "session": false,
+          "explain": false,
+          "kill_session": false
+        },
+        "validation_required": "标准交付验收"
+      },
+      {
+        "db_type": "oracle",
+        "label": "Oracle",
+        "support_level": "validated_minimal",
+        "support_label": "客户验证后交付",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": false,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "必须在客户同构环境验证驱动模式、权限和诊断降级链路"
+      },
+      {
+        "db_type": "mssql",
+        "label": "MSSQL",
+        "support_level": "validated_minimal",
+        "support_label": "客户验证后交付",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": false,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "必须在客户同构环境验证连接、元数据和执行链路"
+      },
+      {
+        "db_type": "doris",
+        "label": "Doris",
+        "support_level": "validated_minimal",
+        "support_label": "客户验证后交付",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": true,
+          "archive": false,
+          "monitor": true,
+          "session": true,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "必须在客户 FE MySQL 协议版本验证"
+      },
+      {
+        "db_type": "elasticsearch",
+        "label": "Elasticsearch",
+        "support_level": "validated_minimal",
+        "support_label": "客户验证后交付",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": false,
+          "archive": false,
+          "monitor": true,
+          "session": false,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "必须验证目标 Elasticsearch 版本 SQL API 兼容性"
+      },
+      {
+        "db_type": "opensearch",
+        "label": "OpenSearch",
+        "support_level": "validated_minimal",
+        "support_label": "客户验证后交付",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": false,
+          "archive": false,
+          "monitor": true,
+          "session": false,
+          "explain": true,
+          "kill_session": false
+        },
+        "validation_required": "必须验证目标 OpenSearch 版本 SQL 插件兼容性"
+      },
+      {
+        "db_type": "cassandra",
+        "label": "Cassandra/ScyllaDB",
+        "support_level": "read_only_metadata",
+        "support_label": "只读/元数据边界",
+        "capabilities": {
+          "connection": true,
+          "schema": true,
+          "query": true,
+          "workflow": false,
+          "archive": false,
+          "monitor": true,
+          "session": false,
+          "explain": false,
+          "kill_session": false
+        },
+        "validation_required": "只承诺元数据和只读 SELECT；DDL/DML/BATCH 不纳入标准交付"
+      }
+    ]
+  },
+  "targets": {
+    "mysql": {
+      "id": 2,
+      "db": "test",
+      "table": "sagitta_observe_events",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "pgsql": {
+      "id": 3,
+      "db": "test",
+      "table": "sagitta_observe_events",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "redis": {
+      "id": 10,
+      "db": "0",
+      "table": "hash",
+      "query": "PING",
+      "workflow": "PING",
+      "explain": "PING"
+    },
+    "starrocks": {
+      "id": 5,
+      "db": "test",
+      "table": "sagitta_observe_events",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "mssql": {
+      "id": 6,
+      "db": "test",
+      "table": "sagitta_observe_events",
+      "query": "SELECT 1 AS value",
+      "workflow": "SELECT 1 AS value",
+      "explain": "SELECT 1 AS value"
+    },
+    "tidb": {
+      "id": 7,
+      "db": "test",
+      "table": "sagitta_observe_events",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "oracle": {
+      "id": 8,
+      "db": "SYSTEM",
+      "table": "SAGITTA_OBSERVE_EVENTS",
+      "query": "SELECT 1 FROM dual",
+      "workflow": "SELECT 1 FROM dual",
+      "explain": "SELECT 1 FROM dual"
+    },
+    "mongo": {
+      "id": 9,
+      "db": "testdb",
+      "table": "users",
+      "query": "db.users.find({})",
+      "workflow": "db.users.updateOne({\"_id\":\"__sagitta_matrix_noop__\"},{\"$set\":{\"probe\":true}})",
+      "explain": "db.users.find({})"
+    },
+    "clickhouse": {
+      "id": 11,
+      "db": "sagitta_demo",
+      "table": "events",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "cassandra": {
+      "id": 12,
+      "db": "observability",
+      "table": "events",
+      "query": "SELECT * FROM events LIMIT 1",
+      "workflow": "SELECT * FROM events LIMIT 1",
+      "explain": "SELECT * FROM events LIMIT 1"
+    },
+    "opensearch": {
+      "id": 13,
+      "db": "sagitta-orders",
+      "table": "sagitta-orders",
+      "query": "SELECT * FROM `sagitta-orders` LIMIT 1",
+      "workflow": "SELECT * FROM `sagitta-orders` LIMIT 1",
+      "explain": "SELECT * FROM `sagitta-orders` LIMIT 1"
+    },
+    "doris": {
+      "id": 14,
+      "db": "observability",
+      "table": "orders",
+      "query": "SELECT 1",
+      "workflow": "SELECT 1",
+      "explain": "SELECT 1"
+    },
+    "elasticsearch": {
+      "id": 15,
+      "db": "sagitta-es-orders",
+      "table": "sagitta-es-orders",
+      "query": "SELECT * FROM \"sagitta-es-orders\" LIMIT 1",
+      "workflow": "SELECT * FROM \"sagitta-es-orders\" LIMIT 1",
+      "explain": "SELECT * FROM \"sagitta-es-orders\" LIMIT 1"
+    }
+  },
+  "workflows": [
+    {
+      "db_type": "mysql",
+      "id": 18
+    },
+    {
+      "db_type": "pgsql",
+      "id": 19
+    },
+    {
+      "db_type": "tidb",
+      "id": 20
+    },
+    {
+      "db_type": "starrocks",
+      "id": 21
+    },
+    {
+      "db_type": "clickhouse",
+      "id": 22
+    },
+    {
+      "db_type": "mongo",
+      "id": 23
+    },
+    {
+      "db_type": "redis",
+      "id": 24,
+      "unexpected": true
+    },
+    {
+      "db_type": "oracle",
+      "id": 25
+    },
+    {
+      "db_type": "mssql",
+      "id": 26
+    },
+    {
+      "db_type": "doris",
+      "id": 27
+    }
+  ],
+  "summary": {
+    "mysql": {
+      "label": "MySQL",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": true,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": true
+      },
+      "checks": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "pgsql": {
+      "label": "PostgreSQL",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": true,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "tidb": {
+      "label": "TiDB",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": true,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 17,
+      "failed": 1
+    },
+    "starrocks": {
+      "label": "StarRocks",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": true,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "clickhouse": {
+      "label": "ClickHouse",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": false,
+        "monitor": true,
+        "session": false,
+        "explain": false,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "mongo": {
+      "label": "MongoDB",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": true,
+        "monitor": true,
+        "session": true,
+        "explain": false,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "redis": {
+      "label": "Redis",
+      "support_level": "ga",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": false,
+        "archive": false,
+        "monitor": true,
+        "session": false,
+        "explain": false,
+        "kill_session": false
+      },
+      "checks": 16,
+      "passed": 15,
+      "failed": 1
+    },
+    "oracle": {
+      "label": "Oracle",
+      "support_level": "validated_minimal",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": false,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 17,
+      "failed": 1
+    },
+    "mssql": {
+      "label": "MSSQL",
+      "support_level": "validated_minimal",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": false,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 17,
+      "failed": 1
+    },
+    "doris": {
+      "label": "Doris",
+      "support_level": "validated_minimal",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": true,
+        "archive": false,
+        "monitor": true,
+        "session": true,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 18,
+      "passed": 15,
+      "failed": 3
+    },
+    "elasticsearch": {
+      "label": "Elasticsearch",
+      "support_level": "validated_minimal",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": false,
+        "archive": false,
+        "monitor": true,
+        "session": false,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 16,
+      "passed": 16,
+      "failed": 0
+    },
+    "opensearch": {
+      "label": "OpenSearch",
+      "support_level": "validated_minimal",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": false,
+        "archive": false,
+        "monitor": true,
+        "session": false,
+        "explain": true,
+        "kill_session": false
+      },
+      "checks": 16,
+      "passed": 15,
+      "failed": 1
+    },
+    "cassandra": {
+      "label": "Cassandra/ScyllaDB",
+      "support_level": "read_only_metadata",
+      "capabilities": {
+        "connection": true,
+        "schema": true,
+        "query": true,
+        "workflow": false,
+        "archive": false,
+        "monitor": true,
+        "session": false,
+        "explain": false,
+        "kill_session": false
+      },
+      "checks": 16,
+      "passed": 16,
+      "failed": 0
+    }
+  },
+  "results": [
+    {
+      "db_type": "mysql",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 7, \"db_name\": \"information_schema\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-20T16:40:07.661588+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 8, \"db_name\": \"mysql\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-20T16:40:07.661588+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 9, \"db_name\": \"performance_schema\", \"remark\": \"\", \"is",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta_observe_events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"id\", \"column_type\": \"bigint\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"PRI\"}, {\"column_name\": \"bucket\", \"column_type\": \"int\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"MUL\"}, {\"column_name\": \"payload\", \"column_type\": \"varchar(255)\", \"is_nullable\": \"",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta_observe_events\", \"ddl\": \"CREATE TABLE `sagitta_observe_events` (\\n  `id` bigint NOT NULL,\\n  `bucket` int NOT NULL,\\n  `payload` varchar(255) DEFAULT NULL,\\n  `amount` decimal(12,2) DEFAULT NULL,\\n  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\\n  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTA",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"PRIMARY\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"PRIMARY\", \"index_type\": \"PRIMARY KEY INDEX\", \"column_names\": \"id\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx_bucket\", \"index_type\": \"INDEX\", \"column_names\": \"bucket\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx_updated_at\", \"index_type\": \"IN",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 2, \"db_name\": \"test\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 2, \"is_masked\": false, \"query_log_id\": 161, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 18, \"workflow_name\": \"矩阵验收-mysql-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 18}",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 2, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"8.4.4\"}, \"uptime_seconds\": 1648144, \"connections\": {\"current\": 3, \"max_connections\": 151}, \"queries\": {\"current\": 4, \"warning\": \"\"}, \"stats\": {\"qps\": 2.24, \"tps\": 0.0, \"slow_queries\": 0, \"slow_queries_total\": 10, \"lock_waits\": 0, \"Innodb_row_lock_waits_total\": 0, \"deadlocks\": null, \"er",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 2, \"instance_name\": \"MySQL84-Test\", \"db_type\": \"mysql\", \"host\": \"mysql84-test\", \"port\": 3306, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 1648140, \"connections\": {\"current\": 2, \"max_connections\": 151}, \"queries\": {\"current\": 3, \"warning\": \"\"}, \"stats\": {\"qps\": 2.24, \"tps\": 0.0, \"slow_queries\": 0, \"slow_queries_total\": 10, \"loc",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 200,
+      "detail": "{\"params\": [{\"Variable_name\": \"activate_all_roles_on_login\", \"Value\": \"OFF\"}, {\"Variable_name\": \"admin_address\", \"Value\": \"\"}, {\"Variable_name\": \"admin_port\", \"Value\": \"33062\"}, {\"Variable_name\": \"admin_ssl_ca\", \"Value\": \"\"}, {\"Variable_name\": \"admin_ssl_capath\", \"Value\": \"\"}, {\"Variable_name\": \"admin_ssl_cert\", \"Value\": \"\"}, {\"Variable_name\": \"admin_ssl_cip",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "mysql",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 3, \"items\": [{\"instance_id\": 2, \"instance_name\": \"MySQL84-Test\", \"db_type\": \"mysql\", \"session_id\": \"5\", \"serial\": \"\", \"username\": \"event_scheduler\", \"host\": \"localhost\", \"program\": \"\", \"db_name\": \"\", \"command\": \"Daemon\", \"state\": \"Waiting on empty queue\", \"time_seconds\": 1648143, \"duration_ms\": 1648143000, \"connection_age_ms\": null, \"state_duration",
+      "note": ""
+    },
+    {
+      "db_type": "mysql",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"EXPLAIN\"], \"rows\": [{\"EXPLAIN\": \"{\\n  \\\"query_block\\\": {\\n    \\\"select_id\\\": 1,\\n    \\\"message\\\": \\\"No tables used\\\"\\n  }\\n}\"}], \"db_type\": \"mysql\"}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 12, \"db_name\": \"postgres\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-14T13:31:37.247145+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 47, \"db_name\": \"rd_testdb\", \"remark\": \"功能验证导入\", \"is_active\": true, \"sync_at\": \"2026-05-14T13:31:37.247145+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 13, \"db_name\": \"test\", \"remark\": \"\", \"is_active\": tr",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta_observe_events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"id\", \"column_type\": \"bigint\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"bucket\", \"column_type\": \"integer\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"payload\", \"column_type\": \"text\", \"is_nullable\": \"YES\", \"col",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta_observe_events\", \"ddl\": \"CREATE TABLE \\\"sagitta_observe_events\\\" (\\n  \\\"id\\\" bigint NOT NULL,\\n  \\\"bucket\\\" integer NOT NULL,\\n  \\\"payload\\\" text,\\n  \\\"amount\\\" numeric,\\n  \\\"updated_at\\\" timestamp with time zone DEFAULT now(),\\n  \\\"created_at\\\" timestamp with time zone DEFAULT now(),\\n  PRIMARY KEY (\\\"id\\\")\\n);\\n\\nCREATE INDEX idx_sa",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"sagitta_observe_events_pkey\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"sagitta_observe_events_pkey\", \"index_type\": \"UNIQUE INDEX\", \"column_names\": \"id\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"CREATE UNIQUE INDEX sagitta_observe_events_pkey ON public.sagitta_observe_events USING btree (id)\"}, {\"index_name\": \"idx_sag_obs_bucket\", \"index_type\": \"INDEX\", \"column_names\": \"bucket\"",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 3, \"db_name\": \"test\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"?column?\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 58, \"is_masked\": false, \"query_log_id\": 162, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 19, \"workflow_name\": \"矩阵验收-pgsql-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 19}",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 3, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"16.13\"}, \"uptime_seconds\": 1633625, \"connections\": {\"current\": 43, \"max_connections\": 100, \"active_sessions\": 2}, \"stats\": {\"qps\": 2621.59, \"tps\": 1.07, \"errors\": 0, \"lock_waits\": 0, \"long_transactions\": 0, \"cache_hit_rate\": 99.71, \"temp_files\": 0, \"temp_bytes\": 0}, \"counters\": {\"query",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 3, \"instance_name\": \"PostgreSQL16-Test\", \"db_type\": \"pgsql\", \"host\": \"pg16-test\", \"port\": 5432, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 1633619, \"connections\": {\"current\": 32, \"max_connections\": 100, \"active_sessions\": 1}, \"stats\": {\"qps\": 2621.6, \"tps\": 1.07, \"errors\": 0, \"lock_waits\": 0, \"long_transactions\": 0, \"cache_hi",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 200,
+      "detail": "{\"params\": [{\"name\": \"DateStyle\", \"setting\": \"ISO, MDY\"}, {\"name\": \"IntervalStyle\", \"setting\": \"postgres\"}, {\"name\": \"TimeZone\", \"setting\": \"UTC\"}, {\"name\": \"allow_in_place_tablespaces\", \"setting\": \"off\"}, {\"name\": \"allow_system_table_mods\", \"setting\": \"off\"}, {\"name\": \"application_name\", \"setting\": \"\"}, {\"name\": \"archive_cleanup_command\", \"setting\": \"\"}, {\"",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 44, \"items\": [{\"instance_id\": 3, \"instance_name\": \"PostgreSQL16-Test\", \"db_type\": \"pgsql\", \"session_id\": \"621742\", \"serial\": \"\", \"username\": \"postgres\", \"host\": \"172.18.0.4/32\", \"program\": \"\", \"db_name\": \"test\", \"command\": \"idle\", \"state\": \"idle\", \"time_seconds\": 335, \"duration_ms\": 335270, \"connection_age_ms\": 335354, \"state_duration_ms\": 335270, ",
+      "note": ""
+    },
+    {
+      "db_type": "pgsql",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"QUERY PLAN\"], \"rows\": [[\"[\\n  {\\n    \\\"Plan\\\": {\\n      \\\"Node Type\\\": \\\"Result\\\",\\n      \\\"Parallel Aware\\\": false,\\n      \\\"Async Capable\\\": false,\\n      \\\"Startup Cost\\\": 0.00,\\n      \\\"Total Cost\\\": 0.01,\\n      \\\"Plan Rows\\\": 1,\\n      \\\"Plan Width\\\": 4,\\n      \\\"Output\\\": [\\\"1\\\"],\\n      \\\"Shared Hit Blocks\\\": 0,\\n      \\\"Shared Read",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 35, \"db_name\": \"INFORMATION_SCHEMA\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-14T13:31:55.568835+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 36, \"db_name\": \"METRICS_SCHEMA\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-14T13:31:55.568835+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 37, \"db_name\": \"PERFORMANCE_SCHEMA\", \"rema",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta_observe_events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"id\", \"column_type\": \"bigint\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"PRI\"}, {\"column_name\": \"bucket\", \"column_type\": \"int\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"MUL\"}, {\"column_name\": \"payload\", \"column_type\": \"varchar(255)\", \"is_nullable\": \"",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta_observe_events\", \"ddl\": \"CREATE TABLE `sagitta_observe_events` (\\n  `id` bigint NOT NULL,\\n  `bucket` int NOT NULL,\\n  `payload` varchar(255) DEFAULT NULL,\\n  `amount` decimal(12,2) DEFAULT NULL,\\n  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\\n  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,\\n  PRI",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"PRIMARY\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"PRIMARY\", \"index_type\": \"PRIMARY KEY INDEX\", \"column_names\": \"id\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx_bucket\", \"index_type\": \"INDEX\", \"column_names\": \"bucket\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx_updated_at\", \"index_type\": \"IN",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 7, \"db_name\": \"test\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 3, \"is_masked\": false, \"query_log_id\": 163, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 20, \"workflow_name\": \"矩阵验收-tidb-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 20}",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 7, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"8.0.11-TiDB-v8.5.5\"}, \"uptime_seconds\": 1651440, \"connections\": {\"current\": null, \"max_connections\": 0}, \"queries\": {\"current\": 3, \"warning\": \"\"}, \"stats\": {\"qps\": null, \"tps\": 0.0, \"slow_queries\": 0, \"slow_queries_total\": null, \"lock_waits\": 0, \"Innodb_row_lock_waits_total\": null, \"de",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 7, \"instance_name\": \"TiDB85-Test\", \"db_type\": \"tidb\", \"host\": \"tidb85-tidb\", \"port\": 4000, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 1651433, \"connections\": {\"current\": null, \"max_connections\": 0}, \"queries\": {\"current\": 2, \"warning\": \"\"}, \"stats\": {\"qps\": null, \"tps\": 0.0, \"slow_queries\": 0, \"slow_queries_total\": null, \"loc",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 200,
+      "detail": "{\"params\": [{\"Variable_name\": \"allow_auto_random_explicit_insert\", \"Value\": \"OFF\"}, {\"Variable_name\": \"authentication_ldap_sasl_auth_method_name\", \"Value\": \"SCRAM-SHA-1\"}, {\"Variable_name\": \"authentication_ldap_sasl_bind_base_dn\", \"Value\": \"\"}, {\"Variable_name\": \"authentication_ldap_sasl_bind_root_dn\", \"Value\": \"\"}, {\"Variable_name\": \"authentication_ldap_sas",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "tidb",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 2, \"items\": [{\"instance_id\": 7, \"instance_name\": \"TiDB85-Test\", \"db_type\": \"tidb\", \"session_id\": \"2192116932\", \"serial\": \"\", \"username\": \"root\", \"host\": \"172.18.0.6:39766\", \"program\": \"\", \"db_name\": \"rd_testdb\", \"command\": \"Query\", \"state\": \"autocommit\", \"time_seconds\": 0, \"duration_ms\": 0, \"connection_age_ms\": null, \"state_duration_ms\": 0, \"active",
+      "note": ""
+    },
+    {
+      "db_type": "tidb",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": false,
+      "status": 400,
+      "detail": "{\"detail\": \"EXPLAIN 失败：(1105, \\\"explain format 'json' is not supported now\\\")\"}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 3}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 30, \"db_name\": \"_statistics_\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-14T13:31:51.085051+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 31, \"db_name\": \"information_schema\", \"remark\": \"\", \"is_active\": false, \"sync_at\": \"2026-05-14T13:31:51.085051+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 48, \"db_name\": \"rd_testdb\", \"remark\": \"功能验证导",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta_observe_events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"id\", \"column_type\": \"bigint(20)\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"PRI\"}, {\"column_name\": \"bucket\", \"column_type\": \"int(11)\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"payload\", \"column_type\": \"varchar(255)\", \"is_nullabl",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta_observe_events\", \"ddl\": \"CREATE TABLE `sagitta_observe_events` (\\n  `id` bigint(20) NOT NULL COMMENT \\\"\\\",\\n  `bucket` int(11) NOT NULL COMMENT \\\"\\\",\\n  `payload` varchar(255) NULL COMMENT \\\"\\\",\\n  `amount` decimal(12, 2) NULL COMMENT \\\"\\\",\\n  `updated_at` datetime NULL COMMENT \\\"\\\",\\n  `created_at` datetime NULL COMMENT \\\"\\\"\\n) ENGIN",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"\", \"constraint_type\": \"PRI\", \"column_names\": \"id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"\", \"index_type\": \"\", \"column_names\": \"id\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 5, \"db_name\": \"test\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 7, \"is_masked\": false, \"query_log_id\": 164, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 21, \"workflow_name\": \"矩阵验收-starrocks-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 21}",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 5, \"metrics\": {\"health\": {\"up\": 1, \"error\": \"\"}, \"version\": {\"value\": \"3.5.10-9848c7f\"}, \"queries\": {\"current\": 2}, \"cluster\": {\"frontends\": {\"count\": 1, \"rows\": [{\"Id\": \"1\", \"Name\": \"127.0.0.1_9010_1778646554768\", \"IP\": \"127.0.0.1\", \"EditLogPort\": \"9010\", \"HttpPort\": \"8030\", \"QueryPort\": \"9030\", \"RpcPort\": \"9020\", \"Role\": \"LEADER\", \"ClusterI",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 5, \"instance_name\": \"StarRocks35-Test\", \"db_type\": \"starrocks\", \"host\": \"starrocks35-test\", \"port\": 9030, \"is_active\": true}, \"metric_groups\": {\"queries\": {\"current\": 1}, \"cluster\": {\"frontends\": {\"count\": 1, \"rows\": [{\"Id\": \"1\", \"Name\": \"127.0.0.1_9010_1778646554768\", \"IP\": \"127.0.0.1\", \"EditLogPort\": \"9010\", \"HttpPort\": \"8030\", \"QueryPo",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 200,
+      "detail": "{\"params\": [{\"Variable_name\": \"SQL_AUTO_IS_NULL\", \"Value\": \"false\"}, {\"Variable_name\": \"activate_all_roles_on_login\", \"Value\": \"false\"}, {\"Variable_name\": \"allow_hive_without_partition_filter\", \"Value\": \"true\"}, {\"Variable_name\": \"ann_params\", \"Value\": \"\"}, {\"Variable_name\": \"array_low_cardinality_optimize\", \"Value\": \"true\"}, {\"Variable_name\": \"audit_execute",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 2, \"items\": [{\"instance_id\": 5, \"instance_name\": \"StarRocks35-Test\", \"db_type\": \"starrocks\", \"session_id\": \"17022369\", \"serial\": \"\", \"username\": \"root\", \"host\": \"172.18.0.6:57822\", \"program\": \"\", \"db_name\": \"rd_testdb\", \"command\": \"Query\", \"state\": \"OK\", \"time_seconds\": 0, \"duration_ms\": 0, \"connection_age_ms\": null, \"state_duration_ms\": 0, \"active",
+      "note": ""
+    },
+    {
+      "db_type": "starrocks",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"Explain String\"], \"rows\": [{\"Explain String\": \"EXECUTE IN FE\"}, {\"Explain String\": \"PLAN COST\"}, {\"Explain String\": \"  CPU: 0.0\"}, {\"Explain String\": \"  Memory: 0.0\"}, {\"Explain String\": \"\"}, {\"Explain String\": \"PLAN FRAGMENT 0(F00)\"}, {\"Explain String\": \"  Output Exprs:2: expr\"}, {\"Explain String\": \"  Input Partition: UNPARTITIONED\"}, {\"Ex",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 72, \"db_name\": \"default\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.352256+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 73, \"db_name\": \"sagitta_demo\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.352256+00:00\", \"db_name_label\": \"数据库\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"event_date\", \"column_type\": \"Date\", \"is_nullable\": \"YES\", \"column_default\": \"\", \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"user_id\", \"column_type\": \"UInt64\", \"is_nullable\": \"YES\", \"column_default\": \"\", \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"amount\", \"column_type\": \"Float64\", \"is_nullable\": \"YES\"",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"events\", \"ddl\": \"CREATE TABLE \\\"events\\\" (\\n  \\\"event_date\\\" Date,\\n  \\\"user_id\\\" UInt64,\\n  \\\"amount\\\" Float64,\\n  PRIMARY KEY (\\\"event_date\\\", \\\"user_id\\\")\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"events\\\" (\\n  \\\"event_date\\\" Date,\\n  \\\"user_id\\\" UInt64,\\n  \\\"amount\\\" Float64,\\n  PRIMARY KEY (\\\"event_date\\\", \\\"user_id\\\")\\n);\", \"raw_ddl\": \"CREA",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"events_primary_key\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"event_date, user_id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"events_primary_key\", \"index_type\": \"PRIMARY KEY\", \"column_names\": \"event_date, user_id\", \"is_composite\": \"YES\", \"index_comment\": \"ClickHouse primary key expression\", \"index_definition\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 11, \"db_name\": \"sagitta_demo\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 0, \"is_masked\": false, \"query_log_id\": 165, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 22, \"workflow_name\": \"矩阵验收-clickhouse-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 22}",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 11, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"24.8.14.39\"}, \"uptime_seconds\": 50049, \"connections\": {\"current\": 1, \"active_sessions\": 1, \"max_connections\": null}, \"queries\": {\"active\": 1, \"delayed_inserts\": 0, \"rejected_inserts\": 0}, \"stats\": {\"error_count\": 0, \"failed_queries_total\": 0, \"delayed_inserts\": 0, \"rejected_inserts\": ",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 11, \"instance_name\": \"ClickHouse24-Docker-RealTest\", \"db_type\": \"clickhouse\", \"host\": \"sagittadb-test-clickhouse\", \"port\": 8123, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 49982, \"connections\": {\"current\": 1, \"active_sessions\": 1, \"max_connections\": null}, \"queries\": {\"active\": 1, \"delayed_inserts\": 0, \"rejected_inserts\": 0},",
+      "note": ""
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'ClickHouseEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "运维工具",
+      "check": "会话/活动列表（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 1, \"items\": [{\"instance_id\": 11, \"instance_name\": \"ClickHouse24-Docker-RealTest\", \"db_type\": \"clickhouse\", \"session_id\": \"bf74bffe-7df2-4c84-abdc-c1c649a01a69\", \"serial\": \"\", \"username\": \"sagitta\", \"host\": \"\", \"program\": \"\", \"db_name\": \"\", \"command\": \"Query\", \"state\": \"Query\", \"time_seconds\": 0, \"duration_ms\": 1, \"connection_age_ms\": null, \"state_d",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "clickhouse",
+      "feature": "运维工具",
+      "check": "执行计划 Explain（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"error\": \"ClickHouse 暂不支持 EXPLAIN\"}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "mongo",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 52, \"db_name\": \"admin\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.098068+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 53, \"db_name\": \"config\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.098068+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 54, \"db_name\": \"local\", \"remark\": \"\", \"is_active\": true, \"sync_at",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"users\", \"orders\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"_id\", \"column_type\": \"ObjectId\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"name\", \"column_type\": \"str\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"age\", \"column_type\": \"int\", \"is_nullable\": \"YES\", \"column_de",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"users\", \"ddl\": \"CREATE TABLE \\\"users\\\" (\\n  \\\"_id\\\" ObjectId,\\n  \\\"name\\\" str,\\n  \\\"age\\\" int,\\n  \\\"email\\\" str,\\n  \\\"team\\\" str\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"users\\\" (\\n  \\\"_id\\\" ObjectId,\\n  \\\"name\\\" str,\\n  \\\"age\\\" int,\\n  \\\"email\\\" str,\\n  \\\"team\\\" str\\n);\", \"raw_ddl\": \"CREATE TABLE \\\"users\\\" (\\n  \\\"_id\\\" ObjectId,\\n  \\\"name\\\" str",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 9, \"db_name\": \"testdb\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"document\"], \"rows\": [[\"{\\\"_id\\\": {\\\"$oid\\\": \\\"6a1c60c97a76cb8b589df8a3\\\"}, \\\"name\\\": \\\"Alice\\\", \\\"age\\\": 31, \\\"email\\\": \\\"alice@example.com\\\", \\\"team\\\": \\\"dba\\\"}\"], [\"{\\\"_id\\\": {\\\"$oid\\\": \\\"6a1c60c97a76cb8b589df8a4\\\"}, \\\"name\\\": \\\"Bob\\\", \\\"age\\\": 28, \\\"email\\\": \\\"bob@example.com\\\", \\\"team\\\": \\\"dev\\\"}\"]], \"affected_rows\": 2, \"cost_time_ms\": ",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"mongo 暂不支持自动风险预案分析，请按业务流程补充人工说明。\", \"risks\": [], \"suggestions\": [\"请人工确认影响范围、备份方式和异常恢复路径。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 23, \"workflow_name\": \"矩阵验收-mongo-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 23}",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 9, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"7.0.34\"}, \"uptime_seconds\": 50057.0, \"connections\": {\"current\": 13, \"available\": 396, \"active\": 7}, \"opcounters\": {\"insert\": 4, \"query\": 230, \"update\": 890, \"delete\": 2, \"getmore\": 0, \"command\": 6278}, \"memory\": {\"resident_mb\": 156, \"virtual_mb\": 580, \"mapped_mb\": 0}, \"database\": {\"nam",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 9, \"instance_name\": \"MongoDB7-Docker-RealTest\", \"db_type\": \"mongo\", \"host\": \"sagittadb-test-mongo\", \"port\": 27017, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 49990.0, \"connections\": {\"current\": 3, \"available\": 406, \"active\": 2}, \"opcounters\": {\"insert\": 4, \"query\": 226, \"update\": 890, \"delete\": 2, \"getmore\": 0, \"command\": 622",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'MongoEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "mongo",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 10, \"items\": [{\"instance_id\": 9, \"instance_name\": \"MongoDB7-Docker-RealTest\", \"db_type\": \"mongo\", \"session_id\": \"622881\", \"serial\": \"\", \"username\": \"\", \"host\": \"172.18.0.6:42676\", \"program\": \"conn2715\", \"db_name\": \"admin\", \"command\": \"command\", \"state\": \"True\", \"time_seconds\": 0, \"duration_ms\": 0, \"connection_age_ms\": null, \"state_duration_ms\": 0, ",
+      "note": ""
+    },
+    {
+      "db_type": "mongo",
+      "feature": "运维工具",
+      "check": "执行计划 Explain（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"error\": \"mongo 暂不支持 EXPLAIN\"}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "redis",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 56, \"db_name\": \"0\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.201558+00:00\", \"db_name_label\": \"数据库编号\"}, {\"id\": 57, \"db_name\": \"1\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-31T16:28:00.201558+00:00\", \"db_name_label\": \"数据库编号\"}, {\"id\": 66, \"db_name\": \"10\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"hash\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"\", \"column_type\": \"\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"hash\", \"ddl\": \"CREATE TABLE \\\"hash\\\" (\\n  \\\"\\\" text\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"hash\\\" (\\n  \\\"\\\" text\\n);\", \"raw_ddl\": \"CREATE TABLE \\\"hash\\\" (\\n  \\\"\\\" text\\n);\", \"source\": \"generated\"}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 10, \"db_name\": \"0\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"result\"], \"rows\": [[\"True\"]], \"affected_rows\": 1, \"cost_time_ms\": 0, \"is_masked\": false, \"query_log_id\": 167, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"redis 暂不支持自动风险预案分析，请按业务流程补充人工说明。\", \"risks\": [], \"suggestions\": [\"请人工确认影响范围、备份方式和异常恢复路径。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "SQL 工单",
+      "check": "不承诺边界提交应被拒绝",
+      "expected": false,
+      "ok": false,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 24, \"workflow_name\": \"矩阵验收-redis-141823\"}}",
+      "note": "workflow=false"
+    },
+    {
+      "db_type": "redis",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 10, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"7.4.9\"}, \"uptime_seconds\": 50061, \"connections\": {\"current\": 1, \"blocked_clients\": 0, \"tracking_clients\": 0, \"max_connections\": 10000}, \"memory\": {\"used_memory\": 11872688, \"used_memory_mb\": 11.32, \"used_memory_peak\": 11923456, \"used_memory_peak_mb\": 11.37, \"maxmemory\": 0, \"memory_usag",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 10, \"instance_name\": \"Redis7-Docker-RealTest\", \"db_type\": \"redis\", \"host\": \"sagittadb-test-redis-engine\", \"port\": 6379, \"is_active\": true}, \"metric_groups\": {\"uptime_seconds\": 49992, \"connections\": {\"current\": 1, \"blocked_clients\": 0, \"tracking_clients\": 0, \"max_connections\": 10000}, \"memory\": {\"used_memory\": 11869992, \"used_memory_mb\": 1",
+      "note": ""
+    },
+    {
+      "db_type": "redis",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'RedisEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "redis",
+      "feature": "运维工具",
+      "check": "会话/活动列表（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 1, \"items\": [{\"instance_id\": 10, \"instance_name\": \"Redis7-Docker-RealTest\", \"db_type\": \"redis\", \"session_id\": \"3682\", \"serial\": \"\", \"username\": \"default\", \"host\": \"172.18.0.6:36414\", \"program\": \"redis-py\", \"db_name\": \"0\", \"command\": \"client|list\", \"state\": \"N\", \"time_seconds\": 0, \"duration_ms\": 0, \"connection_age_ms\": 0, \"state_duration_ms\": 0, \"ac",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "redis",
+      "feature": "运维工具",
+      "check": "执行计划 Explain（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"error\": \"redis 暂不支持 EXPLAIN\"}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "oracle",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 52}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 41, \"db_name\": \"ANONYMOUS\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-14T13:31:32.246125+00:00\", \"db_name_label\": \"Schema\"}, {\"id\": 42, \"db_name\": \"OPS$ORACLE\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-14T13:31:32.246125+00:00\", \"db_name_label\": \"Schema\"}, {\"id\": 43, \"db_name\": \"OUTLN\", \"remark\": \"\", \"is_active\": ",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"AQ$_INTERNET_AGENTS\", \"AQ$_INTERNET_AGENT_PRIVS\", \"AQ$_QUEUES\", \"AQ$_QUEUE_TABLES\", \"AQ$_SCHEDULES\", \"DEF$_AQCALL\", \"DEF$_AQERROR\", \"DEF$_CALLDEST\", \"DEF$_DEFAULTDEST\", \"DEF$_DESTINATION\", \"DEF$_ERROR\", \"DEF$_LOB\", \"DEF$_ORIGIN\", \"DEF$_PROPAGATOR\", \"DEF$_PUSHED_TRANSACTIONS\", \"HELP\", \"LOGMNRC_DBNAME_UID_MAP\", \"LOGMNRC_GSBA\", \"LOGMNRC_GSII\", \"LOG",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"ID\", \"column_type\": \"NUMBER\", \"is_nullable\": \"N\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"BUCKET\", \"column_type\": \"NUMBER\", \"is_nullable\": \"N\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"PAYLOAD\", \"column_type\": \"VARCHAR2\", \"is_nullable\": \"Y\", \"colu",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"SAGITTA_OBSERVE_EVENTS\", \"ddl\": \"CREATE TABLE \\\"SAGITTA_OBSERVE_EVENTS\\\" (\\n \\\"ID\\\" NUMBER NOT NULL,\\n \\\"BUCKET\\\" NUMBER NOT NULL,\\n \\\"PAYLOAD\\\" VARCHAR2,\\n \\\"AMOUNT\\\" NUMBER,\\n \\\"UPDATED_AT\\\" TIMESTAMP(6) NOT NULL DEFAULT SYSTIMESTAMP,\\n \\\"CREATED_AT\\\" TIMESTAMP(6) NOT NULL DEFAULT SYSTIMESTAMP,\\n PRIMARY KEY (\\\"ID\\\")\\n);\", \"copyable_ddl\": \"",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"SYS_C006990\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"ID\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"SYS_C006990\", \"index_type\": \"PRIMARY KEY INDEX\", \"column_names\": \"ID\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"IDX_SAG_OBS_BUCKET\", \"index_type\": \"INDEX\", \"column_names\": \"BUCKET\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 8, \"db_name\": \"SYSTEM\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 67, \"is_masked\": false, \"query_log_id\": 168, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 25, \"workflow_name\": \"矩阵验收-oracle-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 25}",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 8, \"metrics\": {\"health\": {\"up\": 1}, \"connections\": {\"current\": 1, \"active_sessions\": 1, \"max_connections\": \"172\", \"processes_current\": 24, \"processes_limit\": \"       100\"}, \"stats\": {\"tps\": 0.0555493834018442, \"physical_reads_per_sec\": 8.41017664703922, \"redo_bytes_per_sec\": 3901.03321853127, \"logical_reads_per_sec\": 4903.47739140096, \"hard_p",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 8, \"instance_name\": \"Oracle11202XE-Test\", \"db_type\": \"oracle\", \"host\": \"oracle11202-xe-test\", \"port\": 1521, \"is_active\": true}, \"metric_groups\": {\"connections\": {\"current\": 1, \"active_sessions\": 1, \"max_connections\": \"172\", \"processes_current\": 24, \"processes_limit\": \"       100\"}, \"stats\": {\"tps\": 0.0555493834018442, \"physical_reads_per_",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'OracleEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "oracle",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 0, \"items\": [], \"column_list\": [\"session_id\", \"serial\", \"username\", \"host\", \"program\", \"db_name\", \"command\", \"state\", \"time_seconds\", \"connection_age_ms\", \"state_duration_ms\", \"active_duration_ms\", \"transaction_age_ms\", \"sql_id\", \"sql_text\", \"event\", \"blocking_session\", \"inst_id\", \"process_id\", \"module\", \"action\", \"client_identifier\", \"wait_class\",",
+      "note": ""
+    },
+    {
+      "db_type": "oracle",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": false,
+      "status": 400,
+      "detail": "{\"detail\": \"EXPLAIN 失败：ORA-00604: error occurred at recursive SQL level 1\\nORA-12899: value too large for column \\\"SYS\\\".\\\"PLAN_TABLE$\\\".\\\"STATEMENT_ID\\\" (actual: 32, maximum: 30)\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": [{\"id\": 49, \"db_name\": \"rd_testdb\", \"remark\": \"功能验证导入\", \"is_active\": true, \"sync_at\": \"2026-05-14T13:31:46.621708+00:00\", \"db_name_label\": \"数据库\"}, {\"id\": 34, \"db_name\": \"test\", \"remark\": \"\", \"is_active\": true, \"sync_at\": \"2026-05-14T13:31:46.621708+00:00\", \"db_name_label\": \"数据库\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta_observe_events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"id\", \"column_type\": \"bigint\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"bucket\", \"column_type\": \"int\", \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"payload\", \"column_type\": \"nvarchar(255)\", \"is_nullable\": \"YES\",",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta_observe_events\", \"ddl\": \"CREATE TABLE \\\"sagitta_observe_events\\\" (\\n  \\\"id\\\" bigint NOT NULL,\\n  \\\"bucket\\\" int NOT NULL,\\n  \\\"payload\\\" nvarchar(255),\\n  \\\"amount\\\" decimal(12,2),\\n  \\\"updated_at\\\" datetime2 NOT NULL DEFAULT (sysdatetime()),\\n  \\\"created_at\\\" datetime2 NOT NULL DEFAULT (sysdatetime()),\\n  PRIMARY KEY (\\\"id\\\")\\n);\", \"",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"PK__sagitta___3213E83F4F85C3B1\", \"constraint_type\": \"PRIMARY KEY\", \"column_names\": \"id\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}]}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"PK__sagitta___3213E83F4F85C3B1\", \"index_type\": \"PRIMARY KEY INDEX\", \"column_names\": \"id\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx_sag_obs_bucket\", \"index_type\": \"INDEX\", \"column_names\": \"bucket\", \"is_composite\": \"NO\", \"index_comment\": \"\", \"index_definition\": \"\"}, {\"index_name\": \"idx",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 6, \"db_name\": \"test\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"value\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 0, \"is_masked\": false, \"query_log_id\": 169, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 26, \"workflow_name\": \"矩阵验收-mssql-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 26}",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 6, \"metrics\": {\"health\": {\"up\": 1}, \"version\": {\"value\": \"14.0.3490.10\"}, \"databases\": {\"total\": 6, \"online\": 6, \"warning\": \"\"}, \"sessions\": {\"total\": 35, \"user\": 2, \"warning\": \"\"}, \"waits\": [{\"wait_type\": \"HADR_FILESTREAM_IOMGR_IOCOMPLETION\", \"waiting_tasks_count\": 3293898, \"wait_time_ms\": 1648071855, \"max_wait_time_ms\": 541, \"signal_wait_ti",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 6, \"instance_name\": \"SQLServer2017-Compat2012-Test\", \"db_type\": \"mssql\", \"host\": \"mssql2017-compat2012-test\", \"port\": 1433, \"is_active\": true}, \"metric_groups\": {\"databases\": {\"total\": 6, \"online\": 6, \"warning\": \"\"}, \"sessions\": {\"total\": 33, \"user\": 2, \"warning\": \"\"}, \"waits\": [{\"wait_type\": \"SQLTRACE_INCREMENTAL_FLUSH_SLEEP\", \"waiting_t",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'MssqlEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "mssql",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 34, \"items\": [{\"instance_id\": 6, \"instance_name\": \"SQLServer2017-Compat2012-Test\", \"db_type\": \"mssql\", \"session_id\": \"1\", \"serial\": \"\", \"username\": \"sa\", \"host\": \"\", \"program\": \"\", \"db_name\": \"test\", \"command\": \"XTP_CKPT_AGENT\", \"state\": \"background\", \"time_seconds\": 1648158, \"duration_ms\": 1648158083, \"connection_age_ms\": null, \"state_duration_ms\"",
+      "note": ""
+    },
+    {
+      "db_type": "mssql",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": false,
+      "status": 400,
+      "detail": "{\"detail\": \"EXPLAIN 失败：('The SET SHOWPLAN statements must be the only statements in the batch.', None)\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 7}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"orders\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"order_id\", \"column_type\": \"int(11)\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"DUP\"}, {\"column_name\": \"status\", \"column_type\": \"varchar(20)\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"DUP\"}, {\"column_name\": \"amount\", \"column_type\": \"decimalv3(10, 2",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"orders\", \"ddl\": \"CREATE TABLE `orders` (\\n  `order_id` INT NULL,\\n  `status` VARCHAR(20) NULL,\\n  `amount` DECIMAL(10, 2) NULL\\n) ENGINE=OLAP\\nDUPLICATE KEY(`order_id`, `status`)\\nCOMMENT 'OLAP'\\nDISTRIBUTED BY HASH(`order_id`) BUCKETS 1\\nPROPERTIES (\\n\\\"replication_allocation\\\" = \\\"tag.location.default: 1\\\",\\n\\\"min_load_replica_num\\\" = \\\"-1\\",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": false,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"获取约束信息失败：(1105, \\\"ParseException, msg: \\\\nmismatched input 'SEPARATOR' expecting {')', ','}(line 1, pos 144)\\\\n\\\")\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": false,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"获取索引信息失败：(1105, \\\"ParseException, msg: \\\\nmismatched input 'SEPARATOR' expecting {')', ','}(line 1, pos 226)\\\\n\\\")\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 14, \"db_name\": \"observability\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"1\"], \"rows\": [[1]], \"affected_rows\": 1, \"cost_time_ms\": 18, \"is_masked\": false, \"query_log_id\": 170, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"未发现明显高危变更，仍需按工单流程确认影响范围。\", \"risks\": [], \"suggestions\": [\"提交前请确认目标库、目标表和执行窗口。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "SQL 工单",
+      "check": "提交工单",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"msg\": \"工单提交成功\", \"data\": {\"id\": 27, \"workflow_name\": \"矩阵验收-doris-141823\"}}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "SQL 工单",
+      "check": "审批通过",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 2, \"msg\": \"全部审批通过，工单已就绪\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "SQL 工单",
+      "check": "执行回填闭环",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 6, \"msg\": \"外部执行结果已登记\", \"workflow_id\": 27}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 14, \"metrics\": {\"health\": {\"up\": 1, \"error\": \"\"}, \"version\": {\"value\": \"5.7.99\"}, \"queries\": {\"current\": null, \"warning\": \"(1105, \\\"ParseException, msg: \\\\nmissing {'INT', 'INTEGER'} at ')'(line 11, pos 33)\\\\n\\\")\"}, \"cluster\": {\"frontends\": {\"count\": 1, \"rows\": [{\"Name\": \"fe_f38968ae_b9c4_4a75_a4f1_81ecca43ff8f\", \"Host\": \"172.18.0.21\", \"EditL",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 14, \"instance_name\": \"Doris210-ECS-RealTest\", \"db_type\": \"doris\", \"host\": \"sagittadb-test-doris\", \"port\": 9030, \"is_active\": true}, \"metric_groups\": {\"queries\": {\"current\": null, \"warning\": \"(1105, \\\"ParseException, msg: \\\\nmissing {'INT', 'INTEGER'} at ')'(line 11, pos 33)\\\\n\\\")\"}, \"cluster\": {\"frontends\": {\"count\": 1, \"rows\": [{\"Name\": ",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 200,
+      "detail": "{\"params\": [{\"Variable_name\": \"allow_partition_column_nullable\", \"Value\": \"true\", \"Default_Value\": \"true\", \"Changed\": \"0\"}, {\"Variable_name\": \"analyze_timeout\", \"Value\": \"43200\", \"Default_Value\": \"43200\", \"Changed\": \"0\"}, {\"Variable_name\": \"audit_plugin_max_batch_bytes\", \"Value\": \"52428800\", \"Default_Value\": \"52428800\", \"Changed\": \"0\"}, {\"Variable_name\": \"au",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "doris",
+      "feature": "运维工具",
+      "check": "会话/活动列表",
+      "expected": true,
+      "ok": false,
+      "status": 400,
+      "detail": "{\"detail\": \"获取会话列表失败：(1105, \\\"ParseException, msg: \\\\nmissing {'INT', 'INTEGER'} at ')'(line 11, pos 33)\\\\n\\\")\"}",
+      "note": ""
+    },
+    {
+      "db_type": "doris",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"Explain String(Nereids Planner)\"], \"rows\": [{\"Explain String(Nereids Planner)\": \"PLAN FRAGMENT 0\"}, {\"Explain String(Nereids Planner)\": \"  OUTPUT EXPRS:\"}, {\"Explain String(Nereids Planner)\": \"    1[#0]\"}, {\"Explain String(Nereids Planner)\": \"  PARTITION: UNPARTITIONED\"}, {\"Explain String(Nereids Planner)\": \"\"}, {\"Explain String(Nereids Pla",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta-es-orders\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"amount\", \"column_type\": \"double\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"created_at\", \"column_type\": \"date\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"order_id\", \"column_type\": \"keyword\", \"is_nullable\": ",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta-es-orders\", \"ddl\": \"CREATE TABLE \\\"sagitta-es-orders\\\" (\\n  \\\"amount\\\" double,\\n  \\\"created_at\\\" date,\\n  \\\"order_id\\\" keyword,\\n  \\\"status\\\" keyword\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"sagitta-es-orders\\\" (\\n  \\\"amount\\\" double,\\n  \\\"created_at\\\" date,\\n  \\\"order_id\\\" keyword,\\n  \\\"status\\\" keyword\\n);\", \"raw_ddl\": \"CREATE TABLE \\\"",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"amount\", \"index_type\": \"DOUBLE FIELD\", \"column_names\": \"amount\", \"is_composite\": \"NO\", \"index_comment\": \"elasticsearch mapping field\", \"index_definition\": \"\"}, {\"index_name\": \"created_at\", \"index_type\": \"DATE FIELD\", \"column_names\": \"created_at\", \"is_composite\": \"NO\", \"index_comment\": \"elasticsearch mapping field\", \"index_definit",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 15, \"db_name\": \"sagitta-es-orders\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"amount\", \"created_at\", \"order_id\", \"status\"], \"rows\": [[99.9, \"2026-06-01T04:30:00.000Z\", \"E1001\", \"paid\"]], \"affected_rows\": 1, \"cost_time_ms\": 15, \"is_masked\": false, \"query_log_id\": 171, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"elasticsearch 暂不支持自动风险预案分析，请按业务流程补充人工说明。\", \"risks\": [], \"suggestions\": [\"请人工确认影响范围、备份方式和异常恢复路径。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "SQL 工单",
+      "check": "不承诺边界提交应被拒绝",
+      "expected": false,
+      "ok": true,
+      "status": 400,
+      "detail": "{\"status\": 400, \"msg\": \"SQL 预检查不通过，请修改后重新提交\"}",
+      "note": "workflow=false"
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 15, \"metrics\": {\"health\": {\"up\": 1, \"status\": \"yellow\"}, \"version\": {\"value\": \"8.12.2\"}, \"cluster\": {\"name\": \"docker-cluster\", \"nodes\": 1, \"data_nodes\": 1, \"active_shards\": 1, \"unassigned_shards\": 1}, \"indices\": {\"count\": 1, \"docs_count\": 1, \"active_primary_shards\": 1}, \"nodes\": {\"count\": 1, \"heap_usage\": 0.4863, \"disk_usage\": 0.6134, \"rows\":",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 15, \"instance_name\": \"Elasticsearch812-ECS-RealTest\", \"db_type\": \"elasticsearch\", \"host\": \"sagittadb-test-elasticsearch\", \"port\": 9200, \"is_active\": true}, \"metric_groups\": {\"cluster\": {\"name\": \"docker-cluster\", \"nodes\": 1, \"data_nodes\": 1, \"active_shards\": 1, \"unassigned_shards\": 1}, \"indices\": {\"count\": 1, \"docs_count\": 1, \"active_prima",
+      "note": ""
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'ElasticsearchEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "运维工具",
+      "check": "会话/活动列表（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 0, \"items\": [], \"column_list\": [], \"rows\": []}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "elasticsearch",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"plan\"], \"rows\": [[\"Limit[1[INTEGER]]\\n\\\\_Project[[sagitta-es-orders.amount{f}#24, sagitta-es-orders.created_at{f}#25, sagitta-es-orders.order_id{f}#26, sagitta\\n-es-orders.status{f}#27]]\\n  \\\\_EsRelation[sagitta-es-orders][amount{f}#24, created_at{f}#25, order_id{f}#26, sta..]\"]], \"db_type\": \"elasticsearch\"}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 0}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"sagitta-orders\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"amount\", \"column_type\": \"double\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"created_at\", \"column_type\": \"date\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"order_id\", \"column_type\": \"keyword\", \"is_nullable\": ",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"sagitta-orders\", \"ddl\": \"CREATE TABLE \\\"sagitta-orders\\\" (\\n  \\\"amount\\\" double,\\n  \\\"created_at\\\" date,\\n  \\\"order_id\\\" keyword,\\n  \\\"status\\\" keyword\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"sagitta-orders\\\" (\\n  \\\"amount\\\" double,\\n  \\\"created_at\\\" date,\\n  \\\"order_id\\\" keyword,\\n  \\\"status\\\" keyword\\n);\", \"raw_ddl\": \"CREATE TABLE \\\"sagitta-o",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"amount\", \"index_type\": \"DOUBLE FIELD\", \"column_names\": \"amount\", \"is_composite\": \"NO\", \"index_comment\": \"opensearch mapping field\", \"index_definition\": \"\"}, {\"index_name\": \"created_at\", \"index_type\": \"DATE FIELD\", \"column_names\": \"created_at\", \"is_composite\": \"NO\", \"index_comment\": \"opensearch mapping field\", \"index_definition\": ",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 13, \"db_name\": \"sagitta-orders\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [], \"rows\": [], \"affected_rows\": 0, \"cost_time_ms\": 97, \"is_masked\": false, \"query_log_id\": 172, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"opensearch 暂不支持自动风险预案分析，请按业务流程补充人工说明。\", \"risks\": [], \"suggestions\": [\"请人工确认影响范围、备份方式和异常恢复路径。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "SQL 工单",
+      "check": "不承诺边界提交应被拒绝",
+      "expected": false,
+      "ok": true,
+      "status": 400,
+      "detail": "{\"status\": 400, \"msg\": \"SQL 预检查不通过，请修改后重新提交\"}",
+      "note": "workflow=false"
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 13, \"metrics\": {\"health\": {\"up\": 1, \"status\": \"yellow\"}, \"version\": {\"value\": \"2.15.0\"}, \"cluster\": {\"name\": \"docker-cluster\", \"nodes\": 1, \"data_nodes\": 1, \"active_shards\": 4, \"unassigned_shards\": 1}, \"indices\": {\"count\": 3, \"docs_count\": 2, \"active_primary_shards\": 4}, \"nodes\": {\"count\": 1, \"heap_usage\": 0.6768, \"disk_usage\": 0.6134, \"rows\":",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 13, \"instance_name\": \"OpenSearch215-ECS-RealTest\", \"db_type\": \"opensearch\", \"host\": \"sagittadb-test-opensearch\", \"port\": 9200, \"is_active\": true}, \"metric_groups\": {\"cluster\": {\"name\": \"docker-cluster\", \"nodes\": 1, \"data_nodes\": 1, \"active_shards\": 4, \"unassigned_shards\": 1}, \"indices\": {\"count\": 3, \"docs_count\": 2, \"active_primary_shards",
+      "note": ""
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'OpenSearchEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "运维工具",
+      "check": "会话/活动列表（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 0, \"items\": [], \"column_list\": [], \"rows\": []}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "opensearch",
+      "feature": "运维工具",
+      "check": "执行计划 Explain",
+      "expected": true,
+      "ok": false,
+      "status": 400,
+      "detail": "{\"detail\": \"EXPLAIN 失败：RequestError(400, '{\\\\n  \\\"error\\\": {\\\\n    \\\"reason\\\": \\\"Invalid SQL query\\\",\\\\n    \\\"details\\\": \\\"Query must start with SELECT, DELETE, SHOW or DESCRIBE: EXPLAIN SELECT * FROM `sagitta-orders` LIMIT 1\\\",\\\\n    \\\"type\\\": \\\"SQLFeatureNotSupportedException\\\"\\\\n  },\\\\n  \\\"status\\\": 400\\\\n}')\"}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "连接测试",
+      "check": "实例连接测试",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"success\": true, \"message\": \"连接成功\", \"cost_time_ms\": 32}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "数据字典库列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"databases\": []}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "表列表",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"tables\": [\"events\"]}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "列元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"columns\": [{\"column_name\": \"tenant\", \"column_type\": \"text\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"event_id\", \"column_type\": \"timeuuid\", \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"\", \"column_key\": \"\"}, {\"column_name\": \"payload\", \"column_type\": \"text\", \"is_nullable\": \"YES",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "表DDL/Mapping",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"table_name\": \"events\", \"ddl\": \"CREATE TABLE \\\"events\\\" (\\n  \\\"tenant\\\" text,\\n  \\\"event_id\\\" timeuuid,\\n  \\\"payload\\\" text,\\n  \\\"severity\\\" text\\n);\", \"copyable_ddl\": \"CREATE TABLE \\\"events\\\" (\\n  \\\"tenant\\\" text,\\n  \\\"event_id\\\" timeuuid,\\n  \\\"payload\\\" text,\\n  \\\"severity\\\" text\\n);\", \"raw_ddl\": \"CREATE TABLE \\\"events\\\" (\\n  \\\"tenant\\\" text,\\n  \\\"event_i",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "约束元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"constraints\": [{\"constraint_name\": \"events_partition_key\", \"constraint_type\": \"PARTITION KEY\", \"column_names\": \"tenant\", \"referenced_table_name\": \"\", \"referenced_column_names\": \"\", \"check_clause\": \"\"}, {\"constraint_name\": \"events_clustering_key\", \"constraint_type\": \"CLUSTERING KEY\", \"column_names\": \"event_id\", \"referenced_table_name\": \"\", \"referenced_colum",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "数据字典",
+      "check": "索引元数据",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"indexes\": [{\"index_name\": \"events_partition_key\", \"index_type\": \"PARTITION KEY\", \"column_names\": \"tenant\", \"is_composite\": \"NO\", \"index_comment\": \"Cassandra partition key\", \"index_definition\": \"\"}, {\"index_name\": \"events_clustering_key\", \"index_type\": \"CLUSTERING KEY\", \"column_names\": \"event_id\", \"is_composite\": \"NO\", \"index_comment\": \"Cassandra clustering",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "在线查询",
+      "check": "查询权限排查",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 12, \"db_name\": \"observability\", \"allowed\": true, \"reason\": \"admin\", \"layer\": \"identity\"}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "在线查询",
+      "check": "只读查询执行",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [\"tenant\", \"event_id\", \"payload\", \"severity\"], \"rows\": [[\"demo\", \"f3ebb5a0-5d6f-11f1-87b6-8338b0ff3ab5\", \"hello from ecs cassandra\", \"info\"]], \"affected_rows\": 1, \"cost_time_ms\": 27, \"is_masked\": false, \"query_log_id\": 173, \"error\": \"\"}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "SQL 工单",
+      "check": "风险预案",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"status\": 0, \"risk_plan\": {\"scope\": \"workflow\", \"level\": \"low\", \"summary\": \"cassandra 暂不支持自动风险预案分析，请按业务流程补充人工说明。\", \"risks\": [], \"suggestions\": [\"请人工确认影响范围、备份方式和异常恢复路径。\"], \"requires_confirmation\": false, \"requires_manual_remark\": false}, \"requires_high_risk_submit_permission\": false, \"can_submit_high_risk_sql\": true}",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "SQL 工单",
+      "check": "不承诺边界提交应被拒绝",
+      "expected": false,
+      "ok": true,
+      "status": 400,
+      "detail": "{\"status\": 400, \"msg\": \"SQL 预检查不通过，请修改后重新提交\"}",
+      "note": "workflow=false"
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "观测中心",
+      "check": "基础指标采集",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance_id\": 12, \"metrics\": {\"health\": {\"up\": 1, \"error\": \"\"}, \"version\": {\"value\": \"4.1.11\"}, \"cluster\": {\"name\": \"SagittaTestCassandra\", \"data_center\": \"dc1\", \"peer_count\": 0, \"peers\": []}, \"tables\": {\"estimated_partitions\": 0, \"estimated_bytes\": 0, \"rows\": [{\"keyspace_name\": \"observability\", \"table_name\": \"events\", \"range_start\": \"-1389143830839313950\"",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "观测中心",
+      "check": "引擎详情观测",
+      "expected": true,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"instance\": {\"id\": 12, \"instance_name\": \"Cassandra41-ECS-RealTest\", \"db_type\": \"cassandra\", \"host\": \"sagittadb-test-cassandra\", \"port\": 9042, \"is_active\": true}, \"metric_groups\": {\"cluster\": {\"name\": \"SagittaTestCassandra\", \"data_center\": \"dc1\", \"peer_count\": 0, \"peers\": []}, \"tables\": {\"estimated_partitions\": 0, \"estimated_bytes\": 0, \"rows\": [{\"keyspace_na",
+      "note": ""
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "运维工具",
+      "check": "实例参数/变量（信息项）",
+      "expected": "best_effort",
+      "ok": true,
+      "status": 500,
+      "detail": "{\"status\": 500, \"msg\": \"服务器内部错误\", \"detail\": \"'CassandraEngine' object has no attribute 'get_variables'\"}",
+      "note": "不在矩阵 capability 中，单独记录"
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "运维工具",
+      "check": "会话/活动列表（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"total\": 0, \"items\": [], \"column_list\": [], \"rows\": []}",
+      "note": "不承诺项，仅记录实际返回"
+    },
+    {
+      "db_type": "cassandra",
+      "feature": "运维工具",
+      "check": "执行计划 Explain（不承诺）",
+      "expected": false,
+      "ok": true,
+      "status": 200,
+      "detail": "{\"column_list\": [], \"rows\": [], \"db_type\": \"cassandra\"}",
+      "note": "不承诺项，仅记录实际返回"
+    }
+  ]
+}

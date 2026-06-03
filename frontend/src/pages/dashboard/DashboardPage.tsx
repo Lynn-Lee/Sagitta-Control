@@ -37,9 +37,9 @@ import PageHeader from '@/components/common/PageHeader'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 const { Text } = Typography
-const { Option } = Select
 
 const RANGE_OPTIONS = [7, 14, 30, 60]
+const clampRangeDays = (value: number) => Math.min(365, Math.max(1, Number.isFinite(value) ? value : 1))
 const DASHBOARD_CHART_HEIGHT = 300
 const DASHBOARD_GRID_STROKE = 'rgba(0,0,0,0.06)'
 const DASHBOARD_CARD_STYLE = { borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }
@@ -191,43 +191,42 @@ function SmallRangeSelector({
   setDaysInput: (value: number) => void
   scopeLabel?: string
 }) {
+  const presetOptions = RANGE_OPTIONS.map(option => ({ label: `${option}天`, value: option }))
+  const options = presetOptions.some(option => option.value === days)
+    ? presetOptions
+    : [{ label: `${days}天`, value: days }, ...presetOptions]
+
   return (
-    <Space size={8} align="center">
+    <Space className="overview-range" wrap align="center">
       <Text type="secondary">
         {scopeLabel || '我的数据'}
       </Text>
       <Select
-        value={days}
-        onChange={value => {
-          setDays(value)
-          setDaysInput(value)
-        }}
-        style={{ width: 84 }}
         size="small"
-      >
-        {RANGE_OPTIONS.map(option => (
-          <Option key={option} value={option}>
-            {option}天
-          </Option>
-        ))}
-      </Select>
+        value={days}
+        options={options}
+        popupClassName="overview-range-select-popup"
+        onChange={value => {
+          const nextDays = clampRangeDays(Number(value))
+          setDays(nextDays)
+          setDaysInput(nextDays)
+        }}
+      />
       <Text type="secondary">
         自定义
       </Text>
       <InputNumber
+        className="overview-range-days-input"
+        size="small"
         min={1}
         max={365}
-        value={daysInput}
-        size="small"
-        style={{ width: 92 }}
-        controls={{
-          upIcon: <span style={{ fontSize: 10, lineHeight: 1 }}>▲</span>,
-          downIcon: <span style={{ fontSize: 10, lineHeight: 1 }}>▼</span>,
-        }}
-        onChange={value => setDaysInput(value || 7)}
-        onPressEnter={() => setDays(daysInput)}
-        onBlur={() => setDays(daysInput)}
+        value={days}
         addonAfter="天"
+        onChange={value => {
+          const nextDays = clampRangeDays(Number(value ?? 1))
+          setDays(nextDays)
+          setDaysInput(nextDays)
+        }}
       />
     </Space>
   )

@@ -84,6 +84,127 @@ class DorisEngine(MysqlEngine):
             limit_num=1000,
         )
 
+    async def get_table_constraints(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
+        rs = await self.get_all_columns_by_tb(db_name, tb_name, **kwargs)
+        if not rs.is_success:
+            return rs
+        rows = self._rows_to_dicts(rs)
+        key_columns: dict[str, list[str]] = {}
+        for row in rows:
+            key = str(self._row_get(row, "COLUMN_KEY", "column_key") or "").upper()
+            column = str(self._row_get(row, "COLUMN_NAME", "column_name") or "")
+            if not key or not column:
+                continue
+            if key == "PRI":
+                key_columns.setdefault("PRIMARY KEY", []).append(column)
+            elif key == "UNI":
+                key_columns.setdefault("UNIQUE", []).append(column)
+        result_rows = [
+            {
+                "constraint_name": "PRIMARY" if constraint_type == "PRIMARY KEY" else constraint_type,
+                "constraint_type": constraint_type,
+                "column_names": ", ".join(columns),
+                "referenced_table_name": "",
+                "referenced_column_names": "",
+                "check_clause": "",
+            }
+            for constraint_type, columns in key_columns.items()
+        ]
+        return ResultSet(
+            column_list=[
+                "constraint_name",
+                "constraint_type",
+                "column_names",
+                "referenced_table_name",
+                "referenced_column_names",
+                "check_clause",
+            ],
+            rows=result_rows,
+            affected_rows=len(result_rows),
+            warning="Doris 不提供完整关系型约束目录，已按列 KEY 元数据降级展示",
+        )
+
+    async def get_table_indexes(self, db_name: str, tb_name: str, **kwargs: Any) -> ResultSet:
+        rs = await self.get_table_constraints(db_name, tb_name, **kwargs)
+        if not rs.is_success:
+            return rs
+        rows: list[dict[str, Any]] = []
+        for row in self._rows_to_dicts(rs):
+            constraint_type = str(row.get("constraint_type") or "")
+            columns = str(row.get("column_names") or "")
+            if not columns:
+                continue
+            rows.append(
+                {
+                    "index_name": row.get("constraint_name") or constraint_type,
+                    "index_type": "PRIMARY KEY INDEX"
+                    if constraint_type == "PRIMARY KEY"
+                    else "UNIQUE INDEX",
+                    "column_names": columns,
+                    "is_composite": "YES" if "," in columns else "NO",
+                    "index_comment": "",
+                }
+            )
+        return ResultSet(
+            column_list=[
+                "index_name",
+                "index_type",
+                "column_names",
+                "is_composite",
+                "index_comment",
+            ],
+            rows=rows,
+            affected_rows=len(rows),
+            warning=rs.warning,
+        )
+
+    async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
+        rs = await self.query(db_name="", sql="SHOW PROCESSLIST", limit_num=0)
+        if not rs.is_success:
+            return rs
+        normalized_rows: list[dict[str, Any]] = []
+        for row in self._rows_to_dicts(rs):
+            command = self._row_get(row, "COMMAND", "Command", "command")
+            if command_type and command_type != "ALL" and str(command) != command_type:
+                continue
+            time_seconds = self._row_get(row, "TIME", "Time", "time_seconds") or 0
+            try:
+                duration_ms = int(float(time_seconds) * 1000)
+            except (TypeError, ValueError):
+                duration_ms = 0
+            normalized_rows.append(
+                {
+                    "session_id": self._row_get(row, "ID", "Id", "session_id"),
+                    "username": self._row_get(row, "USER", "User", "username"),
+                    "host": self._row_get(row, "HOST", "Host", "host"),
+                    "db_name": self._row_get(row, "DB", "Db", "db_name"),
+                    "command": command,
+                    "time_seconds": time_seconds,
+                    "state_duration_ms": duration_ms,
+                    "duration_ms": duration_ms,
+                    "duration_source": "show_processlist",
+                    "state": self._row_get(row, "STATE", "State", "state"),
+                    "sql_text": self._row_get(row, "INFO", "Info", "sql_text"),
+                }
+            )
+        return ResultSet(
+            column_list=[
+                "session_id",
+                "username",
+                "host",
+                "db_name",
+                "command",
+                "time_seconds",
+                "state_duration_ms",
+                "duration_ms",
+                "duration_source",
+                "state",
+                "sql_text",
+            ],
+            rows=normalized_rows,
+            affected_rows=len(normalized_rows),
+        )
+
     async def collect_sql_activity(
         self,
         limit: int = 100,

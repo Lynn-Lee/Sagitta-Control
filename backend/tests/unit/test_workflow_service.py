@@ -969,6 +969,7 @@ class TestCreateWorkflow:
     async def test_create_rejects_explicit_group_outside_scope(self):
         db = AsyncMock()
         instance = SimpleNamespace(
+            db_type="mysql",
             resource_groups=[SimpleNamespace(id=2, group_name="研发资源组", is_active=True)]
         )
         result = MagicMock()
@@ -984,9 +985,29 @@ class TestCreateWorkflow:
         assert "所选资源组不在你的实例访问范围内" in exc_info.value.message
 
     @pytest.mark.asyncio
+    async def test_create_rejects_unsupported_workflow_engine_before_review(self):
+        db = AsyncMock()
+        instance = SimpleNamespace(
+            db_type="redis",
+            resource_groups=[SimpleNamespace(id=2, group_name="研发资源组", is_active=True)],
+        )
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = instance
+        db.execute = AsyncMock(return_value=result)
+
+        operator = {"id": 7, "username": "dev1", "display_name": "研发一号", "resource_groups": [2]}
+
+        with pytest.raises(AppException) as exc_info:
+            await WorkflowService.create(db, self._request(), operator)
+
+        assert exc_info.value.code == 400
+        assert "不在 SQL 工单标准交付承诺范围内" in exc_info.value.message
+
+    @pytest.mark.asyncio
     async def test_create_rejects_instance_outside_resource_scope(self):
         db = AsyncMock()
         instance = SimpleNamespace(
+            db_type="mysql",
             resource_groups=[SimpleNamespace(id=9, group_name="DBA资源组", is_active=True)]
         )
         result = MagicMock()

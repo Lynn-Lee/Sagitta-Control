@@ -14,6 +14,7 @@ import pytest
 from app.engines.models import ResultSet, ReviewSet
 from app.engines.mysql import MysqlEngine
 from app.engines.pgsql import PgSQLEngine
+from app.engines.tidb import TidbEngine
 
 
 class MockInstance:
@@ -74,6 +75,25 @@ class TestMysqlFilterSql:
     def test_strips_trailing_semicolon(self):
         result = self.engine.filter_sql("SELECT 1;", 10)
         assert not result.endswith(";")
+
+
+@pytest.mark.asyncio
+async def test_tidb_explain_uses_plain_explain(monkeypatch):
+    engine = TidbEngine(instance=MockInstance())
+    captured: dict = {}
+
+    async def fake_query(db_name, sql, limit_num=0, parameters=None, **kwargs):
+        captured["db_name"] = db_name
+        captured["sql"] = sql
+        captured["limit_num"] = limit_num
+        return ResultSet(column_list=["id"], rows=[(1,)])
+
+    monkeypatch.setattr(engine, "query", fake_query)
+
+    rs = await engine.explain_query("testdb", "SELECT 1;")
+
+    assert rs.is_success
+    assert captured == {"db_name": "testdb", "sql": "EXPLAIN SELECT 1", "limit_num": 1000}
 
 
 class TestMysqlExecuteCheck:

@@ -18,6 +18,11 @@ class TidbEngine(MysqlEngine):
     name = "TidbEngine"
     db_type = "tidb"
 
+    async def explain_query(self, db_name: str, sql: str) -> ResultSet:
+        """TiDB 8.x does not support MySQL's EXPLAIN FORMAT=JSON."""
+        explain_sql = f"EXPLAIN {sql.strip().rstrip(';')}"
+        return await self.query(db_name=db_name, sql=explain_sql, limit_num=1000)
+
     @staticmethod
     def _bounded_int(value: int, *, default: int, minimum: int, maximum: int) -> int:
         try:

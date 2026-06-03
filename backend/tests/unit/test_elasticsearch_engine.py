@@ -212,3 +212,27 @@ def test_opensearch_engine_is_registered_compatible_class():
 
     assert engine.name == "OpenSearchEngine"
     assert engine.db_type == "opensearch"
+
+
+@pytest.mark.asyncio
+async def test_opensearch_explain_uses_plugin_explain_endpoint():
+    engine = OpenSearchEngine(MockInstance())
+    calls = []
+
+    class FakeTransport:
+        async def perform_request(self, method, path, body):
+            calls.append((method, path, body))
+            return {"root": {"name": "Project"}}
+
+    class FakeOpenSearchClient:
+        transport = FakeTransport()
+
+    engine._client = FakeOpenSearchClient()
+
+    rs = await engine.explain_query("", "SELECT * FROM `orders` LIMIT 1")
+
+    assert rs.is_success
+    assert calls == [
+        ("POST", "/_plugins/_sql/_explain", {"query": "SELECT * FROM `orders` LIMIT 1"})
+    ]
+    assert rs.column_list == ["explain"]

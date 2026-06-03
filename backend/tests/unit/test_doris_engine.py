@@ -81,6 +81,54 @@ async def test_doris_uses_mysql_information_schema_for_columns():
 
 
 @pytest.mark.asyncio
+async def test_doris_constraints_are_derived_from_column_keys():
+    engine = FakeDorisEngine(
+        {
+            "information_schema.columns": ResultSet(
+                column_list=["COLUMN_NAME", "COLUMN_KEY"],
+                rows=[
+                    {"COLUMN_NAME": "id", "COLUMN_KEY": "PRI"},
+                    {"COLUMN_NAME": "tenant_id", "COLUMN_KEY": ""},
+                ],
+            )
+        }
+    )
+
+    rs = await engine.get_table_constraints("demo", "orders")
+
+    assert rs.is_success
+    assert rs.rows == [
+        {
+            "constraint_name": "PRIMARY",
+            "constraint_type": "PRIMARY KEY",
+            "column_names": "id",
+            "referenced_table_name": "",
+            "referenced_column_names": "",
+            "check_clause": "",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_doris_processlist_uses_show_processlist():
+    engine = FakeDorisEngine(
+        {
+            "show processlist": ResultSet(
+                column_list=["Id", "User", "Host", "Db", "Command", "Time", "State", "Info"],
+                rows=[(12, "root", "127.0.0.1", "demo", "Query", 1.5, "running", "select 1")],
+            )
+        }
+    )
+
+    rs = await engine.processlist(command_type="ALL")
+
+    assert rs.is_success
+    assert "SHOW PROCESSLIST" in engine.seen[-1][1]
+    assert rs.rows[0]["session_id"] == 12
+    assert rs.rows[0]["duration_ms"] == 1500
+
+
+@pytest.mark.asyncio
 async def test_doris_sql_activity_converts_processlist_seconds_to_milliseconds(monkeypatch):
     engine = DorisEngine(MockInstance())
 

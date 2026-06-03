@@ -190,6 +190,30 @@ class TestOracleMetadataQueries:
 
 
 class TestOracleExecution:
+    @pytest.mark.asyncio
+    async def test_explain_statement_id_fits_oracle_11g_plan_table(self, monkeypatch):
+        monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
+        engine = OracleEngine(instance=MockOracleInstance())
+        captured: dict[str, object] = {"statements": []}
+
+        def fake_run_statement_sync(sql, params=None):
+            captured["statements"].append(sql)  # type: ignore[union-attr]
+            return ResultSet()
+
+        def fake_run_query_sync(sql, params=None):
+            captured["display_params"] = params
+            return ResultSet(column_list=["PLAN_TABLE_OUTPUT"], rows=[("plan",)])
+
+        monkeypatch.setattr(engine, "_run_statement_sync", fake_run_statement_sync)
+        monkeypatch.setattr(engine, "_run_query_sync", fake_run_query_sync)
+
+        rs = await engine.explain_query("SYSTEM", "SELECT 1 FROM dual")
+
+        statement_id = captured["display_params"]["statement_id"]  # type: ignore[index]
+        assert rs.is_success
+        assert len(statement_id) <= 30
+        assert statement_id in captured["statements"][0]  # type: ignore[index]
+
     def test_filter_sql_does_not_double_limit_existing_rownum_or_fetch(self, monkeypatch):
         monkeypatch.setattr("app.engines.oracle.decrypt_field", lambda value: value)
         engine = OracleEngine(instance=MockOracleInstance())

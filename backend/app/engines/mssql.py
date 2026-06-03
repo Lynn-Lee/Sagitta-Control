@@ -86,6 +86,31 @@ class MssqlEngine:
                 conn.close()
         return rs
 
+    def _run_showplan_sync(self, sql: str, db_name: str | None = None) -> ResultSet:
+        rs = ResultSet()
+        conn = None
+        try:
+            conn = self._connect_sync(db_name)
+            with conn.cursor() as cur:
+                cur.execute("SET SHOWPLAN_XML ON")
+                cur.execute(sql.strip().rstrip(";"))
+                if cur.description:
+                    rs.column_list = [col[0] for col in cur.description]
+                    rs.rows = cur.fetchall()
+                    rs.affected_rows = len(rs.rows)
+        except Exception as e:
+            rs.error = str(e)
+            logger.warning("mssql_showplan_error: %s", str(e))
+        finally:
+            if conn is not None:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SET SHOWPLAN_XML OFF")
+                except Exception:
+                    logger.debug("mssql_showplan_cleanup_failed", exc_info=True)
+                conn.close()
+        return rs
+
     async def get_connection(self, db_name: str | None = None):
         return await asyncio.to_thread(self._connect_sync, db_name)
 
@@ -297,8 +322,7 @@ class MssqlEngine:
         return await asyncio.to_thread(self._run_query_sync, filtered_sql, parameters, db_name)
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
-        explain_sql = f"SET SHOWPLAN_XML ON; {sql.strip().rstrip(';')}; SET SHOWPLAN_XML OFF;"
-        return await asyncio.to_thread(self._run_query_sync, explain_sql, None, db_name)
+        return await asyncio.to_thread(self._run_showplan_sync, sql, db_name)
 
     async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
         sql = """

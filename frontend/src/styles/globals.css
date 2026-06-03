@@ -161,6 +161,11 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   font-size: 14px !important;
 }
 
+.ant-input-number-group-wrapper {
+  height: var(--button-height) !important;
+  min-height: var(--button-height) !important;
+}
+
 .ant-input-number-input,
 .ant-input-affix-wrapper > input.ant-input,
 .ant-picker-input > input,
@@ -183,6 +188,56 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   align-items: center;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+.overview-range {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 8px;
+}
+
+.overview-range .ant-select {
+  width: 84px;
+}
+
+.overview-range .ant-input-number-group-wrapper {
+  width: 132px;
+}
+
+.overview-range .overview-range-days-input .ant-input-number {
+  border-inline-end: 0 !important;
+  border-start-end-radius: 0 !important;
+  border-end-end-radius: 0 !important;
+}
+
+.overview-range .overview-range-days-input .ant-input-number-input {
+  padding-inline-start: 12px !important;
+  padding-inline-end: 12px !important;
+}
+
+.overview-range .ant-input-number-group-addon {
+  min-width: 40px;
+  padding: 0 12px !important;
+  color: var(--text-primary);
+  background: #F5F5F5;
+  border-color: #D9D9D9 !important;
+  border-inline-start: 1px solid #D9D9D9 !important;
+  border-start-start-radius: 0 !important;
+  border-end-start-radius: 0 !important;
+  border-start-end-radius: var(--radius-sm) !important;
+  border-end-end-radius: var(--radius-sm) !important;
+  line-height: calc(var(--button-height) - 2px) !important;
+}
+
+.overview-range-select-popup .ant-select-item {
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.overview-range-select-popup .ant-select-item-option-selected {
+  font-weight: 600;
 }
 
 .ant-btn-primary {

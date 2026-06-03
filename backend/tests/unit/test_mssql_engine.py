@@ -95,6 +95,28 @@ async def test_mssql_kill_connection_uses_kill_statement(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_mssql_explain_uses_showplan_runner(monkeypatch):
+    engine = _engine()
+    captured: dict = {}
+
+    def fake_run_showplan_sync(sql, db_name=None):
+        captured["sql"] = sql
+        captured["db_name"] = db_name
+        return ResultSet(column_list=["showplan"], rows=[("<ShowPlanXML />",)])
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "_run_showplan_sync", fake_run_showplan_sync)
+    monkeypatch.setattr("app.engines.mssql.asyncio.to_thread", fake_to_thread)
+
+    rs = await engine.explain_query("demo", "SELECT 1 AS value")
+
+    assert rs.is_success
+    assert captured == {"sql": "SELECT 1 AS value", "db_name": "demo"}
+
+
+@pytest.mark.asyncio
 async def test_mssql_collect_sql_activity_uses_dmvs_and_normalizes_rows(monkeypatch):
     engine = _engine()
     captured: dict = {}

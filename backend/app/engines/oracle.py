@@ -246,7 +246,7 @@ class OracleEngine:
         return await self.get_all_columns_by_tb(db_name, tb_name, **kwargs)
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
-        statement_id = f"SAGITTA_{uuid.uuid4().hex[:24].upper()}"
+        statement_id = f"SAGITTA_{uuid.uuid4().hex[:20].upper()}"
         explain_sql = (
             f"EXPLAIN PLAN SET STATEMENT_ID = '{statement_id}' FOR {sql.strip().rstrip(';')}"
         )

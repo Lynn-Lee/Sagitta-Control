@@ -9,7 +9,7 @@ import {
   LogoutOutlined, UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   BugOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined, HistoryOutlined,
-  CustomerServiceOutlined,
+  CheckOutlined, CustomerServiceOutlined, ConsoleSqlOutlined,
 } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { notificationApi, type SystemNotification } from '@/api/system'
@@ -197,13 +197,13 @@ const NAV_ITEMS: NavItem[] = [
     key: 'dashboard-group', icon: <DashboardOutlined />, label: '数据看板', permission: 'menu_dashboard',
     children: [
       { key: '/dashboard/query', icon: <MenuIcon component={QueryMenuSvg} label="在线查询概览" />, label: '在线查询概览' },
-      { key: '/dashboard/workflow', icon: <MenuIcon component={SqlWorkflowMenuSvg} label="SQL 工单概览" />, label: 'SQL 工单概览' },
+      { key: '/dashboard/workflow', icon: <ConsoleSqlOutlined aria-label="SQL 工单概览" />, label: 'SQL 工单概览' },
       { key: '/dashboard/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档概览" />, label: '数据归档概览' },
       { key: '/dashboard/instance', icon: <MenuIcon component={InstanceMenuSvg} label="实例与库概览" />, label: '实例与库概览' },
     ],
   },
   {
-    key: 'workflow-group', icon: <MenuIcon component={SqlWorkflowMenuSvg} label="SQL 工单" />, label: 'SQL 工单', permission: 'menu_sqlworkflow',
+    key: 'workflow-group', icon: <ConsoleSqlOutlined aria-label="SQL 工单" />, label: 'SQL 工单', permission: 'menu_sqlworkflow',
     children: [
       { key: '/workflow', icon: <MenuIcon component={WorkflowListMenuSvg} label="工单列表" />, label: '工单列表' },
       { key: '/workflow/submit', icon: <MenuIcon component={WorkflowSubmitMenuSvg} label="提交工单" />, label: '提交工单' },
@@ -317,17 +317,22 @@ export default function MainLayout() {
     },
   })
   const unreadCount = unreadCountData?.count || 0
-  const recentNotifications = notificationList?.items || []
+  const recentNotifications = useMemo(
+    () => notificationList?.items || [],
+    [notificationList?.items],
+  )
 
   const handleNotificationClick: MenuProps['onClick'] = async ({ key }) => {
-    setNotificationOpen(false)
+    if (key === 'notification-header') return
     if (key === 'read-all') {
+      setNotificationOpen(false)
       await markAllReadMutation.mutateAsync()
       return
     }
     const id = Number(String(key).replace('notification-', ''))
     const item = recentNotifications.find((notice) => notice.id === id)
     if (!item) return
+    setNotificationOpen(false)
     if (!item.is_read) {
       await markReadMutation.mutateAsync(item.id)
     }
@@ -340,11 +345,23 @@ export default function MainLayout() {
     const items: MenuProps['items'] = [
       {
         key: 'notification-header',
-        disabled: true,
         label: (
-          <div style={{ width: 320, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text strong>通知</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>{unreadCount} 条未读</Text>
+          <div style={{ width: 340, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div>
+              <Text strong>站内通知</Text>
+              <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>{unreadCount} 条未读</Text>
+            </div>
+            <Button
+              icon={<CheckOutlined />}
+              disabled={unreadCount === 0 || markAllReadMutation.isPending}
+              loading={markAllReadMutation.isPending}
+              onClick={(event) => {
+                event.stopPropagation()
+                markAllReadMutation.mutate()
+              }}
+            >
+              全部已读
+            </Button>
           </div>
         ),
       },
@@ -362,7 +379,7 @@ export default function MainLayout() {
         items.push({
           key: `notification-${notice.id}`,
           label: (
-            <div style={{ width: 320, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ width: 340, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <span
                 style={{
                   width: 7,
@@ -392,14 +409,8 @@ export default function MainLayout() {
       })
     }
 
-    items.push({ type: 'divider' })
-    items.push({
-      key: 'read-all',
-      disabled: unreadCount === 0 || markAllReadMutation.isPending,
-      label: '全部已读',
-    })
     return items
-  }, [markAllReadMutation.isPending, recentNotifications, unreadCount])
+  }, [markAllReadMutation, recentNotifications, unreadCount])
 
   const selectedMenuKey = useMemo(() => {
     const leafKeys = NAV_ITEMS.flatMap((item) => item.children?.map((child) => child.key as string) ?? [item.key as string])
@@ -529,11 +540,11 @@ export default function MainLayout() {
             onOpenChange={setNotificationOpen}
             destroyOnHidden
           >
-            <Tooltip title="通知">
+            <Tooltip title="站内通知">
               <Badge count={unreadCount} size="small" overflowCount={99}>
                 <Button icon={<BellOutlined />}
                   style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
-                  通知
+                  站内通知
                 </Button>
               </Badge>
             </Tooltip>
