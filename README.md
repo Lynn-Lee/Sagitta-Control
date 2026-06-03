@@ -98,7 +98,7 @@ cd /opt/sagittadb/source
 COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main
 ```
 
-`deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本、执行部署前备份、构建镜像、迁移数据库、重建服务并完成健康检查。首次配置 deploy key、remote、回滚和发布后验证步骤见 [运维管理手册](docs/operations_guide.md#24-内部-ecs-源码直拉部署约定)。
+`deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本，并按变更范围自动选择备份、迁移、镜像构建和服务重建；后端、Worker、Beat、Flower 共用同一个后端镜像，普通文档或 CI 改动会跳过镜像构建。首次配置 deploy key、remote、回滚和发布后验证步骤见 [运维管理手册](docs/operations_guide.md#24-内部-ecs-源码直拉部署约定)。
 
 ## 生产环境安全提示
 

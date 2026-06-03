@@ -246,11 +246,19 @@ bash deploy/update-prod.sh                  # 默认部署 origin/main
 bash deploy/update-prod.sh --ref origin/main
 bash deploy/update-prod.sh --ref v2.2.0
 bash deploy/update-prod.sh --ref <commit_sha>
+bash deploy/update-prod.sh --full           # 强制全量构建并重建应用服务
 ```
 
-脚本固定执行以下步骤：检查 tracked 工作区、校验 SSH Git remote、拉取远端引用、切换目标版本、按变更范围决定是否备份 PostgreSQL、构建应用镜像、启动基础服务、执行 Alembic 迁移、重建应用服务、等待 backend/frontend 健康检查、输出 Compose 状态。
+脚本固定执行以下步骤：检查 tracked 工作区、校验 SSH Git remote、拉取远端引用、切换目标版本、按变更范围决定是否备份 PostgreSQL、是否执行 Alembic 迁移、是否构建应用镜像、是否重建应用服务、等待 backend/frontend 健康检查、输出 Compose 状态。
 
-默认只有目标版本相对当前版本包含数据库相关变更时才执行 `pg_dump`，匹配范围包括 `backend/alembic/`、`backend/app/models/`、数据库连接核心文件以及 Compose/Helm 部署配置。普通前端、文档、业务服务代码更新会自动跳过部署前备份，降低测试环境更新耗时。若发布前需要留档备份，可显式强制备份：
+部署脚本会按改动范围缩小更新面：
+
+- `backend/` 变更只构建一次后端共享镜像，并重建 `backend`、`celery_worker`、`celery_beat`、`flower`。
+- `frontend/` 或 `deploy/nginx.conf` 变更只构建并重建 `frontend`。
+- `deploy/docker-compose.yml`、`deploy/update-prod.sh` 或根 `docker-compose.yml` 变更会触发全量应用服务更新。
+- 普通文档、CI 配置、验证报告或其他不影响运行时的改动会跳过镜像构建和服务重建，仅保留健康检查。
+
+默认只有目标版本相对当前版本包含数据库相关变更时才执行 `pg_dump` 和 Alembic 迁移，匹配范围包括 `backend/alembic/`、`backend/app/models/`、数据库连接核心文件以及 Compose/Helm 部署配置。普通前端、文档、业务服务代码更新会自动跳过部署前备份，降低测试环境更新耗时。若发布前需要留档备份，可显式强制备份：
 
 ```bash
 COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --force-backup

@@ -6,6 +6,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.yml"
 ENV_FILE="${ROOT_DIR}/.env"
 APP_SERVICES=(backend celery_worker celery_beat flower frontend)
+BACKEND_SERVICES=(backend celery_worker celery_beat flower)
+FRONTEND_SERVICES=(frontend)
 BASE_SERVICES=(postgres redis)
 DEFAULT_BACKEND_HEALTH_URL="http://127.0.0.1:8000/health"
 DEFAULT_FRONTEND_HEALTH_URL="http://127.0.0.1/health"
@@ -21,6 +23,18 @@ DB_CHANGE_PATTERNS=(
   "deploy/docker-compose.yml"
   "deploy/helm/"
 )
+BACKEND_CHANGE_PATTERNS=(
+  "backend/"
+)
+FRONTEND_CHANGE_PATTERNS=(
+  "frontend/"
+  "deploy/nginx.conf"
+)
+FULL_DEPLOY_CHANGE_PATTERNS=(
+  "docker-compose.yml"
+  "deploy/docker-compose.yml"
+  "deploy/update-prod.sh"
+)
 
 usage() {
   cat <<'EOF'
@@ -31,10 +45,10 @@ usage() {
   1. 检查本地已跟踪文件是否干净
   2. 通过 SSH Git remote 拉取 origin，并把本地 main 快进到 origin/main，或切换到 --ref 指定版本
   3. 检测目标版本是否包含数据库相关变更；如包含则通过 postgres 容器执行部署前 PostgreSQL 备份
-  4. 构建生产镜像
+  4. 根据变更范围选择构建后端共享镜像、前端镜像或跳过镜像构建
   5. 确保 postgres/redis 正在运行
-  6. 执行 alembic 迁移
-  7. 重建应用服务
+  6. 仅在数据库相关变更时执行 alembic 迁移
+  7. 按变更范围重建应用服务
   8. 等待健康检查并展示服务状态
 
 默认约定：
@@ -47,6 +61,7 @@ usage() {
   --force-backup           即使未检测到数据库相关变更，也执行部署前数据库备份。
   --skip-backup            跳过部署前数据库备份；优先级高于 --force-backup。
   --skip-migrate           跳过 alembic upgrade head。
+  --full                   强制构建并重建全部应用服务。
   --no-cache               使用 --no-cache 构建 Docker 镜像。
   --prune                  部署成功后清理悬空 Docker 镜像。
   --backend-health <url>   后端健康检查 URL，默认 http://127.0.0.1:8000/health
@@ -60,6 +75,8 @@ usage() {
   BACKUP_DIR               数据库备份目录，默认 /data/sagittadb/backups。
   BACKUP_RETAIN_DAYS       备份保留天数，默认 7。
   COMPOSE_PROJECT_NAME     Compose 项目名；ECS 测试环境使用 sagittadb-source-test。
+  SAGITTADB_BACKEND_IMAGE  后端/Worker/Beat/Flower 共享镜像名，默认 <COMPOSE_PROJECT_NAME>-backend:latest。
+  SAGITTADB_FRONTEND_IMAGE 前端镜像名，默认 <COMPOSE_PROJECT_NAME>-frontend:latest。
 
 示例：
   COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
@@ -67,6 +84,7 @@ usage() {
   bash deploy/update-prod.sh --ref origin/main
   bash deploy/update-prod.sh --ref v2.0.0
   bash deploy/update-prod.sh --force-backup
+  bash deploy/update-prod.sh --full
   bash deploy/update-prod.sh --skip-backup --no-cache
 EOF
 }
@@ -189,10 +207,44 @@ db_changes_between_revisions() {
   return 1
 }
 
+path_matches_patterns() {
+  local changed_file="$1"
+  shift
+  local pattern
+  for pattern in "$@"; do
+    if [[ "${changed_file}" == "${pattern}"* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+changed_files_match() {
+  local changed_files="$1"
+  shift
+  local changed_file
+
+  [[ -n "${changed_files}" ]] || return 1
+  while IFS= read -r changed_file; do
+    [[ -n "${changed_file}" ]] || continue
+    if path_matches_patterns "${changed_file}" "$@"; then
+      printf '%s\n' "${changed_file}"
+      return 0
+    fi
+  done <<< "${changed_files}"
+  return 1
+}
+
+join_by_space() {
+  local IFS=" "
+  printf '%s' "$*"
+}
+
 REF=""
 SKIP_BACKUP=0
 FORCE_BACKUP=0
 SKIP_MIGRATE=0
+FORCE_FULL_DEPLOY="${FORCE_FULL_DEPLOY:-0}"
 NO_CACHE=0
 PRUNE=0
 BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-${DEFAULT_BACKEND_HEALTH_URL}}"
@@ -218,6 +270,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-migrate)
       SKIP_MIGRATE=1
+      shift
+      ;;
+    --full)
+      FORCE_FULL_DEPLOY=1
       shift
       ;;
     --no-cache)
@@ -256,6 +312,10 @@ require_cmd curl
 
 cd "${ROOT_DIR}"
 
+compose_project_name="${COMPOSE_PROJECT_NAME:-sagittadb}"
+export SAGITTADB_BACKEND_IMAGE="${SAGITTADB_BACKEND_IMAGE:-${compose_project_name}-backend:latest}"
+export SAGITTADB_FRONTEND_IMAGE="${SAGITTADB_FRONTEND_IMAGE:-${compose_project_name}-frontend:latest}"
+
 [[ -f "${COMPOSE_FILE}" ]] || die "未找到 Compose 文件：${COMPOSE_FILE}"
 [[ -f "${ENV_FILE}" ]] || die "未找到 .env：${ENV_FILE}，请在部署前从 .env.example 创建。"
 
@@ -281,12 +341,63 @@ new_revision="$(git rev-parse --short HEAD)"
 new_revision_full="$(git rev-parse HEAD)"
 log "目标版本：${new_revision}"
 
+changed_files="$(git diff --name-only "${old_revision_full}" "${new_revision_full}")"
+if [[ -n "${changed_files}" ]]; then
+  log "本次变更文件："
+  while IFS= read -r changed_file; do
+    [[ -n "${changed_file}" ]] && log "  - ${changed_file}"
+  done <<< "${changed_files}"
+else
+  log "当前版本与目标版本一致，未检测到代码变更"
+fi
+
+full_deploy_reason=""
+backend_change_reason=""
+frontend_change_reason=""
+if [[ "${FORCE_FULL_DEPLOY}" == "1" ]]; then
+  full_deploy_reason="按 --full 要求强制全量应用更新"
+elif full_deploy_reason="$(changed_files_match "${changed_files}" "${FULL_DEPLOY_CHANGE_PATTERNS[@]}")"; then
+  full_deploy_reason="检测到部署入口相关变更：${full_deploy_reason}"
+fi
+
+if [[ -z "${full_deploy_reason}" ]]; then
+  backend_change_reason="$(changed_files_match "${changed_files}" "${BACKEND_CHANGE_PATTERNS[@]}")" || true
+  frontend_change_reason="$(changed_files_match "${changed_files}" "${FRONTEND_CHANGE_PATTERNS[@]}")" || true
+fi
+
+build_services=()
+deploy_services=()
+if [[ -n "${full_deploy_reason}" ]]; then
+  log "${full_deploy_reason}"
+  build_services=(backend frontend)
+  deploy_services=("${APP_SERVICES[@]}")
+else
+  if [[ -n "${backend_change_reason}" ]]; then
+    log "检测到后端相关变更：${backend_change_reason}"
+    build_services+=(backend)
+    deploy_services+=("${BACKEND_SERVICES[@]}")
+  fi
+  if [[ -n "${frontend_change_reason}" ]]; then
+    log "检测到前端相关变更：${frontend_change_reason}"
+    build_services+=(frontend)
+    deploy_services+=("${FRONTEND_SERVICES[@]}")
+  fi
+fi
+
+if [[ ${NO_CACHE} -eq 1 && ${#build_services[@]} -eq 0 ]]; then
+  log "按 --no-cache 要求执行全量应用构建"
+  build_services=(backend frontend)
+  deploy_services=("${APP_SERVICES[@]}")
+fi
+
+db_change_reason="$(db_changes_between_revisions "${old_revision_full}" "${new_revision_full}")" || true
+
 if [[ ${SKIP_BACKUP} -eq 0 ]]; then
   backup_reason=""
   if [[ ${FORCE_BACKUP} -eq 1 ]]; then
     backup_reason="按 --force-backup 要求强制备份"
-  elif matched_db_change="$(db_changes_between_revisions "${old_revision_full}" "${new_revision_full}")"; then
-    backup_reason="检测到数据库相关变更：${matched_db_change}"
+  elif [[ -n "${db_change_reason}" ]]; then
+    backup_reason="检测到数据库相关变更：${db_change_reason}"
   fi
 
   if [[ -n "${backup_reason}" ]]; then
@@ -306,21 +417,39 @@ if [[ ${NO_CACHE} -eq 1 ]]; then
   build_args+=(--no-cache)
 fi
 
-log "构建生产镜像：${APP_SERVICES[*]}"
-compose build "${build_args[@]}" "${APP_SERVICES[@]}"
-
-log "确保基础服务正在运行：${BASE_SERVICES[*]}"
-compose up -d "${BASE_SERVICES[@]}"
-
-if [[ ${SKIP_MIGRATE} -eq 0 ]]; then
-  log "执行数据库迁移"
-  compose run --rm backend alembic upgrade head
+if [[ ${#build_services[@]} -gt 0 ]]; then
+  log "构建生产镜像：$(join_by_space "${build_services[@]}")"
+  compose build "${build_args[@]}" "${build_services[@]}"
 else
-  log "按要求跳过数据库迁移"
+  log "未检测到后端或前端运行时变更，跳过镜像构建"
 fi
 
-log "重建已更新的应用服务：${APP_SERVICES[*]}"
-compose up -d --no-deps "${APP_SERVICES[@]}"
+if [[ ${#deploy_services[@]} -gt 0 ]]; then
+  log "确保基础服务正在运行：${BASE_SERVICES[*]}"
+  compose up -d "${BASE_SERVICES[@]}"
+fi
+
+if [[ ${SKIP_MIGRATE} -eq 0 && -n "${db_change_reason}" ]]; then
+  log "执行数据库迁移"
+  if [[ ${#deploy_services[@]} -eq 0 ]]; then
+    log "数据库相关变更未触发应用重建，先确保基础服务正在运行"
+    compose up -d "${BASE_SERVICES[@]}"
+  fi
+  compose run --rm backend alembic upgrade head
+else
+  if [[ ${SKIP_MIGRATE} -eq 1 ]]; then
+    log "按要求跳过数据库迁移"
+  else
+    log "未检测到数据库相关变更，跳过数据库迁移"
+  fi
+fi
+
+if [[ ${#deploy_services[@]} -gt 0 ]]; then
+  log "重建已更新的应用服务：$(join_by_space "${deploy_services[@]}")"
+  compose up -d --no-deps "${deploy_services[@]}"
+else
+  log "未检测到需要重建的应用服务"
+fi
 
 wait_for_url "backend" "${BACKEND_HEALTH_URL}" 40 3
 wait_for_url "frontend" "${FRONTEND_HEALTH_URL}" 30 3

@@ -64,6 +64,7 @@ services:
 
   # ─── 后端服务 ────────────────────────────────────────────────
   backend:
+    image: ${SAGITTADB_BACKEND_IMAGE:-sagittadb-backend:latest}
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -105,9 +106,7 @@ services:
 
   # ─── Celery Worker ───────────────────────────────────────────
   celery_worker:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    image: ${SAGITTADB_BACKEND_IMAGE:-sagittadb-backend:latest}
     restart: always
     env_file: ../.env
     environment:
@@ -145,9 +144,7 @@ services:
 
   # ─── Celery Beat ─────────────────────────────────────────────
   celery_beat:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    image: ${SAGITTADB_BACKEND_IMAGE:-sagittadb-backend:latest}
     restart: always
     env_file: ../.env
     environment:
@@ -174,9 +171,7 @@ services:
 
   # ─── Flower ──────────────────────────────────────────────────
   flower:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    image: ${SAGITTADB_BACKEND_IMAGE:-sagittadb-backend:latest}
     restart: always
     environment:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
@@ -201,6 +196,7 @@ services:
 
   # ─── 前端 ────────────────────────────────────────────────────
   frontend:
+    image: ${SAGITTADB_FRONTEND_IMAGE:-sagittadb-frontend:latest}
     build:
       context: ../frontend
       dockerfile: Dockerfile
