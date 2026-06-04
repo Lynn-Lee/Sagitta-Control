@@ -81,6 +81,8 @@ const supportLevelColor: Record<string, string> = {
   backlog: 'default',
 }
 
+const nowrapText = (value: unknown) => <span style={{ whiteSpace: 'nowrap' }}>{String(value ?? '-')}</span>
+
 export default function CommercialOpsPage() {
   const navigate = useNavigate()
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
@@ -547,9 +549,9 @@ export default function CommercialOpsPage() {
                     dataSource={matrix?.items || []}
                     rowKey="db_type"
                     pagination={false}
-                    scroll={{ x: 1200 }}
+                    scroll={{ x: 1700 }}
                     columns={[
-                      { title: '数据库', dataIndex: 'label', fixed: 'left', width: 150 },
+                      { title: '数据库', dataIndex: 'label', fixed: 'left', width: 190, render: nowrapText },
                       {
                         title: '支持等级',
                         dataIndex: 'support_label',
@@ -561,7 +563,7 @@ export default function CommercialOpsPage() {
                         width: 110,
                         render: (_: any, row: any) => row.capabilities?.[key] ? <Tag color="green">支持</Tag> : <Tag>不承诺</Tag>,
                       })),
-                      { title: '交付口径', dataIndex: 'validation_required', width: 220 },
+                      { title: '交付口径', dataIndex: 'validation_required', width: 360, render: nowrapText },
                     ]}
                   />
                 </Card>
