@@ -305,7 +305,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - MSSQL 专属页签展示 waits、blocking、deadlock、tempdb、job、执行计划和缺失索引建议。
 - MongoDB 专属页签展示 currentOp、profiler 慢操作、ReplicaSet/Sharding、WiredTiger、数据库和集合级容量指标。
 - Elasticsearch 专属页签展示 Elasticsearch cluster/node/index/shard、heap、thread pool、segment 和任务活动。
-- OpenSearch 专属页签展示 OpenSearch cluster/node/index/shard、heap、thread pool、segment 和任务活动，SQL 查询走 OpenSearch SQL 插件。
+- OpenSearch 专属页签展示 OpenSearch cluster/node/index/shard、heap、thread pool、segment 和任务活动，SQL 查询走 OpenSearch SQL 插件；包含连字符的索引名在提交到插件前会按 OpenSearch 方言使用反引号引用，避免被识别为字符串值。
 - Cassandra/ScyllaDB 专属页签展示 CQL 系统表可采集的 peer、容量估算和 compaction 历史；读写延迟、tombstone、SSTable、cache、thread pool 等深度指标需要 JMX/sidecar。
 - Oracle 会话监控会优先展示 RAC 实例、OS PID、module/action、等待分类、阻塞实例和 PGA 信息；Top SQL 优先来自 SQL Monitor，并在 AWR 或 SQL Monitor 权限不足时自动降级到游标缓存或当前会话 SQL。
 - Kill 会话属于高风险操作，应确认业务影响后执行。

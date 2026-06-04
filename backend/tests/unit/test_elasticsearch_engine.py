@@ -215,6 +215,30 @@ def test_opensearch_engine_is_registered_compatible_class():
 
 
 @pytest.mark.asyncio
+async def test_opensearch_query_normalizes_quoted_index_identifier():
+    engine = OpenSearchEngine(MockInstance())
+    calls = []
+
+    class FakeTransport:
+        async def perform_request(self, method, path, body):
+            calls.append((method, path, body))
+            return {"columns": [{"name": "amount"}], "rows": [[99.9]]}
+
+    class FakeOpenSearchClient:
+        transport = FakeTransport()
+
+    engine._client = FakeOpenSearchClient()
+
+    rs = await engine.query("", 'SELECT * FROM "sagitta-orders"', limit_num=1)
+
+    assert rs.is_success
+    assert rs.rows == [[99.9]]
+    assert calls == [
+        ("POST", "/_plugins/_sql", {"query": "SELECT * FROM `sagitta-orders` LIMIT 1", "fetch_size": 1})
+    ]
+
+
+@pytest.mark.asyncio
 async def test_opensearch_explain_uses_plugin_explain_endpoint():
     engine = OpenSearchEngine(MockInstance())
     calls = []
@@ -229,10 +253,10 @@ async def test_opensearch_explain_uses_plugin_explain_endpoint():
 
     engine._client = FakeOpenSearchClient()
 
-    rs = await engine.explain_query("", "SELECT * FROM `orders` LIMIT 1")
+    rs = await engine.explain_query("", 'SELECT * FROM "sagitta-orders" LIMIT 1')
 
     assert rs.is_success
     assert calls == [
-        ("POST", "/_plugins/_sql/_explain", {"query": "SELECT * FROM `orders` LIMIT 1"})
+        ("POST", "/_plugins/_sql/_explain", {"query": "SELECT * FROM `sagitta-orders` LIMIT 1"})
     ]
     assert rs.column_list == ["explain"]

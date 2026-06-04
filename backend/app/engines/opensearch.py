@@ -7,10 +7,11 @@ SQL API 路径和产品校验边界不同，因此作为独立引擎注册。
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
-from app.engines.models import ResultSet
 from app.engines.elasticsearch import ElasticsearchEngine
+from app.engines.models import ResultSet
 
 
 class OpenSearchEngine(ElasticsearchEngine):
@@ -35,7 +36,29 @@ class OpenSearchEngine(ElasticsearchEngine):
         return self._client
 
     async def _sql_query(self, client: Any, payload: dict[str, Any]) -> Any:
-        return await client.transport.perform_request("POST", "/_plugins/_sql", body=payload)
+        normalized = dict(payload)
+        query = normalized.get("query")
+        if isinstance(query, str):
+            normalized["query"] = self._normalize_sql_identifier_quotes(query)
+        return await client.transport.perform_request("POST", "/_plugins/_sql", body=normalized)
+
+    @staticmethod
+    def _normalize_sql_identifier_quotes(sql: str) -> str:
+        """OpenSearch SQL 对连字符索引名使用反引号，双引号会被当作字符串值。"""
+
+        def replace_relation(match: re.Match[str]) -> str:
+            keyword, identifier = match.groups()
+            escaped = identifier.replace("`", "``")
+            return f"{keyword} `{escaped}`"
+
+        return re.sub(
+            r'(?i)\b(from|join)\s+"([^"]+)"',
+            replace_relation,
+            sql.strip().rstrip(";"),
+        )
+
+    def filter_sql(self, sql: str, limit_num: int) -> str:
+        return self._normalize_sql_identifier_quotes(super().filter_sql(sql, limit_num))
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
         rs = ResultSet()
@@ -44,7 +67,7 @@ class OpenSearchEngine(ElasticsearchEngine):
             data = await client.transport.perform_request(
                 "POST",
                 "/_plugins/_sql/_explain",
-                body={"query": sql.strip().rstrip(";")},
+                body={"query": self._normalize_sql_identifier_quotes(sql)},
             )
             rs.column_list = ["explain"]
             rs.rows = [(json.dumps(self._to_plain(data), ensure_ascii=False),)]
