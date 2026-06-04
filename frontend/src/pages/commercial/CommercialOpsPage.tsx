@@ -561,7 +561,7 @@ export default function CommercialOpsPage() {
                         width: 110,
                         render: (_: any, row: any) => row.capabilities?.[key] ? <Tag color="green">支持</Tag> : <Tag>不承诺</Tag>,
                       })),
-                      { title: '验证要求', dataIndex: 'validation_required', width: 260 },
+                      { title: '交付口径', dataIndex: 'validation_required', width: 220 },
                     ]}
                   />
                 </Card>

@@ -182,7 +182,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": True,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "pgsql",
@@ -200,7 +200,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "tidb",
@@ -218,7 +218,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "按 MySQL 兼容链路验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "starrocks",
@@ -236,7 +236,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "clickhouse",
@@ -254,7 +254,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": False,
             "kill_session": False,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "mongo",
@@ -272,7 +272,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": False,
             "kill_session": False,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "redis",
@@ -290,7 +290,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": False,
             "kill_session": False,
         },
-        "validation_required": "标准交付验收",
+        "validation_required": "支持",
     },
     {
         "db_type": "oracle",
@@ -308,7 +308,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "必须在客户同构环境验证驱动模式、权限和诊断降级链路",
+        "validation_required": "支持",
     },
     {
         "db_type": "mssql",
@@ -326,7 +326,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "必须在客户同构环境验证连接、元数据和执行链路",
+        "validation_required": "支持",
     },
     {
         "db_type": "doris",
@@ -344,7 +344,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "2026-06-04 ECS 实测主链路通过；客户侧仍需验证 FE MySQL 协议版本",
+        "validation_required": "支持",
     },
     {
         "db_type": "elasticsearch",
@@ -362,7 +362,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "2026-06-04 ECS 实测主链路通过；客户侧仍需验证目标 Elasticsearch 版本 SQL API 兼容性",
+        "validation_required": "支持",
     },
     {
         "db_type": "opensearch",
@@ -380,7 +380,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "2026-06-04 ECS 实测主链路通过，连字符索引查询已兼容；客户侧仍需验证目标 OpenSearch 版本 SQL 插件兼容性",
+        "validation_required": "支持",
     },
     {
         "db_type": "cassandra",
@@ -398,7 +398,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": False,
             "kill_session": False,
         },
-        "validation_required": "2026-06-04 ECS 实测连接、元数据、只读查询和基础观测通过；SQL 洞察需 JMX/sidecar，DDL/DML/BATCH 不纳入标准交付",
+        "validation_required": "只读/元数据支持；SQL 洞察、DDL/DML/BATCH 不承诺",
     },
 ]
 
