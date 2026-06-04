@@ -21,6 +21,11 @@ def test_engine_matrix_contains_required_capabilities():
         item["db_type"] == "cassandra" and item["support_level"] == "read_only_metadata"
         for item in matrix["items"]
     )
+    opensearch = next(item for item in matrix["items"] if item["db_type"] == "opensearch")
+    assert "2026-06-04 ECS 实测主链路通过" in opensearch["validation_required"]
+    assert "连字符索引查询已兼容" in opensearch["validation_required"]
+    cassandra = next(item for item in matrix["items"] if item["db_type"] == "cassandra")
+    assert "SQL 洞察需 JMX/sidecar" in cassandra["validation_required"]
 
 
 def test_engine_matrix_db_types_match_registered_engines():

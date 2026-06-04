@@ -344,7 +344,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "必须在客户 FE MySQL 协议版本验证",
+        "validation_required": "2026-06-04 ECS 实测主链路通过；客户侧仍需验证 FE MySQL 协议版本",
     },
     {
         "db_type": "elasticsearch",
@@ -362,7 +362,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "必须验证目标 Elasticsearch 版本 SQL API 兼容性",
+        "validation_required": "2026-06-04 ECS 实测主链路通过；客户侧仍需验证目标 Elasticsearch 版本 SQL API 兼容性",
     },
     {
         "db_type": "opensearch",
@@ -380,7 +380,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": True,
             "kill_session": False,
         },
-        "validation_required": "必须验证目标 OpenSearch 版本 SQL 插件兼容性",
+        "validation_required": "2026-06-04 ECS 实测主链路通过，连字符索引查询已兼容；客户侧仍需验证目标 OpenSearch 版本 SQL 插件兼容性",
     },
     {
         "db_type": "cassandra",
@@ -398,7 +398,7 @@ ENGINE_MATRIX: list[dict[str, Any]] = [
             "explain": False,
             "kill_session": False,
         },
-        "validation_required": "只承诺元数据和只读 SELECT；DDL/DML/BATCH 不纳入标准交付",
+        "validation_required": "2026-06-04 ECS 实测连接、元数据、只读查询和基础观测通过；SQL 洞察需 JMX/sidecar，DDL/DML/BATCH 不纳入标准交付",
     },
 ]
 
