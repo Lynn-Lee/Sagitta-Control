@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MenuProps } from 'antd'
 import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
 import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import dayjs, { type Dayjs } from 'dayjs'
-import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
@@ -17,8 +16,10 @@ import { getTablePaginationConfig } from '@/utils/tablePagination'
 import { getEngineDiagnosticTabs, resolveWorkbenchTabForDbType } from './components/EngineDiagnosticPanels'
 import { ConfigStatusTag, MetricCard, RiskTag, StatusTag, riskReasonText } from './components/MonitorStatus'
 import { compactSqlText, formatBytes, formatDurationSeconds, formatMetric, formatRateMetric, formatTime, formatTrendTooltip, formatWindowMinutes, topSqlHeader } from './formatters'
-import type { BulkCollectConfigResponse, MonitorInstance, MonitorOverview, MonitorSnapshot, UnifiedCollectConfigItem, UnifiedCollectConfigListResponse } from './types'
+import type { MonitorInstance, MonitorSnapshot } from './types'
 import { TOP_SQL_TIME_FORMAT, TOP_SQL_WINDOW_OPTIONS } from './types'
+import { useMonitorMutations } from './hooks/useMonitorMutations'
+import { useMonitorQueries } from './hooks/useMonitorQueries'
 
 const { Text, Title } = Typography
 const { Option } = Select
@@ -59,101 +60,44 @@ export default function MonitorPage() {
   const [tablePageSize, setTablePageSize] = useState(100)
   const [form] = Form.useForm()
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['native-monitor-instances'],
-    queryFn: () => apiClient.get('/monitor/native/instances/').then(r => r.data),
-  })
-  const { data: overview } = useQuery<MonitorOverview>({
-    queryKey: ['native-monitor-overview'],
-    queryFn: () => apiClient.get('/monitor/native/overview/').then(r => r.data),
-  })
-  const { data: collectConfigData } = useQuery<UnifiedCollectConfigListResponse>({
-    queryKey: ['unified-collect-configs'],
-    queryFn: () => apiClient.get('/monitor/native/collect-configs/').then(r => r.data),
-  })
-  const allInstances: MonitorInstance[] = useMemo(
-    () => overview?.items || data?.items || [],
-    [overview?.items, data?.items],
-  )
-  const collectConfigByInstance = useMemo(() => {
-    const map = new Map<number, UnifiedCollectConfigItem>()
-    ;(collectConfigData?.items || []).forEach(item => map.set(item.instance_id, item))
-    return map
-  }, [collectConfigData?.items])
-  const instances = useMemo(() => allInstances.filter(item => {
-    if (dbTypeFilter && item.db_type !== dbTypeFilter) return false
-    if (riskFilter && item.risk_level !== riskFilter) return false
-    if (collectStatusFilter && item.last_collect_status !== collectStatusFilter) return false
-    return true
-  }), [allInstances, dbTypeFilter, riskFilter, collectStatusFilter])
-  useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(instances.length / overviewPageSize))
-    if (overviewPage > maxPage) setOverviewPage(maxPage)
-  }, [instances.length, overviewPage, overviewPageSize])
-  const activeId = selectedId || instances[0]?.instance_id || null
-  const active = instances.find(i => i.instance_id === activeId) || null
   const topSqlDateStart = topSqlCustomRange?.[0]?.format(TOP_SQL_TIME_FORMAT)
   const topSqlDateEnd = topSqlCustomRange?.[1]?.format(TOP_SQL_TIME_FORMAT)
-
-  const { data: detail } = useQuery({
-    queryKey: ['native-monitor-detail', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: trendData } = useQuery({
-    queryKey: ['native-monitor-trend', activeId, trendHours],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/trend/`, { params: { hours: trendHours } }).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: healthData } = useQuery({
-    queryKey: ['native-monitor-health', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/health/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: topSqlData } = useQuery({
-    queryKey: ['native-monitor-top-sql', activeId, topSqlWindowMinutes, topSqlDateStart, topSqlDateEnd],
-    queryFn: () => {
-      const params: Record<string, any> = { window_minutes: topSqlWindowMinutes }
-      if (topSqlDateStart && topSqlDateEnd) {
-        params.date_start = topSqlDateStart
-        params.date_end = topSqlDateEnd
-      }
-      return apiClient.get(`/monitor/native/instances/${activeId}/top-sql/`, { params }).then(r => r.data)
-    },
-    enabled: !!activeId && canViewSql,
-  })
-  const topSqlRangeLabel = topSqlDateStart && topSqlDateEnd
-    ? `${topSqlCustomRange?.[0]?.format('MM-DD HH:mm')} 至 ${topSqlCustomRange?.[1]?.format('MM-DD HH:mm')}`
-    : `最近 ${formatWindowMinutes(topSqlData?.window_minutes || topSqlWindowMinutes)}`
-  const { data: waitsData } = useQuery({
-    queryKey: ['native-monitor-waits', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/waits/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: growthData } = useQuery({
-    queryKey: ['native-monitor-capacity-growth', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/capacity-growth/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: engineDetail } = useQuery({
-    queryKey: ['native-monitor-engine-detail', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/engine-detail/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: alertRules } = useQuery({
-    queryKey: ['native-monitor-alerts', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/alerts/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: dbCapacity } = useQuery({
-    queryKey: ['native-monitor-db-capacity', activeId],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/databases/`).then(r => r.data),
-    enabled: !!activeId,
-  })
-  const { data: tableCapacity, isLoading: tableLoading } = useQuery({
-    queryKey: ['native-monitor-table-capacity', activeId, tableDb, tableSearch, tablePage, tablePageSize],
-    queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/tables/`, { params: { db_name: tableDb, search: tableSearch, page: tablePage, page_size: tablePageSize } }).then(r => r.data),
-    enabled: !!activeId,
+  const {
+    isLoading,
+    overview,
+    allInstances,
+    collectConfigByInstance,
+    instances,
+    activeId,
+    active,
+    detail,
+    trendData,
+    healthData,
+    topSqlData,
+    topSqlRangeLabel,
+    waitsData,
+    growthData,
+    engineDetail,
+    alertRules,
+    dbCapacity,
+    tableCapacity,
+    tableLoading,
+  } = useMonitorQueries({
+    selectedId,
+    dbTypeFilter,
+    riskFilter,
+    collectStatusFilter,
+    trendHours,
+    topSqlWindowMinutes,
+    topSqlDateStart,
+    topSqlDateEnd,
+    topSqlRangeStartLabel: topSqlCustomRange?.[0]?.format('MM-DD HH:mm'),
+    topSqlRangeEndLabel: topSqlCustomRange?.[1]?.format('MM-DD HH:mm'),
+    canViewSql,
+    tableDb,
+    tableSearch,
+    tablePage,
+    tablePageSize,
   })
   const showOverviewActions = mainTab === 'instance-overview'
 
@@ -169,123 +113,24 @@ export default function MonitorPage() {
     setAlertRulesText(JSON.stringify(alertRules?.rules || {}, null, 2))
   }, [alertRules?.rules])
 
-  const invalidateCollectConfigQueries = (instanceId?: number | null) => {
-    queryClient.invalidateQueries({ queryKey: ['unified-collect-configs'] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-    queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-    queryClient.invalidateQueries({ queryKey: ['session-collect-configs'] })
-    queryClient.invalidateQueries({ queryKey: ['slowlog-configs'] })
-    if (instanceId) {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', instanceId] })
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
-    }
+  const closeConfig = () => {
+    setConfigOpen(false)
+    setConfigTarget(null)
   }
-
-  const saveConfig = useMutation({
-    mutationFn: ({ instanceId, values }: { instanceId: number; values: any }) => apiClient.put(`/monitor/native/instances/${instanceId}/collect-configs/`, values).then(r => r.data),
-    onSuccess: (_data, variables) => {
-      invalidateCollectConfigQueries(variables.instanceId)
-      setConfigOpen(false)
-      setConfigTarget(null)
-      msgApi.success('采集配置已保存')
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '保存失败'),
-  })
-  const saveAllConfig = useMutation<BulkCollectConfigResponse, any, any>({
-    mutationFn: (values: any) => apiClient.put<BulkCollectConfigResponse>('/monitor/native/collect-configs/bulk/', values).then(r => r.data),
-    onSuccess: (result) => {
-      invalidateCollectConfigQueries()
-      setConfigOpen(false)
-      setConfigTarget(null)
-      msgApi.success(`已配置 ${result.success}/${result.total} 个实例${result.failed?.length ? `，失败 ${result.failed.length} 个` : ''}`)
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量保存失败'),
-  })
-  const disableAllConfig = useMutation<BulkCollectConfigResponse, any, void>({
-    mutationFn: () => apiClient.put<BulkCollectConfigResponse>('/monitor/native/collect-configs/bulk/', {
-      native: {
-        is_enabled: false,
-        collect_interval: 60,
-        capacity_collect_interval: 3600,
-        retention_days: 30,
-      },
-      session: {
-        is_enabled: false,
-        collect_interval: 60,
-        retention_days: 30,
-      },
-      sql: {
-        is_enabled: false,
-        threshold_ms: 1000,
-        collect_interval: 300,
-        retention_days: 30,
-        collect_limit: 100,
-      },
-    }).then(r => r.data),
-    onSuccess: (result) => {
-      invalidateCollectConfigQueries()
-      msgApi.success(`已关闭 ${result.success}/${result.total} 个实例采集${result.failed?.length ? `，失败 ${result.failed.length} 个` : ''}`)
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '批量关闭失败'),
-  })
-  const collectNow = useMutation({
-    mutationFn: (instanceId: number) => apiClient.post(`/monitor/native/instances/${instanceId}/collect/`).then(r => r.data),
-    onSuccess: (_data, instanceId) => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-trend', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-health', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-top-sql', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-waits', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-capacity-growth', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-engine-detail', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['unified-collect-configs'] })
-      msgApi.success('采集完成')
-    },
-    onError: (e: any) => msgApi.error(e.response?.data?.msg || '采集失败'),
-  })
-  const collectAll = useMutation({
-    mutationFn: async () => {
-      let success = 0
-      const failed: string[] = []
-      for (const item of instances) {
-        try {
-          await apiClient.post(`/monitor/native/instances/${item.instance_id}/collect/`)
-          success += 1
-        } catch (error: any) {
-          failed.push(`${item.instance_name}：${error.response?.data?.msg || '采集失败'}`)
-        }
-      }
-      return { total: instances.length, success, failed }
-    },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-instances'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-detail'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-trend'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-db-capacity'] })
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-table-capacity'] })
-      if (result.failed.length) {
-        msgApi.warning(`已采集 ${result.success}/${result.total} 个实例，${result.failed.length} 个失败`)
-      } else {
-        msgApi.success(`已采集全部 ${result.total} 个实例`)
-      }
-    },
-  })
-  const saveAlertRules = useMutation({
-    mutationFn: async () => {
-      const payload = JSON.parse(alertRulesText || '{}')
-      return apiClient.put(`/monitor/native/instances/${activeId}/alerts/`, payload).then(r => r.data)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['native-monitor-alerts', activeId] })
-      msgApi.success('告警规则已保存')
-    },
-    onError: (e: any) => msgApi.error(e instanceof SyntaxError ? '告警规则 JSON 格式不正确' : e.response?.data?.msg || '保存告警规则失败'),
+  const {
+    saveConfig,
+    saveAllConfig,
+    disableAllConfig,
+    collectNow,
+    collectAll,
+    saveAlertRules,
+  } = useMonitorMutations({
+    activeId,
+    alertRulesText,
+    instances,
+    queryClient,
+    msgApi,
+    closeConfig,
   })
 
   const latest: MonitorSnapshot | null = detail?.latest || active?.latest || null
