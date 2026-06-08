@@ -3,6 +3,7 @@
 """
 
 import logging
+import json
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -38,6 +39,7 @@ from app.schemas.auth import (
     LdapLoginRequest,
     LoginRequest,
     LoginTwoFAVerifyRequest,
+    OAuthExchangeRequest,
     RefreshRequest,
     SmsCodeRequest,
     SmsLoginRequest,
@@ -52,6 +54,7 @@ from app.services.user import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+OAUTH_LOGIN_CODE_TTL_SECONDS = 120
 
 
 def _serialize_current_user(db_user, user: dict) -> dict:
@@ -93,6 +96,14 @@ def _issue_login_tokens(user, *, verified_2fa: bool = False) -> TokenResponse:
             {"sub": str(user.id), "tenant_id": user.tenant_id, "2fa_verified": verified_2fa}
         ),
     )
+
+
+def _oauth_login_code_key(login_code: str) -> str:
+    return f"oauth_login_code:{login_code}"
+
+
+def _create_oauth_login_code() -> str:
+    return uuid.uuid4().hex + uuid.uuid4().hex
 
 
 async def get_redis():
@@ -433,7 +444,7 @@ async def oauth_callback(
 ):
     """
     接收平台 OAuth2 回调，验证 state、换取用户信息，生成 JWT 后重定向到前端。
-    成功：→ {platform_url}/oauth/callback?access_token=...&refresh_token=...
+    成功：→ {platform_url}/oauth/callback?login_code=...
     失败：→ {platform_url}/login?oauth_error=...
     """
     platform_url = (await SystemConfigService.get_value(db, "platform_url")).rstrip("/")
@@ -476,12 +487,48 @@ async def oauth_callback(
     if not user.is_active:
         return _redirect_error("账号已被禁用，请联系管理员")
 
-    payload = {"sub": str(user.id), "username": user.username, "tenant_id": user.tenant_id}
-    access_token = create_access_token(payload)
-    refresh_token = create_refresh_token({"sub": str(user.id), "tenant_id": user.tenant_id})
-
     logger.info("oauth_login: provider=%s username=%s", provider, user.username)
+    login_code = _create_oauth_login_code()
+    await redis.setex(
+        _oauth_login_code_key(login_code),
+        OAUTH_LOGIN_CODE_TTL_SECONDS,
+        json.dumps(
+            {
+                "sub": str(user.id),
+                "username": user.username,
+                "tenant_id": user.tenant_id,
+                "provider": provider,
+            },
+            ensure_ascii=False,
+        ),
+    )
     return RedirectResponse(
-        f"{platform_url}/oauth/callback?access_token={access_token}&refresh_token={refresh_token}&provider={provider}",
+        f"{platform_url}/oauth/callback?login_code={login_code}&provider={provider}",
         status_code=302,
+    )
+
+
+@router.post("/oauth/exchange/", response_model=TokenResponse, summary="交换第三方登录一次性登录码")
+async def exchange_oauth_login_code(data: OAuthExchangeRequest, redis=Depends(get_redis)):
+    raw = await redis.get(_oauth_login_code_key(data.login_code))
+    if not raw:
+        raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
+    await redis.delete(_oauth_login_code_key(data.login_code))
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录") from exc
+
+    user_id = str(payload.get("sub") or "")
+    tenant_id = int(payload.get("tenant_id") or 1)
+    username = str(payload.get("username") or "")
+    if not user_id or not username:
+        raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
+
+    return TokenResponse(
+        access_token=create_access_token(
+            {"sub": user_id, "username": username, "tenant_id": tenant_id}
+        ),
+        refresh_token=create_refresh_token({"sub": user_id, "tenant_id": tenant_id}),
     )

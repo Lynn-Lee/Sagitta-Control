@@ -2,9 +2,11 @@
 Sprint 1 认证与用户服务单元测试。
 """
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.core.security import (
@@ -23,7 +25,20 @@ from app.core.security import (
     validate_password_strength,
     verify_password,
 )
+from app.routers.auth import _oauth_login_code_key, exchange_oauth_login_code
+from app.schemas.auth import OAuthExchangeRequest
 from app.schemas.user import UserCreate
+
+
+class FakeRedis:
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def delete(self, key: str) -> None:
+        self.store.pop(key, None)
 
 
 class TestPasswordHashing:
@@ -72,6 +87,31 @@ class TestJWT:
         token = create_access_token({"sub": "1"})
         decoded = decode_token(token)
         assert "tenant_id" in decoded
+
+    @pytest.mark.asyncio
+    async def test_oauth_login_code_exchange_is_one_time(self):
+        redis = FakeRedis()
+        login_code = "a" * 64
+        redis.store[_oauth_login_code_key(login_code)] = json.dumps({
+            "sub": "42",
+            "username": "oauth_user",
+            "tenant_id": 1,
+            "provider": "oidc",
+        })
+
+        response = await exchange_oauth_login_code(
+            OAuthExchangeRequest(login_code=login_code),
+            redis=redis,
+        )
+        assert response.access_token
+        assert response.refresh_token
+
+        with pytest.raises(HTTPException) as exc:
+            await exchange_oauth_login_code(
+                OAuthExchangeRequest(login_code=login_code),
+                redis=redis,
+            )
+        assert exc.value.status_code == 401
 
 
 class TestFieldEncryption:

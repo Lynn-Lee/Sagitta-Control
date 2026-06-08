@@ -23,6 +23,9 @@ export const authApi = {
   refresh: (refresh_token: string) =>
     apiClient.post<TokenResp>('/auth/token/refresh/', { refresh_token }).then(r => r.data),
 
+  exchangeOAuthLoginCode: (login_code: string) =>
+    apiClient.post<TokenResp>('/auth/oauth/exchange/', { login_code }).then(r => r.data),
+
   logout: () =>
     apiClient.post('/auth/logout/').then(r => r.data),
 

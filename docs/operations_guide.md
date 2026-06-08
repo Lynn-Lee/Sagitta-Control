@@ -445,13 +445,19 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
   --username <admin> --password '<password>'
 ```
 
-也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案和数据字典注册库列表。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
+也可使用 `--token '<access_token>'` 代替用户名密码。默认模式只做非破坏性检查；提供 `--instance-id <id> --db-name <db>` 后，会按 `SQL 工单`、`在线查询`、`观测中心`、`运维工具`、`数据字典` 等验收域输出矩阵，并额外检查 SQL 工单风险预案、在线查询权限排查、查询权限风险预案、数据字典库表列表、实例指标、会话诊断、SQL 洞察和实例参数。输出中的 `SKIP` 不计入通过数，`PROMISED` 表示本轮承诺验收范围，`NOT-PROMISED` 表示未启用的可选动作或缺少实例/表参数导致未验证。真实创建类验收必须显式加 `--submit-workflow`、`--apply-query-privilege`、`--submit-archive`，License 和通知验收分别使用 `--activate-license`、`--refresh-license`、`--notify-user-id <id>`。
+
+客户验证后交付引擎使用 `scripts/customer-engine-validation.py` 生成 JSON/Markdown 归档记录。脚本默认只跑只读链路和风险预案，不会触发库列表同步、SQL 活动采集或工单提交；如需验证这些会写入平台记录的动作，必须显式加 `--sync-databases`、`--collect-sql-activity`、`--submit-workflow-boundary`。正式客户验收可加 `--strict-promised`，让承诺项被跳过时也作为门禁失败处理；如某类引擎只承诺部分场景，可在 target JSON 中配置 `promised_domains`，仅允许 `workflow`、`query`、`observability`、`operations`、`dictionary`。
 
 产品内 `商业交付` → `交付与支持` 页面已沉淀同类非破坏性验收能力，页面顶部会汇总推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、数据库类型分布和监控采集失败数；推广前待处理项可直接跳转到对应配置页，并区分阻塞项与建议补齐项。页面提供 `初始化试用环境`，可幂等创建商业试用资源组、用户组、标准审批流和样例审计记录；如已接入活跃实例，会补充 SQL 工单、查询权限申请、在线查询、归档作业和监控快照演示数据并自动生成验收报告。该流程不会伪造活跃实例或保存真实数据库密码，未接入实例时仍需按客户现场信息完成首个实例配置。页面会自检备份脚本、恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料；容器运行态如果无法直接访问宿主机交付目录，会使用随后端打包的 `commercial_delivery_manifest.json` 作为已验证发布清单兜底。建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。验收报告会输出 `可推广`、`需补配置` 或 `阻塞` 结论；诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
 
 客户现场进入正式推广或客户验收前，先在客户包目录执行 `./prepare-go-live-env.sh --customer-id <customer_id>` 生成生产随机密钥和稳定部署 ID，再完成正式 License、实例、治理、通知和验收报告配置。最后执行 `./go-live-check.sh --api-base-url http://<server>:8000 --frontend-url http://<server>/ --username <admin> --password '<password>'` 作为硬门禁；管理员启用 2FA 时改用 `--token <access_token>`。该脚本会把默认密钥、试用 License、客户 ID 不一致、无活跃实例、实施向导未完成、推广就绪度非 `ready`、监控采集失败和待处理项全部判为失败。
 
-上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。
+上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查
+结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。这些记录只进入
+受控交付系统或客户授权支持渠道；公开仓库、公开 Release、PR 描述和对外材料不得
+包含真实客户 ID、域名、公网 IP、License、token、部署指纹、内部验收记录、数据库
+连接信息或客户现场截图。
 
 当前商业部署版本为 `2.2.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 

@@ -57,6 +57,12 @@ README.md
 - 授权中心后台 token、真实客户 License、真实激活码、真实 `.env`。
 - sourcemap、构建缓存、CI 安全扫描原始报告或内部验收记录。
 - `latest` 镜像标签、源码 `build:` 配置或本地源码挂载路径。
+- 真实客户 ID、真实域名、公网 IP、部署指纹、实例名称、账号、客户现场截图、
+  支持群截图或授权状态流转记录。
+
+公开文档、Release 说明、PR 描述和截图默认使用 `<customer_id>`、`<domain>`、
+`<origin-ip>`、`<fingerprint>` 等占位符。客户案例进入公开材料前必须先改写为
+通用模板，只保留问题类型、排障步骤和可复用结论。
 
 ## 3. 镜像命名
 
@@ -266,7 +272,9 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 - 商业前端镜像不包含 `.map` 文件或 `sourceMappingURL` 引用。
 - 商业 Docker build context 不包含本地虚拟环境、依赖缓存、测试目录、历史发布包、私钥、License 文件或激活材料。
 - Release 目录包含客户包签名、前后端镜像 SBOM 和 SBOM 校验/签名文件。
-- 公开仓库和 Release 包不包含源码、私钥、token、真实 License、sourcemap、本地 `build:` 配置或 `latest` 标签。
+- 公开仓库和 Release 包不包含源码、私钥、token、真实 License、真实客户 ID、
+  真实域名、部署指纹、内部验收记录、sourcemap、本地 `build:` 配置或 `latest`
+  标签。
 
 ## 9. 推荐默认值
 

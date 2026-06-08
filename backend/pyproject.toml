@@ -70,8 +70,8 @@ dependencies = [
     "openpyxl~=3.1",
     "defusedxml~=0.7.1",
 ]
-# 生产部署建议：使用 `uv lock` 或 `pip-compile requirements.in` 生成精确 lock file，
-# 将其提交到版本控制，保证不同时间、不同机器的构建完全一致。
+# 后端 CI 和本地复现使用 `requirements.lock` 固定完整依赖树。
+# 刷新命令见仓库 README；修改依赖声明后必须同步刷新锁文件。
 
 [project.optional-dependencies]
 oracle = [

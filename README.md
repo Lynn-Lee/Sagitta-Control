@@ -134,11 +134,25 @@ SagittaDB/
 
 ```bash
 cd backend
-pip install -e ".[dev]"
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements.lock
+uv pip install --no-deps -e .
 uvicorn app.main:app --reload --port 8000
 alembic upgrade head
 pytest tests/unit/ -v --cov=app --cov-fail-under=35
-ruff format . && ruff check . && mypy app/
+ruff format . && ruff check .
+while IFS= read -r target; do
+  mypy --follow-imports=silent "$target"
+done < mypy-baseline.txt
+```
+
+修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
+
+```bash
+uv pip compile --python-version 3.12 --universal --extra dev \
+  --custom-compile-command 'uv pip compile --python-version 3.12 --universal --extra dev --output-file backend/requirements.lock backend/pyproject.toml' \
+  --output-file backend/requirements.lock backend/pyproject.toml
 ```
 
 前端：
@@ -188,7 +202,9 @@ v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 �
 - 商业 License 使用 Ed25519 签名校验；支持在线激活、联网刷新和离线 challenge-response，生产环境默认禁止旧式裸 License 导入。
 - 商业镜像使用 Ed25519 签名完整性 Manifest 启动校验，镜像和客户包发布流程需完成 cosign 镜像签名与交付包签名。
 - 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线 challenge-response、备份恢复和升级回滚验证。
-- 内部留存客户环境验收和 License-Server-Center 授权状态流转记录；这些记录不作为仓库长期公开文档。
+- 内部留存客户环境验收和 License-Server-Center 授权状态流转记录；公开仓库和
+  Release 说明不得包含真实客户 ID、域名、License、token、部署指纹、内部验收
+  记录或客户现场截图。
 - 合同条款需明确禁止逆向、篡改、绕过授权和二次分发，作为技术保护之外的法务兜底。
 
 公开商业交付仓库方案见 [SagittaDB 公开商业交付说明](docs/public_commercial_delivery.md)。

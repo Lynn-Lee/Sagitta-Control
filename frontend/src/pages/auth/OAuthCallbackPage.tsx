@@ -1,12 +1,12 @@
 /**
  * OAuth2 回调页（/oauth/callback）
- * 后端完成 OAuth 认证后重定向到此页，读取 URL 参数中的 JWT 并完成登录。
+ * 后端完成 OAuth 认证后重定向到此页，使用一次性登录码换取 JWT 并完成登录。
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Spin, Alert } from 'antd'
 import { useAuthStore, type AuthProvider } from '@/store/auth'
-import apiClient from '@/api/client'
+import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
 
 export default function OAuthCallbackPage() {
@@ -16,10 +16,9 @@ export default function OAuthCallbackPage() {
   const [errMsg, setErrMsg] = useState('')
 
   useEffect(() => {
-    const accessToken  = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
-    const oauthError   = searchParams.get('oauth_error')
-    const provider     = searchParams.get('provider') as AuthProvider | null
+    const loginCode  = searchParams.get('login_code')
+    const oauthError = searchParams.get('oauth_error')
+    const provider   = searchParams.get('provider') as AuthProvider | null
 
     if (oauthError) {
       setErrMsg(decodeURIComponent(oauthError))
@@ -27,19 +26,25 @@ export default function OAuthCallbackPage() {
       return
     }
 
-    if (!accessToken || !refreshToken) {
+    if (!loginCode) {
       setErrMsg('登录回调参数缺失，3 秒后返回登录页')
       setTimeout(() => navigate('/login', { replace: true }), 3000)
       return
     }
 
-    apiClient
-      .get('/auth/me/', { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(meRes => {
-        setTokens(accessToken, refreshToken)
+    authApi
+      .exchangeOAuthLoginCode(loginCode)
+      .then(tokens => {
+        if (!tokens.access_token || !tokens.refresh_token) {
+          throw new Error('登录码交换失败')
+        }
+        setTokens(tokens.access_token, tokens.refresh_token)
         setAuthProvider(provider)
-        setUser(meRes.data)
-        navigate(getPostLoginPath(meRes.data.permissions || []), { replace: true })
+        return authApi.me()
+      })
+      .then(meRes => {
+        setUser(meRes)
+        navigate(getPostLoginPath(meRes.permissions || []), { replace: true })
       })
       .catch(() => {
         setErrMsg('获取用户信息失败，3 秒后返回登录页')
