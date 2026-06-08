@@ -103,6 +103,9 @@ jobs:
 
       - name: 设置 uv
         uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/requirements.lock
 
       - name: 校验后端依赖锁
         run: |
@@ -133,9 +136,16 @@ jobs:
           done < mypy-baseline.txt
 
       - name: 后端全量类型审计（存量债追踪）
-        continue-on-error: true
         working-directory: backend
-        run: mypy app
+        shell: bash
+        run: |
+          set +e
+          mypy app
+          status=$?
+          if [[ "$status" -ne 0 ]]; then
+            echo "::notice title=后端全量类型审计::仍存在存量类型问题，当前只将 mypy-baseline.txt 中的已清洁文件作为硬门禁。"
+          fi
+          exit 0
 
       - name: 后端单元测试
         working-directory: backend
