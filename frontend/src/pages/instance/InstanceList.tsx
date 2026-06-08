@@ -263,32 +263,34 @@ export default function InstanceList() {
   const openDbManage = (r: InstanceItem) => { setSelectedInstance(r); setDbModalOpen(true) }
 
   const columns: ColumnsType<InstanceItem> = [
-    { title: 'ID', dataIndex: 'id', width: 55 },
+    { title: 'ID', dataIndex: 'id', width: 64 },
     {
-      title: '实例名称', dataIndex: 'instance_name', width: 210,
+      title: '实例名称', dataIndex: 'instance_name', width: 260,
       render: (v: string, r: InstanceItem) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{v}</Text>
-          <Text type="secondary">{r.host}:{r.port}</Text>
+        <Space direction="vertical" size={0} style={{ maxWidth: 224 }}>
+          <Text strong ellipsis={{ tooltip: v }} style={{ maxWidth: 224 }}>{v}</Text>
+          <Text type="secondary" ellipsis={{ tooltip: `${r.host}:${r.port}` }} style={{ maxWidth: 224 }}>
+            {r.host}:{r.port}
+          </Text>
         </Space>
       ),
     },
     {
-      title: '类型', dataIndex: 'db_type', width: 110,
+      title: '类型', dataIndex: 'db_type', width: 130,
       render: (v: string) => <Tag color={DB_TYPE_COLORS[v] || 'default'}>{formatDbTypeLabel(v)}</Tag>,
     },
     {
-      title: '连接用户', dataIndex: 'user', width: 120,
+      title: '连接用户', dataIndex: 'user', width: 130, ellipsis: true,
       render: (v: string) => v || <Text type="secondary">—</Text>,
     },
-    { title: '默认连接', dataIndex: 'db_name', width: 130,
+    { title: '默认连接', dataIndex: 'db_name', width: 150, ellipsis: true,
       render: (v: string) => v || <Text type="secondary">—</Text> },
     {
-      title: '备注', dataIndex: 'remark', width: 220, ellipsis: true,
+      title: '备注', dataIndex: 'remark', width: 260, ellipsis: true,
       render: (v: string) => v || <Text type="secondary">—</Text>,
     },
     {
-      title: '状态', dataIndex: 'is_active', width: 80,
+      title: '状态', dataIndex: 'is_active', width: 90,
       render: (v: boolean, r: InstanceItem) => (
         <Switch
           size="small"
@@ -318,12 +320,14 @@ export default function InstanceList() {
       },
     },
     {
-      title: '操作', width: 230,
+      title: '操作', width: 300, fixed: 'right',
       render: (_: any, r: InstanceItem) => (
-        <Space size={4}>
-          <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)}>
-            管理数据库
-          </Button>
+        <Space size={6} style={{ whiteSpace: 'nowrap' }}>
+          <Tooltip title="管理数据库">
+            <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<DatabaseOutlined />} disabled={!r.is_active} onClick={() => openDbManage(r)}>
+              数据库
+            </Button>
+          </Tooltip>
           <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>
             编辑
           </Button>
@@ -367,7 +371,7 @@ export default function InstanceList() {
           loading={isLoading}
           locale={{ emptyText: <TableEmptyState title="暂无实例数据" /> }}
           tableLayout="fixed"
-          scroll={{ x: 1080 }}
+          scroll={{ x: 1480 }}
           pagination={getTablePaginationConfig({
             total: data?.total,
             current: page,
