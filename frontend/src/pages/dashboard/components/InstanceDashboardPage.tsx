@@ -48,6 +48,12 @@ export default function InstanceDashboardPage() {
     { title: '已禁用库/Schema数', value: instanceOverview?.cards?.disabled_database_count ?? 0, icon: <StopOutlined />, color: CHART_COLORS.warning },
   ]
 
+  const instanceTypeChartData = buildTopChartData(instanceOverview?.instance_type_distribution, 'count').map(item => ({
+    ...item,
+    label: formatDbTypeLabel(String(item.db_type || '')),
+  }))
+  const instanceTypeChartHeight = Math.max(DASHBOARD_CHART_HEIGHT, instanceTypeChartData.length * 28)
+
   return (
     <div>
       <PageHeader title="实例与库概览" marginBottom={20} />
@@ -85,23 +91,28 @@ export default function InstanceDashboardPage() {
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>
             <Card title="实例类型分布" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
-              {instanceOverview?.instance_type_distribution?.length ? (
-                <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
+              {instanceTypeChartData.length ? (
+                <ResponsiveContainer width="100%" height={instanceTypeChartHeight}>
                   <BarChart
-                    data={buildTopChartData(instanceOverview.instance_type_distribution, 'count').map(item => ({
-                      ...item,
-                      label: formatDbTypeLabel(String(item.db_type || '')),
-                    }))}
+                    data={instanceTypeChartData}
                     layout="vertical"
                     margin={{ top: 5, right: 16, left: 8, bottom: 5 }}
-                    barSize={20}
+                    barSize={18}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
                     <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <YAxis dataKey="label" type="category" width={108} tick={{ fontSize: 11 }} />
+                    <YAxis
+                      dataKey="label"
+                      type="category"
+                      width={118}
+                      interval={0}
+                      minTickGap={0}
+                      tick={{ fontSize: 11 }}
+                      tickMargin={8}
+                    />
                     <Tooltip />
-                    <Bar dataKey="count" name="实例数" radius={[0, 6, 6, 0]} maxBarSize={20}>
-                      {buildTopChartData(instanceOverview.instance_type_distribution, 'count').map((_, index) => (
+                    <Bar dataKey="count" name="实例数" radius={[0, 6, 6, 0]} maxBarSize={18}>
+                      {instanceTypeChartData.map((_, index) => (
                         <Cell key={index} fill={WORKFLOW_TOP_COLORS[index % WORKFLOW_TOP_COLORS.length]} />
                       ))}
                     </Bar>
