@@ -858,6 +858,43 @@ class ArchiveService:
             job.finished_at = datetime.now(UTC)
 
     @staticmethod
+    async def _load_workflow_with_content(db: AsyncSession, workflow_id: int) -> SqlWorkflow | None:
+        result = await db.execute(
+            select(SqlWorkflow)
+            .options(selectinload(SqlWorkflow.content))
+            .where(SqlWorkflow.id == workflow_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def _sync_workflow_execution_result(db: AsyncSession, job: ArchiveJob) -> SqlWorkflow | None:
+        if not job.workflow_id:
+            return None
+        wf = await ArchiveService._load_workflow_with_content(db, job.workflow_id)
+        if not wf:
+            return None
+        if job.status == ArchiveJobStatus.SUCCESS:
+            wf.status = WorkflowStatus.FINISH
+        elif job.status == ArchiveJobStatus.CANCELED:
+            wf.status = WorkflowStatus.ABORT
+        else:
+            wf.status = WorkflowStatus.EXCEPTION
+        wf.finish_time = job.finished_at
+        if wf.content:
+            wf.content.execute_result = json.dumps(
+                {
+                    "mode": wf.execute_mode or "immediate",
+                    "success": job.status == ArchiveJobStatus.SUCCESS,
+                    "status": job.status,
+                    "processed_rows": job.processed_rows,
+                    "current_batch": job.current_batch,
+                    "error": job.error_message,
+                },
+                ensure_ascii=False,
+            )
+        return wf
+
+    @staticmethod
     async def execute_job(db: AsyncSession, job_id: int, operator_id: int) -> None:
         job = await ArchiveService.get_job_obj(db, job_id)
         if job.status not in (ArchiveJobStatus.QUEUED, ArchiveJobStatus.PAUSED):
@@ -898,28 +935,7 @@ class ArchiveService:
             job.error_message = str(exc)
             job.finished_at = datetime.now(UTC)
         finally:
-            if job.workflow_id:
-                wf = await db.get(SqlWorkflow, job.workflow_id)
-                if wf:
-                    if job.status == ArchiveJobStatus.SUCCESS:
-                        wf.status = WorkflowStatus.FINISH
-                    elif job.status == ArchiveJobStatus.CANCELED:
-                        wf.status = WorkflowStatus.ABORT
-                    else:
-                        wf.status = WorkflowStatus.EXCEPTION
-                    wf.finish_time = job.finished_at
-                    if wf.content:
-                        wf.content.execute_result = json.dumps(
-                            {
-                                "mode": wf.execute_mode or "immediate",
-                                "success": job.status == ArchiveJobStatus.SUCCESS,
-                                "status": job.status,
-                                "processed_rows": job.processed_rows,
-                                "current_batch": job.current_batch,
-                                "error": job.error_message,
-                            },
-                            ensure_ascii=False,
-                        )
+            await ArchiveService._sync_workflow_execution_result(db, job)
             await db.commit()
             NotifyService.enqueue_event(
                 {

@@ -123,8 +123,9 @@ async def _run_query_with_permissions(
         db, data.instance_id, data.db_name
     )
     masking_svc = DataMaskingService(rules=active_rules)
-    masked_result = masking_svc.mask_result(resultset, data.sql, inst.db_type)
-    is_masked = masked_result is not resultset
+    masking_apply_result = masking_svc.mask_result_with_meta(resultset, data.sql, inst.db_type)
+    masked_result = masking_apply_result.resultset
+    is_masked = masking_apply_result.masked
     if operation_type == "export" and data.export_limit:
         start = data.export_offset or 0
         masked_result.rows = masked_result.rows[start:start + data.export_limit]
@@ -140,7 +141,7 @@ async def _run_query_with_permissions(
             effect_row=masked_result.affected_rows,
             cost_time_ms=masked_result.cost_time,
             priv_check=passed,
-            hit_rule=False,
+            hit_rule=masking_apply_result.hit_rule,
             masking=is_masked,
             operation_type=operation_type,
             export_format=export_format,

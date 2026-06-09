@@ -111,6 +111,34 @@ class TestDataMaskingService:
         assert phones[0].startswith("138")
         assert phones[0].endswith("78")
 
+    def test_masking_meta_reports_hit_rule_and_actual_masking(self):
+        rules = [{"column_name": "phone", "rule_type": "phone"}]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["id", "phone"],
+            rows=[(1, "13812345678")],
+        )
+
+        result = svc.mask_result_with_meta(rs, "SELECT id, phone FROM users", "mysql")
+
+        assert result.resultset.rows[0][1] == "138****78"
+        assert result.hit_rule is True
+        assert result.masked is True
+
+    def test_masking_meta_distinguishes_rule_hit_from_value_change(self):
+        rules = [{"column_name": "phone", "rule_type": "phone"}]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["phone"],
+            rows=[("not-a-phone",)],
+        )
+
+        result = svc.mask_result_with_meta(rs, "SELECT phone FROM users", "mysql")
+
+        assert result.resultset.rows[0][0] == "not-a-phone"
+        assert result.hit_rule is True
+        assert result.masked is False
+
     def test_email_masking(self):
         rules = [{"column_name": "email", "rule_type": "email"}]
         svc = DataMaskingService(rules=rules)

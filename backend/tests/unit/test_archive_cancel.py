@@ -145,6 +145,63 @@ async def test_archive_execute_permission_can_schedule_job_and_sync_workflow():
 
 
 @pytest.mark.asyncio
+async def test_archive_execute_job_success_syncs_workflow_finish_and_content():
+    finished_at = datetime.now(UTC)
+    job = SimpleNamespace(
+        id=13,
+        status=ArchiveJobStatus.QUEUED,
+        archive_mode="purge",
+        workflow_id=42,
+        source_instance_id=8,
+        source_db="testdb",
+        source_table="orders",
+        created_by_id=7,
+        created_by="liuyang",
+        started_at=None,
+        finished_at=None,
+        processed_rows=0,
+        current_batch=0,
+        error_message="",
+    )
+    content = SimpleNamespace(execute_result="")
+    wf = SimpleNamespace(
+        id=42,
+        status=WorkflowStatus.QUEUING,
+        execute_mode="immediate",
+        finish_time=None,
+        content=content,
+    )
+    workflow_result = MagicMock()
+    workflow_result.scalar_one_or_none.return_value = wf
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=wf),
+        execute=AsyncMock(return_value=workflow_result),
+        commit=AsyncMock(),
+    )
+
+    async def finish_job(_db, archive_job):
+        archive_job.status = ArchiveJobStatus.SUCCESS
+        archive_job.finished_at = finished_at
+        archive_job.processed_rows = 3
+        archive_job.current_batch = 1
+        await _db.commit()
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._execute_purge_job",
+        side_effect=finish_job,
+    ), patch("app.services.notify.NotifyService.enqueue_event"):
+        await ArchiveService.execute_job(db, 13, 2)
+
+    assert wf.status == WorkflowStatus.FINISH
+    assert wf.finish_time == finished_at
+    execute_result = json.loads(content.execute_result)
+    assert execute_result["success"] is True
+    assert execute_result["status"] == ArchiveJobStatus.SUCCESS
+    assert execute_result["processed_rows"] == 3
+    assert execute_result["current_batch"] == 1
+
+
+@pytest.mark.asyncio
 async def test_archive_job_visible_to_current_manager_approver():
     job = SimpleNamespace(
         id=13,

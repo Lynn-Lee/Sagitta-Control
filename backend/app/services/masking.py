@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from typing import Any
 
@@ -37,6 +38,15 @@ DIALECT_MAP: dict[str, str] = {
     "redis":         "mysql",
     "cassandra":     "mysql",
 }
+
+
+@dataclass(frozen=True)
+class MaskingApplyResult:
+    """脱敏执行结果及元信息。"""
+
+    resultset: ResultSet
+    hit_rule: bool
+    masked: bool
 
 
 def extract_select_columns(sql: str, db_type: str) -> list[dict[str, Any]]:
@@ -185,8 +195,17 @@ class DataMaskingService:
         sql: str,
         db_type: str,
     ) -> ResultSet:
+        """对查询结果集应用脱敏规则，兼容旧调用方仅返回结果集的行为。"""
+        return self.mask_result_with_meta(resultset, sql, db_type).resultset
+
+    def mask_result_with_meta(
+        self,
+        resultset: ResultSet,
+        sql: str,
+        db_type: str,
+    ) -> MaskingApplyResult:
         """
-        对查询结果集应用脱敏规则。
+        对查询结果集应用脱敏规则，并返回规则命中与实际脱敏元信息。
         
         工作流程：
           1. sqlglot 解析 SQL，提取列引用（替代 goInception）
@@ -194,7 +213,7 @@ class DataMaskingService:
           3. 对匹配到规则的列的每一行数据执行脱敏
         """
         if not self.rules or not resultset.rows:
-            return resultset
+            return MaskingApplyResult(resultset=resultset, hit_rule=False, masked=False)
 
         # 提取列引用（sqlglot，支持所有方言）
         col_refs = extract_select_columns(sql, db_type)
@@ -222,18 +241,27 @@ class DataMaskingService:
                     break
 
         if not mask_cols:
-            return resultset
+            return MaskingApplyResult(resultset=resultset, hit_rule=False, masked=False)
 
         # 执行脱敏
         masked_rows = []
+        masked = False
         for row in resultset.rows:
             row_list = list(row.values()) if isinstance(row, dict) else list(row)
 
             for col_idx, rule in mask_cols.items():
                 if col_idx < len(row_list):
-                    row_list[col_idx] = self._apply_rule(str(row_list[col_idx]), rule)
+                    original_value = str(row_list[col_idx])
+                    masked_value = self._apply_rule(original_value, rule)
+                    if masked_value != original_value:
+                        masked = True
+                    row_list[col_idx] = masked_value
 
             masked_rows.append(tuple(row_list))
 
         resultset.rows = masked_rows
-        return resultset
+        return MaskingApplyResult(
+            resultset=resultset,
+            hit_rule=True,
+            masked=masked,
+        )
