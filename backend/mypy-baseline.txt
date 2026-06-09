@@ -41,6 +41,7 @@ app/schemas/role.py
 app/schemas/slowlog.py
 app/schemas/user.py
 app/services/__init__.py
+app/services/dashboard.py
 app/services/ldap_auth.py
 app/services/oauth_auth.py
 app/services/risk_plan.py

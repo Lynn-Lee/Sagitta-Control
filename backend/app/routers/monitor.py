@@ -22,7 +22,8 @@ from app.schemas.monitor import (
     NativeMonitorConfigUpsert,
     UnifiedCollectConfigUpsert,
 )
-from app.services.monitor import DashboardService, MonitorService
+from app.services.dashboard import DashboardService
+from app.services.monitor import MonitorService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
