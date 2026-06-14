@@ -1,3 +1,12 @@
+import type { ReactNode } from 'react'
+
+export type DashboardStatCard = {
+  title: string
+  value: number
+  icon: ReactNode
+  color: string
+}
+
 export type OverviewResponse = {
   scope?: { label?: string }
   cards?: Record<string, number>

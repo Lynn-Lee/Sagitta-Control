@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Button, Card, Form, Input, InputNumber, Modal, Popconfirm,
+  Button, Form, Input, InputNumber, Modal, Popconfirm,
   Select, Space, Table, Tabs, Tag, Tooltip, Typography, message, Switch, Alert, Grid,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { instanceApi, type InstanceItem } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { DB_TYPES, formatDbTypeLabel, getEngineSupport, isExperimentalDbType } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -351,6 +352,7 @@ export default function InstanceList() {
       {msgCtx}
       <PageHeader
         title="实例管理"
+        description="统一维护数据库连接、引擎类型、默认库和可观测采集入口，支撑查询、工单、字典和审计等核心流程。"
         actions={(
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
           style={isMobile ? { width: '100%' } : undefined}>
@@ -359,17 +361,17 @@ export default function InstanceList() {
         )}
       />
 
-      <FilterCard>
+      <FilterCard title="筛选实例">
         <Input.Search placeholder="搜索实例名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
           enterButton={<><SearchOutlined />搜索</>}
           onSearch={(value) => { setSearch(value); setPage(1) }}
           onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+      <SectionCard title="实例列表" extra={<Text type="secondary">共 {data?.total ?? 0} 个实例</Text>} bodyPadding={0} marginBottom={0}>
         <Table dataSource={data?.items} columns={columns} rowKey="id"
           loading={isLoading}
-          locale={{ emptyText: <TableEmptyState title="暂无实例数据" /> }}
+          locale={{ emptyText: <TableEmptyState title="暂无实例数据" tone={search ? 'filter' : 'setup'} /> }}
           tableLayout="fixed"
           scroll={{ x: 1480 }}
           pagination={getTablePaginationConfig({
@@ -382,7 +384,7 @@ export default function InstanceList() {
               setPageSize(nextPageSize)
             },
           })} />
-      </Card>
+      </SectionCard>
 
       {/* 新建/编辑实例 Modal */}
       <Modal title={editRecord ? '编辑实例' : '新建实例'} open={modalOpen}

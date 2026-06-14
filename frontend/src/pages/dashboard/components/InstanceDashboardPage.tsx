@@ -1,4 +1,4 @@
-import { Card, Col, Row, Statistic, Typography } from 'antd'
+import { Card, Col, Row, Typography } from 'antd'
 import {
   AppstoreOutlined,
   CheckCircleOutlined,
@@ -21,16 +21,22 @@ import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
+import ChartCard from './ChartCard'
+import DashboardIntro from './DashboardIntro'
 import EmptyChart from './EmptyChart'
+import MetricCard from './MetricCard'
 import {
   buildTopChartData,
+  DASHBOARD_AXIS_TICK_STYLE,
+  DASHBOARD_BAR_CHART_MARGIN,
   CHART_COLORS,
-  DASHBOARD_CARD_STYLE,
   DASHBOARD_CHART_HEIGHT,
   DASHBOARD_GRID_STROKE,
+  DASHBOARD_PANEL_STYLE,
+  DASHBOARD_TOOLTIP_STYLE,
   WORKFLOW_TOP_COLORS,
 } from '../helpers'
-import type { InstanceOverviewResponse } from '../types'
+import type { DashboardStatCard, InstanceOverviewResponse } from '../types'
 
 const { Text } = Typography
 
@@ -41,7 +47,7 @@ export default function InstanceDashboardPage() {
     refetchInterval: 60000,
   })
 
-  const instanceCards = [
+  const instanceCards: DashboardStatCard[] = [
     { title: '可见实例数', value: instanceOverview?.cards?.visible_instance_count ?? 0, icon: <DatabaseOutlined />, color: CHART_COLORS.primary },
     { title: '已同步库/Schema数', value: instanceOverview?.cards?.synced_database_count ?? 0, icon: <AppstoreOutlined />, color: CHART_COLORS.primary },
     { title: '已启用库/Schema数', value: instanceOverview?.cards?.enabled_database_count ?? 0, icon: <CheckCircleOutlined />, color: CHART_COLORS.success },
@@ -60,57 +66,48 @@ export default function InstanceDashboardPage() {
 
       <Card
         title="实例与库概览"
-        style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginTop: 20 }}
+        style={{ ...DASHBOARD_PANEL_STYLE, marginTop: 20 }}
         extra={
           <Text type="secondary">
             {instanceOverview?.scope?.label || '可见资源范围'}
           </Text>
         }
       >
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">
-            统计当前用户权限范围内可见的实例，以及已同步到平台的库/Schema 数量；库/Schema 按已启用和已禁用分别汇总。
-          </Text>
-        </div>
+        <DashboardIntro>
+          统计当前用户权限范围内可见的实例，以及已同步到平台的库/Schema 数量；库/Schema 按已启用和已禁用分别汇总。
+        </DashboardIntro>
 
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           {instanceCards.map(card => (
             <Col key={card.title} xs={24} sm={12} lg={12} xl={6}>
-              <Card style={DASHBOARD_CARD_STYLE} styles={{ body: { padding: '16px 18px' } }}>
-                <Statistic
-                  title={card.title}
-                  value={card.value}
-                  prefix={<span style={{ color: card.color, marginRight: 4 }}>{card.icon}</span>}
-                  valueStyle={{ color: card.color, fontWeight: 600 }}
-                />
-              </Card>
+              <MetricCard {...card} />
             </Col>
           ))}
         </Row>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>
-            <Card title="实例类型分布" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <ChartCard title="实例类型分布">
               {instanceTypeChartData.length ? (
                 <ResponsiveContainer width="100%" height={instanceTypeChartHeight}>
                   <BarChart
                     data={instanceTypeChartData}
                     layout="vertical"
-                    margin={{ top: 5, right: 16, left: 8, bottom: 5 }}
+                    margin={DASHBOARD_BAR_CHART_MARGIN}
                     barSize={18}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <XAxis type="number" tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
                     <YAxis
                       dataKey="label"
                       type="category"
                       width={118}
                       interval={0}
                       minTickGap={0}
-                      tick={{ fontSize: 11 }}
+                      tick={DASHBOARD_AXIS_TICK_STYLE}
                       tickMargin={8}
                     />
-                    <Tooltip />
+                    <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
                     <Bar dataKey="count" name="实例数" radius={[0, 6, 6, 0]} maxBarSize={18}>
                       {instanceTypeChartData.map((_, index) => (
                         <Cell key={index} fill={WORKFLOW_TOP_COLORS[index % WORKFLOW_TOP_COLORS.length]} />
@@ -119,26 +116,26 @@ export default function InstanceDashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="暂无实例分布数据" />
+                <EmptyChart text="暂无实例分布数据" hint="同步实例后会显示数据库类型构成。" />
               )}
-            </Card>
+            </ChartCard>
           </Col>
           <Col xs={24} lg={10}>
             <Row gutter={[16, 16]}>
               <Col span={24}>
-                <Card title="实例状态分布" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+                <ChartCard title="实例状态分布">
                   {instanceOverview?.instance_status_distribution?.length ? (
                     <ResponsiveContainer width="100%" height={140}>
                       <BarChart
                         data={buildTopChartData(instanceOverview.instance_status_distribution, 'count')}
                         layout="vertical"
-                        margin={{ top: 5, right: 16, left: 8, bottom: 5 }}
+                        margin={DASHBOARD_BAR_CHART_MARGIN}
                         barSize={20}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                        <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <YAxis dataKey="label" type="category" width={92} tick={{ fontSize: 11 }} />
-                        <Tooltip />
+                        <XAxis type="number" tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                        <YAxis dataKey="label" type="category" width={92} tick={DASHBOARD_AXIS_TICK_STYLE} />
+                        <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
                         <Bar dataKey="count" name="实例数" radius={[0, 6, 6, 0]} maxBarSize={20}>
                           {buildTopChartData(instanceOverview.instance_status_distribution, 'count').map((item, index) => (
                             <Cell
@@ -150,24 +147,24 @@ export default function InstanceDashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <EmptyChart text="暂无实例状态数据" />
+                    <EmptyChart text="暂无实例状态数据" hint="启用或禁用实例后会展示状态占比。" height={140} />
                   )}
-                </Card>
+                </ChartCard>
               </Col>
               <Col span={24}>
-                <Card title="库/Schema 状态分布" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+                <ChartCard title="库/Schema 状态分布">
                   {instanceOverview?.database_status_distribution?.length ? (
                     <ResponsiveContainer width="100%" height={140}>
                       <BarChart
                         data={buildTopChartData(instanceOverview.database_status_distribution, 'count')}
                         layout="vertical"
-                        margin={{ top: 5, right: 16, left: 8, bottom: 5 }}
+                        margin={DASHBOARD_BAR_CHART_MARGIN}
                         barSize={20}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                        <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <YAxis dataKey="label" type="category" width={108} tick={{ fontSize: 11 }} />
-                        <Tooltip />
+                        <XAxis type="number" tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                        <YAxis dataKey="label" type="category" width={108} tick={DASHBOARD_AXIS_TICK_STYLE} />
+                        <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
                         <Bar dataKey="count" name="数量" radius={[0, 6, 6, 0]} maxBarSize={20}>
                           {buildTopChartData(instanceOverview.database_status_distribution, 'count').map((item, index) => (
                             <Cell
@@ -179,9 +176,9 @@ export default function InstanceDashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <EmptyChart text="暂无库/Schema 状态数据" />
+                    <EmptyChart text="暂无库/Schema 状态数据" hint="同步库/Schema 后会展示启停状态。" height={140} />
                   )}
-                </Card>
+                </ChartCard>
               </Col>
             </Row>
           </Col>

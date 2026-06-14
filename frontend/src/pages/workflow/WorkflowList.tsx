@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Button, Card, DatePicker, Input, InputNumber, Select,
+  Button, DatePicker, Input, Select,
   Popconfirm, Space, Table, Tabs, Tag, Typography, Tooltip, Grid, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -11,6 +11,7 @@ import { workflowApi } from '@/api/workflow'
 import { instanceApi } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
@@ -306,6 +307,7 @@ export default function WorkflowList() {
     activeTab === 'audit' ? '申请人' : '提交人'
 
   const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
+  const hasActiveFilters = Boolean(search || statusFilter !== undefined || instanceFilter || engineerFilter || dbNameFilter || dateRange)
 
   return (
     <div>
@@ -313,6 +315,7 @@ export default function WorkflowList() {
       <PageHeader
         title="SQL 工单"
         meta={`共 ${data?.total ?? 0} 个`}
+        description="集中处理 SQL 变更、审批、执行和归档类工单，保持风险、审批链路和执行状态可追踪。"
         actions={(
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/workflow/submit')}
           style={isMobile ? { width: '100%' } : undefined}>
@@ -322,7 +325,7 @@ export default function WorkflowList() {
       />
 
       {/* 查询条件 */}
-      <FilterCard>
+      <FilterCard title="筛选工单">
         <Tabs
           activeKey={activeTab}
           onChange={(key) => {
@@ -406,15 +409,13 @@ export default function WorkflowList() {
         </Space>
       </FilterCard>
 
-      <Card
-        style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-      >
+      <SectionCard title="工单列表" extra={<Text type="secondary">{scopePreview?.scope?.label || '按当前权限范围展示'}</Text>} bodyPadding={0} marginBottom={0}>
         <Table
           dataSource={data?.items}
           columns={columns}
           rowKey="id"
           loading={isLoading}
-          locale={{ emptyText: <TableEmptyState title="暂无工单数据" /> }}
+          locale={{ emptyText: <TableEmptyState title="暂无工单数据" tone={hasActiveFilters ? 'filter' : 'default'} /> }}
           tableLayout="fixed"
           scroll={{ x: activeTab === 'audit' || activeTab === 'scope' ? 1920 : activeTab === 'execute' ? 1850 : 1780 }}
           pagination={getTablePaginationConfig({
@@ -428,7 +429,7 @@ export default function WorkflowList() {
             },
           })}
         />
-      </Card>
+      </SectionCard>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Button, Card, DatePicker, Input, Select, Space, Table, Tag, Typography, Grid } from 'antd'
+import { Button, DatePicker, Input, Select, Space, Table, Tag, Typography, Grid } from 'antd'
 import { ClearOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import apiClient from '@/api/client'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
@@ -53,6 +54,7 @@ export default function AuditLog() {
   }
 
   const filterWidth = (desktopWidth: number) => (isMobile ? '100%' : desktopWidth)
+  const hasActiveFilters = Boolean(username || module || action || result || dateRange)
 
   const columns = [
     {
@@ -85,9 +87,13 @@ export default function AuditLog() {
 
   return (
     <div>
-      <PageHeader title="审计日志" meta={`共 ${data?.total ?? 0} 条`} />
+      <PageHeader
+        title="审计日志"
+        meta={`共 ${data?.total ?? 0} 条`}
+        description="集中查看账号、工单、查询、实例和系统配置操作，保留关键审计线索。"
+      />
 
-      <FilterCard>
+      <FilterCard title="筛选审计事件">
         <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
           <Input placeholder="操作人" allowClear style={{ width: filterWidth(120) }}
             value={username} onChange={e => { setUsername(e.target.value); setPage(1) }} />
@@ -111,13 +117,13 @@ export default function AuditLog() {
         </Space>
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+      <SectionCard title="审计事件" extra={<Text type="secondary">最近操作优先</Text>} bodyPadding={0} marginBottom={0}>
         <Table
           dataSource={data?.items}
           columns={columns}
           rowKey="id"
           loading={isLoading}
-          locale={{ emptyText: <TableEmptyState title="暂无审计日志" /> }}
+          locale={{ emptyText: <TableEmptyState title="暂无审计日志" tone={hasActiveFilters ? 'filter' : 'default'} /> }}
           size="small"
           tableLayout="fixed"
           scroll={{ x: 1100 }}
@@ -130,7 +136,7 @@ export default function AuditLog() {
             },
           })}
         />
-      </Card>
+      </SectionCard>
     </div>
   )
 }

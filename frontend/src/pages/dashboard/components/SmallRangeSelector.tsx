@@ -1,5 +1,7 @@
 import { InputNumber, Select, Space, Typography } from 'antd'
 
+import { CHART_COLORS } from '../helpers'
+
 import { clampRangeDays, RANGE_OPTIONS } from '../helpers'
 
 const { Text } = Typography
@@ -24,8 +26,19 @@ export default function SmallRangeSelector({
     : [{ label: `${days}天`, value: days }, ...presetOptions]
 
   return (
-    <Space className="overview-range" wrap align="center">
-      <Text type="secondary">
+    <Space
+      className="overview-range"
+      wrap
+      align="center"
+      size={8}
+      style={{
+        padding: '6px 8px',
+        borderRadius: 10,
+        border: '1px solid rgba(22,93,255,0.12)',
+        background: 'rgba(22,93,255,0.035)',
+      }}
+    >
+      <Text type="secondary" style={{ fontSize: 12 }}>
         {scopeLabel || '我的数据'}
       </Text>
       <Select
@@ -33,13 +46,14 @@ export default function SmallRangeSelector({
         value={days}
         options={options}
         popupClassName="overview-range-select-popup"
+        style={{ width: 84 }}
         onChange={value => {
           const nextDays = clampRangeDays(Number(value))
           setDays(nextDays)
           setDaysInput(nextDays)
         }}
       />
-      <Text type="secondary">
+      <Text type="secondary" style={{ fontSize: 12, color: CHART_COLORS.gray }}>
         自定义
       </Text>
       <InputNumber

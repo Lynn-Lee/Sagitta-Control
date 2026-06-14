@@ -41,7 +41,7 @@ const antTheme = {
     colorInfo:      '#165DFF',
 
     // 背景
-    colorBgLayout:    '#F2F3F5',
+    colorBgLayout:    '#F6F8FB',
     colorBgContainer: '#FFFFFF',
     colorBgElevated:  '#FFFFFF',
 
@@ -62,10 +62,10 @@ const antTheme = {
     borderRadiusSM: 4,
     borderRadiusXS: 3,
 
-    // 无阴影
-    boxShadow:          'none',
-    boxShadowSecondary: 'none',
-    boxShadowTertiary:  'none',
+    // 阴影：保持克制，但让浮层与卡片有清晰层级
+    boxShadow:          '0 10px 30px rgba(15, 23, 42, 0.08)',
+    boxShadowSecondary: '0 8px 24px rgba(15, 23, 42, 0.08)',
+    boxShadowTertiary:  '0 4px 14px rgba(15, 23, 42, 0.06)',
 
     // 间距
     padding:   16,
@@ -92,7 +92,7 @@ const antTheme = {
       headerColor:   '#FFFFFF',
       headerHeight:  56,
       siderBg:       '#FFFFFF',
-      bodyBg:        '#F2F3F5',
+      bodyBg:        '#F6F8FB',
       triggerBg:     '#F2F3F5',
       triggerColor:  '#4E5969',
     },
@@ -106,9 +106,9 @@ const antTheme = {
     },
     Table: {
       borderColor:        '#E5E6EB',
-      headerBg:           '#F7F8FA',
+      headerBg:           '#F8FAFC',
       headerColor:        '#4E5969',
-      rowHoverBg:         '#EEF3FF',
+      rowHoverBg:         '#F3F7FF',
       cellPaddingBlock:   10,
       cellPaddingInline:  14,
       fontSize:           13,
@@ -125,9 +125,12 @@ const antTheme = {
       paddingInlineLG: 14,
     },
     Card: {
-      boxShadow:    'none',
+      boxShadow:    '0 10px 30px rgba(15, 23, 42, 0.05)',
       borderRadius: 8,
       paddingLG:    20,
+    },
+    Dropdown: {
+      paddingBlock: 6,
     },
     Tabs: {
       itemSelectedColor: '#165DFF',

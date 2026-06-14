@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Card, Col, Row, Statistic, Typography } from 'antd'
+import { Card, Col, Row } from 'antd'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -29,20 +29,26 @@ import {
 import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 
+import ChartCard from './ChartCard'
+import DashboardIntro from './DashboardIntro'
 import EmptyChart from './EmptyChart'
+import MetricCard from './MetricCard'
 import SmallRangeSelector from './SmallRangeSelector'
 import {
   buildTopChartData,
+  DASHBOARD_AXIS_TICK_STYLE,
+  DASHBOARD_BAR_CHART_MARGIN,
   CHART_COLORS,
-  DASHBOARD_CARD_STYLE,
+  DASHBOARD_CHART_MARGIN,
   DASHBOARD_CHART_HEIGHT,
   DASHBOARD_GRID_STROKE,
+  DASHBOARD_LEGEND_PROPS,
+  DASHBOARD_PANEL_STYLE,
+  DASHBOARD_TOOLTIP_STYLE,
   QUERY_GOVERNANCE_COLORS,
   TOP_USER_COLORS,
 } from '../helpers'
-import type { OverviewResponse } from '../types'
-
-const { Text } = Typography
+import type { DashboardStatCard, OverviewResponse } from '../types'
 
 export default function QueryDashboardPage() {
   const [queryDays, setQueryDays] = useState<number>(7)
@@ -70,7 +76,7 @@ export default function QueryDashboardPage() {
     }))
   }, [queryOverview])
 
-  const queryCards = [
+  const queryCards: DashboardStatCard[] = [
     { title: `${queryRangeLabel}查询次数`, value: queryOverview?.cards?.period_query_count ?? 0, icon: <SearchOutlined />, color: CHART_COLORS.primary },
     { title: `${queryRangeLabel}查询用户数`, value: queryOverview?.cards?.period_query_user_count ?? 0, icon: <FileTextOutlined />, color: CHART_COLORS.purple },
     { title: `${queryRangeLabel}治理失败次数`, value: queryOverview?.cards?.period_failure_count ?? 0, icon: <CloseCircleOutlined />, color: CHART_COLORS.error },
@@ -89,7 +95,7 @@ export default function QueryDashboardPage() {
 
       <Card
         title="在线查询概览"
-        style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', marginBottom: 20 }}
+        style={{ ...DASHBOARD_PANEL_STYLE, marginBottom: 20 }}
         extra={
           <SmallRangeSelector
             days={queryDays}
@@ -100,55 +106,46 @@ export default function QueryDashboardPage() {
           />
         }
       >
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">
-            统计按当前用户可见的查询业务范围聚合；治理失败次数包含查询执行失败，以及查询权限申请/审批失败。
-          </Text>
-        </div>
+        <DashboardIntro>
+          统计按当前用户可见的查询业务范围聚合；治理失败次数包含查询执行失败，以及查询权限申请/审批失败。
+        </DashboardIntro>
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           {queryCards.map(card => (
             <Col key={card.title} xs={24} sm={12} lg={8} xl={6}>
-              <Card style={DASHBOARD_CARD_STYLE} styles={{ body: { padding: '16px 18px' } }}>
-                <Statistic
-                  title={card.title}
-                  value={card.value}
-                  prefix={<span style={{ color: card.color, marginRight: 4 }}>{card.icon}</span>}
-                  valueStyle={{ color: card.color, fontWeight: 600 }}
-                />
-              </Card>
+              <MetricCard {...card} />
             </Col>
           ))}
         </Row>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={16}>
-            <Card title="查询趋势" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <ChartCard title="查询趋势">
               {queryTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
-                  <LineChart data={queryTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <LineChart data={queryTrendData} margin={DASHBOARD_CHART_MARGIN}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Legend />
+                    <XAxis dataKey="date" tick={DASHBOARD_AXIS_TICK_STYLE} />
+                    <YAxis tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                    <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
+                    <Legend {...DASHBOARD_LEGEND_PROPS} />
                     <Line type="monotone" dataKey="query_count" stroke={CHART_COLORS.primary} name="查询次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="query_user_count" stroke={CHART_COLORS.purple} name="查询用户数" strokeWidth={2} dot={{ r: 2 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="暂无在线查询数据" />
+                <EmptyChart text="暂无在线查询数据" hint="调整时间范围或等待查询记录写入后再查看。" />
               )}
-            </Card>
+            </ChartCard>
           </Col>
           <Col xs={24} lg={8}>
-            <Card title="查询用户 Top 10" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <ChartCard title="查询用户 Top 10">
               {queryOverview?.top_users?.length ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
-                  <BarChart data={buildTopChartData(queryOverview.top_users, 'query_count')} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }} barSize={18}>
+                  <BarChart data={buildTopChartData(queryOverview.top_users, 'query_count')} layout="vertical" margin={DASHBOARD_BAR_CHART_MARGIN} barSize={18}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <YAxis dataKey="display_name" type="category" width={72} tick={{ fontSize: 11 }} />
-                    <Tooltip />
+                    <XAxis type="number" tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                    <YAxis dataKey="display_name" type="category" width={72} tick={DASHBOARD_AXIS_TICK_STYLE} />
+                    <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
                     <Bar dataKey="query_count" name="查询次数" radius={[0, 6, 6, 0]} maxBarSize={18}>
                       {buildTopChartData(queryOverview.top_users, 'query_count').map((_, index) => (
                         <Cell key={index} fill={TOP_USER_COLORS[index % TOP_USER_COLORS.length]} />
@@ -157,23 +154,23 @@ export default function QueryDashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="暂无排行数据" />
+                <EmptyChart text="暂无排行数据" hint="产生查询记录后会显示高频用户。" />
               )}
-            </Card>
+            </ChartCard>
           </Col>
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={24} lg={16}>
-            <Card title="治理趋势" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <ChartCard title="治理趋势">
               {queryTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
-                  <LineChart data={queryTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <LineChart data={queryTrendData} margin={DASHBOARD_CHART_MARGIN}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Legend />
+                    <XAxis dataKey="date" tick={DASHBOARD_AXIS_TICK_STYLE} />
+                    <YAxis tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                    <Tooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
+                    <Legend {...DASHBOARD_LEGEND_PROPS} />
                     <Line type="monotone" dataKey="failure_count" stroke={QUERY_GOVERNANCE_COLORS.failure} name="治理失败次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="masked_count" stroke={QUERY_GOVERNANCE_COLORS.masked} name="命中脱敏次数" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="approved_count" stroke={QUERY_GOVERNANCE_COLORS.approved} name="已通过申请数" strokeWidth={2} dot={{ r: 2 }} />
@@ -182,20 +179,20 @@ export default function QueryDashboardPage() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="暂无治理趋势数据" />
+                <EmptyChart text="暂无治理趋势数据" hint="有审批或脱敏命中后会形成趋势。" />
               )}
-            </Card>
+            </ChartCard>
           </Col>
           <Col xs={24} lg={8}>
-            <Card title="待审批库存趋势" style={DASHBOARD_CARD_STYLE} styles={{ body: { paddingTop: 12 } }}>
+            <ChartCard title="待审批库存趋势">
               {queryTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={DASHBOARD_CHART_HEIGHT}>
-                  <AreaChart data={queryTrendData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                  <AreaChart data={queryTrendData} margin={DASHBOARD_CHART_MARGIN}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DASHBOARD_GRID_STROKE} />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip formatter={pendingStockTooltipFormatter} />
-                    <Legend />
+                    <XAxis dataKey="date" tick={DASHBOARD_AXIS_TICK_STYLE} />
+                    <YAxis tick={DASHBOARD_AXIS_TICK_STYLE} allowDecimals={false} />
+                    <Tooltip formatter={pendingStockTooltipFormatter} contentStyle={DASHBOARD_TOOLTIP_STYLE} />
+                    <Legend {...DASHBOARD_LEGEND_PROPS} />
                     <Area
                       type="monotone"
                       dataKey="pending_stock_count"
@@ -210,9 +207,9 @@ export default function QueryDashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyChart text="暂无待审批库存数据" />
+                <EmptyChart text="暂无待审批库存数据" hint="有待审批申请后会显示库存变化。" />
               )}
-            </Card>
+            </ChartCard>
           </Col>
         </Row>
       </Card>

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 export const RANGE_OPTIONS = [7, 14, 30, 60]
 
 export const clampRangeDays = (value: number) => Math.min(365, Math.max(1, Number.isFinite(value) ? value : 1))
@@ -5,6 +7,26 @@ export const clampRangeDays = (value: number) => Math.min(365, Math.max(1, Numbe
 export const DASHBOARD_CHART_HEIGHT = 300
 export const DASHBOARD_GRID_STROKE = 'rgba(0,0,0,0.06)'
 export const DASHBOARD_CARD_STYLE = { borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }
+export const DASHBOARD_PANEL_STYLE: CSSProperties = {
+  ...DASHBOARD_CARD_STYLE,
+  boxShadow: '0 10px 28px rgba(22,93,255,0.04)',
+}
+export const DASHBOARD_METRIC_CARD_BODY_STYLE: CSSProperties = { padding: '12px 14px' }
+export const DASHBOARD_CHART_CARD_BODY_STYLE: CSSProperties = { paddingTop: 14 }
+export const DASHBOARD_CHART_MARGIN = { top: 8, right: 20, left: 0, bottom: 8 }
+export const DASHBOARD_BAR_CHART_MARGIN = { top: 8, right: 18, left: 8, bottom: 8 }
+export const DASHBOARD_AXIS_TICK_STYLE = { fontSize: 11, fill: '#4E5969' }
+export const DASHBOARD_LEGEND_PROPS = {
+  verticalAlign: 'top' as const,
+  align: 'right' as const,
+  iconType: 'circle' as const,
+  wrapperStyle: { paddingBottom: 8, fontSize: 12 },
+}
+export const DASHBOARD_TOOLTIP_STYLE = {
+  borderRadius: 8,
+  border: '1px solid rgba(0,0,0,0.08)',
+  boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+}
 
 export const CHART_COLORS = {
   primary: '#165DFF',

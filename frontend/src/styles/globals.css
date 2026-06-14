@@ -45,6 +45,8 @@
   --border-default:       #E5E6EB;
   --border-strong:        #C9CDD4;
   --border-blue:          rgba(22, 93, 255, 0.15);
+  --border-soft:          rgba(15, 23, 42, 0.08);
+  --border-subtle:        rgba(15, 23, 42, 0.05);
 
   /* ── 字体 ──────────────────────────────────────────────────*/
   --font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont,
@@ -62,6 +64,7 @@
   /* ── 阴影（极轻） ──────────────────────────────────────────*/
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.05);
   --glow:      0 0 0 3px rgba(22, 93, 255, 0.12);
 
   /* ── 过渡 ──────────────────────────────────────────────────*/
@@ -85,7 +88,9 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg-page);
+  background:
+    linear-gradient(180deg, #F7F9FC 0%, var(--bg-page) 320px),
+    var(--bg-page);
   color: var(--text-primary);
   line-height: 1.6;
   overflow-x: hidden;
@@ -104,10 +109,152 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 
 /* 让 Card 过渡更平滑 */
 .ant-card {
-  transition: border-color var(--transition), box-shadow var(--transition);
+  border-color: var(--border-soft);
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 .ant-card:hover {
   border-color: var(--border-blue) !important;
+}
+
+.ant-card-head {
+  min-height: 48px !important;
+  border-bottom-color: var(--border-subtle) !important;
+}
+
+.ant-card-head-title {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.ant-table-wrapper .ant-table {
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  color: var(--text-secondary);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom-color: var(--border-subtle);
+}
+
+.ant-table-wrapper .ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-cell-fix-left {
+  background: #fff;
+}
+
+.sagitta-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 2px 0;
+}
+
+.sagitta-page-header__main {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.sagitta-page-header__title.ant-typography {
+  margin: 0;
+  color: #101828;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+}
+
+.sagitta-page-header__meta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--text-secondary) !important;
+  background: rgba(22, 93, 255, 0.06);
+  border: 1px solid rgba(22, 93, 255, 0.10);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.sagitta-page-header__description {
+  display: block;
+  max-width: 760px;
+  margin-top: 4px;
+  color: var(--text-secondary) !important;
+  line-height: 22px;
+}
+
+.sagitta-page-header__actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.sagitta-section-card,
+.sagitta-filter-card {
+  overflow: hidden;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.sagitta-section-card--tight .ant-card-body {
+  padding: 12px 14px;
+}
+
+.sagitta-section-card--feature {
+  border-color: rgba(22, 93, 255, 0.18) !important;
+  background:
+    linear-gradient(180deg, rgba(22, 93, 255, 0.035), rgba(255,255,255,0) 96px),
+    #fff !important;
+}
+
+.sagitta-filter-card {
+  background: rgba(255,255,255,0.92) !important;
+}
+
+.sagitta-filter-card .ant-card-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.sagitta-filter-card .ant-form,
+.sagitta-filter-card .ant-space {
+  max-width: 100%;
+}
+
+.sagitta-table-empty {
+  padding: 10px 0;
+}
+
+.sagitta-table-empty__title {
+  color: var(--text-secondary);
+}
+
+.sagitta-table-empty__description {
+  max-width: 360px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.sagitta-table-empty__action {
+  margin-top: 6px;
+}
+
+.sagitta-section-loading {
+  border-radius: var(--radius-md);
+}
+
+.sagitta-section-loading--table {
+  background: linear-gradient(180deg, #fff, #FAFBFC);
 }
 
 /*
@@ -518,32 +665,6 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   .sagitta-login-error-alert .ant-alert-message {
     white-space: normal;
   }
-}
-
-.ant-modal-footer .ant-btn:not(:has(.anticon))::before,
-.ant-modal-confirm-btns .ant-btn:not(:has(.anticon))::before,
-.ant-popconfirm-buttons .ant-btn:not(:has(.anticon))::before {
-  display: inline-block;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.ant-modal-footer .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before,
-.ant-modal-confirm-btns .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before,
-.ant-popconfirm-buttons .ant-btn-primary:not(.ant-btn-dangerous):not(:has(.anticon))::before {
-  content: "✓";
-}
-
-.ant-modal-footer .ant-btn-dangerous:not(:has(.anticon))::before,
-.ant-modal-confirm-btns .ant-btn-dangerous:not(:has(.anticon))::before,
-.ant-popconfirm-buttons .ant-btn-dangerous:not(:has(.anticon))::before {
-  content: "!";
-}
-
-.ant-modal-footer .ant-btn-default:not(:has(.anticon))::before,
-.ant-modal-confirm-btns .ant-btn-default:not(:has(.anticon))::before,
-.ant-popconfirm-buttons .ant-btn-default:not(:has(.anticon))::before {
-  content: "×";
 }
 
 /* 输入框 focus 发光 */

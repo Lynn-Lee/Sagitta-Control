@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, Card, DatePicker, Input, Modal, Select, Space, Table, Tag, Typography, message, Grid } from 'antd'
+import { Button, DatePicker, Input, Modal, Select, Space, Table, Tag, Typography, message, Grid } from 'antd'
 import { ClearOutlined, CloseOutlined, CopyOutlined, EyeOutlined, ReloadOutlined, StarFilled, StarOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
@@ -7,6 +7,7 @@ import { instanceApi } from '@/api/instance'
 import { queryApi, type QueryLogItem } from '@/api/query'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
+import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -59,6 +60,9 @@ export default function QueryHistoryPage() {
     page,
     page_size: pageSize,
   }), [dateRange, dbName, instanceId, masking, operationType, page, pageSize, sqlKeyword, username])
+  const hasActiveFilters = Boolean(
+    instanceId || username || dbName || operationType || masking !== undefined || sqlKeyword || dateRange,
+  )
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['query-history', params],
@@ -199,9 +203,13 @@ export default function QueryHistoryPage() {
   return (
     <div>
       {msgCtx}
-      <PageHeader title="查询历史" meta={`共 ${data?.total ?? 0} 条`} />
+      <PageHeader
+        title="查询历史"
+        meta={`共 ${data?.total ?? 0} 条`}
+        description="追踪查询、导出、脱敏命中和执行结果，方便审计 SQL 使用轨迹与复用高频语句。"
+      />
 
-      <FilterCard>
+      <FilterCard title="筛选查询记录">
         <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
           <RangePicker
             value={dateRange ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
@@ -268,13 +276,13 @@ export default function QueryHistoryPage() {
         </Space>
       </FilterCard>
 
-      <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
+      <SectionCard title="历史记录" extra={<Text type="secondary">按时间倒序展示</Text>} bodyPadding={0} marginBottom={0}>
         <Table
           dataSource={data?.items}
           columns={columns}
           rowKey="id"
           loading={isLoading}
-          locale={{ emptyText: <TableEmptyState title="暂无查询历史" /> }}
+          locale={{ emptyText: <TableEmptyState title="暂无查询历史" tone={hasActiveFilters ? 'filter' : 'default'} /> }}
           size="small"
           tableLayout="fixed"
           scroll={{ x: 1600 }}
@@ -289,7 +297,7 @@ export default function QueryHistoryPage() {
             },
           })}
         />
-      </Card>
+      </SectionCard>
 
       <Modal
         title="SQL 明细"

@@ -481,8 +481,9 @@ export default function MainLayout() {
       <Header style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
         height: 56, padding: isMobile ? '0 12px 0 0' : '0 16px 0 0',
-        background: '#0F172A',
-        borderBottom: '1px solid rgba(22,93,255,0.12)',
+        background: 'linear-gradient(90deg, #08111F 0%, #0F172A 52%, #111C33 100%)',
+        borderBottom: '1px solid rgba(148,163,184,0.14)',
+        boxShadow: '0 8px 24px rgba(2,6,23,0.22)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         {/* 左侧：折叠按钮 + Logo */}
@@ -521,7 +522,7 @@ export default function MainLayout() {
                 fontWeight: 400,
                 fontSize: 10,
                 color: 'rgba(22,93,255,0.8)',
-                letterSpacing: '3px',
+                letterSpacing: 0,
                 marginTop: 1,
               }}>
                 矢准数据
@@ -606,6 +607,7 @@ export default function MainLayout() {
               position: 'fixed', left: 0, top: 56, bottom: 0,
               height: 'calc(100vh - 56px)',
               borderRight: '1px solid #E5E6EB',
+              boxShadow: '6px 0 24px rgba(15,23,42,0.04)',
               overflow: 'auto', zIndex: 100,
               background: '#FFFFFF',
             }}
@@ -653,7 +655,7 @@ export default function MainLayout() {
           transition: 'margin-left 0.2s',
           padding: isMobile ? 16 : 24,
           minHeight: 'calc(100vh - 56px)',
-          background: '#F2F3F5',
+          background: 'transparent',
         }}>
           {user?.password_expiring_soon && (
             <Alert

@@ -4,20 +4,27 @@ import { Card } from 'antd'
 type FilterCardProps = {
   children: ReactNode
   marginBottom?: number
+  title?: ReactNode
+  extra?: ReactNode
+  compact?: boolean
 }
 
 export default function FilterCard({
   children,
   marginBottom = 12,
+  title,
+  extra,
+  compact = false,
 }: FilterCardProps) {
   return (
     <Card
+      className={['sagitta-filter-card', compact ? 'sagitta-filter-card--compact' : ''].filter(Boolean).join(' ')}
+      title={title}
+      extra={extra}
       style={{
         marginBottom,
-        borderRadius: 12,
-        border: '1px solid rgba(0,0,0,0.08)',
       }}
-      styles={{ body: { padding: '12px 16px' } }}
+      styles={{ body: { padding: compact ? '10px 14px' : '14px 16px' } }}
     >
       {children}
     </Card>
