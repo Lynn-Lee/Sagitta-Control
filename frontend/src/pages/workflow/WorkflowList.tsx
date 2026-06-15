@@ -32,7 +32,7 @@ const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth =
   (name: string, r: any) => (
     <Tooltip title={name}>
       <Button
-        className="sagitta-action-btn sagitta-action-btn--inspect"
+        className="sagitta-action-btn sagitta-action-btn--inspect sagitta-table-link-button"
         icon={<EyeOutlined />}
         onClick={() => navigate(`/workflow/${r.id}`)}
         style={{
@@ -44,6 +44,17 @@ const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth =
       </Button>
     </Tooltip>
   )
+
+const renderPersonName = (_: unknown, r: any) => {
+  const value = r.engineer_display || r.engineer || r.applicant_name || r.applicant_username || '—'
+  return (
+    <Tooltip title={value}>
+      <Text className="sagitta-nowrap-cell" style={{ maxWidth: 136 }}>
+        {value}
+      </Text>
+    </Tooltip>
+  )
+}
 
 const renderInstance = (_: unknown, r: any) => (
   <Text style={{ fontWeight: 500 }}>
@@ -258,7 +269,7 @@ export default function WorkflowList() {
   const auditColumns: ColumnsType<any> = [
     idColumn,
     { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
-    { title: '申请人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
+    { title: '申请人', key: 'engineer', width: 165, render: renderPersonName },
     { title: '工单名称', dataIndex: 'workflow_name', width: 255, render: renderWorkflowName(navigate, 225) },
     { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
@@ -276,7 +287,7 @@ export default function WorkflowList() {
     { title: '工单名称', dataIndex: 'workflow_name', width: 340, render: renderWorkflowName(navigate, 310) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
     { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
-    { title: '提交人', key: 'engineer', width: 140, render: (_, r) => r.engineer_display || r.engineer },
+    { title: '提交人', key: 'engineer', width: 165, render: renderPersonName },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '执行方式', key: 'execute_mode', width: 130, render: renderExecutionInfo },
     {

@@ -291,11 +291,6 @@ export default function UserManagement() {
     setStatuses([])
   }
 
-  const filterGridColumns = isMobile
-    ? '1fr'
-    : screens.xl
-      ? 'minmax(300px, 1.45fr) repeat(5, minmax(130px, 1fr)) minmax(180px, 1.05fr) minmax(112px, auto)'
-      : 'repeat(2, minmax(0, 1fr))'
   const handleExport = (exportFormat: 'xlsx' | 'csv') => {
     if (exportScope === 'selected' && !selectedRowKeys.length) {
       msgApi.warning('当前导出范围为“勾选结果”，请先勾选要导出的用户')
@@ -481,15 +476,10 @@ export default function UserManagement() {
       />
       <FilterCard marginBottom={16}>
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: filterGridColumns,
-            gap: 12,
-            alignItems: 'center',
-            width: '100%',
-          }}
+          className="sagitta-user-filter-grid"
         >
           <Input.Search
+            className="sagitta-user-filter-search"
             placeholder="搜索用户名 / 显示名 / 邮箱 / 电话号码"
             allowClear
             enterButton={<><SearchOutlined />搜索</>}
@@ -551,6 +541,7 @@ export default function UserManagement() {
             onChange={(value) => handleFilterChange(setStatuses, value)}
           />
           <Select
+            className="sagitta-user-filter-export-scope"
             style={{ width: '100%' }}
             options={[
               { value: 'filtered', label: '导出当前筛选结果' },

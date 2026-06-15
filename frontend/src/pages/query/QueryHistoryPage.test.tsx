@@ -78,5 +78,6 @@ describe('QueryHistoryPage', () => {
     expect(screen.getByText('导出')).toBeInTheDocument()
     expect(screen.getByText('XLSX')).toBeInTheDocument()
     expect(screen.getByText('25')).toBeInTheDocument()
+    expect(screen.getByText('2026-04-23 10:00:00')).toBeInTheDocument()
   })
 })

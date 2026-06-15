@@ -434,6 +434,63 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   background: var(--button-bg) !important;
 }
 
+.sagitta-table-link-button {
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.sagitta-table-link-button > span:not(.ant-btn-icon) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sagitta-nowrap-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sagitta-date-time-cell {
+  min-width: 19ch;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sagitta-user-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.sagitta-user-filter-search {
+  grid-column: span 2;
+  min-width: 280px;
+}
+
+.sagitta-user-filter-export-scope {
+  min-width: 220px;
+}
+
+@media (max-width: 900px) {
+  .sagitta-user-filter-grid,
+  .sagitta-user-filter-search {
+    grid-template-columns: 1fr;
+    grid-column: auto;
+    min-width: 0;
+  }
+}
+
 .sagitta-action-btn .anticon {
   color: var(--button-fg) !important;
 }

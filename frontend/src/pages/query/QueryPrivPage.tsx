@@ -7,16 +7,20 @@ import { queryApi } from '@/api/query'
 import type { RiskPlan } from '@/api/workflow'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
+import DateTimeCell from '@/components/common/DateTimeCell'
 import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 import dayjs from 'dayjs'
 
 const { Text } = Typography
 const { Option } = Select
 const { useBreakpoint } = Grid
+
+const renderDateTimeCell = (value?: string | null) => <DateTimeCell value={value} />
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
   0: { label: '待审核', color: 'processing' },
@@ -345,8 +349,8 @@ export default function QueryPrivPage() {
     { title: '行数限制', dataIndex: 'limit_num', width: 90 },
     { title: '有效期', dataIndex: 'valid_date', width: 120, render: (v: string) => <Tag color="success">{v}</Tag> },
     {
-      title: '授权时间', dataIndex: 'created_at', width: 140,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
+      title: '授权时间', dataIndex: 'created_at', width: 190,
+      render: renderDateTimeCell,
     },
     {
       title: '操作',
@@ -371,8 +375,8 @@ export default function QueryPrivPage() {
       render: (v: string) => v || '—',
     },
     {
-      title: '撤销时间', dataIndex: 'revoked_at', width: 150,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
+      title: '撤销时间', dataIndex: 'revoked_at', width: 190,
+      render: renderDateTimeCell,
     },
     {
       title: '撤销原因', dataIndex: 'revoke_reason', width: 220, ellipsis: true,
@@ -442,8 +446,8 @@ export default function QueryPrivPage() {
       render: (v: number) => <Tag color={STATUS_MAP[v]?.color}>{STATUS_MAP[v]?.label}</Tag>,
     },
     {
-      title: '提交时间', dataIndex: 'created_at', width: 140,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
+      title: '提交时间', dataIndex: 'created_at', width: 190,
+      render: renderDateTimeCell,
     },
     {
       title: '审批操作',
@@ -505,8 +509,8 @@ export default function QueryPrivPage() {
       render: (v: string) => v ? <Tag color={v === '通过' ? 'success' : 'error'}>{v}</Tag> : '待审批',
     },
     {
-      title: '审批时间', dataIndex: 'acted_at', width: 170,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
+      title: '审批时间', dataIndex: 'acted_at', width: 190,
+      render: renderDateTimeCell,
     },
   ]
 
@@ -547,7 +551,7 @@ export default function QueryPrivPage() {
       label: `申请记录（${applyData?.total ?? 0}）`,
       children: (
         <Table dataSource={applyData?.items} columns={applyColumns as any}
-          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1870 }}
+          rowKey="id" size="small" tableLayout="fixed" scroll={{ x: 1920 }}
           pagination={remotePagination(applyData?.total, applyPage, applyPageSize, setApplyPage, setApplyPageSize, '条申请')} />
       ),
     },
@@ -561,7 +565,7 @@ export default function QueryPrivPage() {
           rowKey="id"
           size="small"
           tableLayout="fixed"
-          scroll={{ x: 2130 }}
+          scroll={{ x: 2180 }}
           pagination={remotePagination(auditData?.total, auditPage, auditPageSize, setAuditPage, setAuditPageSize, '条记录')}
         />
       ),
@@ -650,7 +654,7 @@ export default function QueryPrivPage() {
             </Descriptions.Item>
             <Descriptions.Item label="风险">{renderRiskTag(detailTarget.risk_level, detailTarget.risk_summary)}</Descriptions.Item>
             <Descriptions.Item label="当前节点">{detailTarget.current_node_name || '—'}</Descriptions.Item>
-            <Descriptions.Item label="提交时间" span={2}>{detailTarget.created_at ? dayjs(detailTarget.created_at).format('YYYY-MM-DD HH:mm') : '—'}</Descriptions.Item>
+            <Descriptions.Item label="提交时间" span={2}>{formatDateTime(detailTarget.created_at)}</Descriptions.Item>
             <Descriptions.Item label="申请理由" span={2}>{detailTarget.apply_reason || '—'}</Descriptions.Item>
             <Descriptions.Item label="审批链路" span={2}>{detailTarget.approval_progress || '—'}</Descriptions.Item>
           </Descriptions>

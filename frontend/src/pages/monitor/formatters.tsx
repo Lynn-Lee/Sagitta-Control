@@ -1,4 +1,5 @@
 import { Typography } from 'antd'
+import { formatDateTime } from '@/utils/datetime'
 
 const { Text } = Typography
 
@@ -42,8 +43,7 @@ export function formatTrendTooltip(value: any, name: string, item?: any) {
 }
 
 export function formatTime(value?: string | null) {
-  if (!value) return '暂无数据'
-  return value.replace('T', ' ').slice(0, 19)
+  return formatDateTime(value, '暂无数据')
 }
 
 export function formatDurationSeconds(value?: number | null) {

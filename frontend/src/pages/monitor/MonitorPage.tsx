@@ -10,6 +10,7 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
 import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
+import DateTimeCell from '@/components/common/DateTimeCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -423,7 +424,7 @@ export default function MonitorPage() {
     { title: '索引大小', dataIndex: 'index_size_bytes', render: formatBytes },
     { title: '表数量', dataIndex: 'table_count' },
     { title: '行数估算', dataIndex: 'row_count' },
-    { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
+    { title: '采集时间', dataIndex: 'collected_at', width: 210, render: (value: string) => <DateTimeCell value={value} fallback="暂无数据" /> },
   ]
 
   const tableColumns = [
@@ -454,7 +455,7 @@ export default function MonitorPage() {
     { title: '数据大小', dataIndex: 'data_size_bytes', sorter: (a: any, b: any) => a.data_size_bytes - b.data_size_bytes, render: formatBytes },
     { title: '索引大小', dataIndex: 'index_size_bytes', sorter: (a: any, b: any) => a.index_size_bytes - b.index_size_bytes, render: formatBytes },
     { title: '行数估算', dataIndex: 'row_count', sorter: (a: any, b: any) => a.row_count - b.row_count },
-    { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
+    { title: '采集时间', dataIndex: 'collected_at', width: 210, render: (value: string) => <DateTimeCell value={value} fallback="暂无数据" /> },
   ]
 
   const copyTopSql = async (sql: string) => {
@@ -538,7 +539,7 @@ export default function MonitorPage() {
     { title: '库/Schema', dataIndex: 'db_name', width: 180 },
     { title: '增长量', dataIndex: 'growth_bytes', render: formatBytes },
     { title: '当前大小', dataIndex: 'latest_size_bytes', render: formatBytes },
-    { title: '采集时间', dataIndex: 'collected_at', render: formatTime },
+    { title: '采集时间', dataIndex: 'collected_at', width: 210, render: (value: string) => <DateTimeCell value={value} fallback="暂无数据" /> },
   ]
 
   const currentDbType = (active?.db_type || detail?.instance?.db_type || '').toLowerCase()
