@@ -10,8 +10,8 @@
 - 后端目录为 `backend/`，技术栈为 Python 3.12、FastAPI、SQLAlchemy 2 async、Alembic、Celery、Redis、PostgreSQL。
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
-- 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 Public-Releases。
-- 商业部署版、商业交付包和 Public-Releases 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
+- 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 `Lynn-Lee/SagittaDB-Enterprise` 公开交付仓库。
+- 商业部署版、商业交付包和 `Lynn-Lee/SagittaDB-Enterprise` 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
 
 ## 语言与文档规则
 
@@ -22,7 +22,7 @@
 - 日期选择器和日期范围选择器按全站中文化最终口径处理：月份、星期、`Today`、`Select date`、`Start date`、`End date` 等 Ant Design 默认文案必须显示为简体中文，例如 `今天`、`请选择日期`、`开始日期`、`结束日期`；日期格式、配置键和 API 字段名可保留英文或 ISO 格式。
 - 登录页英文 slogan、Logo 或品牌素材自带英文、登录入口接入方式名称、分页页码和分页翻页符号不按中文化硬性要求处理，允许保持英文、数字或图标形式。
 - 代码注释优先使用中文；类名、函数名、字段名、枚举值、配置键、SQL 关键字和第三方 API 名称保持英文。
-- 专业术语保留英文，例如 FastAPI、Docker Compose、PostgreSQL、Redis、JWT、RBAC、License、Public-Releases。
+- 专业术语保留英文，例如 FastAPI、Docker Compose、PostgreSQL、Redis、JWT、RBAC、License、GHCR、GitHub Releases。
 - 代码注释只在复杂逻辑、协议边界、安全校验、部署风险或兼容性处理处添加，避免解释显而易见的语句。
 
 ## 品牌与界面规则
@@ -42,7 +42,7 @@
 每次完成项目新的功能代码或 UI 调整后，必须完成以下收尾动作，除非用户明确要求暂停、只做局部分析或不提交：
 
 - 每次功能完成后都要同步更新本地代码和相关文档，提交到 git 并推送 GitHub 主远端和 Gitee 国内镜像远端，然后更新云 ECS 测试环境到最新源码。
-- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 Public-Releases 后续仅按用户明确指令更新。
+- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 `Lynn-Lee/SagittaDB-Enterprise` 后续仅按用户明确指令更新。
 
 1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagittadb_prd.md`、`docs/user_manual.md`、`docs/operations_guide.md`、`docs/public_commercial_delivery.md` 和本文件。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。
@@ -68,7 +68,7 @@
 ## 云 ECS 测试环境规则
 
 - 每次完成新功能代码、同步文档并推送 GitHub 与 Gitee 后，必须同步更新云 ECS 服务器上的测试环境到最新代码。
-- 云 ECS 测试环境必须使用源码方式更新和运行，不再使用商业版更新包、`dist-commercial/` 产物或 Public-Releases 商业部署包更新。
+- 云 ECS 测试环境必须使用源码方式更新和运行，不再使用商业版更新包、`dist-commercial/` 产物或公开交付仓库商业部署包更新。
 - 云 ECS 登录方式统一使用：
 
 ```bash

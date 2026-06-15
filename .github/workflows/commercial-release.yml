@@ -13,7 +13,7 @@ on:
         required: false
         type: string
       publish_public_repo:
-        description: "是否将渲染后的商业部署包发布到 Public-Releases。正式 tag 始终发布。"
+        description: "是否将渲染后的商业部署包发布到 SagittaDB-Enterprise 公开仓库。正式 tag 始终发布。"
         required: false
         default: false
         type: boolean
@@ -27,8 +27,7 @@ env:
   PRODUCT_CODE: sagittadb
   PRODUCT_NAME: SagittaDB Enterprise
   COMMERCIAL_BASE_VERSION: "2.2.0"
-  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Public-Releases
-  PUBLIC_PRODUCT_DIR: products/sagittadb
+  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/SagittaDB-Enterprise
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
 
 concurrency:
@@ -208,7 +207,7 @@ jobs:
           token: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
           path: public-releases
 
-      - name: 发布部署包到 Public-Releases
+      - name: 发布部署包到 SagittaDB-Enterprise
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         run: |
@@ -216,19 +215,22 @@ jobs:
 
           package_name="${{ steps.release.outputs.package_name }}"
           release_dir="${{ steps.release.outputs.release_dir }}"
-          product_dir="public-releases/${PUBLIC_PRODUCT_DIR}"
+          public_dir="public-releases"
 
-          mkdir -p "${product_dir}/releases/${release_dir}" "${product_dir}/screenshots"
+          mkdir -p "${public_dir}/releases/${release_dir}" "${public_dir}/screenshots"
           rsync -a --delete \
+            --exclude .git \
+            --exclude .github \
+            --exclude .gitignore \
             --exclude releases \
             --exclude screenshots \
             "dist-commercial/${package_name}/" \
-            "${product_dir}/"
-          cp "dist-commercial/${package_name}.zip" "${product_dir}/releases/${release_dir}/"
-          cp "dist-commercial/${package_name}.zip.sha256" "${product_dir}/releases/${release_dir}/"
-          cp "dist-commercial/${package_name}.zip.sig.json" "${product_dir}/releases/${release_dir}/"
-          cp dist-commercial/sbom/* "${product_dir}/releases/${release_dir}/"
-          rsync -a docs/screenshots/user-manual/ "${product_dir}/screenshots/"
+            "${public_dir}/"
+          cp "dist-commercial/${package_name}.zip" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/${package_name}.zip.sha256" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/${package_name}.zip.sig.json" "${public_dir}/releases/${release_dir}/"
+          cp dist-commercial/sbom/* "${public_dir}/releases/${release_dir}/"
+          rsync -a docs/screenshots/user-manual/ "${public_dir}/screenshots/"
 
           if [[ ! -f public-releases/.gitignore ]]; then
             {
@@ -255,32 +257,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          product_dir="public-releases/${PUBLIC_PRODUCT_DIR}"
+          public_dir="public-releases"
           release_dir="${{ steps.release.outputs.release_dir }}"
           package_name="${{ steps.release.outputs.package_name }}"
 
-          test -f public-releases/README.md
-          grep -q "DataFusionX" public-releases/README.md
-          grep -q "SagittaDB" public-releases/README.md
-          grep -q "SchemaForge" public-releases/README.md
-          grep -q "StreamForge" public-releases/README.md
+          test -f "${public_dir}/README.md"
+          grep -q "SagittaDB Enterprise" "${public_dir}/README.md"
+          grep -q "docker compose" "${public_dir}/README.md"
+          grep -q "License" "${public_dir}/README.md"
 
-          test -f "${product_dir}/README.md"
-          test -f "${product_dir}/docker-compose.yml"
-          test -f "${product_dir}/.env.example"
-          test -f "${product_dir}/LEGAL-NOTICE.md"
-          test -f "${product_dir}/nginx.conf"
-          test -d "${product_dir}/helm/sagittadb"
-          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip"
-          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sha256"
-          test -f "${product_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
-          test -f "${product_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
-          test -f "${product_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
-          test -f "${product_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
-          test -f "${product_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
+          test -f "${public_dir}/docker-compose.yml"
+          test -f "${public_dir}/.env.example"
+          test -f "${public_dir}/LEGAL-NOTICE.md"
+          test -f "${public_dir}/nginx.conf"
+          test -d "${public_dir}/helm/sagittadb"
+          test -f "${public_dir}/docs/installation.md"
+          test -f "${public_dir}/docs/operations-upgrade.md"
+          test -f "${public_dir}/docs/product-manual.md"
+          test -f "${public_dir}/releases/${release_dir}/${package_name}.zip"
+          test -f "${public_dir}/releases/${release_dir}/${package_name}.zip.sha256"
+          test -f "${public_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
+          test -f "${public_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${public_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
+          test -f "${public_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${public_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
 
           (
-            cd "${product_dir}/releases/${release_dir}"
+            cd "${public_dir}/releases/${release_dir}"
             sha256sum --check "${package_name}.zip.sha256"
             sha256sum --check "sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
             sha256sum --check "sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
@@ -288,7 +291,7 @@ jobs:
 
           if grep -RInE \
             'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
-            "${product_dir}" \
+            "${public_dir}" \
             --exclude-dir=.git \
             --exclude='*.zip'; then
             echo "公开发布仓库包含禁止发布的内容。" >&2
@@ -296,7 +299,7 @@ jobs:
           fi
 
           tmpdir="$(mktemp -d)"
-          unzip -q "${product_dir}/releases/${release_dir}/${package_name}.zip" -d "${tmpdir}"
+          unzip -q "${public_dir}/releases/${release_dir}/${package_name}.zip" -d "${tmpdir}"
           if grep -RInE \
             'LICENSE_PRIVATE_KEY|MANIFEST_PRIVATE_KEY|BEGIN [A-Z ]*PRIVATE KEY|LICENSE_SERVER_TOKEN|private_key[[:space:]]*=|docker login ghcr\.io|:latest\b|^[[:space:]]*build:' \
             "${tmpdir}"; then
@@ -304,18 +307,67 @@ jobs:
             exit 1
           fi
 
-      - name: 提交并推送 Public-Releases 更新
+      - name: 提交并推送 SagittaDB-Enterprise 更新
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         working-directory: public-releases
         shell: bash
         run: |
           set -euo pipefail
+          if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+            git switch --orphan main
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if git diff --cached --quiet; then
-            echo "Public-Releases 没有需要发布的变更。"
+            echo "SagittaDB-Enterprise 公开仓库没有需要发布的变更。"
             exit 0
           fi
           git commit -m "发布 SagittaDB Enterprise ${{ steps.release.outputs.version }}"
-          git push
+          git push origin HEAD:main
+
+      - name: 创建或更新 SagittaDB-Enterprise Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.release.outputs.version }}"
+          channel="${{ steps.release.outputs.channel }}"
+          package_name="${{ steps.release.outputs.package_name }}"
+          release_dir="${{ steps.release.outputs.release_dir }}"
+          public_dir="public-releases"
+          tag="v${version}"
+          title="SagittaDB Enterprise v${version}"
+          notes_file="$(mktemp)"
+
+          sed \
+            -e "s/X.Y.Z/${version}/g" \
+            -e "s#ghcr.io/<org>/sagittadb#${PUBLIC_IMAGE_REPOSITORY}#g" \
+            docs/release_templates/sagittadb_public_release.md > "${notes_file}"
+
+          assets=(
+            "${public_dir}/releases/${release_dir}/${package_name}.zip"
+            "${public_dir}/releases/${release_dir}/${package_name}.zip.sha256"
+            "${public_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
+            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json"
+            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json.sha256"
+            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json.bundle"
+            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json"
+            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json.sha256"
+            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json.bundle"
+          )
+
+          release_flags=()
+          if [[ "${channel}" != "stable" ]]; then
+            release_flags+=(--prerelease)
+          fi
+
+          if gh release view "${tag}" --repo "${PUBLIC_RELEASE_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${tag}" "${assets[@]}" --repo "${PUBLIC_RELEASE_REPOSITORY}" --clobber
+            gh release edit "${tag}" --repo "${PUBLIC_RELEASE_REPOSITORY}" --title "${title}" --notes-file "${notes_file}" "${release_flags[@]}"
+          else
+            gh release create "${tag}" "${assets[@]}" --repo "${PUBLIC_RELEASE_REPOSITORY}" --title "${title}" --notes-file "${notes_file}" "${release_flags[@]}"
+          fi

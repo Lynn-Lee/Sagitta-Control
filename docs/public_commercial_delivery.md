@@ -6,7 +6,7 @@
 
 SagittaDB 采用以下边界：
 
-- 公开交付仓库：根 `README.md` 是 DataFusionX、SagittaDB、SchemaForge、StreamForge 共享的商业发布门户；SagittaDB 发布流程只更新 `products/sagittadb/` 下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、截图和 Release 下载资产。
+- 公开交付仓库：`Lynn-Lee/SagittaDB-Enterprise` 是 SagittaDB Enterprise 专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
 - 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
@@ -14,32 +14,36 @@ SagittaDB 采用以下边界：
 推荐公开仓库结构：
 
 ```text
-products/
-  sagittadb/
-    README.md
-    docker-compose.yml
-    .env.example
-    LEGAL-NOTICE.md
-    nginx.conf
-    helm/
-      sagittadb/
-    scripts/
-      upgrade.sh
-      verify-license.sh
-    screenshots/
-shared/
-  legal/
-  docs/
 README.md
+docker-compose.yml
+.env.example
+LEGAL-NOTICE.md
+nginx.conf
+prepare-go-live-env.sh
+go-live-check.sh
+upgrade.sh
+verify-license.sh
+helm/
+  sagittadb/
+docs/
+  installation.md
+  operations-upgrade.md
+  product-manual.md
+screenshots/
+releases/
+  v2.2.0/
+    SagittaDB-Enterprise-v2.2.0.zip
+    SagittaDB-Enterprise-v2.2.0.zip.sha256
+    SagittaDB-Enterprise-v2.2.0.zip.sig.json
 ```
 
-公开仓库根 `README.md` 由 `Public-Releases` 仓库维护，不由 SagittaDB 的发布 workflow 生成或覆盖。
+公开仓库根 `README.md` 由 SagittaDB 私有仓库的商业发布 workflow 渲染生成，是客户下载、安装、授权和运维文档的第一入口。
 
 当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入公开仓库。
 
 ## 2. 公开仓库内容
 
-`products/sagittadb/README.md` 应作为用户入口，包含：
+公开仓库根 `README.md` 应作为用户入口，包含：
 
 - SagittaDB Enterprise 产品定位和核心功能。
 - Docker Compose 快速开始。
@@ -47,6 +51,7 @@ README.md
 - 60 天试用说明。
 - 在线激活和离线 challenge-response 简述。
 - 输入客户 ID 生成正式激活部署指纹的授权操作说明。
+- 安装部署、运维升级、产品使用手册入口。
 - 商业授权联系方式。
 - Release 下载和 sha256 校验方式。
 
@@ -86,10 +91,11 @@ ghcr.io/<org>/sagittadb-frontend:2.2.0
 
 ## 4. GitHub Release 规则
 
-SagittaDB 在统一 public 仓库中按产品独立发版：
+SagittaDB 在专用公开仓库中按版本发版：
 
 ```text
-Tag: sagittadb/v2.2.0
+Repository: Lynn-Lee/SagittaDB-Enterprise
+Tag: v2.2.0
 Title: SagittaDB Enterprise v2.2.0
 Assets:
   SagittaDB-Enterprise-v2.2.0.zip
@@ -101,7 +107,9 @@ Release 发布说明使用 [SagittaDB 公开发布模板](release_templates/sagi
 用户安装命令示例：
 
 ```bash
-wget https://github.com/<org>/<public-repo>/releases/download/sagittadb/v2.2.0/SagittaDB-Enterprise-v2.2.0.zip
+wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v2.2.0/SagittaDB-Enterprise-v2.2.0.zip
+wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v2.2.0/SagittaDB-Enterprise-v2.2.0.zip.sha256
+sha256sum -c SagittaDB-Enterprise-v2.2.0.zip.sha256
 unzip SagittaDB-Enterprise-v2.2.0.zip
 cd SagittaDB-Enterprise-v2.2.0
 
@@ -206,18 +214,18 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 9. 检查商业构建上下文 `.dockerignore`，确认 `.venv`、测试目录、依赖缓存、`dist-commercial`、私钥和 License 文件不会进入 Docker context。
 10. 生成前后端镜像 CycloneDX SBOM，签名前后端镜像、SBOM 和客户部署包。
 11. 执行 `scripts/validate-commercial-release-materials.sh`，确认 zip、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且可校验。
-12. 同步部署文件到公开仓库 `products/sagittadb/`。
-13. 在公开仓库创建 `sagittadb/v2.2.0` Release。
+12. 同步部署文件到公开仓库 `Lynn-Lee/SagittaDB-Enterprise` 根目录。
+13. 在公开仓库创建或更新 `v2.2.0` Release。
 14. 上传 zip、sha256、签名文件和 SBOM。
 
 源码 CI 和商业发布机制与 DataFusionX 保持一致：
 
 - 推送到 `main` 时，只触发 `.github/workflows/ci.yml` 和 `.github/workflows/release-version-record.yml`，用于源码构建校验和版本记录，不构建或发布商业包。
-- 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.2.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步 `Public-Releases`。
-- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Public-Releases`。
-- 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到 `Public-Releases`，只有显式勾选发布时才同步公开发布仓库。
+- 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.2.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步公开交付仓库。
+- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/SagittaDB-Enterprise`。
+- 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到公开交付仓库，只有显式勾选发布时才同步公开发布仓库。
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
-- 工作流会更新 `Lynn-Lee/Public-Releases` 的 `products/sagittadb/`，并把 zip/sha256 放入 `products/sagittadb/releases/v<version>/`；根 README 保持四产品门户，不由 SagittaDB 发布覆盖。
+- 工作流会更新 `Lynn-Lee/SagittaDB-Enterprise` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 - 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免海外 runner 访问国内镜像源时出现依赖下载超时。
 
@@ -228,7 +236,7 @@ MANIFEST_PRIVATE_KEY
 PUBLIC_RELEASES_TOKEN
 ```
 
-`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Public-Releases` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
+`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/SagittaDB-Enterprise` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
 
 现有脚本入口：
 
@@ -283,7 +291,7 @@ Product Code: sagittadb
 Product Name: SagittaDB
 Edition: enterprise
 Trial Days: 30
-Release Tag: sagittadb/v2.2.0
+Release Tag: v2.2.0
 Package Name: SagittaDB-Enterprise-v2.2.0.zip
 Backend Image: ghcr.io/<org>/sagittadb-backend:2.2.0
 Frontend Image: ghcr.io/<org>/sagittadb-frontend:2.2.0

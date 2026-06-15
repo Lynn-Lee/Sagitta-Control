@@ -7,9 +7,11 @@
 
 ## 安装
 
-下载 `SagittaDB-Enterprise-vX.Y.Z.zip`，校验 sha256 后解压，并按包内 `README.md` 部署。
+下载 `SagittaDB-Enterprise-vX.Y.Z.zip` 和 sha256 文件，校验后解压，并按包内 `README.md` 部署。
 
 ```bash
+wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/vX.Y.Z/SagittaDB-Enterprise-vX.Y.Z.zip
+wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/vX.Y.Z/SagittaDB-Enterprise-vX.Y.Z.zip.sha256
 sha256sum -c SagittaDB-Enterprise-vX.Y.Z.zip.sha256
 unzip SagittaDB-Enterprise-vX.Y.Z.zip
 cd SagittaDB-Enterprise-vX.Y.Z
