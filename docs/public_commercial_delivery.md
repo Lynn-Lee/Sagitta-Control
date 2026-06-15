@@ -30,6 +30,9 @@ docs/
   operations-upgrade.md
   product-manual.md
 screenshots/
+  02-dashboard.png
+  08-query-workbench.png
+  20-license.png
 releases/
   v2.2.0/
     SagittaDB-Enterprise-v2.2.0.zip
@@ -46,12 +49,13 @@ releases/
 公开仓库根 `README.md` 应作为用户入口，包含：
 
 - SagittaDB Enterprise 产品定位和核心功能。
+- 测试环境页面截图，展示 Dashboard、实例、SQL 工单、在线查询、字典、脱敏、监控、归档、权限、审计和 License 等核心界面。
 - Docker Compose 快速开始。
 - Kubernetes / Helm 部署入口。
 - 60 天试用说明。
 - 在线激活和离线 challenge-response 简述。
 - 输入客户 ID 生成正式激活部署指纹的授权操作说明。
-- 安装部署、运维升级、产品使用手册入口。
+- 安装部署、运维升级、产品使用手册入口；客户包内也必须包含 `screenshots/`，保证下载 zip 后 README 和手册中的图片仍可打开。
 - 商业授权联系方式。
 - Release 下载和 sha256 校验方式。
 
