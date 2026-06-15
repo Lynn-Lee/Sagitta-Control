@@ -239,6 +239,10 @@ jobs:
           GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
         run: |
           set -euo pipefail
+          test -n "${GH_TOKEN}" || {
+            echo "缺少 PUBLIC_RELEASES_TOKEN，无法写入 ${PUBLIC_RELEASE_REPOSITORY}。" >&2
+            exit 1
+          }
 
           git init public-releases
           cd public-releases
@@ -275,7 +279,12 @@ jobs:
           cp "dist-commercial/${package_name}.zip" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/${package_name}.zip.sha256" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/${package_name}.zip.sig.json" "${public_dir}/releases/${release_dir}/"
-          cp dist-commercial/sbom/* "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
           rsync -a docs/screenshots/user-manual/ "${public_dir}/screenshots/"
 
           if [[ ! -f public-releases/.gitignore ]]; then
@@ -357,8 +366,17 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         working-directory: public-releases
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
         run: |
           set -euo pipefail
+          test -n "${GH_TOKEN}" || {
+            echo "缺少 PUBLIC_RELEASES_TOKEN，无法写入 ${PUBLIC_RELEASE_REPOSITORY}。" >&2
+            exit 1
+          }
+          auth_header="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ${auth_header}"
+
           if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
             git switch --orphan main
           fi

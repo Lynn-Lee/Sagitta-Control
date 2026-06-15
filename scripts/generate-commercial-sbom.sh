@@ -10,6 +10,7 @@ command -v syft >/dev/null 2>&1 || {
   exit 1
 }
 
+rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 
 write_sha256() {
