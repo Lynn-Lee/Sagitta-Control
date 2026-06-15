@@ -43,14 +43,14 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ─── 商业授权 ─────────────────────────────────────────────
-    LICENSE_PUBLIC_KEY: str = ""
+    LICENSE_PUBLIC_KEY: str = "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"
     LICENSE_CUSTOMER_ID: str = ""
-    LICENSE_SERVER_URL: str = ""
+    LICENSE_SERVER_URL: str = "https://license.loveai.asia"
     LICENSE_SERVER_TOKEN: str = ""
     LICENSE_AUTO_REFRESH_ENABLED: bool = True
     LICENSE_ONLINE_GRACE_DAYS: int = 7
     LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
-    LICENSE_TRIAL_DAYS: int = 30
+    LICENSE_TRIAL_DAYS: int = 60
     LICENSE_DEPLOYMENT_ID: str = ""
     LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: int = 60
     LICENSE_ALLOW_LEGACY_LICENSE_IMPORT: bool = False

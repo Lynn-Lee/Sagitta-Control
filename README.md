@@ -186,7 +186,7 @@ v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 �
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
 
-商业授权接入统一授权中心 `License-Server-Center`。客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
+商业授权接入统一授权中心 `License-Server-Center`。源码部署模板和客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`，并预置官方 License 验签公钥。SagittaDB 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：SagittaDB（sagittadb）`，用于现场确认当前部署正在按 SagittaDB 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
 
 商业交付闭环已内置到产品：管理员可在 `商业交付` → `交付与支持` 页面完成实施交付向导、生成 Markdown/JSON 验收报告、导出脱敏诊断包、查看合规报表、处理告警事件和确认引擎支持矩阵。在线激活和联网刷新会向授权中心上报 usage/runtime 摘要，便于客户成功、续费和支持排障。
 

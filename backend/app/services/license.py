@@ -333,6 +333,20 @@ class LicenseService:
     async def ensure_trial(db: AsyncSession) -> LicenseRecord:
         current = await LicenseService._current_record(db)
         if current:
+            if current.source == "trial" and current.issued_at:
+                issued_at = current.issued_at
+                expires_at = current.expires_at
+                if issued_at.tzinfo is None:
+                    issued_at = issued_at.replace(tzinfo=UTC)
+                if expires_at and expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=UTC)
+                configured_expires_at = issued_at + timedelta(days=settings.LICENSE_TRIAL_DAYS)
+                if not expires_at or expires_at < configured_expires_at:
+                    current.expires_at = configured_expires_at
+                    current.last_check_status = "ok"
+                    current.last_check_reason = "试用期内"
+                    await db.commit()
+                    await db.refresh(current)
             return current
         now = LicenseService._utcnow()
         trial = LicenseRecord(

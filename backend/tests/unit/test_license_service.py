@@ -191,6 +191,39 @@ def test_evaluate_online_record_requires_recent_server_check(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_ensure_trial_extends_existing_trial_to_configured_days(monkeypatch):
+    issued_at = datetime.now(UTC) - timedelta(days=30)
+    record = LicenseRecord(
+        source="trial",
+        status="trial",
+        is_current=True,
+        license_id="trial",
+        customer_id="trial",
+        company_name="试用版",
+        edition="trial",
+        features=[],
+        limits={},
+        issued_at=issued_at,
+        not_before=issued_at,
+        expires_at=issued_at + timedelta(days=30),
+        last_check_status="expired",
+        last_check_reason="License 已过期",
+    )
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock())
+    monkeypatch.setattr("app.services.license.settings.LICENSE_TRIAL_DAYS", 60)
+    monkeypatch.setattr(LicenseService, "_current_record", AsyncMock(return_value=record))
+
+    result = await LicenseService.ensure_trial(db)
+
+    assert result is record
+    assert record.expires_at == issued_at + timedelta(days=60)
+    assert record.last_check_status == "ok"
+    assert record.last_check_reason == "试用期内"
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(record)
+
+
+@pytest.mark.asyncio
 async def test_check_access_rejects_expired_license(monkeypatch):
     async def fake_status(_db):
         return {"status": "expired", "reason": "License 已过期", "features": []}

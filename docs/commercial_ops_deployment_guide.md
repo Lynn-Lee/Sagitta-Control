@@ -57,7 +57,7 @@ SagittaDB Enterprise 由以下核心服务组成：
 | 管理员账号 | 首次初始化后创建或由系统初始化接口生成 |
 | 首个数据库实例 | 用于验证连接、查询、工单和观测链路 |
 | 通知渠道 | 邮件、钉钉、飞书或企业微信至少一种 |
-| 授权方式 | 30 天试用、在线激活或离线 challenge-response |
+| 授权方式 | 60 天试用、在线激活或离线 challenge-response |
 
 ### 2.2 网络与安全
 
@@ -210,7 +210,7 @@ kubectl -n sagittadb logs deploy/sagittadb-worker --tail=100
 
 ### 5.1 试用授权
 
-首次部署没有正式 License 时，系统自动进入 30 天全功能试用。
+首次部署没有正式 License 时，系统自动进入 60 天全功能试用。
 
 试用期间：
 

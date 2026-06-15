@@ -17,7 +17,7 @@
 - 准备 PostgreSQL、Redis、后端、前端、Worker、Beat 和反向代理运行环境。
 - 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
 - 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`。
-- 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在客户包模板中预置，私有授权中心或密钥轮换时需替换。
+- 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在源码部署模板和客户包模板中预置，私有授权中心或密钥轮换时需替换。
 - 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，要求至少每 7 天成功联网刷新一次；长期离线场景应使用 challenge-response 离线授权。
 - 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；商业构建标识会强制执行校验，即使客户误改 `APP_INTEGRITY_REQUIRED=false` 也不能关闭；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
 - 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
@@ -459,7 +459,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 包含真实客户 ID、域名、公网 IP、License、token、部署指纹、内部验收记录、数据库
 连接信息或客户现场截图。
 
-当前商业部署版本为 `2.2.0`。SagittaDB 授权项目码固定为 `sagittadb`，客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.2.0`。SagittaDB 授权项目码固定为 `sagittadb`，源码部署模板和客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：SagittaDB（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

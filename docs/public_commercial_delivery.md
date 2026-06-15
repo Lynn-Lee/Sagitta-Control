@@ -44,7 +44,7 @@ README.md
 - SagittaDB Enterprise 产品定位和核心功能。
 - Docker Compose 快速开始。
 - Kubernetes / Helm 部署入口。
-- 30 天试用说明。
+- 60 天试用说明。
 - 在线激活和离线 challenge-response 简述。
 - 输入客户 ID 生成正式激活部署指纹的授权操作说明。
 - 商业授权联系方式。
@@ -135,7 +135,7 @@ product=sagittadb
 试用规则：
 
 - 首次部署没有 License 时自动创建 trial 记录。
-- 默认 `LICENSE_TRIAL_DAYS=30`。
+- 默认 `LICENSE_TRIAL_DAYS=60`。
 - 试用期内全部受保护功能可用。
 - 试用期结束后，业务 API 返回 `LICENSE_REQUIRED`，登录、健康检查和授权管理入口继续可用。
 - 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，每次成功激活或刷新都会更新本地联网校验时间；超过宽限期未成功回源时，在线授权状态转为无效，业务 API 暂停。
@@ -260,7 +260,7 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 - GHCR 镜像可匿名拉取。
 - 部署包不需要源码即可启动。
 - `docker-compose.yml` 和 Helm values 使用固定版本镜像。
-- 首次部署自动进入 30 天全功能试用。
+- 首次部署自动进入 60 天全功能试用。
 - 在线授权超过联网校验宽限期后会 fail closed。
 - 试用到期后业务功能阻断，授权管理入口仍可访问。
 - 在线激活、联网刷新和离线 challenge-response 均可用。

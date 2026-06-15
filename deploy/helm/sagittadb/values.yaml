@@ -142,7 +142,7 @@ license:
   autoRefreshEnabled: true
   onlineGraceDays: 7
   renewalNotifyDays: "30,7"
-  trialDays: 30
+  trialDays: 60
   deploymentId: "CHANGE_ME_STABLE_RANDOM_DEPLOYMENT_ID"
   offlineChallengeTtlMinutes: 60
   allowLegacyLicenseImport: false
