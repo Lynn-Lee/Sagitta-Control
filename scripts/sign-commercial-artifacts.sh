@@ -30,7 +30,11 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
   cosign_args+=(--key "${COSIGN_KEY}")
 fi
 if [[ "${COSIGN_USE_SIGNING_CONFIG:-false}" != "true" ]]; then
-  cosign_args+=(--use-signing-config=false)
+  if cosign sign --help 2>/dev/null | grep -q -- "--use-signing-config"; then
+    cosign_args+=(--use-signing-config=false)
+  else
+    echo "cosign does not support --use-signing-config; continuing without that flag" >&2
+  fi
 fi
 
 "${PYTHON_BIN}" tools/sign_manifest.py \
