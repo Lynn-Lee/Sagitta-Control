@@ -126,7 +126,7 @@ helm upgrade --install sagittadb helm/sagittadb \
 
 升级脚本会拉取固定版本镜像、备份 PostgreSQL、执行 Alembic 迁移、重启服务并检查前后端健康状态。升级前请阅读 [运维升级指南](docs/operations-upgrade.md)，并确认已经完成数据库备份。
 
-## 供应链材料
+## 发布校验文件
 
 每个 Release 提供：
 
@@ -136,8 +136,4 @@ helm upgrade --install sagittadb helm/sagittadb \
 - 后端镜像 CycloneDX SBOM、sha256 和签名 bundle
 - 前端镜像 CycloneDX SBOM、sha256 和签名 bundle
 
-客户侧可以先校验 sha256，再按内部供应链流程归档 SBOM 和签名材料。
-
-## 安全提示
-
-公开仓库和部署包不包含 SagittaDB 源码、签发工具、私钥、真实客户 License、真实激活码、客户数据库连接信息或内部验收记录。共享日志、截图和诊断包前，请先完成脱敏处理。
+客户侧可以先校验 sha256，再按内部流程归档 SBOM 和签名材料。
