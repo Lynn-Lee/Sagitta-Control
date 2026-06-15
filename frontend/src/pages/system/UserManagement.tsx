@@ -478,14 +478,13 @@ export default function UserManagement() {
         <div
           className="sagitta-user-filter-grid"
         >
-          <Input.Search
+          <Input
             className="sagitta-user-filter-search"
             placeholder="搜索用户名 / 显示名 / 邮箱 / 电话号码"
             allowClear
-            enterButton={<><SearchOutlined />搜索</>}
             style={{ width: '100%' }}
             value={search}
-            onSearch={handleSearch}
+            onPressEnter={() => handleSearch(search)}
             onChange={e => {
               if (!e.target.value) handleSearch('')
               else {
@@ -552,6 +551,14 @@ export default function UserManagement() {
                 onChange={setExportScope}
               />
             </div>
+            <Button
+              type="primary"
+              className="sagitta-user-filter-search-button"
+              icon={<SearchOutlined />}
+              onClick={() => handleSearch(search)}
+            >
+              搜索
+            </Button>
             <Button className="sagitta-action-btn sagitta-action-btn--refresh sagitta-user-filter-reset" icon={<ReloadOutlined />} onClick={resetFilters}>
               重置筛选
             </Button>

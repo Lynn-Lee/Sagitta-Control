@@ -488,10 +488,11 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .sagitta-user-filter-export-scope {
-  flex: 1 1 260px;
+  flex: 1 1 280px;
   min-width: 240px;
 }
 
+.sagitta-user-filter-search-button,
 .sagitta-user-filter-reset {
   flex: 0 0 auto;
   min-width: 132px;
@@ -507,6 +508,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   }
 
   .sagitta-user-filter-export-scope,
+  .sagitta-user-filter-search-button,
   .sagitta-user-filter-reset {
     flex: 1 1 100%;
   }
