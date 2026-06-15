@@ -17,6 +17,11 @@ on:
         required: false
         default: false
         type: boolean
+      rebuild_images:
+        description: "即使当前版本商业镜像已存在，也强制重新构建并推送镜像。"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -86,7 +91,34 @@ jobs:
         shell: bash
         run: scripts/validate-commercial-build-context.sh
 
+      - name: 检查商业镜像是否已存在
+        id: existing-images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.release.outputs.version }}"
+          rebuild_images="${{ inputs.rebuild_images || false }}"
+          backend_image="${PUBLIC_IMAGE_REPOSITORY}-backend:${version}"
+          frontend_image="${PUBLIC_IMAGE_REPOSITORY}-frontend:${version}"
+
+          if [[ "${rebuild_images}" == "true" ]]; then
+            echo "已要求强制重建商业镜像。"
+            echo "images_exist=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if docker buildx imagetools inspect "${backend_image}" >/dev/null 2>&1 \
+            && docker buildx imagetools inspect "${frontend_image}" >/dev/null 2>&1; then
+            echo "商业镜像已存在，跳过重复构建：${backend_image}, ${frontend_image}"
+            echo "images_exist=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "商业镜像不存在或不完整，将执行构建。"
+            echo "images_exist=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: 构建并推送商业后端镜像
+        if: ${{ steps.existing-images.outputs.images_exist != 'true' }}
         id: backend-image
         uses: docker/build-push-action@v5
         with:
@@ -107,6 +139,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 构建并推送商业前端镜像
+        if: ${{ steps.existing-images.outputs.images_exist != 'true' }}
         id: frontend-image
         uses: docker/build-push-action@v5
         with:
