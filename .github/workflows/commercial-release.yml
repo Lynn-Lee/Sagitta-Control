@@ -201,11 +201,24 @@ jobs:
 
       - name: 检出公开发布仓库
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PUBLIC_RELEASE_REPOSITORY }}
-          token: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          path: public-releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git init public-releases
+          cd public-releases
+          git remote add origin "https://github.com/${PUBLIC_RELEASE_REPOSITORY}.git"
+          auth_header="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ${auth_header}"
+
+          if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+            git fetch --depth=1 origin main
+            git checkout -B main FETCH_HEAD
+          else
+            git checkout -B main
+          fi
 
       - name: 发布部署包到 SagittaDB-Enterprise
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
