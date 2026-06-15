@@ -11,6 +11,7 @@
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
 - 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 Public-Releases。
+- 商业部署版、商业交付包和 Public-Releases 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
 
 ## 语言与文档规则
 
@@ -41,6 +42,7 @@
 每次完成项目新的功能代码或 UI 调整后，必须完成以下收尾动作，除非用户明确要求暂停、只做局部分析或不提交：
 
 - 每次功能完成后都要同步更新本地代码和相关文档，提交到 git 并推送 GitHub 主远端和 Gitee 国内镜像远端，然后更新云 ECS 测试环境到最新源码。
+- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 Public-Releases 后续仅按用户明确指令更新。
 
 1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagittadb_prd.md`、`docs/user_manual.md`、`docs/operations_guide.md`、`docs/public_commercial_delivery.md` 和本文件。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。

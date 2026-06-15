@@ -540,19 +540,22 @@ export default function UserManagement() {
             value={statuses}
             onChange={(value) => handleFilterChange(setStatuses, value)}
           />
-          <Select
-            className="sagitta-user-filter-export-scope"
-            style={{ width: '100%' }}
-            options={[
-              { value: 'filtered', label: '导出当前筛选结果' },
-              { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
-            ]}
-            value={exportScope}
-            onChange={setExportScope}
-          />
-          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={{ width: '100%' }}>
-            重置筛选
-          </Button>
+          <div className="sagitta-user-filter-actions">
+            <div className="sagitta-user-filter-export-scope">
+              <Select
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'filtered', label: '导出当前筛选结果' },
+                  { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
+                ]}
+                value={exportScope}
+                onChange={setExportScope}
+              />
+            </div>
+            <Button className="sagitta-action-btn sagitta-action-btn--refresh sagitta-user-filter-reset" icon={<ReloadOutlined />} onClick={resetFilters}>
+              重置筛选
+            </Button>
+          </div>
         </div>
         <div style={{ marginTop: 12 }}>
           <Space wrap size={[8, 8]} style={{

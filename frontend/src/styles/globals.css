@@ -478,16 +478,37 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   min-width: 280px;
 }
 
+.sagitta-user-filter-actions {
+  grid-column: span 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
 .sagitta-user-filter-export-scope {
-  min-width: 220px;
+  flex: 1 1 260px;
+  min-width: 240px;
+}
+
+.sagitta-user-filter-reset {
+  flex: 0 0 auto;
+  min-width: 132px;
 }
 
 @media (max-width: 900px) {
   .sagitta-user-filter-grid,
-  .sagitta-user-filter-search {
+  .sagitta-user-filter-search,
+  .sagitta-user-filter-actions {
     grid-template-columns: 1fr;
     grid-column: auto;
     min-width: 0;
+  }
+
+  .sagitta-user-filter-export-scope,
+  .sagitta-user-filter-reset {
+    flex: 1 1 100%;
   }
 }
 

@@ -39,6 +39,9 @@ describe('UserManagement', () => {
     const { container } = render(<UserManagement />)
 
     expect(container.querySelector('.sagitta-user-filter-grid')).toBeInTheDocument()
+    expect(container.querySelector('.sagitta-user-filter-actions')).toBeInTheDocument()
+    expect(screen.getByText('导出当前筛选结果').closest('.sagitta-user-filter-actions')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /重置筛选/ }).closest('.sagitta-user-filter-actions')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /重置筛选/ })).toBeVisible()
   })
 })
