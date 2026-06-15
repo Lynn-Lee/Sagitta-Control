@@ -285,7 +285,7 @@ jobs:
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
-          rsync -a docs/screenshots/user-manual/ "${public_dir}/screenshots/"
+          rsync -a --delete docs/screenshots/user-manual/ "${public_dir}/screenshots/"
 
           if [[ ! -f public-releases/.gitignore ]]; then
             {
