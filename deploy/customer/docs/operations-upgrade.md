@@ -17,17 +17,17 @@ curl -fsS http://127.0.0.1/health
 重点关注：
 
 - PostgreSQL、Redis、backend、celery_worker、celery_beat、frontend 是否健康。
-- 授权管理页是否显示授权有效或试用有效。
+- `License 授权` 页是否显示授权有效或试用有效。
 - `商业交付` -> `交付与支持` 中是否存在阻塞项。
 - 数据库实例采集、归档作业和通知任务是否持续失败。
 - 服务器磁盘空间、备份目录和日志目录是否接近容量上限。
 - 审批、查询和执行任务是否有异常堆积。
 
-![Dashboard 巡检入口](../screenshots/02-dashboard.png)
+![查询看板巡检入口](../screenshots/02-dashboard-query.png)
 
 建议每周至少登录一次 `商业交付` -> `License 授权`，确认在线授权刷新、客户 ID、部署指纹和授权项目状态。
 
-![License 巡检](../screenshots/20-license.png)
+`License 授权` 页面包含客户 ID、部署指纹和授权状态，不作为公开截图素材。对外共享巡检材料时只保留脱敏后的结论，不直接传播授权页原图。
 
 ## 2. 备份策略
 
@@ -94,9 +94,9 @@ curl -fsS http://127.0.0.1/health
 - 实例列表、SQL 工单、在线查询、查询权限、审计日志可以正常打开。
 - `商业交付` -> `交付与支持` 可生成验收报告。
 
-![实例列表验证](../screenshots/03-instance-list.png)
+![实例管理验证](../screenshots/15-instance-management.png)
 
-![在线查询验证](../screenshots/08-query-workbench.png)
+![在线查询验证](../screenshots/09-query-workbench.png)
 
 ## 4. 回滚流程
 

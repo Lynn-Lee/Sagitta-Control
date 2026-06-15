@@ -1,36 +1,55 @@
 # SagittaDB Enterprise v__SAGITTADB_VERSION__
 
-SagittaDB Enterprise 是面向企业数据库治理场景的统一管控平台，帮助团队把数据库实例、SQL 变更、在线查询、查询授权、数据字典、数据脱敏、运行诊断、数据归档和审计追踪放到一套可交付、可验收、可运维的平台中。
+SagittaDB Enterprise 是面向企业数据库治理场景的统一管控平台，覆盖数据看板、数据库实例管理、SQL 工单、在线查询、查询权限、数据字典、数据脱敏、观测诊断、数据归档、系统管理、审计追踪和商业交付。
 
-本仓库是 SagittaDB Enterprise 的公开交付仓库，面向试用客户、实施人员和运维团队提供部署文件、安装脚本、Helm Chart、产品手册、截图示例、版本下载和供应链验收材料。后端源码、前端源码、商业构建脚本、签名私钥、License 签发工具和客户内部数据不会放在公开仓库中。
+本仓库是 SagittaDB Enterprise 的公开交付仓库，面向试用客户、实施人员、DBA 和运维团队提供部署文件、安装脚本、Helm Chart、产品手册、真实测试环境页面截图、版本下载和供应链验收材料。后端源码、前端源码、商业构建脚本、签名私钥、License 签发工具和客户内部数据不会放在公开仓库中。
 
-![SagittaDB Dashboard](screenshots/02-dashboard.png)
+![SagittaDB 在线查询概览](screenshots/02-dashboard-query.png)
 
-## 适合解决什么问题
+截图来自 SagittaDB 云 ECS 测试环境，使用页面视口截图，不包含浏览器地址栏、测试环境 IP 或登录密码。`License 授权 / 授权管理` 页面不在公开截图集中展示。
 
-SagittaDB Enterprise 适合已经有多套数据库、多个研发团队和审计要求的组织。典型场景包括：
+## 核心能力
 
-- 统一登记 MySQL、PostgreSQL、Oracle、SQL Server、MongoDB、Redis、ClickHouse、StarRocks 等数据库实例。
-- 通过 SQL 工单管理 DDL/DML 变更审批、执行和审计。
-- 让研发在受控权限下自助查询数据，并自动记录查询历史。
-- 统一申请、审批和回收查询权限，减少人工发账号、发密码。
-- 为敏感字段配置脱敏规则，降低生产数据暴露风险。
-- 查看实例运行状态、慢 SQL、容量、会话和采集异常。
-- 通过数据归档处理历史数据下沉或迁移。
-- 在试用、上线和验收阶段生成交付报告和脱敏诊断包。
+- 数据看板：按查询、工单、归档、实例与库多个视角查看治理概览。
+- 实例管理：统一登记数据库实例、引擎类型、连接状态和资源归属。
+- SQL 工单：提交、审批、执行和审计数据库变更。
+- 在线查询：在授权范围内执行受控查询，并记录查询历史。
+- 查询权限：通过申请和审批控制实例、数据库或表级访问。
+- 数据字典：查看库表字段、索引和结构说明。
+- 数据脱敏：配置敏感字段规则，保护查询和导出场景。
+- 观测中心：查看实例健康、采集状态、慢 SQL 和运行诊断。
+- 数据归档：标准化归档申请、审批、执行和结果跟踪。
+- 系统管理：维护用户、角色、用户组、资源组、审批流和系统配置。
+- 商业交付：查看推广就绪度、交付验收、告警中心和支持材料。
+- 审计日志：集中追踪登录、工单、查询、实例和配置操作。
 
-## 界面预览
+## 页面预览
 
-| 场景 | 截图 |
+| 页面 | 截图 |
 |---|---|
-| 实例列表：按资源组维护数据库接入、连接状态和实例类型。 | ![实例列表](screenshots/03-instance-list.png) |
-| SQL 工单：提交变更、查看风险提示并进入审批流程。 | ![SQL 工单提交](screenshots/05-workflow-submit.png) |
-| 在线查询：在授权范围内选择实例、查看表结构并执行只读查询。 | ![在线查询](screenshots/08-query-workbench.png) |
-| 数据字典：在平台内查看库表字段、索引和备注信息。 | ![数据字典](screenshots/10-data-dictionary.png) |
-| 数据脱敏：维护敏感字段规则，保护查询和导出场景。 | ![数据脱敏](screenshots/11-masking-rule.png) |
-| 商业授权：查看试用、正式授权、客户 ID 和部署指纹。 | ![License 授权](screenshots/20-license.png) |
-
-截图来自 SagittaDB 测试环境，仅展示产品页面内容，不包含测试环境服务器 IP、浏览器地址栏或客户数据。实际页面会因版本、角色权限、License、实例数量和客户配置略有差异。
+| 在线查询概览 | ![在线查询概览](screenshots/02-dashboard-query.png) |
+| SQL 工单概览 | ![SQL 工单概览](screenshots/03-dashboard-workflow.png) |
+| 数据归档概览 | ![数据归档概览](screenshots/04-dashboard-archive.png) |
+| 实例与库概览 | ![实例与库概览](screenshots/05-dashboard-instance.png) |
+| 工单列表 | ![工单列表](screenshots/06-workflow-list.png) |
+| 提交工单 | ![提交工单](screenshots/07-workflow-submit.png) |
+| 工单模板 | ![工单模板](screenshots/08-workflow-templates.png) |
+| 执行查询 | ![执行查询](screenshots/09-query-workbench.png) |
+| 查询权限 | ![查询权限](screenshots/10-query-privileges.png) |
+| 查询历史 | ![查询历史](screenshots/11-query-history.png) |
+| 观测中心 | ![观测中心](screenshots/12-monitor.png) |
+| 数据归档 | ![数据归档](screenshots/13-archive.png) |
+| 数据字典 | ![数据字典](screenshots/14-data-dictionary.png) |
+| 实例管理 | ![实例管理](screenshots/15-instance-management.png) |
+| 用户管理 | ![用户管理](screenshots/16-user-management.png) |
+| 资源组管理 | ![资源组管理](screenshots/17-resource-groups.png) |
+| 角色管理 | ![角色管理](screenshots/18-role-management.png) |
+| 用户组管理 | ![用户组管理](screenshots/19-user-groups.png) |
+| 审批流管理 | ![审批流管理](screenshots/20-approval-flows.png) |
+| 系统配置 | ![系统配置](screenshots/21-system-config.png) |
+| 数据脱敏规则 | ![数据脱敏规则](screenshots/22-masking-rules.png) |
+| 交付与支持 | ![交付与支持](screenshots/23-commercial-support.png) |
+| 审计日志 | ![审计日志](screenshots/24-audit-log.png) |
 
 ## 当前版本与镜像
 
@@ -47,7 +66,7 @@ SagittaDB Enterprise 适合已经有多套数据库、多个研发团队和审�
 
 - [安装部署指南](docs/installation.md)：服务器准备、Docker Compose 部署、Helm 部署、授权激活和上线检查。
 - [运维升级指南](docs/operations-upgrade.md)：日常巡检、备份、升级、回滚、日志诊断和安全基线。
-- [产品使用手册](docs/product-manual.md)：角色说明、登录、实例、SQL 工单、在线查询、权限、字典、脱敏、监控、归档、审计和商业交付。
+- [产品使用手册](docs/product-manual.md)：按真实菜单顺序说明各功能页面和常用流程。
 - [法律提示](LEGAL-NOTICE.md)：授权、知识产权、免责声明和使用边界。
 
 ## 快速部署
@@ -82,7 +101,7 @@ curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1/health
 ```
 
-前端健康后，使用客户侧域名或服务器入口访问 SagittaDB。不要在公开截图、工单、群聊或文档中暴露测试环境 IP、`.env`、License 文件、激活码、数据库密码或未脱敏客户数据。
+前端健康后，使用客户侧域名或服务器入口访问 SagittaDB。公开截图、工单、群聊和文档中不要暴露测试环境 IP、`.env`、License 文件、激活码、数据库密码或未脱敏客户数据。
 
 ## Kubernetes / Helm
 
@@ -123,15 +142,15 @@ helm upgrade --install sagittadb helm/sagittadb \
 
 ## License 与试用
 
-登录后可在 `商业交付` -> `License 授权` 中完成在线激活或离线授权。也可以用脚本验证授权流程：
+登录后可在 `商业交付` -> `License 授权` 中完成在线激活或离线授权。该页面包含客户 ID、部署指纹、激活状态等敏感信息，因此公开 README 和产品手册不提供该页面截图。
+
+也可以用脚本验证授权流程：
 
 ```bash
 ./verify-license.sh <activation_code> <customer_id>
 ```
 
-SagittaDB Enterprise 使用统一授权中心 License-Server-Center，默认授权服务地址为 `https://license.loveai.asia`。在线激活和联网刷新会提交授权项目码 `sagittadb`，授权管理页应显示 `授权项目：SagittaDB（sagittadb）`。
-
-在线激活前，请在授权管理页输入客户 ID，复制页面展示的“正式激活部署指纹”，交给 SagittaDB 商业支持生成激活码。HTTP 试用部署会使用兼容复制方式；HTTPS 环境优先使用浏览器剪贴板能力。
+SagittaDB Enterprise 使用统一授权中心 License-Server-Center，默认授权服务地址为 `https://license.loveai.asia`。在线激活和联网刷新会提交授权项目码 `sagittadb`。
 
 ## 供应链材料
 

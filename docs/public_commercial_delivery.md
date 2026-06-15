@@ -30,9 +30,10 @@ docs/
   operations-upgrade.md
   product-manual.md
 screenshots/
-  02-dashboard.png
-  08-query-workbench.png
-  20-license.png
+  02-dashboard-query.png
+  09-query-workbench.png
+  23-commercial-support.png
+  24-audit-log.png
 releases/
   v2.2.0/
     SagittaDB-Enterprise-v2.2.0.zip
@@ -49,7 +50,7 @@ releases/
 公开仓库根 `README.md` 应作为用户入口，包含：
 
 - SagittaDB Enterprise 产品定位和核心功能。
-- 测试环境页面截图，展示 Dashboard、实例、SQL 工单、在线查询、字典、脱敏、监控、归档、权限、审计和 License 等核心界面。
+- 测试环境页面截图，展示 Dashboard、实例、SQL 工单、在线查询、字典、脱敏、监控、归档、权限、系统配置和审计等核心界面。
 - Docker Compose 快速开始。
 - Kubernetes / Helm 部署入口。
 - 60 天试用说明。
@@ -68,6 +69,7 @@ releases/
 - `latest` 镜像标签、源码 `build:` 配置或本地源码挂载路径。
 - 真实客户 ID、真实域名、公网 IP、部署指纹、实例名称、账号、客户现场截图、
   支持群截图或授权状态流转记录。
+- `License 授权` / `授权管理` 页面原图；该页面包含客户 ID、部署指纹和授权状态，只能在脱敏后的内部支持材料中使用。
 
 公开文档、Release 说明、PR 描述和截图默认使用 `<customer_id>`、`<domain>`、
 `<origin-ip>`、`<fingerprint>` 等占位符。客户案例进入公开材料前必须先改写为

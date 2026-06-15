@@ -92,7 +92,7 @@ http://<server>/
 5. 将部署指纹提供给 SagittaDB 商业支持。
 6. 获得激活码后在页面完成在线激活。
 
-![License 授权](../screenshots/20-license.png)
+`License 授权` 页面会展示客户 ID、部署指纹、授权状态和激活记录，属于客户现场敏感信息，公开文档不附该页面截图。内部验收或支持沟通时如需截图，请先遮挡公网 IP、客户 ID、部署指纹、激活码和授权状态明细。
 
 长期离线部署可在授权页面生成 Challenge，由商业支持签发 challenge-response 文件后导入。
 
