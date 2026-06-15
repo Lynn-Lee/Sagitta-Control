@@ -53,7 +53,7 @@ SagittaDB 支持试用和正式授权，部署完成后可在产品内完成激�
 - [安装部署指南](docs/installation.md)：服务器准备、Docker Compose 部署、Helm 部署、授权激活和上线检查。
 - [产品使用手册](docs/product-manual.md)：从部署后的初始化配置到各模块日常使用的完整说明。
 - [运维升级指南](docs/operations-upgrade.md)：日常巡检、备份、升级、回滚、日志诊断和安全基线。
-- [法律提示](LEGAL-NOTICE.md)：授权、知识产权、免责声明和使用边界。
+- [使用授权](LEGAL-NOTICE.md)：试用、学习、内部验证和继续使用授权说明。
 
 ## 快速部署
 
