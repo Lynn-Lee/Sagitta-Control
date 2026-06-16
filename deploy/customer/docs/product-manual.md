@@ -240,13 +240,9 @@ SQL 工单用于把数据库变更纳入提交、审批、执行和审计闭环�
 
 选择实例后，可以查看性能、库容量、表容量、会话洞察、SQL 洞察、复制、等待事件、容量增长、告警和采集诊断等页签。
 
-![实例性能](../screenshots/12-monitor-performance.png)
-
 SQL 洞察用于分析 Top SQL、SQL 样本、SQL 指纹、聚合指标和异常样本，适合定位慢 SQL、突增查询和高耗时语句。
 
-![SQL 洞察](../screenshots/12-monitor-sql-insight.png)
-
-![SQL 分析](../screenshots/12-monitor-sql-analysis.png)
+诊断工作台与舰队总览共用 `观测中心` 入口，进入实例后按页签切换查看性能、SQL 洞察和采集诊断。
 
 ## 6. 数据归档
 

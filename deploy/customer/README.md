@@ -55,9 +55,23 @@ SagittaDB 支持试用和正式授权，部署完成后可在产品内完成激�
 - [运维升级指南](docs/operations-upgrade.md)：日常巡检、备份、升级、回滚、日志诊断和安全基线。
 - [使用授权](LEGAL-NOTICE.md)：试用、学习、内部验证和继续使用授权说明。
 
+## 5 分钟理解部署流程
+
+SagittaDB Enterprise 的客户部署包已经包含 `docker-compose.yml`、`.env.example`、初始化脚本、升级脚本、上线检查脚本、Helm Chart 和文档。首次部署建议按下面顺序执行：
+
+1. 下载并校验 Release 包。
+2. 复制 `.env.example` 为 `.env`，生成随机密钥和稳定部署 ID。
+3. 按客户现场确认端口、域名、License、数据库和缓存密码。
+4. 拉取固定版本镜像，启动 PostgreSQL 和 Redis。
+5. 执行数据库迁移，再启动全部服务。
+6. 访问前后端健康接口。
+7. 登录产品完成授权确认、基础配置和上线检查。
+
+如果客户服务器不能访问 GHCR 或授权服务，请先看 [安装部署指南](docs/installation.md) 的离线部署章节，不要直接跳过镜像和授权准备。
+
 ## 快速部署
 
-从 GitHub Releases 下载完整部署包：
+在 Linux 服务器上下载完整部署包：
 
 ```bash
 wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v__SAGITTADB_VERSION__/SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
@@ -67,18 +81,36 @@ unzip SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
 cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
 ```
 
-准备环境并启动：
+准备 `.env`。`prepare-go-live-env.sh` 会保留已有正式值，并为占位符生成强随机值：
 
 ```bash
 cp .env.example .env
 ./prepare-go-live-env.sh --customer-id <customer_id>
-# 按现场信息确认 .env 中的域名、端口、密钥、授权和通知配置。
+```
+
+继续检查 `.env`，至少确认这些值不是空值或 `CHANGE_ME`：
+
+```text
+POSTGRES_PASSWORD
+REDIS_PASSWORD
+SECRET_KEY
+LICENSE_CUSTOMER_ID
+LICENSE_DEPLOYMENT_ID
+BACKEND_PORT
+FRONTEND_PORT
+```
+
+启动服务：
+
+```bash
 docker compose pull
 docker compose up -d postgres redis
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
 docker compose ps
 ```
+
+`docker compose ps` 中 `postgres`、`redis`、`backend`、`celery_worker`、`celery_beat`、`frontend` 应为 `running` 或 `healthy`。如果镜像拉取失败，先确认服务器能访问 GHCR；离线服务器请先导入镜像 tar 包。
 
 健康检查：
 
@@ -87,11 +119,11 @@ curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1/health
 ```
 
-前端健康后，使用客户侧域名或服务器入口访问 SagittaDB。
+两个命令都成功后，使用客户侧域名或服务器入口访问 SagittaDB。生产环境建议通过 HTTPS 域名访问，不建议长期使用裸 IP。
 
 ## Kubernetes / Helm
 
-仓库内包含 Helm Chart：
+仓库内包含 Helm Chart。使用 Helm 前，请先准备 Ingress、证书、Secret、外部 PostgreSQL/Redis 或客户侧存储策略：
 
 ```bash
 helm dependency update helm/sagittadb
@@ -116,15 +148,21 @@ helm upgrade --install sagittadb helm/sagittadb \
   --password '<password>'
 ```
 
-上线检查会验证服务健康、管理员登录、关键配置、授权状态、交付向导和基础功能可用性。若管理员启用了 2FA，请改用 `--token <access_token>`。
+上线检查会验证服务健康、管理员登录、关键配置、正式授权状态、交付向导、活跃实例、活跃用户和推广就绪度。这个脚本对生产上线是严格检查：如果仍处于试用 License、没有活跃实例、交付向导未完成或存在推广前待处理项，脚本会失败。
+
+如果只是试用或 POC 阶段，健康检查通过即可继续初始化业务配置；正式上线前再执行 `go-live-check.sh`。若管理员启用了 2FA，请改用 `--token <access_token>`。
 
 ## 升级入口
 
+升级前先下载新版本部署包并校验 sha256，然后把旧部署目录的 `.env` 复制到新目录。不要重新生成 `SECRET_KEY` 或 `LICENSE_DEPLOYMENT_ID`。
+
 ```bash
+cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
+cp /path/to/old/SagittaDB-Enterprise-v<old_version>/.env .env
 ./upgrade.sh __SAGITTADB_VERSION__
 ```
 
-升级脚本会拉取固定版本镜像、备份 PostgreSQL、执行 Alembic 迁移、重启服务并检查前后端健康状态。升级前请阅读 [运维升级指南](docs/operations-upgrade.md)，并确认已经完成数据库备份。
+升级脚本会更新镜像标签、拉取固定版本镜像、备份 PostgreSQL、执行 Alembic 迁移、重启服务并检查前后端健康状态。升级前请阅读 [运维升级指南](docs/operations-upgrade.md)，确认维护窗口、备份文件和回滚路径都已准备好。
 
 ## 发布校验文件
 

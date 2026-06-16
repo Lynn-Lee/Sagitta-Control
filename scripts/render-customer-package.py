@@ -135,10 +135,61 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
 
     readme_path = package_dir / "README.md"
     product_manual_path = package_dir / "docs" / "product-manual.md"
+    installation_path = package_dir / "docs" / "installation.md"
+    operations_path = package_dir / "docs" / "operations-upgrade.md"
     if readme_path.exists() and "screenshots/" not in readme_path.read_text(encoding="utf-8"):
         errors.append("README.md 未引用产品截图")
     if product_manual_path.exists() and "../screenshots/" not in product_manual_path.read_text(encoding="utf-8"):
         errors.append("产品使用手册未引用产品截图")
+    required_doc_snippets = {
+        readme_path: [
+            "prepare-go-live-env.sh",
+            "go-live-check.sh",
+            "upgrade.sh",
+            "SECRET_KEY",
+            "LICENSE_DEPLOYMENT_ID",
+        ],
+        installation_path: [
+            "sha256sum -c",
+            "prepare-go-live-env.sh",
+            "docker compose run --rm backend alembic upgrade head",
+            "go-live-check.sh",
+        ],
+        operations_path: [
+            "pg_dump",
+            "upgrade.sh",
+            "gunzip -c",
+            "docker compose logs --tail=200 backend",
+        ],
+    }
+    for path, snippets in required_doc_snippets.items():
+        if not path.exists():
+            errors.append(f"客户包缺少关键文档：{path.relative_to(package_dir)}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(f"{path.relative_to(package_dir)} 缺少关键操作说明：{snippet}")
+
+    for path in [readme_path, *(package_dir / "docs").glob("*.md")]:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]+\]\(([^)]+)\)", text):
+            target = match.group(1) or match.group(2)
+            if target.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            target = target.split("#", 1)[0]
+            if not target:
+                continue
+            linked_path = (path.parent / target).resolve()
+            try:
+                linked_path.relative_to(package_dir.resolve())
+            except ValueError:
+                errors.append(f"{path.relative_to(package_dir)} 的链接越过客户包目录：{target}")
+                continue
+            if not linked_path.exists():
+                errors.append(f"{path.relative_to(package_dir)} 的链接不存在：{target}")
 
     if re.search(r":latest\b", combined_text):
         errors.append("客户包禁止引用 :latest 镜像")
