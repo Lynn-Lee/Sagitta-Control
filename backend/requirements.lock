@@ -25,9 +25,9 @@ amqp==5.3.1
     # via kombu
 annotated-types==0.7.0
     # via pydantic
-anthropic==0.109.1
+anthropic==0.109.2
     # via sagittadb-backend (backend/pyproject.toml)
-anyio==4.13.0
+anyio==4.14.0
     # via
     #   anthropic
     #   httpx
@@ -386,7 +386,7 @@ sniffio==1.3.1
     #   anthropic
     #   httpx
     #   openai
-sqlalchemy==2.0.50
+sqlalchemy==2.0.51
     # via
     #   sagittadb-backend (backend/pyproject.toml)
     #   alembic
