@@ -327,7 +327,7 @@ class TestRelationalDataDictConstraints:
                         "check_clause": '"REQUIRED_FLAG" IS NOT NULL',
                     },
                     {
-                        "constraint_name": "CK_STATUS_FLAG",
+                        "constraint_name": "CK_DEMO_STATUS",
                         "constraint_type": "CHECK",
                         "column_names": "STATUS_FLAG",
                         "referenced_table_name": "",
@@ -343,7 +343,7 @@ class TestRelationalDataDictConstraints:
 
         assert [item["constraint_name"] for item in result] == [
             "PK_DEMO_CONSTRAINTS",
-            "CK_STATUS_FLAG",
+            "CK_DEMO_STATUS",
         ]
 
     @pytest.mark.asyncio
