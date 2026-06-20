@@ -903,7 +903,18 @@ export default function LoginPage() {
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
         lineHeight: 1.8,
       }}>
-        <div>Copyright © 2026 Lynn-Lee. All rights reserved.</div>
+        <div>
+          Copyright © 2026{' '}
+          <a
+            href="https://github.com/Lynn-Lee"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+          >
+            Lynn-Lee
+          </a>
+          . All rights reserved.
+        </div>
         <div>{branding.platform_name} v2.2.0 · Full Engine Compatibility, End-to-End Observability</div>
       </div>
     </div>

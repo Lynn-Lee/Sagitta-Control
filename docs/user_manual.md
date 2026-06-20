@@ -408,7 +408,7 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 - `平台名称` 会显示在登录页、顶部导航和浏览器标题中。
 - `平台 Logo URL` 支持图片 URL，也支持上传 PNG/JPG/SVG/WebP 后自动保存为 data URL；留空时使用默认 Logo。
 - 保存后刷新页面即可看到登录页、顶部导航、浏览器标题和 favicon 的品牌变化。前端会在应用启动前预加载品牌配置，避免浏览器刷新时短暂显示默认旧标题。
-- 登录页底部版权文案显示为 `Copyright © 2026 Lynn-Lee. All rights reserved.`。
+- 登录页底部版权文案显示为 `Copyright © 2026 Lynn-Lee. All rights reserved.`，其中 `Lynn-Lee` 可点击打开 `https://github.com/Lynn-Lee`。
 
 ## 13. 审计日志
 
