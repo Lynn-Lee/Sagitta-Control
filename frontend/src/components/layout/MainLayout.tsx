@@ -517,16 +517,6 @@ export default function MainLayout() {
               }}>
                 {branding.platform_name}
               </div>
-              <div style={{
-                fontFamily: "'Noto Sans SC', sans-serif",
-                fontWeight: 400,
-                fontSize: 10,
-                color: 'rgba(22,93,255,0.8)',
-                letterSpacing: 0,
-                marginTop: 1,
-              }}>
-                矢准数据
-              </div>
             </div>
           </Space>
         </Space>
