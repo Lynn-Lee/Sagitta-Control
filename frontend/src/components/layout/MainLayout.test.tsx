@@ -76,5 +76,21 @@ describe('MainLayout', () => {
       'style',
       expect.stringContaining('align-items: center'),
     )
+    expect(screen.getByTestId('header-left-actions')).toHaveAttribute(
+      'style',
+      expect.stringContaining('height: 100%'),
+    )
+    expect(screen.getByTestId('header-left-actions')).toHaveAttribute(
+      'style',
+      expect.stringContaining('align-items: center'),
+    )
+    expect(screen.getByTestId('header-right-actions')).toHaveAttribute(
+      'style',
+      expect.stringContaining('height: 100%'),
+    )
+    expect(screen.getByTestId('header-right-actions')).toHaveAttribute(
+      'style',
+      expect.stringContaining('align-items: center'),
+    )
   })
 })

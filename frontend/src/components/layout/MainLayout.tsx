@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Tooltip, Drawer, Grid, Alert } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Typography, Badge, Button, Tooltip, Drawer, Grid, Alert } from 'antd'
 import type { MenuProps } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -485,9 +485,20 @@ export default function MainLayout() {
         borderBottom: '1px solid rgba(148,163,184,0.14)',
         boxShadow: '0 8px 24px rgba(2,6,23,0.22)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        lineHeight: 1,
       }}>
         {/* 左侧：折叠按钮 + Logo */}
-        <Space size={0}>
+        <div
+          data-testid="header-left-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: '100%',
+            gap: 12,
+            minWidth: 0,
+            paddingLeft: 12,
+          }}
+        >
           <Button
             icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
             onClick={() => {
@@ -497,7 +508,7 @@ export default function MainLayout() {
               }
               setCollapsed(!collapsed)
             }}
-            style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', height: 32, margin: '0 12px' }}
+            style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', height: 32 }}
           >
             菜单
           </Button>
@@ -528,10 +539,18 @@ export default function MainLayout() {
               {branding.platform_name}
             </div>
           </div>
-        </Space>
+        </div>
 
         {/* 右侧：通知 + 用户 */}
-        <Space size={4}>
+        <div
+          data-testid="header-right-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: '100%',
+            gap: 4,
+          }}
+        >
           <Dropdown
             menu={{ items: notificationMenuItems, onClick: handleNotificationClick }}
             placement="bottomRight"
@@ -543,7 +562,7 @@ export default function MainLayout() {
             <Tooltip title="站内通知">
               <Badge count={unreadCount} size="small" overflowCount={99}>
                 <Button icon={<BellOutlined />}
-                  style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                  style={{ color: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)', borderRadius: 6, height: 32 }}>
                   站内通知
                 </Button>
               </Badge>
@@ -594,7 +613,7 @@ export default function MainLayout() {
               )}
             </div>
           </Dropdown>
-        </Space>
+        </div>
       </Header>
 
       <Layout style={{ marginTop: 56 }}>
