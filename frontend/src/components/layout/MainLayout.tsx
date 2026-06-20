@@ -501,24 +501,33 @@ export default function MainLayout() {
           >
             菜单
           </Button>
-          <Space size={10} style={{ cursor: 'pointer' }} onClick={() => navigate(homePath)}>
+          <div
+            data-testid="header-brand"
+            style={{
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              height: 32,
+            }}
+            onClick={() => navigate(homePath)}
+          >
             <BrandLogo logoUrl={branding.platform_logo_url} size={26} color="#165DFF" />
-            <div style={{ lineHeight: 1 }}>
-              <div style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 800,
-                fontSize: 15,
-                color: '#FFFFFF',
-                letterSpacing: 0,
-                maxWidth: isMobile ? 132 : 220,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {branding.platform_name}
-              </div>
+            <div style={{
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 800,
+              fontSize: 15,
+              lineHeight: '26px',
+              color: '#FFFFFF',
+              letterSpacing: 0,
+              maxWidth: isMobile ? 132 : 220,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {branding.platform_name}
             </div>
-          </Space>
+          </div>
         </Space>
 
         {/* 右侧：通知 + 用户 */}
