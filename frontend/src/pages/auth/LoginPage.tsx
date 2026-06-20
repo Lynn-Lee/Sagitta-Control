@@ -424,7 +424,7 @@ export default function LoginPage() {
           <div style={{
             fontFamily: "'Inter', sans-serif",
             fontWeight: 300, fontSize: 11,
-            color: 'rgba(255,255,255,0.25)',
+            color: 'rgba(226,237,255,0.68)',
             letterSpacing: '1.5px', marginTop: 12,
           }}>
             {branding.platform_name} · Aim at Data, Control with Precision
@@ -813,8 +813,8 @@ export default function LoginPage() {
               <>
                 {/* ── 第三方登录 ── */}
                 <Divider style={{
-                  borderColor: 'rgba(255,255,255,0.07)',
-                  color: 'rgba(255,255,255,0.22)',
+                  borderColor: 'rgba(143,179,255,0.20)',
+                  color: 'rgba(226,237,255,0.62)',
                   fontSize: 11,
                   fontFamily: "'JetBrains Mono', monospace",
                   letterSpacing: '1px',
@@ -899,7 +899,7 @@ export default function LoginPage() {
         left: 16,
         right: 16,
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 11, color: 'rgba(255,255,255,0.13)',
+        fontSize: 11, color: 'rgba(226,237,255,0.56)',
         letterSpacing: '1px', zIndex: 2, textAlign: 'center',
         lineHeight: 1.8,
       }}>
@@ -909,7 +909,7 @@ export default function LoginPage() {
             href="https://github.com/Lynn-Lee"
             target="_blank"
             rel="noreferrer"
-            style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+            style={{ color: 'rgba(226,237,255,0.78)', textDecoration: 'underline', textUnderlineOffset: 3 }}
           >
             Lynn-Lee
           </a>
