@@ -375,7 +375,7 @@ class CommercialOpsService:
                 db, MonitorCollectConfig, MonitorCollectConfig.last_collect_status == "failed"
             )
         return {
-            "version": "2.2.0",
+            "version": "2.2.2",
             "app_env": settings.APP_ENV,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",
             "license_source": license_source,
@@ -1182,7 +1182,7 @@ class CommercialOpsService:
             {
                 "generated_at": _now().isoformat(),
                 "generated_by": user.get("username", ""),
-                "version": "2.2.0",
+                "version": "2.2.2",
                 "app_env": settings.APP_ENV,
                 "alembic_version": alembic_version,
                 "license": latest_license,
@@ -1420,7 +1420,7 @@ class CommercialOpsService:
         )
         readiness = await CommercialOpsService.commercial_readiness(db, license_status)
         return {
-            "version": "2.2.0",
+            "version": "2.2.2",
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
             "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",

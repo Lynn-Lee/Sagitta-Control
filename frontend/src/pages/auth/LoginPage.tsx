@@ -915,7 +915,7 @@ export default function LoginPage() {
           </a>
           . All rights reserved.
         </div>
-        <div>{branding.platform_name} v2.2.0 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>{branding.platform_name} v2.2.2 · Full Engine Compatibility, End-to-End Observability</div>
       </div>
     </div>
   )

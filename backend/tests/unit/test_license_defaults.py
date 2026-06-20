@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -5,6 +7,8 @@ import yaml
 from app.core.config import Settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+PRODUCT_VERSION = "2.2.2"
+IMAGE_REPOSITORY = "ghcr.io/lynn-lee/sagittadb"
 LICENSE_SERVER_URL = "https://license.loveai.asia"
 LICENSE_PUBLIC_KEY = "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"
 LICENSE_TRIAL_DAYS = "60"
@@ -29,11 +33,33 @@ def test_settings_default_online_license_config():
     assert settings.LICENSE_TRIAL_DAYS == 60
 
 
-def test_source_and_commercial_env_templates_share_license_defaults():
+def _render_customer_package(tmp_path: Path) -> Path:
+    output_dir = tmp_path / "dist-commercial"
+    package_name = f"SagittaDB-Enterprise-v{PRODUCT_VERSION}"
+    subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts/render-customer-package.py"),
+            "--version",
+            PRODUCT_VERSION,
+            "--image-repository",
+            IMAGE_REPOSITORY,
+            "--output-dir",
+            str(output_dir),
+            "--package-name",
+            package_name,
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+    )
+    return output_dir / package_name
+
+
+def test_source_and_commercial_env_templates_share_license_defaults(tmp_path):
+    package_dir = _render_customer_package(tmp_path)
     for relative_path in (
         ".env.example",
         "deploy/customer/.env.example",
-        "dist-commercial/SagittaDB-Enterprise-v2.2.0/.env.example",
     ):
         values = _env_values(REPO_ROOT / relative_path)
 
@@ -41,14 +67,24 @@ def test_source_and_commercial_env_templates_share_license_defaults():
         assert values["LICENSE_SERVER_URL"] == LICENSE_SERVER_URL
         assert values["LICENSE_TRIAL_DAYS"] == LICENSE_TRIAL_DAYS
 
+    values = _env_values(package_dir / ".env.example")
+    assert values["LICENSE_PUBLIC_KEY"] == LICENSE_PUBLIC_KEY
+    assert values["LICENSE_SERVER_URL"] == LICENSE_SERVER_URL
+    assert values["LICENSE_TRIAL_DAYS"] == LICENSE_TRIAL_DAYS
 
-def test_helm_values_share_license_defaults():
+
+def test_helm_values_share_license_defaults(tmp_path):
+    package_dir = _render_customer_package(tmp_path)
     for relative_path in (
         "deploy/helm/sagittadb/values.yaml",
-        "dist-commercial/SagittaDB-Enterprise-v2.2.0/helm/sagittadb/values.yaml",
     ):
         values = yaml.safe_load((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
 
         assert values["license"]["publicKey"] == LICENSE_PUBLIC_KEY
         assert values["license"]["serverUrl"] == LICENSE_SERVER_URL
         assert values["license"]["trialDays"] == 60
+
+    values = yaml.safe_load((package_dir / "helm/sagittadb/values.yaml").read_text(encoding="utf-8"))
+    assert values["license"]["publicKey"] == LICENSE_PUBLIC_KEY
+    assert values["license"]["serverUrl"] == LICENSE_SERVER_URL
+    assert values["license"]["trialDays"] == 60

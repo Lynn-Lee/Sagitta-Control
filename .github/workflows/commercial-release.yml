@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      preserve_public_docs:
+        description: "发布到公开部署仓库时保留现有 README、docs、LEGAL-NOTICE 和 screenshots。"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -31,7 +36,7 @@ permissions:
 env:
   PRODUCT_CODE: sagittadb
   PRODUCT_NAME: SagittaDB Enterprise
-  COMMERCIAL_BASE_VERSION: "2.2.0"
+  COMMERCIAL_BASE_VERSION: "2.2.2"
   PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/SagittaDB-Enterprise
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
 
@@ -266,14 +271,27 @@ jobs:
           package_name="${{ steps.release.outputs.package_name }}"
           release_dir="${{ steps.release.outputs.release_dir }}"
           public_dir="public-releases"
+          preserve_public_docs="${{ inputs.preserve_public_docs || false }}"
 
           mkdir -p "${public_dir}/releases/${release_dir}" "${public_dir}/screenshots"
-          rsync -a --delete \
+          rsync_excludes=(
             --exclude .git \
             --exclude .github \
             --exclude .gitignore \
             --exclude releases \
-            --exclude screenshots \
+            --exclude screenshots
+          )
+          if [[ "${preserve_public_docs}" == "true" ]]; then
+            rsync_excludes+=(
+              --exclude README.md
+              --exclude LEGAL-NOTICE.md
+              --exclude docs
+              --exclude screenshots
+            )
+          fi
+
+          rsync -a --delete \
+            "${rsync_excludes[@]}" \
             "dist-commercial/${package_name}/" \
             "${public_dir}/"
           cp "dist-commercial/${package_name}.zip" "${public_dir}/releases/${release_dir}/"
@@ -285,7 +303,9 @@ jobs:
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
-          rsync -a --delete docs/screenshots/user-manual/ "${public_dir}/screenshots/"
+          if [[ "${preserve_public_docs}" != "true" ]]; then
+            rsync -a --delete docs/screenshots/user-manual/ "${public_dir}/screenshots/"
+          fi
 
           if [[ ! -f public-releases/.gitignore ]]; then
             {

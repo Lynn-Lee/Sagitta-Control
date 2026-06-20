@@ -98,13 +98,13 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
 
     release_dir = tmp_path / "dist-commercial"
     release_dir.mkdir()
-    (release_dir / "SagittaDB-Enterprise-v2.2.0.zip.sha256").write_text("checksum\n", encoding="utf-8")
-    (release_dir / "SagittaDB-Enterprise-v2.2.0.zip.sig.json").write_text("{}", encoding="utf-8")
+    (release_dir / "SagittaDB-Enterprise-v2.2.2.zip.sha256").write_text("checksum\n", encoding="utf-8")
+    (release_dir / "SagittaDB-Enterprise-v2.2.2.zip.sig.json").write_text("{}", encoding="utf-8")
     sbom_dir = release_dir / "sbom"
     sbom_dir.mkdir()
-    (sbom_dir / "sagittadb-backend-2.2.0.cyclonedx.json").write_text("{}", encoding="utf-8")
-    (sbom_dir / "sagittadb-backend-2.2.0.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
-    (sbom_dir / "sagittadb-backend-2.2.0.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
+    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json").write_text("{}", encoding="utf-8")
+    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
+    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
 
     result = CommercialOpsService.delivery_preflight(tmp_path)
 
@@ -114,7 +114,7 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
 
 def test_delivery_preflight_can_use_release_manifest(tmp_path):
     manifest = {
-        "version": "2.2.0",
+        "version": "2.2.2",
         "materials": [
             {"path": "deploy/backup/backup-postgres.sh", "executable": True},
             {"path": "deploy/backup/restore-postgres.sh", "executable": True},
@@ -125,11 +125,11 @@ def test_delivery_preflight_can_use_release_manifest(tmp_path):
             {"path": "scripts/validate-commercial-images.sh", "executable": True},
             {"path": "scripts/generate-commercial-sbom.sh", "executable": True},
             {"path": "scripts/sign-commercial-artifacts.sh", "executable": True},
-            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.0.zip.sha256", "executable": False},
-            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.0.zip.sig.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.0.cyclonedx.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.0.cyclonedx.json.sha256", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.0.cyclonedx.json.bundle", "executable": False},
+            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.2.zip.sha256", "executable": False},
+            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.2.zip.sig.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json.sha256", "executable": False},
+            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json.bundle", "executable": False},
         ],
     }
 
