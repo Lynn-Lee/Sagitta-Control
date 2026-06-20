@@ -796,6 +796,11 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   border-color: var(--color-primary) !important;
 }
 
+.ant-menu-item-icon + span,
+.anticon + .ant-menu-title-content {
+  margin-inline-start: 10px !important;
+}
+
 /* Tag 圆角统一 */
 .ant-tag { border-radius: var(--radius-xs) !important; }
 
