@@ -685,7 +685,7 @@ export default function MonitorPage() {
                     type="warning"
                     showIcon
                     message="该实例尚未启用原生监控采集"
-                    description="保存采集配置或点击立即采集后，SagittaDB 会使用实例账号读取数据库原生监控指标。账号权限不足的指标会显示为空。"
+                    description="保存采集配置或点击立即采集后，Sagitta Control 会使用实例账号读取数据库原生监控指标。账号权限不足的指标会显示为空。"
                   />
                 )}
                 {latest?.error && <Alert type="error" showIcon message="最近采集失败" description={latest.error} />}
@@ -941,7 +941,7 @@ export default function MonitorPage() {
                             type="info"
                             showIcon
                             message="指标缺失说明"
-                            description="SagittaDB 使用实例配置账号采集监控数据。若账号缺少系统视图、性能视图或管理命令权限，对应指标会显示为空。请为监控账号授予数据库原生监控权限后重新采集。"
+                            description="Sagitta Control 使用实例配置账号采集监控数据。若账号缺少系统视图、性能视图或管理命令权限，对应指标会显示为空。请为监控账号授予数据库原生监控权限后重新采集。"
                           />
                           <Descriptions bordered size="small" column={1}>
                             <Descriptions.Item label="实例指标采集">{formatTime(detail?.config?.last_metric_collect_at)}</Descriptions.Item>

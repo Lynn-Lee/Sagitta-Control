@@ -1,12 +1,14 @@
-# SagittaDB 公开商业交付说明
+# Sagitta Control 公开商业交付说明
 
-本文档定义 SagittaDB Enterprise 的公开商业交付方式：公开部署包和商业镜像，源码、签发工具、私钥和内部构建流程继续保留在私有仓库。
+本文档定义 Sagitta Control Enterprise 的公开商业交付方式：公开部署包和商业镜像，源码、签发工具、私钥和内部构建流程继续保留在私有仓库。
+
+> 阶段一兼容说明：对外产品名切换为 `Sagitta Control`，但公开交付仓库、历史 Release、客户包文件名、镜像名、Helm chart 目录和授权项目码暂保留 `SagittaDB-Enterprise` / `sagittadb`，避免影响现有发布、升级和授权链路。
 
 ## 1. 交付模型
 
-SagittaDB 采用以下边界：
+Sagitta Control 采用以下边界：
 
-- 公开交付仓库：`Lynn-Lee/SagittaDB-Enterprise` 是 SagittaDB Enterprise 专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
+- 公开交付仓库：`Lynn-Lee/SagittaDB-Enterprise` 是 Sagitta Control Enterprise 阶段一继续沿用的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
 - 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
@@ -41,7 +43,7 @@ releases/
     SagittaDB-Enterprise-v2.2.0.zip.sig.json
 ```
 
-公开仓库根 `README.md` 由 SagittaDB 私有仓库的商业发布 workflow 渲染生成，是客户下载、安装、授权和运维文档的第一入口。
+公开仓库根 `README.md` 由 Sagitta Control 私有源码仓库的商业发布 workflow 渲染生成，是客户下载、安装、授权和运维文档的第一入口。
 
 当前私有仓库中的 `backend/`、`frontend/`、`tools/license_issue.py`、`tools/license_authority.py`、`tools/sign_manifest.py`、`scripts/build-commercial-images.sh`、`scripts/sign-commercial-artifacts.sh` 不进入公开仓库。
 
@@ -49,7 +51,7 @@ releases/
 
 公开仓库根 `README.md` 应作为用户入口，包含：
 
-- SagittaDB Enterprise 产品定位和核心功能。
+- Sagitta Control Enterprise 产品定位和核心功能。
 - 测试环境页面截图，展示 Dashboard、实例、SQL 工单、在线查询、字典、脱敏、监控、归档、权限、系统配置和审计等核心界面。
 - Docker Compose 快速开始。
 - Kubernetes / Helm 部署入口。
@@ -77,7 +79,7 @@ releases/
 
 ## 3. 镜像命名
 
-SagittaDB 镜像统一发布到公开 GHCR 组织，并只在部署包中引用完整版本号：
+Sagitta Control 阶段一镜像继续发布到既有公开 GHCR 仓库，并只在部署包中引用完整版本号：
 
 ```text
 ghcr.io/<org>/sagittadb-backend:2.2.0
@@ -97,18 +99,18 @@ ghcr.io/<org>/sagittadb-frontend:2.2.0
 
 ## 4. GitHub Release 规则
 
-SagittaDB 在专用公开仓库中按版本发版：
+Sagitta Control 在专用公开仓库中按版本发版，阶段一继续使用既有仓库和资产命名：
 
 ```text
 Repository: Lynn-Lee/SagittaDB-Enterprise
 Tag: v2.2.0
-Title: SagittaDB Enterprise v2.2.0
+Title: Sagitta Control Enterprise v2.2.0
 Assets:
   SagittaDB-Enterprise-v2.2.0.zip
   SagittaDB-Enterprise-v2.2.0.zip.sha256
 ```
 
-Release 发布说明使用 [SagittaDB 公开发布模板](release_templates/sagittadb_public_release.md)。
+Release 发布说明使用 [Sagitta Control 公开发布模板](release_templates/sagittadb_public_release.md)。
 
 用户安装命令示例：
 
@@ -131,7 +133,7 @@ docker compose ps
 
 ## 5. License 策略
 
-SagittaDB 固定授权项目码：
+Sagitta Control 当前阶段固定授权项目码：
 
 ```text
 project=sagittadb
@@ -194,10 +196,10 @@ payload:
 离线授权：
 
 1. 客户在授权管理页生成 Challenge。
-2. 客户把 Challenge 发送给 SagittaDB 商业支持。
+2. 客户把 Challenge 发送给 Sagitta Control 商业支持。
 3. 私有仓库使用 `tools/license_issue.py --challenge-file ... --response-out ...` 签发 response。
 4. 客户导入 challenge-response 文件。
-5. SagittaDB 校验 Challenge、License 签名、客户 ID、项目码和部署指纹。
+5. Sagitta Control 校验 Challenge、License 签名、客户 ID、项目码和部署指纹。
 
 生产环境保持：
 
@@ -294,7 +296,7 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 
 ```text
 Product Code: sagittadb
-Product Name: SagittaDB
+Product Name: Sagitta Control
 Edition: enterprise
 Trial Days: 30
 Release Tag: v2.2.0

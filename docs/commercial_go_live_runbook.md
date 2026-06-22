@@ -1,6 +1,6 @@
-# SagittaDB Enterprise 生产部署排障模板
+# Sagitta Control Enterprise 生产部署排障模板
 
-本文用于记录 SagittaDB Enterprise 客户现场 go-live 的通用排障步骤和案例复盘模板。
+本文用于记录 Sagitta Control Enterprise 客户现场 go-live 的通用排障步骤和案例复盘模板。
 公开仓库只保留可复用方法，不记录真实客户名称、客户 ID、域名、公网 IP、
 License、token、内部验收结论或授权中心操作记录。
 
@@ -120,7 +120,7 @@ curl -i https://<domain>/health
 结论判断：
 
 - 直连源站正常，但 CDN 代理返回 TLS 握手错误：问题通常在 CDN 到源站的证书信任、
-  TLS 模式或 SNI 配置，不是 SagittaDB 应用。
+  TLS 模式或 SNI 配置，不是 Sagitta Control 应用。
 - `HEAD /health` 返回 `405`：后端只允许 GET，不代表健康检查失败。
 - DNS 改成直连后，权威 DNS 已返回源站 IP，但本地仍看到旧 IP：等待本地 DNS 缓存过期，或重启浏览器/切换网络验证。
 - `198.18.*` 解析结果通常来自本机代理或虚拟网络，不可作为公网权威 DNS 结论。
@@ -149,7 +149,7 @@ docker run -d --name <customer>-sample-pg \
   postgres:16-alpine
 ```
 
-创建 SagittaDB 实例后必须调用连接测试，确认 `success=true`。样例实例只用于
+创建 Sagitta Control 实例后必须调用连接测试，确认 `success=true`。样例实例只用于
 验证流程，真实客户数据库连接串、账号、库名、表名和脱敏前数据不得写入公开文档。
 
 ## 7. 敏感信息清理

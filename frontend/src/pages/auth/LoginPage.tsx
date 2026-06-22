@@ -419,7 +419,7 @@ export default function LoginPage() {
             color: '#8FB3FF',
             letterSpacing: '7px', marginTop: 7, textAlign: 'center',
           }}>
-            矢 准 数 据
+            矢 准 管 控
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
@@ -427,7 +427,7 @@ export default function LoginPage() {
             color: 'rgba(226,237,255,0.68)',
             letterSpacing: '1.5px', marginTop: 12,
           }}>
-            {branding.platform_name} · Aim at Data, Control with Precision
+            {branding.platform_name} · Aim at Data, Govern with Precision
           </div>
         </div>
 
@@ -915,7 +915,7 @@ export default function LoginPage() {
           </a>
           . All rights reserved.
         </div>
-        <div>{branding.platform_name} v2.2.2 · Full Engine Compatibility, End-to-End Observability</div>
+        <div>{branding.platform_name} v2.2.2 · Database Security Control Platform</div>
       </div>
     </div>
   )

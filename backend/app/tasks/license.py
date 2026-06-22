@@ -70,7 +70,7 @@ async def _refresh_online_license_with_db(db: AsyncSession) -> dict:
                 "subject_type": "license",
                 "subject_id": 0,
                 "app_type": "商业授权",
-                "title": state.get("company_name") or state.get("license_id") or "SagittaDB License",
+                "title": state.get("company_name") or state.get("license_id") or "Sagitta Control License",
                 "applicant_name": "系统",
                 "permissions": ["system_config_manage"],
                 "remark": f"License 将在 {days_remaining} 天后到期，请及时续期或刷新授权。",

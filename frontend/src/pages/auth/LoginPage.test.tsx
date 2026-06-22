@@ -17,7 +17,7 @@ vi.mock('@/store/auth', () => ({
 vi.mock('@/hooks/useBranding', () => ({
   useBranding: () => ({
     branding: {
-      platform_name: 'SagittaDB',
+      platform_name: 'Sagitta Control',
       platform_logo_url: '',
     },
   }),
@@ -41,6 +41,21 @@ vi.mock('@/api/auth', () => ({
 }))
 
 describe('LoginPage', () => {
+  it('uses the Sagitta Control precision governance slogan', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByText('Sagitta Control · Aim at Data, Govern with Precision'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Sagitta Control v2.2.2 · Database Security Control Platform'),
+    ).toBeInTheDocument()
+  })
+
   it('links the footer author name to the GitHub profile', async () => {
     render(
       <MemoryRouter>

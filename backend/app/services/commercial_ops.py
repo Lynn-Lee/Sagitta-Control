@@ -582,7 +582,7 @@ class CommercialOpsService:
         changed, detail = await CommercialOpsService._ensure_system_config(
             db,
             "platform_name",
-            "SagittaDB",
+            "Sagitta Control",
             "平台名称",
         )
         record(changed, detail)
@@ -1092,10 +1092,11 @@ class CommercialOpsService:
 
     @staticmethod
     def acceptance_markdown(report: dict[str, Any]) -> str:
+        project_name = report.get("project") or LICENSE_PROJECT_NAME
         lines = [
-            "# SagittaDB 商业交付验收报告",
+            f"# {project_name} 商业交付验收报告",
             "",
-            f"- 项目：{report.get('project')}（{report.get('project_code')}）",
+            f"- 项目：{project_name}（{report.get('project_code')}）",
             f"- 生成时间：{report.get('generated_at')}",
             f"- 生成人：{report.get('generated_by') or '-'}",
             f"- 状态：{report.get('status')}",
@@ -1338,7 +1339,7 @@ class CommercialOpsService:
     @staticmethod
     def compliance_markdown(report: dict[str, Any]) -> str:
         lines = [
-            f"# SagittaDB 合规报表：{report['report_type']}",
+            f"# {LICENSE_PROJECT_NAME} 合规报表：{report['report_type']}",
             "",
             f"- 生成时间：{report['generated_at']}",
             f"- 统计周期：{report['period']['start']} 至 {report['period']['end']}",

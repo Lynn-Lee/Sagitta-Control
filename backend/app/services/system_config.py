@@ -83,7 +83,7 @@ CONFIG_GROUPS = {
 # 配置项定义：key → (description, group, is_sensitive, default)
 CONFIG_DEFINITIONS: dict[str, tuple[str, str, bool, str]] = {
     # ── 基础 ──────────────────────────────────────────────────
-    "platform_name": ("平台名称", "basic", False, "SagittaDB"),
+    "platform_name": ("平台名称", "basic", False, "Sagitta Control"),
     "platform_logo_url": ("平台 Logo URL", "basic", False, ""),
     "platform_url": ("平台访问地址", "basic", False, "http://localhost"),
     "sql_review_limit": ("单次审核SQL最大行数", "basic", False, "1000"),
@@ -207,7 +207,7 @@ def _normalize_config_value(key: str, value: str) -> str:
     value = value.strip()
     if key == "platform_name":
         if not value:
-            return "SagittaDB"
+            return "Sagitta Control"
         if len(value) > 80:
             raise ValueError("平台名称不能超过 80 个字符")
     if key == "platform_logo_url" and value:
@@ -282,7 +282,7 @@ class SystemConfigService:
         platform_name = await SystemConfigService.get_value(db, "platform_name")
         platform_logo_url = await SystemConfigService.get_value(db, "platform_logo_url")
         return {
-            "platform_name": platform_name or "SagittaDB",
+            "platform_name": platform_name or "Sagitta Control",
             "platform_logo_url": platform_logo_url or "",
         }
 
@@ -418,8 +418,8 @@ class SystemConfigService:
             if not host or not user:
                 return {"success": False, "message": "邮件配置不完整，请先填写 SMTP 地址和发件人"}
 
-            msg = MIMEText("这是来自SagittaDB 的测试邮件，收到说明邮件配置正确。", "plain", "utf-8")
-            msg["Subject"] = "【SagittaDB】测试邮件"
+            msg = MIMEText("这是来自 Sagitta Control 的测试邮件，收到说明邮件配置正确。", "plain", "utf-8")
+            msg["Subject"] = "【Sagitta Control】测试邮件"
             msg["From"] = f"{sender} <{user}>"
             msg["To"] = to_email
 
@@ -463,7 +463,7 @@ class SystemConfigService:
                 ).decode()
                 url = f"{webhook}&timestamp={ts}&sign={urllib.parse.quote_plus(sign)}"
 
-            payload = {"msgtype": "text", "text": {"content": "【SagittaDB】钉钉通知测试 ✓"}}
+            payload = {"msgtype": "text", "text": {"content": "【Sagitta Control】钉钉通知测试 ✓"}}
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(url, json=payload)
                 data = resp.json()
@@ -486,7 +486,7 @@ class SystemConfigService:
 
             payload = {
                 "msgtype": "text",
-                "text": {"content": "【SagittaDB】企业微信通知测试 ✓"},
+                "text": {"content": "【Sagitta Control】企业微信通知测试 ✓"},
             }
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(webhook, json=payload)
@@ -510,7 +510,7 @@ class SystemConfigService:
 
             payload = {
                 "msg_type": "text",
-                "content": {"text": "【SagittaDB】飞书通知测试 ✓"},
+                "content": {"text": "【Sagitta Control】飞书通知测试 ✓"},
             }
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(webhook, json=payload)

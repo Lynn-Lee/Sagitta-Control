@@ -25,7 +25,7 @@ from app.models.user import Users
 
 LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", "instance"}
 LICENSE_PROJECT_CODE = "sagittadb"
-LICENSE_PROJECT_NAME = "SagittaDB"
+LICENSE_PROJECT_NAME = "Sagitta Control"
 TRIAL_FEATURES = sorted(LICENSE_FEATURES)
 LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
     ("/api/v1/workflow", "workflow"),

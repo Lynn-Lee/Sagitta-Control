@@ -1,12 +1,12 @@
-# SagittaDB 矢准数据产品设计文档
+# Sagitta Control 矢准数据库安全管控平台产品设计文档
 
 > 文档版本：v2.2
-> 适用版本：SagittaDB v2.2 商业部署版 + v2-lite 授权体系
+> 适用版本：Sagitta Control v2.2 商业部署版 + v2-lite 授权体系
 > 目标读者：客户决策人、售前、产品经理、实施工程师、DBA、研发负责人、审计负责人
 
 ## 1. 产品定位
 
-SagittaDB 是企业级多引擎数据库管控平台，面向数据库变更、数据查询、权限治理、运行诊断和审计合规等场景，提供统一、安全、可追溯的管理入口。
+Sagitta Control 是企业级多引擎数据库安全管控平台，面向数据库变更、数据查询、权限治理、运行诊断和审计合规等场景，提供统一、安全、可追溯的管理入口。
 
 产品核心目标是让企业把数据库访问从“分散账号、人工审批、线下执行、事后追责”升级为“统一入口、权限收敛、流程审批、异步执行、全程审计”。
 
@@ -252,10 +252,10 @@ SQL 洞察按引擎能力选择采集来源。MySQL 使用 `performance_schema` 
 平台品牌配置包括：
 
 - `platform_name`：平台显示名称，用于登录页、顶部导航和浏览器标题。
-- `platform_logo_url`：平台 Logo 地址或图片 data URL，用于登录页、顶部导航和 favicon；未配置时使用默认 SagittaDB Logo。
+- `platform_logo_url`：平台 Logo 地址或图片 data URL，用于登录页、顶部导航和 favicon；未配置时使用默认 Sagitta Control Logo。
 - 前端通过公开接口 `/api/v1/system/branding/` 读取品牌信息，未登录用户也可获取登录页展示所需的非敏感配置。
-- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `SagittaDB`，不再显示中文副标。
-- 默认登录页展示引文版品牌语：`SagittaDB · Aim at Data, Control with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
+- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标。
+- 默认登录页展示引文版品牌语：`Sagitta Control · Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
 - 登录页认证入口通过公开接口 `/api/v1/system/auth-methods/` 读取 LDAP、CAS、OIDC、短信验证码、钉钉、飞书和企业微信的启用状态，只暴露布尔开关，不返回密钥或服务端地址。第三方登录入口采用纯图标展示，并通过 Tooltip 提示“使用 XXX 登录”；`LDAP`、`CAS`、`OIDC` 保持大写，短信验证码、钉钉、飞书和企业微信使用中文名称。点击未启用或未配置的企业入口时，错误提示与 DataFusionX-Enterprise 对齐为各入口的具体中文提示，例如 `飞书登录未启用或 App ID 未配置。`、`CAS 登录未启用或服务器地址未配置。`、`OIDC 登录未启用或 Client ID / Issuer 未配置。`。进入 LDAP 或短信验证码登录模式后，顶部使用紧凑返回图标和统一高度的认证标题块，输入框和登录按钮字号与账号密码登录表单保持一致，保持认证方式切换区视觉一致。
 - 登录页入口图标以系统配置页的登录接入图标为准：短信、钉钉、飞书、企微和 LDAP 使用对应 SVG 图标，CAS 使用全局网络图标，OIDC 使用 Key 图标，并采用与页面文字协调的紧凑尺寸；邮件、钉钉、飞书、企微测试发送按钮使用纸飞机发送图标，CAS/OIDC 提供与 LDAP 相同样式的连通性测试按钮。登录页仅展示已启用的登录接入入口，所有入口保持单行展示并按可用宽度自适应分布。
 
@@ -310,7 +310,7 @@ SQL 洞察按引擎能力选择采集来源。MySQL 使用 `performance_schema` 
 
 ## 9. 商业交付说明
 
-SagittaDB 对外投放时建议提供以下交付件：
+Sagitta Control 对外投放时建议提供以下交付件：
 
 - 根目录 README。
 - 产品设计文档。
@@ -318,7 +318,7 @@ SagittaDB 对外投放时建议提供以下交付件：
 - 运维管理手册。
 - 固定版本 Docker/Helm 客户部署包和 License 激活信息。
 
-当前商业部署版本为 `2.2.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。SagittaDB 的授权项目码固定为 `sagittadb`，展示名称为 `SagittaDB`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
+当前商业部署版本为 `2.2.0`。商业授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。Sagitta Control 当前阶段继续使用授权项目码 `sagittadb`，展示名称为 `Sagitta Control`。在线激活和联网刷新由后端自动提交 `project=sagittadb` 与兼容字段 `product=sagittadb`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
 
 v2.1 商业版重点补强 Oracle 可观测性：实时会话支持 RAC 实例号、OS 进程、module/action、client identifier、等待分类、阻塞实例、PGA 和 SQL child 信息；SQL 洞察新增 `oracle_sql_monitor`、`oracle_awr_sqlstat`、`oracle_cursor_cache` 来源，并按 SQL Monitor、AWR、游标缓存、当前会话顺序自动降级。Oracle 监控保持只读诊断边界，权限不足时返回 warning，不引入破坏性诊断动作。
 
@@ -338,7 +338,7 @@ v2.1 商业版重点补强 Oracle 可观测性：实时会话支持 RAC 实例�
 - 至少接入一个生产同构测试实例。
 - 完成用户、角色、用户组、资源组、审批流配置。
 - 验证 SQL 工单、查询权限、在线查询、数据字典、归档、通知链路。
-- 验证授权管理页展示 `授权项目：SagittaDB（sagittadb）`，客户 ID 可生成正式激活部署指纹，并完成在线激活、联网刷新和离线 challenge-response 导入。
+- 验证授权管理页展示 `授权项目：Sagitta Control（sagittadb）`，客户 ID 可生成正式激活部署指纹，并完成在线激活、联网刷新和离线 challenge-response 导入。
 - 验证 `商业交付` → `交付与支持` 页展示推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、监控采集失败数和推广前待处理项；`初始化试用环境` 可幂等创建商业试用资源组、用户组、标准审批流和演示链路数据，未接入实例时不得伪造活跃实例或保存真实数据库密码；验收报告需输出 `可推广`、`需补配置` 或 `阻塞` 结论。
 - 验证备份恢复和升级回滚。
 - 验证审计日志、查询历史和操作追踪可用。

@@ -9,7 +9,7 @@ export const BRANDING_STORAGE_KEY = 'sagittadb:branding'
 export const FALLBACK_DOCUMENT_TITLE = '数据管控平台'
 
 export const DEFAULT_BRANDING: Branding = {
-  platform_name: 'SagittaDB',
+  platform_name: 'Sagitta Control',
   platform_logo_url: '',
 }
 

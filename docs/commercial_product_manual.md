@@ -1,17 +1,17 @@
-# SagittaDB Enterprise 产品使用手册
+# Sagitta Control Enterprise 产品使用手册
 
 > 文档版本：v1.0  
-> 适用产品：SagittaDB Enterprise 正式商业版 2.2.0  
+> 适用产品：Sagitta Control Enterprise 正式商业版 2.2.0  
 > 目标读者：试用客户、研发工程师、DBA、系统管理员、运维工程师、安全审计员、实施顾问  
 > 授权项目码：`sagittadb`
 
-本文面向正式商业试用和客户培训场景，说明 SagittaDB Enterprise 的主要页面、典型流程和注意事项。实际页面可能因客户版本、角色权限、系统配置和授权状态略有差异。
+本文面向正式商业试用和客户培训场景，说明 Sagitta Control Enterprise 的主要页面、典型流程和注意事项。实际页面可能因客户版本、角色权限、系统配置和授权状态略有差异。
 
 ## 1. 使用前准备
 
 ### 1.1 访问条件
 
-使用 SagittaDB 前，请确认：
+使用 Sagitta Control 前，请确认：
 
 - 已获得平台访问地址。
 - 已由管理员创建账号，或企业身份登录已完成配置。
@@ -49,7 +49,7 @@
 
 操作步骤：
 
-1. 打开 SagittaDB 访问地址。
+1. 打开 Sagitta Control 访问地址。
 2. 选择账号密码、LDAP、CAS、OIDC、短信验证码、钉钉、飞书或企业微信等已启用的登录方式。
 3. 输入凭据并登录。
 4. 如系统提示默认密码、弱密码或密码过期，请先完成强制改密。
@@ -556,7 +556,7 @@ Dashboard 展示当前用户权限范围内的整体概览，包括：
 页面可查看：
 
 - License 状态。
-- 授权项目：`SagittaDB（sagittadb）`。
+- 授权项目：`Sagitta Control（sagittadb）`。
 - 客户 ID。
 - 激活客户 ID。
 - 部署指纹。
@@ -583,7 +583,7 @@ max_instances
 
 1. 在授权管理页输入正式客户 ID。
 2. 复制正式激活部署指纹。
-3. 商务或运营侧在 License-Server-Center 中创建 SagittaDB 激活码。
+3. 商务或运营侧在 License-Server-Center 中创建 Sagitta Control 激活码。
 4. 将激活码交付给客户管理员。
 5. 客户管理员输入激活码和客户 ID。
 6. 点击在线激活。

@@ -38,7 +38,7 @@ vi.mock('@/store/auth', () => ({
 vi.mock('@/hooks/useBranding', () => ({
   useBranding: () => ({
     branding: {
-      platform_name: 'SagittaDB',
+      platform_name: 'Sagitta Control',
       platform_logo_url: '',
     },
   }),
@@ -59,14 +59,14 @@ vi.mock('@/components/auth/ProfileSettingsModal', () => ({
 }))
 
 describe('MainLayout', () => {
-  it('shows only the logo icon and English product name in the header brand', () => {
+  it('shows only the logo icon and Sagitta Control product name in the header brand', () => {
     render(
       <MemoryRouter>
         <MainLayout />
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('SagittaDB')).toBeInTheDocument()
+    expect(screen.getByText('Sagitta Control')).toBeInTheDocument()
     expect(screen.queryByText('矢准数据')).not.toBeInTheDocument()
     expect(screen.getByTestId('header-brand')).toHaveAttribute(
       'style',

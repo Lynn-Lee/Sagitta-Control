@@ -38,6 +38,7 @@ class TestConfigDefinitions:
 
     def test_branding_config_exists(self):
         assert CONFIG_DEFINITIONS["platform_name"][1] == "basic"
+        assert CONFIG_DEFINITIONS["platform_name"][3] == "Sagitta Control"
         assert CONFIG_DEFINITIONS["platform_logo_url"][1] == "basic"
 
     def test_ai_group_config_exists(self):

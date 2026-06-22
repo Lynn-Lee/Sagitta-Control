@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
   },
 })
 
-// ── SagittaDB Design Token ────────────────────────────────────
+// ── Sagitta Control Design Token ──────────────────────────────
 const antTheme = {
   token: {
     // 字体：Inter + Noto Sans SC 配合系统字体

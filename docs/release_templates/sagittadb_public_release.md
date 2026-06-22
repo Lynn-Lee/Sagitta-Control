@@ -1,4 +1,4 @@
-# SagittaDB Enterprise vX.Y.Z
+# Sagitta Control Enterprise vX.Y.Z
 
 ## 镜像
 
@@ -37,9 +37,9 @@ curl -fsS http://127.0.0.1/health
 
 在线授权默认需要至少每 7 天成功联网刷新一次；长期离线部署请使用 challenge-response 离线授权。
 
-获取商业授权时，请联系 SagittaDB 支持团队。在授权管理页输入客户 ID 后复制“正式激活部署指纹”，并将该指纹提供给授权运营侧生成激活码。HTTP 试用部署会自动使用兼容复制方式，若浏览器仍阻止复制，可直接手动选择页面展示的完整指纹。
+获取商业授权时，请联系 Sagitta Control 支持团队。在授权管理页输入客户 ID 后复制“正式激活部署指纹”，并将该指纹提供给授权运营侧生成激活码。HTTP 试用部署会自动使用兼容复制方式，若浏览器仍阻止复制，可直接手动选择页面展示的完整指纹。
 
 ## 安全说明
 
-本部署包只包含部署文件，不包含 SagittaDB 源码、私钥、客户 License、激活码或镜像仓库凭据。
+本部署包只包含部署文件，不包含 Sagitta Control 源码、私钥、客户 License、激活码或镜像仓库凭据。
 Release 同时提供客户包签名文件、前后端镜像 CycloneDX SBOM 及其校验/签名材料。

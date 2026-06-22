@@ -1,5 +1,5 @@
 """
-SagittaDB — FastAPI 应用入口
+Sagitta Control — FastAPI 应用入口
 """
 import logging
 from contextlib import asynccontextmanager
@@ -39,15 +39,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     configure_logging()
     verify_startup_integrity()
-    logger.info("SagittaDB starting env=%s version=2.2.2", settings.APP_ENV)
+    logger.info("Sagitta Control starting env=%s version=2.2.2", settings.APP_ENV)
     yield
     await engine.dispose()
-    logger.info("SagittaDB shutdown complete")
+    logger.info("Sagitta Control shutdown complete")
 
 
 app = FastAPI(
-    title="SagittaDB — 矢准数据",
-    description="企业级数据库工单审核、在线查询、观测中心 API",
+    title="Sagitta Control — 矢准数据库安全管控平台",
+    description="企业级数据库安全管控、SQL 工单审核、在线查询、观测中心 API",
     version="2.2.2",
     docs_url="/docs" if settings.APP_ENV == "development" else None,
     redoc_url="/redoc" if settings.APP_ENV == "development" else None,
@@ -130,4 +130,4 @@ async def health_check():
 
 @app.get("/", tags=["健康检查"])
 async def root():
-    return {"message": "SagittaDB 矢准数据", "docs": "/docs"}
+    return {"message": "Sagitta Control 矢准数据库安全管控平台", "docs": "/docs"}

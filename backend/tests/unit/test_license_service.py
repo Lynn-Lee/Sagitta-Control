@@ -118,6 +118,32 @@ def test_deployment_fingerprint_uses_customer_and_deployment_id(monkeypatch):
     assert first != second
 
 
+@pytest.mark.asyncio
+async def test_status_uses_sagitta_control_display_name(monkeypatch):
+    record = LicenseRecord(
+        source="trial",
+        status="trial",
+        is_current=True,
+        license_id="trial",
+        customer_id="trial",
+        company_name="试用版",
+        edition="trial",
+        features=[],
+        limits={},
+        issued_at=datetime.now(UTC),
+        not_before=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + timedelta(days=60),
+        last_check_status="trial",
+        last_check_reason="试用期内",
+    )
+    monkeypatch.setattr(LicenseService, "ensure_trial", AsyncMock(return_value=record))
+
+    result = await LicenseService.status(SimpleNamespace(commit=AsyncMock()))
+
+    assert result["project_code"] == "sagittadb"
+    assert result["project_name"] == "Sagitta Control"
+
+
 def test_offline_challenge_response_success(monkeypatch, keypair, valid_payload):
     monkeypatch.setattr("app.services.license.settings.SECRET_KEY", "secret-for-challenge")
     monkeypatch.setattr("app.services.license.settings.LICENSE_DEPLOYMENT_ID", "deploy-a")

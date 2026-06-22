@@ -237,7 +237,7 @@ async def setup_2fa(user=Depends(current_user), db: AsyncSession = Depends(get_d
     totp = pyotp.TOTP(secret)
     return {
         "secret": secret,
-        "provisioning_uri": totp.provisioning_uri(name=db_user.username, issuer_name="SagittaDB"),
+        "provisioning_uri": totp.provisioning_uri(name=db_user.username, issuer_name="Sagitta Control"),
     }
 
 

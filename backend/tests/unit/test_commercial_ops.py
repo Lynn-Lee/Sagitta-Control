@@ -42,7 +42,7 @@ def test_engine_matrix_db_types_match_registered_engines():
 
 def test_acceptance_markdown_renders_check_results():
     report = {
-        "project": "SagittaDB",
+        "project": "Sagitta Control",
         "project_code": "sagittadb",
         "generated_at": "2026-05-28T00:00:00+00:00",
         "generated_by": "admin",
@@ -61,7 +61,7 @@ def test_acceptance_markdown_renders_check_results():
 
     markdown = CommercialOpsService.acceptance_markdown(report)
 
-    assert "SagittaDB 商业交付验收报告" in markdown
+    assert "Sagitta Control 商业交付验收报告" in markdown
     assert "推广结论：可推广" in markdown
     assert "PASS" in markdown
     assert "WARN" in markdown

@@ -1,12 +1,12 @@
-# SagittaDB 专属 Agent 工作规则
+# Sagitta Control / SagittaDB 专属 Agent 工作规则
 
-本文件是 SagittaDB 项目专属的 Codex / Agent 工作规则，记录后续研发、交付和测试环境更新时必须遵守的协作约定。每次开始编码、调试、重构、文档或部署任务前，应先阅读并遵守本文；如用户明确给出更具体要求，以用户当次要求为准。
+本文件是 Sagitta Control 项目专属的 Codex / Agent 工作规则；当前源码仓库和部分技术标识仍沿用 SagittaDB / sagittadb 兼容名称。本文记录后续研发、交付和测试环境更新时必须遵守的协作约定。每次开始编码、调试、重构、文档或部署任务前，应先阅读并遵守本文；如用户明确给出更具体要求，以用户当次要求为准。
 
 根目录 `AGENT.md` 是本项目唯一有效规则文件；如本地出现 `AGENT_*CaseConflict.md` 等同步冲突副本，一律不作为规则来源，并以当前 `AGENT.md` 为准。
 
 ## 项目定位
 
-- SagittaDB 是面向企业数据库治理场景的统一管控平台，覆盖数据库实例管理、SQL 工单、在线查询、数据字典、权限治理、数据脱敏、SQL 洞察、运行诊断、数据归档、审计和企业通知。
+- Sagitta Control 是面向企业数据库管理和安全控制场景的统一管控平台，覆盖数据库实例管理、SQL 工单、在线查询、数据字典、权限治理、数据脱敏、SQL 洞察、运行诊断、数据归档、审计和企业通知。
 - 后端目录为 `backend/`，技术栈为 Python 3.12、FastAPI、SQLAlchemy 2 async、Alembic、Celery、Redis、PostgreSQL。
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
@@ -27,9 +27,10 @@
 
 ## 品牌与界面规则
 
-- 默认品牌名称为 `SagittaDB`，中文品牌名为 `矢准数据`。
-- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `SagittaDB`，不再显示中文副标；不要再使用旧文案 `数据管控`。
-- 登录页默认使用引文版品牌语：`SagittaDB · Aim at Data, Control with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
+- 默认对外品牌名称为 `Sagitta Control`，中文产品名为 `矢准数据库安全管控平台`，软著备案推荐名称为 `矢准数据库安全管控平台软件`。
+- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标；不要再使用旧文案 `数据管控`。
+- 登录页默认使用引文版品牌语：`Sagitta Control · Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
+- 阶段一品牌切换只改变对外展示、文档和默认平台名；`LICENSE_PROJECT_CODE=sagittadb`、历史客户包名、公开交付仓库、ECS 目录、Helm chart 目录和镜像仓库名先保持兼容，除非用户明确要求执行技术标识迁移。
 - 如修改品牌、登录页、导航、系统配置展示或默认文案，必须同步更新 `docs/sagittadb_prd.md`、`README.md` 或其他相关文档。
 - 页面、菜单、按钮、表单控件、弹窗和抽屉等前端界面必须保持统一字体和字号体系，优先复用 Ant Design 主题 Token 或项目已有全局样式，不得在局部页面随意新增不一致的字体、字号或行高。
 - 前端所有按钮必须遵循统一按钮规划：按钮高度保持统一；按钮宽度根据图标和文字内容自适应，不固定成同一长度；按钮内容统一采用“图标 + 文字”形式，图标需按功能选择最合适的语义图标；按钮文字颜色、图标颜色和背景色需与功能语义及主题色协调。

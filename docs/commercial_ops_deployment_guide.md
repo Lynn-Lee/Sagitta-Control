@@ -1,15 +1,15 @@
-# SagittaDB Enterprise 运维部署维护升级文档
+# Sagitta Control Enterprise 运维部署维护升级文档
 
 > 文档版本：v1.0  
-> 适用产品：SagittaDB Enterprise 正式商业版 2.2.0  
+> 适用产品：Sagitta Control Enterprise 正式商业版 2.2.0  
 > 目标读者：运维工程师、DevOps、DBA、系统管理员、实施顾问  
 > 授权项目码：`sagittadb`
 
-本文面向客户正式试用和生产推广，说明 SagittaDB Enterprise 的部署、授权、初始化、巡检、备份恢复、升级回滚、维护、安全检查和常见故障处理。
+本文面向客户正式试用和生产推广，说明 Sagitta Control Enterprise 的部署、授权、初始化、巡检、备份恢复、升级回滚、维护、安全检查和常见故障处理。阶段一品牌切换仅调整对外产品名，客户包文件名、Helm release、Kubernetes namespace 和授权项目码仍保留 `SagittaDB-Enterprise` / `sagittadb` 兼容示例。
 
 ## 1. 部署架构
 
-SagittaDB Enterprise 由以下核心服务组成：
+Sagitta Control Enterprise 由以下核心服务组成：
 
 | 服务 | 作用 |
 |---|---|
@@ -228,11 +228,11 @@ kubectl -n sagittadb logs deploy/sagittadb-worker --tail=100
 
 操作步骤：
 
-1. 管理员登录 SagittaDB。
+1. 管理员登录 Sagitta Control。
 2. 打开 `商业交付` → `License 授权`。
 3. 输入正式客户 ID。
 4. 复制正式激活部署指纹。
-5. 商务或运营侧在授权中心创建 SagittaDB 激活码。
+5. 商务或运营侧在授权中心创建 Sagitta Control 激活码。
 6. 客户管理员输入激活码和客户 ID。
 7. 点击在线激活。
 8. 验证授权状态为 `licensed`，试用状态为 `false`。
@@ -743,7 +743,7 @@ docker compose ps
 排查顺序：
 
 1. 检查客户 ID 是否与授权中心一致。
-2. 检查激活码是否属于 SagittaDB 项目。
+2. 检查激活码是否属于 Sagitta Control 项目。
 3. 检查授权项目码是否为 `sagittadb`。
 4. 检查部署指纹是否与授权中心记录一致。
 5. 检查授权中心激活码状态是否 active。
@@ -790,7 +790,7 @@ docker compose ps
 每次客户正式交付建议保存：
 
 - 客户名称和客户 ID。
-- SagittaDB 版本号。
+- Sagitta Control 版本号。
 - 部署方式和服务器信息。
 - 镜像摘要和客户包 sha256。
 - `.env` 配置项摘要，不保存明文密码。

@@ -256,7 +256,7 @@ export default function LicensePage() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="授权项目">
-                {status?.project_name || 'SagittaDB'}
+                {status?.project_name || 'Sagitta Control'}
                 <Text type="secondary">（{status?.project_code || 'sagittadb'}）</Text>
               </Descriptions.Item>
               <Descriptions.Item label="License ID">{status?.license_id || '-'}</Descriptions.Item>

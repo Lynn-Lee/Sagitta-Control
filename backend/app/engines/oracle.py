@@ -105,7 +105,7 @@ def _normalize_oracle_connect_error(exc: Exception) -> str:
     message = str(exc)
     if "DPY-3010" in message:
         return (
-            f"{message}；当前 SagittaDB 正在使用 python-oracledb Thin 模式。"
+            f"{message}；当前 Sagitta Control 正在使用 python-oracledb Thin 模式。"
             "Oracle 11.2 及更早版本需安装 Instant Client，并将 ORACLE_DRIVER_MODE=thick。"
         )
     return message
