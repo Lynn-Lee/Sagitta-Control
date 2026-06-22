@@ -6,7 +6,7 @@
 
 ## 项目定位
 
-- Sagitta Control 是面向企业数据库管理和安全控制场景的统一管控平台，覆盖数据库实例管理、SQL 工单、在线查询、数据字典、权限治理、数据脱敏、SQL 洞察、运行诊断、数据归档、审计和企业通知。
+- Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单、在线查询、数据字典、权限治理、数据脱敏、SQL 洞察、运行诊断、数据归档、审计和企业通知。
 - 后端目录为 `backend/`，技术栈为 Python 3.12、FastAPI、SQLAlchemy 2 async、Alembic、Celery、Redis、PostgreSQL。
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
@@ -28,7 +28,7 @@
 ## 品牌与界面规则
 
 - 默认对外品牌名称为 `Sagitta Control`，中文产品名为 `矢准数据库安全管控平台`，软著备案推荐名称为 `矢准数据库安全管控平台软件`。
-- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标；不要再使用旧文案 `数据管控`。
+- 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标；不要再使用旧中文副标。
 - 登录页默认使用引文版品牌语：`Sagitta Control · Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
 - 登录页底部版本描述统一为 `Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability`。
 - 如修改品牌、登录页、导航、系统配置展示或默认文案，必须同步更新 `docs/sagitta_control_prd.md`、`README.md` 或其他相关文档。
