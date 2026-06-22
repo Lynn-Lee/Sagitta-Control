@@ -171,7 +171,7 @@ npm run build
 ## 商业交付
 
 当前版本：`v2.2 商业部署版 + v2-lite 授权体系`。
-当前商业部署版本：`2.2.0`。
+当前商业部署版本：`2.2.3`。
 状态：正式版商业交付。
 
 v2.1 重点增强 Oracle 引擎观测能力：会话监控优先使用 RAC 友好的 `GV$SESSION/GV$PROCESS/GV$SQL` 组合，SQL 洞察新增 Oracle SQL Monitor、AWR SQLStat、Cursor Cache 和当前会话 SQL 降级链路，并补充等待事件、阻塞会话、长事务和长操作摘要。所有 Oracle 诊断采集均使用 `python-oracledb` 参数化只读查询；权限不足时返回 warning 并自动降级，不执行 kill、dump、baseline、profile、patch 等高风险诊断动作。
@@ -184,7 +184,7 @@ v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查�
 
 前端中文化最终口径已收口到全局入口：Ant Design 日期选择器和日期范围选择器统一使用简体中文 locale，月份、星期、`Today`、`Select date`、`Start date`、`End date` 等默认文案分别显示为 `今天`、`请选择日期`、`开始日期`、`结束日期` 等中文文案。若生产环境仍出现英文日期控件，按旧前端静态资源或浏览器缓存未刷新处理，应重新构建发布前端并清理 Nginx/CDN/浏览器缓存。
 
-v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.2.0 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
+v2.2.3 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.2.3 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
 

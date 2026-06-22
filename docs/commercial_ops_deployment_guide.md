@@ -1,7 +1,7 @@
 # Sagitta Control 运维部署维护升级文档
 
 > 文档版本：v1.0
-> 适用产品：Sagitta Control 正式商业版 2.2.0
+> 适用产品：Sagitta Control 正式商业版 2.2.3
 > 目标读者：运维工程师、DevOps、DBA、系统管理员、实施顾问
 > 授权项目码：`sagitta-control`
 
@@ -99,9 +99,9 @@ Sagitta Control 由以下核心服务组成：
 ### 3.1 解压客户包
 
 ```bash
-sha256sum -c Sagitta-Control-v2.2.0.zip.sha256
-unzip Sagitta-Control-v2.2.0.zip
-cd Sagitta-Control-v2.2.0
+sha256sum -c Sagitta-Control-v2.2.3.zip.sha256
+unzip Sagitta-Control-v2.2.3.zip
+cd Sagitta-Control-v2.2.3
 ```
 
 ### 3.2 准备配置

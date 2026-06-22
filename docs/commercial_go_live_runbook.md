@@ -29,7 +29,7 @@ no matching manifest for linux/amd64 in the manifest list entries
 发布前必须检查镜像 manifest：
 
 ```bash
-VERSION=2.2.0 \
+VERSION=2.2.3 \
 IMAGE_REPOSITORY=ghcr.io/<org>/sagitta-control \
 EXPECTED_PLATFORMS=linux/amd64 \
 ./scripts/validate-commercial-images.sh
