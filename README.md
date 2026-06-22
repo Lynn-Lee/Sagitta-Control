@@ -170,47 +170,9 @@ npm run build
 
 ## 商业交付
 
-当前版本：`v2.2 商业部署版 + v2-lite 授权体系`。
-当前商业部署版本：`2.2.3`。
-状态：正式版商业交付。
+当前源码版本对应商业部署版本 `2.2.3`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
 
-v2.1 重点增强 Oracle 引擎观测能力：会话监控优先使用 RAC 友好的 `GV$SESSION/GV$PROCESS/GV$SQL` 组合，SQL 洞察新增 Oracle SQL Monitor、AWR SQLStat、Cursor Cache 和当前会话 SQL 降级链路，并补充等待事件、阻塞会话、长事务和长操作摘要。所有 Oracle 诊断采集均使用 `python-oracledb` 参数化只读查询；权限不足时返回 warning 并自动降级，不执行 kill、dump、baseline、profile、patch 等高风险诊断动作。
+商业交付包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。
 
-v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查询、归档、工单等页面的操作按钮、搜索入口、导入导出和弹窗确认按钮样式；常规按钮统一为 36px 高和图标 + 文字结构，并按主操作、查看/管理/刷新、编辑、导入导出、中性操作、危险操作规划语义色；登录页第三方接入入口改为纯图标按钮并通过悬停提示说明“使用 XXX 登录”，LDAP/CAS/OIDC 保持大写，钉钉、飞书、企业微信使用中文展示名，企业入口点击后的未启用/未配置提示与 DataFusionX-Enterprise 对齐，例如 `飞书登录未启用或 App ID 未配置。`、`CAS 登录未启用或服务器地址未配置。`、`OIDC 登录未启用或 Client ID / Issuer 未配置。`，LDAP 登录模式使用更紧凑一致的返回图标和认证标题块，并与账号密码登录表单保持一致的输入框和按钮字号；补充多处图标按钮文案与危险操作视觉层级，并优化全局按钮/弹窗/表格工具区细节，让客户生产环境的管理界面更一致、更易扫描。
-
-商业推广前 UI 颜色审核已完成收口：登录页统一为 Sagitta Control 品牌蓝与深炭黑主轴；后台主界面保留 `#165DFF` 企业蓝、`#0F172A` 深色顶栏、`#F2F3F5` 中性页面底色和白色内容卡片；Dashboard、慢 SQL、监控趋势等图表色板收敛到统一品牌/功能色，在线查询、数据字典、工单模板、用户导入和用户组导入等页面清理默认 Ant Design 蓝色残留；资源组数据库类型标签对亮黄色场景做对比度修正，避免客户演示和投影环境下文字发虚。
-
-商业控制台 UI 已按 v2.2 交付标准继续收口：全局 PageHeader、FilterCard、SectionCard、TableEmptyState 和 SectionLoading 统一页面标题说明、筛选区、表格外壳、空态和加载态；Dashboard 四类概览页统一指标卡、图表卡、时间范围选择器、Tooltip、Legend 和空图提示；实例管理、SQL 工单、查询历史和审计日志等高频列表页统一为“业务说明 + 筛选卡 + 表格卡”结构，移动端动作区自动铺满，筛选无结果、未配置和无权限等状态不再混用同一句空文案。
-
-前端中文化最终口径已收口到全局入口：Ant Design 日期选择器和日期范围选择器统一使用简体中文 locale，月份、星期、`Today`、`Select date`、`Start date`、`End date` 等默认文案分别显示为 `今天`、`请选择日期`、`开始日期`、`结束日期` 等中文文案。若生产环境仍出现英文日期控件，按旧前端静态资源或浏览器缓存未刷新处理，应重新构建发布前端并清理 Nginx/CDN/浏览器缓存。
-
-前端日期时间展示统一使用 `YYYY-MM-DD HH:mm:ss`，例如 `2026-06-02 22:32:33`。表格列、详情项、抽屉、弹窗、通知和运维面板不得直接使用浏览器本地化时间字符串，纯日期业务字段如授权有效期可继续保持 `YYYY-MM-DD`。
-
-v2.2.3 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.2.3 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
-
-系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
-
-商业授权接入统一授权中心 `License-Server-Center`。源码部署模板和客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`，并预置官方 License 验签公钥。Sagitta Control 客户端在线激活和联网刷新时会自动提交授权项目码 `sagitta-control`，同时保留 `product=sagitta-control` 兼容字段；授权管理页会展示 `授权项目：Sagitta Control（sagitta-control）`，用于现场确认当前部署正在按 Sagitta Control 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
-
-商业交付闭环已内置到产品：管理员可在 `商业交付` → `交付与支持` 页面完成实施交付向导、生成 Markdown/JSON 验收报告、导出脱敏诊断包、查看合规报表、处理告警事件和确认引擎支持矩阵。在线激活和联网刷新会向授权中心上报 usage/runtime 摘要，便于客户成功、续费和支持排障。
-
-商业试用初始化已内置到交付页：管理员可点击 `初始化试用环境`，幂等创建商业试用资源组、用户组、标准审批流和样例审计记录；若现场已有活跃数据库实例，会进一步生成 SQL 工单、查询权限申请、在线查询、归档作业和监控快照演示数据，并自动生成一次验收报告。该流程不会伪造活跃实例或保存真实数据库密码，未接入实例时会保留“首个实例”待处理项。
-
-客户包新增正式推广前硬门禁：`prepare-go-live-env.sh` 会为客户现场生成生产随机密钥和稳定部署 ID，`go-live-check.sh` 会严格校验生产环境变量、正式 License、客户 ID、部署指纹、活跃实例、实施向导、验收报告、运行健康和推广就绪度。该脚本通过后，才视为客户现场具备正式推广上线条件；任一失败项都应先完成配置或补验收。
-
-发布机制与 DataFusionX 对齐：源码 `main` 分支只触发快速 CI 和版本记录，不自动发布商业包；推送 `release/**` 分支生成 RC 候选商业镜像和部署包，但不默认同步公开交付仓库；推送正式 `vX.Y.Z` 标签生成最终商业交付包并同步到 `Lynn-Lee/Sagitta-Deploy`，并创建或更新对应 GitHub Release。手动触发商业发布时默认只生成临时包，只有显式勾选发布才同步公开发布仓库。
-
-正式交付包含：
-
-- 固定版本 Docker/Helm 公开商业部署包，不使用 `latest`。
-- 商业后端镜像使用 Nuitka 编译核心 Python 模块，前端只交付 build 产物且构建阶段禁止 sourcemap。
-- `.env.example`、`docker-compose.yml`、`upgrade.sh`、`verify-license.sh` 和 Nginx 配置。
-- 商业 License 使用 Ed25519 签名校验；支持在线激活、联网刷新和离线 challenge-response，生产环境默认禁止旧式裸 License 导入。
-- 商业镜像使用 Ed25519 签名完整性 Manifest 启动校验，镜像和客户包发布流程需完成 cosign 镜像签名与交付包签名。
-- 生产环境上线前完成实例接入、审批流、权限、通知、License 在线激活/联网刷新/离线 challenge-response、备份恢复和升级回滚验证。
-- 内部留存客户环境验收和 License-Server-Center 授权状态流转记录；公开仓库和
-  Release 说明不得包含真实客户 ID、域名、License、token、部署指纹、内部验收
-  记录或客户现场截图。
-- 合同条款需明确禁止逆向、篡改、绕过授权和二次分发，作为技术保护之外的法务兜底。
-
-公开商业交付仓库方案见 [Sagitta Control 公开商业交付说明](docs/public_commercial_delivery.md)。
+- 公开商业交付规则见 [Sagitta Control 公开商业交付说明](docs/public_commercial_delivery.md)。
+- 客户安装、升级和使用入口见 [Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy)。
