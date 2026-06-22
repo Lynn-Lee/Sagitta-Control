@@ -103,7 +103,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   pytest
     #   tqdm
     #   uvicorn
-coverage==7.14.1
+coverage==7.14.2
     # via pytest-cov
 cryptography==42.0.8
     # via
