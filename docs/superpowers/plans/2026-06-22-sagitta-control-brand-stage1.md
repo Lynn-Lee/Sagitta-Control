@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Switch the visible product brand to Sagitta Control / 矢准管控 while keeping the existing `sagitta-control` technical project code compatible.
+**Goal:** Switch the visible product brand to Sagitta Control / 矢准数据库安全管控平台 while keeping the existing `sagitta-control` technical project code compatible.
 
 **Architecture:** This stage changes customer-facing defaults, UI copy, API display names, and documentation. It deliberately leaves repository remotes, ECS paths, Docker image names, Helm chart directory names, historical commercial packages, and License project code unchanged.
 
@@ -72,7 +72,7 @@
 - Modify: `AGENT.md`
 
 - [ ] **Step 1: Update public positioning**
-  Replace visible product name with `Sagitta Control` / `矢准管控` where the text is product-facing.
+  Replace visible product name with `Sagitta Control` / `矢准数据库安全管控平台` where the text is product-facing.
 - [ ] **Step 2: Preserve technical compatibility names**
   Keep `sagitta-control`, `Sagitta-Control`, existing Git remotes, `/opt/sagitta-control/source`, `deploy/helm/sagitta-control`, and historical package examples as compatibility notes unless the text describes next-version naming.
 - [ ] **Step 3: Document the migration boundary**
@@ -90,7 +90,7 @@
   Run: `cd backend && . .venv/bin/activate && pytest tests/unit/test_commercial_ops.py tests/unit/test_license_service.py tests/unit/test_system_config.py -q`
   Expected: PASS.
 - [ ] **Step 3: Review remaining brand hits**
-  Run: `rg -n "Sagitta Control|矢准管控|Database Security Control Platform" README.md docs AGENT.md frontend/src backend/app backend/tests`
+  Run: `rg -n "Sagitta Control|矢准数据库安全管控平台|Database Security Control Platform" README.md docs AGENT.md frontend/src backend/app backend/tests`
   Expected: Remaining hits are either compatibility references, historical package/repo names, or intentionally preserved project codes.
 - [ ] **Step 4: Inspect git diff**
   Run: `git status --short && git diff --stat`

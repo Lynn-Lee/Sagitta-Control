@@ -419,7 +419,7 @@ export default function LoginPage() {
             color: '#8FB3FF',
             letterSpacing: '1px', marginTop: 7, textAlign: 'center',
           }}>
-            矢准管控
+            矢 准 管 控
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",

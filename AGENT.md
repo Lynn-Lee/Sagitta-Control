@@ -27,9 +27,9 @@
 
 ## 品牌与界面规则
 
-- 默认对外品牌名称为 `Sagitta Control`，中文产品名为 `矢准管控`，软著备案推荐名称为 `矢准管控软件`。
+- 默认对外品牌名称为 `Sagitta Control`，中文产品名为 `矢准数据库安全管控平台`，软著备案推荐名称为 `矢准数据库安全管控平台软件`。
 - 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标；不要再使用旧中文副标。
-- 登录页 Logo 下方中文名称统一为 `矢准管控`，默认使用精简品牌语：`Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
+- 登录页 Logo 下方展示中文简称 `矢准管控`，视觉文案统一为 `矢 准 管 控`，默认使用精简品牌语：`Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
 - 登录页底部版本描述统一为 `Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability`。
 - 如修改品牌、登录页、导航、系统配置展示或默认文案，必须同步更新 `docs/sagitta_control_prd.md`、`README.md` 或其他相关文档。
 - 页面、菜单、按钮、表单控件、弹窗和抽屉等前端界面必须保持统一字体和字号体系，优先复用 Ant Design 主题 Token 或项目已有全局样式，不得在局部页面随意新增不一致的字体、字号或行高。

@@ -67,7 +67,8 @@ describe('MainLayout', () => {
     )
 
     expect(screen.getByText('Sagitta Control')).toBeInTheDocument()
-    expect(screen.queryByText('矢准管控')).not.toBeInTheDocument()
+    expect(screen.queryByText('矢准数据库安全管控平台')).not.toBeInTheDocument()
+    expect(screen.queryByText('矢 准 管 控')).not.toBeInTheDocument()
     expect(screen.getByTestId('header-brand')).toHaveAttribute(
       'style',
       expect.stringContaining('display: inline-flex'),
