@@ -1,7 +1,7 @@
 # Sagitta Control 正式商业推广文案
 
 > 文档版本：v1.0
-> 适用产品：Sagitta Control 正式商业版 2.2.3
+> 适用产品：Sagitta Control 正式商业版 2.3.0
 > 适用场景：官网落地页、产品手册、销售介绍、解决方案材料、客户试用邀请、公开发布说明
 > 授权项目码：`sagitta-control`
 
@@ -445,7 +445,7 @@ max_instances
 - 产品名：`Sagitta Control 矢准数据库安全管控平台` 或 `Sagitta Control`。
 - 授权项目展示：`Sagitta Control（sagitta-control）`。
 - 产品版本：`Sagitta Control 正式商业版`。
-- 商业部署版本：`2.2.3`。
+- 商业部署版本：`2.3.0`。
 - 标准部署：Docker Compose、Kubernetes + Helm。
 - 试用策略：60 天全功能试用。
 - 授权策略：在线激活、联网刷新、离线 challenge-response。
