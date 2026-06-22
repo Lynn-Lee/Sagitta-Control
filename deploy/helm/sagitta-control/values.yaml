@@ -1,4 +1,4 @@
-# ─── SagittaDB Helm Chart Default Values ─────────────────────────────────────
+# ─── Sagitta Control Helm Chart Default Values ─────────────────────────────────────
 # 在 values-staging.yaml / values-prod.yaml 中覆盖
 
 nameOverride: ""
@@ -7,7 +7,7 @@ fullnameOverride: ""
 # ─── 镜像配置 ──────────────────────────────────────────────────────────────────
 image:
   registry: ghcr.io
-  repository: your-org/sagittadb
+  repository: your-org/sagitta-control
   tag: "1.0.0"
   pullPolicy: IfNotPresent
 
@@ -74,7 +74,7 @@ frontend:
   replicaCount: 2
   image:
     registry: ghcr.io
-    repository: your-org/sagittadb-frontend
+    repository: your-org/sagitta-control-frontend
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   resources:
@@ -102,7 +102,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
   hosts:
-    - host: sagittadb.example.com
+    - host: sagitta-control.example.com
       paths:
         - path: /api
           pathType: Prefix
@@ -111,9 +111,9 @@ ingress:
           pathType: Prefix
           backend: frontend
   tls: []
-  # - secretName: sagittadb-tls
+  # - secretName: sagitta-control-tls
   #   hosts:
-  #     - sagittadb.example.com
+  #     - sagitta-control.example.com
 
 # ─── 应用配置 ──────────────────────────────────────────────────────────────────
 app:
@@ -157,7 +157,7 @@ integrity:
 postgresql:
   enabled: true
   auth:
-    database: sagittadb
+    database: sagitta_control
     username: sagitta
     password: "sagitta123"
   primary:
@@ -175,7 +175,7 @@ postgresql:
 externalDatabase:
   host: "rds.example.com"
   port: 5432
-  database: sagittadb
+  database: sagitta_control
   username: sagitta
   password: "CHANGE_ME"
 

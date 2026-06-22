@@ -1,20 +1,20 @@
-# Sagitta Control Enterprise vX.Y.Z
+# Sagitta Control vX.Y.Z
 
 ## 镜像
 
-- `ghcr.io/<org>/sagittadb-backend:X.Y.Z`
-- `ghcr.io/<org>/sagittadb-frontend:X.Y.Z`
+- `ghcr.io/<org>/sagitta-control-backend:X.Y.Z`
+- `ghcr.io/<org>/sagitta-control-frontend:X.Y.Z`
 
 ## 安装
 
-下载 `SagittaDB-Enterprise-vX.Y.Z.zip` 和 sha256 文件，校验后解压，并按包内 `README.md` 和 `docs/installation.md` 部署。
+下载 `Sagitta-Control-vX.Y.Z.zip` 和 sha256 文件，校验后解压，并按包内 `README.md` 和 `docs/installation.md` 部署。
 
 ```bash
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/vX.Y.Z/SagittaDB-Enterprise-vX.Y.Z.zip
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/vX.Y.Z/SagittaDB-Enterprise-vX.Y.Z.zip.sha256
-sha256sum -c SagittaDB-Enterprise-vX.Y.Z.zip.sha256
-unzip SagittaDB-Enterprise-vX.Y.Z.zip
-cd SagittaDB-Enterprise-vX.Y.Z
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip.sha256
+sha256sum -c Sagitta-Control-vX.Y.Z.zip.sha256
+unzip Sagitta-Control-vX.Y.Z.zip
+cd Sagitta-Control-vX.Y.Z
 cp .env.example .env
 ./prepare-go-live-env.sh --customer-id <customer_id>
 docker compose pull

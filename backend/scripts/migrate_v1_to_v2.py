@@ -353,7 +353,7 @@ def migrate(dry_run: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SagittaDB v1→v2 权限体系迁移")
+    parser = argparse.ArgumentParser(description="Sagitta Control v1→v2 权限体系迁移")
     parser.add_argument("--dry-run", action="store_true", help="仅打印迁移计划，不修改数据")
     args = parser.parse_args()
     migrate(dry_run=args.dry_run)

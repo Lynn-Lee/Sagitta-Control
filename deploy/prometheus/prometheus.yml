@@ -2,7 +2,7 @@ global:
   scrape_interval: 60s
   evaluation_interval: 60s
   external_labels:
-    monitor: 'sagittadb-monitor'
+    monitor: 'sagitta-control-monitor'
 
 rule_files:
   - /etc/prometheus/rules/*.yml
@@ -14,14 +14,14 @@ alerting:
 
 scrape_configs:
   # 平台应用自身指标
-  - job_name: sagittadb_app
+  - job_name: sagitta_control_app
     static_configs:
       - targets: ['backend:8000']
     metrics_path: /metrics
 
   # 数据库实例监控 — HTTP SD 动态服务发现
   # 平台自动管理 Exporter 列表，无需手动修改此文件
-  - job_name: sagittadb_db_monitor
+  - job_name: sagitta_control_db_monitor
     http_sd_configs:
       - url: http://backend:8000/internal/prometheus/sd-targets
         refresh_interval: 30s

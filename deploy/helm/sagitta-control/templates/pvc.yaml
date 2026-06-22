@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-downloads
+  name: {{ include "sagitta-control.fullname" . }}-downloads
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}

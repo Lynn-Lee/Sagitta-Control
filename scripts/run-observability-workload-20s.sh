@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-LOG_FILE="${OBS_WORKLOAD_LOG:-/opt/sagittadb/source/logs/observability_workload.log}"
-CONTAINER="${OBS_WORKLOAD_CONTAINER:-sagittadb-source-test-backend-1}"
+LOG_FILE="${OBS_WORKLOAD_LOG:-/opt/sagitta-control/source/logs/observability_workload.log}"
+CONTAINER="${OBS_WORKLOAD_CONTAINER:-sagitta-control-source-test-backend-1}"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 

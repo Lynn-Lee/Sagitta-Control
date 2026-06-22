@@ -6,7 +6,7 @@
 
 ## 1. 运维范围
 
-本文档说明 Sagitta Control 正式运行后的部署、初始化、巡检、日志、备份恢复、升级回滚、监控告警、容量管理、故障处理和安全检查。当前阶段底层部署目录、Compose project、数据库名和 Git remote 仍沿用 `sagittadb` / `SagittaDB` 兼容标识。
+本文档说明 Sagitta Control 正式运行后的部署、初始化、巡检、日志、备份恢复、升级回滚、监控告警、容量管理、故障处理和安全检查。当前阶段底层部署目录、Compose project、数据库名和 Git remote 仍沿用 `sagitta-control` / `Sagitta Control` 兼容标识。
 
 ## 2. 部署与服务清单
 
@@ -66,24 +66,24 @@ Flower、Prometheus、Grafana 不包含在客户商业部署包的默认 Compose
 内部测试环境和可访问私有仓库的自管环境，统一采用“服务器保留 Git 工作区，发布时由服务器通过 SSH deploy key 直接拉取 `origin/main` 并执行部署脚本”的方式。标准目录约定：
 
 ```text
-/opt/sagittadb/source
+/opt/sagitta-control/source
 ```
 
 Git remote 必须使用 SSH URL，不使用交互式 HTTPS 账号密码。GitHub deploy key 建议只授予当前仓库只读权限：
 
 ```bash
-ssh-keygen -t ed25519 -C "sagittadb-ecs-deploy" -f ~/.ssh/sagittadb_deploy -N ""
+ssh-keygen -t ed25519 -C "sagitta-control-ecs-deploy" -f ~/.ssh/sagitta_control_deploy -N ""
 
 cat >> ~/.ssh/config <<'EOF'
-Host github.com-sagittadb
+Host github.com-sagitta-control
   HostName github.com
   User git
-  IdentityFile ~/.ssh/sagittadb_deploy
+  IdentityFile ~/.ssh/sagitta_control_deploy
   IdentitiesOnly yes
 EOF
 
-ssh -T git@github.com-sagittadb
-git remote set-url origin git@github.com-sagittadb:Lynn-Lee/SagittaDB.git
+ssh -T git@github.com-sagitta-control
+git remote set-url origin git@github.com-sagitta-control:Lynn-Lee/Sagitta-Control.git
 git fetch origin
 ```
 
@@ -132,7 +132,7 @@ docker compose -f deploy/docker-compose.yml exec celery_worker celery -A app.cel
 ### 3.4 数据库空间
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec postgres psql -U sagitta -d sagittadb -c "select pg_size_pretty(pg_database_size('sagittadb'));"
+docker compose -f deploy/docker-compose.yml exec postgres psql -U sagitta -d sagitta_control -c "select pg_size_pretty(pg_database_size('sagitta_control'));"
 ```
 
 重点关注：
@@ -182,13 +182,13 @@ bash deploy/backup/backup-postgres.sh
 或使用发布脚本内置备份：
 
 ```bash
-BACKUP_DIR=/data/sagittadb/backups BACKUP_RETAIN_DAYS=14 bash deploy/update-prod.sh
+BACKUP_DIR=/data/sagitta-control/backups BACKUP_RETAIN_DAYS=14 bash deploy/update-prod.sh
 ```
 
 备份完成后检查：
 
 ```bash
-ls -lh /data/sagittadb/backups
+ls -lh /data/sagitta-control/backups
 ```
 
 ### 5.3 恢复数据
@@ -228,15 +228,15 @@ bash deploy/backup/restore-postgres.sh
 内部 ECS 测试环境标准命令：
 
 ```bash
-cd /opt/sagittadb/source
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main
+cd /opt/sagitta-control/source
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref origin/main
 ```
 
 正式生产环境沿用同一入口，按实际 Compose 项目名和目标版本执行：
 
 ```bash
-cd /opt/sagittadb/source
-COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagittadb/backups bash deploy/update-prod.sh --ref <target_ref>
+cd /opt/sagitta-control/source
+COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagitta-control/backups bash deploy/update-prod.sh --ref <target_ref>
 ```
 
 常见发布目标：
@@ -261,13 +261,13 @@ bash deploy/update-prod.sh --full           # 强制全量构建并重建应用�
 默认只有目标版本相对当前版本包含数据库相关变更时才执行 `pg_dump` 和 Alembic 迁移，匹配范围包括 `backend/alembic/`、`backend/app/models/`、数据库连接核心文件以及 Compose/Helm 部署配置。普通前端、文档、业务服务代码更新会自动跳过部署前备份，降低测试环境更新耗时。若发布前需要留档备份，可显式强制备份：
 
 ```bash
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --force-backup
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref origin/main --force-backup
 ```
 
 如果刚刚完成过手工备份、连续重试同一版本，或已确认数据库变更不需要现场备份，可显式跳过备份：
 
 ```bash
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main --skip-backup
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref origin/main --skip-backup
 ```
 
 对生产环境显式跳过数据库相关变更备份时，必须在发布记录中注明最近一次可用备份文件。
@@ -277,9 +277,9 @@ COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref orig
 在 ECS 上验证当前版本、服务状态和健康接口：
 
 ```bash
-cd /opt/sagittadb/source
+cd /opt/sagitta-control/source
 git rev-parse --short HEAD
-COMPOSE_PROJECT_NAME=sagittadb-source-test docker compose -f deploy/docker-compose.yml ps
+COMPOSE_PROJECT_NAME=sagitta-control-source-test docker compose -f deploy/docker-compose.yml ps
 curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1/health
 ```
@@ -304,8 +304,8 @@ curl -fsS http://127.0.0.1/health
 应用版本回滚仍走同一脚本入口，目标 ref 使用上一版 tag 或提交号：
 
 ```bash
-cd /opt/sagittadb/source
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref <previous_tag_or_commit>
+cd /opt/sagitta-control/source
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref <previous_tag_or_commit>
 ```
 
 如果异常来自不可逆或破坏性数据库迁移，应先停止写入流量，再按 5.3 使用升级前备份恢复数据库。
@@ -337,10 +337,10 @@ Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。�
 测试环境的观测模拟任务通过系统 cron 触发，默认每分钟执行 3 轮，用于给观测中心持续产生连接、查询、事务、容量和等待类指标。云 ECS 测试环境的当前配置如下：
 
 ```cron
-* * * * * /usr/bin/flock -n /tmp/sagitta_observe_workload.lock /opt/sagittadb/source/scripts/run-observability-workload-20s.sh
+* * * * * /usr/bin/flock -n /tmp/sagitta_observe_workload.lock /opt/sagitta-control/source/scripts/run-observability-workload-20s.sh
 ```
 
-`run-observability-workload-20s.sh` 默认在 `sagittadb-source-test-backend-1` 容器内执行 `backend/scripts/observability_workload.py`，分别在第 0、20、40 秒触发一次，并将结果追加到 `/opt/sagittadb/source/logs/observability_workload.log`。容器名、日志路径和执行轮次可分别通过 `OBS_WORKLOAD_CONTAINER`、`OBS_WORKLOAD_LOG`、`OBS_WORKLOAD_ITERATIONS`、`OBS_WORKLOAD_INTERVAL` 调整。
+`run-observability-workload-20s.sh` 默认在 `sagitta-control-source-test-backend-1` 容器内执行 `backend/scripts/observability_workload.py`，分别在第 0、20、40 秒触发一次，并将结果追加到 `/opt/sagitta-control/source/logs/observability_workload.log`。容器名、日志路径和执行轮次可分别通过 `OBS_WORKLOAD_CONTAINER`、`OBS_WORKLOAD_LOG`、`OBS_WORKLOAD_ITERATIONS`、`OBS_WORKLOAD_INTERVAL` 调整。
 
 关系型测试库默认使用真实测试表 `rd_testdb.idp_task_flow_record` 生成负载；可通过 `OBS_REAL_WORKLOAD_DB`、`OBS_REAL_WORKLOAD_TABLE`、`OBS_REAL_WORKLOAD_MARKER`、`OBS_REAL_WORKLOAD_KEEP_DAYS` 覆盖数据库、表名、标记字段和清理窗口。Redis 仍使用 Redis 原生命令模拟；StarRocks 在该表不支持 UPDATE/DELETE 的部署形态下只执行插入和查询负载。观测中心前端展示 QPS/TPS 时统一保留两位小数，趋势图 tooltip 也使用相同格式，原始采集值仍保留在指标数据中。
 
@@ -459,10 +459,10 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 包含真实客户 ID、域名、公网 IP、License、token、部署指纹、内部验收记录、数据库
 连接信息或客户现场截图。
 
-当前商业部署版本为 `2.2.0`。Sagitta Control 授权项目码当前阶段固定为 `sagittadb`，源码部署模板和客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagittadb` 与兼容字段 `product=sagittadb`。验收时应在授权管理页确认 `授权项目：Sagitta Control（sagittadb）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.2.0`。Sagitta Control 授权项目码当前阶段固定为 `sagitta-control`，源码部署模板和客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagitta-control` 与兼容字段 `product=sagitta-control`。验收时应在授权管理页确认 `授权项目：Sagitta Control（sagitta-control）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 
 商业发布流水线应先使用 `scripts/validate-commercial-build-context.sh` 检查根级 `.dockerignore`，再使用 `scripts/build-commercial-images.sh` 构建后端 Nuitka 商业镜像和前端 build 镜像，使用 `scripts/validate-commercial-images.sh` 检查真实镜像文件系统，使用 `scripts/generate-commercial-sbom.sh` 生成 CycloneDX SBOM，并使用 `scripts/sign-commercial-artifacts.sh` 对后端完整性 Manifest、前后端镜像、SBOM 和客户部署包进行签名；签名后必须执行 `scripts/validate-commercial-release-materials.sh`，确认客户包、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且校验通过。交付记录中保存镜像 digest、cosign 签名状态、客户包 sha256 与签名文件。后端商业镜像构建必须通过源码残留门禁：`/app/app` 下除 `__init__.py` 外不得存在 `.py`、`.pyc` 或 `.pyo`；前端商业镜像不得包含 `.map` 或 `sourceMappingURL`。
 
-提交与发布策略参考 DataFusionX：`main` 只触发源码 CI 和版本记录；`release/**` 生成 RC 候选商业包和固定版本镜像，但不默认同步公开仓库；正式 `vX.Y.Z` tag 生成最终商业交付包并同步 `Lynn-Lee/SagittaDB-Enterprise`，同时创建或更新对应 GitHub Release；手动商业发布默认只生成临时包，除非显式勾选发布。商业部署包默认不上传为 Actions artifact，如需临时留存可设置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
+提交与发布策略参考 DataFusionX：`main` 只触发源码 CI 和版本记录；`release/**` 生成 RC 候选商业包和固定版本镜像，但不默认同步公开仓库；正式 `vX.Y.Z` tag 生成最终商业交付包并同步 `Lynn-Lee/Sagitta-Control`，同时创建或更新对应 GitHub Release；手动商业发布默认只生成临时包，除非显式勾选发布。商业部署包默认不上传为 Actions artifact，如需临时留存可设置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。

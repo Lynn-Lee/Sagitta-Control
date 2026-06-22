@@ -1,9 +1,9 @@
-# Sagitta Control Enterprise 正式商业推广文案
+# Sagitta Control 正式商业推广文案
 
-> 文档版本：v1.0  
-> 适用产品：Sagitta Control Enterprise 正式商业版 2.2.0  
-> 适用场景：官网落地页、产品手册、销售介绍、解决方案材料、客户试用邀请、公开发布说明  
-> 授权项目码：`sagittadb`
+> 文档版本：v1.0
+> 适用产品：Sagitta Control 正式商业版 2.2.0
+> 适用场景：官网落地页、产品手册、销售介绍、解决方案材料、客户试用邀请、公开发布说明
+> 授权项目码：`sagitta-control`
 
 ## 1. 品牌定位
 
@@ -92,7 +92,7 @@ Sagitta Control 提供观测中心、会话诊断、SQL 洞察、容量采样、
 
 ### 3.5 商业可交付
 
-Sagitta Control Enterprise 已形成商业部署包、固定版本镜像、License 授权、客户包签名、SBOM、上线门禁、验收报告、升级回滚和运维文档闭环。
+Sagitta Control 已形成商业部署包、固定版本镜像、License 授权、客户包签名、SBOM、上线门禁、验收报告、升级回滚和运维文档闭环。
 
 客户价值：
 
@@ -228,7 +228,7 @@ Sagitta Control Enterprise 已形成商业部署包、固定版本镜像、Licen
 - 固定版本 Docker/Helm 商业部署包。
 - 60 天全功能试用。
 - 在线激活、联网刷新、离线 challenge-response。
-- 授权项目固定为 `Sagitta Control（sagittadb）`。
+- 授权项目固定为 `Sagitta Control（sagitta-control）`。
 - 授权功能模块为 `workflow`、`query`、`archive`、`monitor`、`ai`、`masking`、`instance`。
 - 支持 `max_users` 和 `max_instances` 额度控制。
 - 商业交付页提供推广就绪度、验收报告、诊断包和支持矩阵。
@@ -347,7 +347,7 @@ Sagitta Control 覆盖从实例接入、权限治理、SQL 变更、在线查询
 ### 商业交付区短文案
 
 ```text
-Sagitta Control Enterprise 提供固定版本商业部署包、60 天全功能试用、在线和离线授权、上线门禁、验收报告、诊断包、SBOM 和签名材料，帮助客户从试用到正式上线形成稳定交付路径。
+Sagitta Control 提供固定版本商业部署包、60 天全功能试用、在线和离线授权、上线门禁、验收报告、诊断包、SBOM 和签名材料，帮助客户从试用到正式上线形成稳定交付路径。
 ```
 
 ## 7. 销售短 Pitch
@@ -369,7 +369,7 @@ Sagitta Control 是企业级多引擎数据库管控平台，帮助企业把数�
 标题：
 
 ```text
-邀请试用 Sagitta Control Enterprise：统一治理数据库访问、变更与审计
+邀请试用 Sagitta Control：统一治理数据库访问、变更与审计
 ```
 
 正文：
@@ -377,7 +377,7 @@ Sagitta Control 是企业级多引擎数据库管控平台，帮助企业把数�
 ```text
 您好，
 
-我们诚邀您试用 Sagitta Control Enterprise。Sagitta Control 是面向企业数据库治理场景的多引擎数据库管控平台，覆盖数据库实例管理、SQL 工单审批、在线查询、查询权限申请、数据脱敏、运行诊断、数据归档和审计追踪。
+我们诚邀您试用 Sagitta Control。Sagitta Control 是面向企业数据库治理场景的多引擎数据库管控平台，覆盖数据库实例管理、SQL 工单审批、在线查询、查询权限申请、数据脱敏、运行诊断、数据归档和审计追踪。
 
 试用版默认提供 60 天全功能体验，可通过 Docker Compose 快速部署，也支持 Kubernetes + Helm。试用期间可以完成实例接入、用户和权限配置、SQL 工单流程验证、在线查询授权、通知渠道配置、观测诊断和交付验收报告生成。
 
@@ -442,9 +442,9 @@ max_instances
 
 正式推广前，所有客户材料应统一以下口径：
 
-- 产品名：`Sagitta Control 矢准数据库安全管控平台` 或 `Sagitta Control Enterprise`。
-- 授权项目展示：`Sagitta Control（sagittadb）`。
-- 产品版本：`Sagitta Control Enterprise 正式商业版`。
+- 产品名：`Sagitta Control 矢准数据库安全管控平台` 或 `Sagitta Control`。
+- 授权项目展示：`Sagitta Control（sagitta-control）`。
+- 产品版本：`Sagitta Control 正式商业版`。
 - 商业部署版本：`2.2.0`。
 - 标准部署：Docker Compose、Kubernetes + Helm。
 - 试用策略：60 天全功能试用。

@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-backend
+  name: {{ include "sagitta-control.fullname" . }}-backend
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
   replicas: {{ .Values.backend.replicaCount }}
   selector:
     matchLabels:
-      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: backend
   template:
     metadata:
       labels:
-        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        {{- include "sagitta-control.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backend
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      serviceAccountName: {{ include "sagitta-control.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
@@ -31,9 +31,9 @@ spec:
           command: ["alembic", "upgrade", "head"]
           envFrom:
             - configMapRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
             - secretRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
@@ -49,9 +49,9 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
             - secretRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
           livenessProbe:
             httpGet:
               path: /health
@@ -85,7 +85,7 @@ spec:
       {{ if .Values.persistence.enabled }}
         - name: downloads
           persistentVolumeClaim:
-            claimName: {{ include "sagittadb.fullname" . }}-downloads
+            claimName: {{ include "sagitta-control.fullname" . }}-downloads
       {{ end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

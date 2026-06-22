@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # ─── 数据库 ───────────────────────────────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://sagitta:sagitta123@localhost:5432/sagittadb"
-    DATABASE_URL_SYNC: str = "postgresql+psycopg2://sagitta:sagitta123@localhost:5432/sagittadb"
+    DATABASE_URL: str = "postgresql+asyncpg://sagitta:sagitta123@localhost:5432/sagitta_control"
+    DATABASE_URL_SYNC: str = "postgresql+psycopg2://sagitta:sagitta123@localhost:5432/sagitta_control"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     APP_INTEGRITY_MANIFEST: str = "/app/COMMERCIAL-MANIFEST.json"
     APP_INTEGRITY_ROOT: str = "/app"
     MANIFEST_PUBLIC_KEY: str = ""
-    SAGITTADB_COMMERCIAL_BUILD: bool = False
+    SAGITTA_CONTROL_COMMERCIAL_BUILD: bool = False
 
     # ─── 多租户预留（企业版固定为 1）─────────────────────────
     TENANT_ID: int = 1

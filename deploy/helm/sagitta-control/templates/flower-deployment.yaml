@@ -2,23 +2,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-flower
+  name: {{ include "sagitta-control.fullname" . }}-flower
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: flower
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: flower
   template:
     metadata:
       labels:
-        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        {{- include "sagitta-control.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: flower
     spec:
-      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      serviceAccountName: {{ include "sagitta-control.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -32,9 +32,9 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
             - secretRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
           livenessProbe:
             httpGet:
               path: /healthcheck
@@ -59,9 +59,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-flower
+  name: {{ include "sagitta-control.fullname" . }}-flower
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: flower
 spec:
   type: {{ .Values.flower.service.type }}
@@ -71,6 +71,6 @@ spec:
       protocol: TCP
       name: flower
   selector:
-    {{- include "sagittadb.selectorLabels" . | nindent 4 }}
+    {{- include "sagitta-control.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: flower
 {{- end }}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ─── SagittaDB PostgreSQL 备份脚本 ────────────────────────────────────────────
+# ─── Sagitta Control PostgreSQL 备份脚本 ────────────────────────────────────────────
 # 用法:
 #   ./backup-postgres.sh                       # 手动备份
 #   0 2 * * * /path/to/backup-postgres.sh      # 每天凌晨 2 点自动备份
@@ -10,11 +10,11 @@
 #   POSTGRES_PORT     端口（默认 5432）
 #   POSTGRES_USER     用户名（默认 sagitta）
 #   POSTGRES_PASSWORD 密码
-#   POSTGRES_DB       库名（默认 sagittadb）
-#   BACKUP_DIR        本地备份目录（默认 /data/sagittadb/backups）
+#   POSTGRES_DB       库名（默认 sagitta-control）
+#   BACKUP_DIR        本地备份目录（默认 /data/sagitta-control/backups）
 #   BACKUP_RETAIN_DAYS 本地保留天数（默认 7）
 #   S3_BUCKET         S3 存储桶名（留空跳过上传）
-#   S3_PREFIX         S3 路径前缀（默认 sagittadb/db）
+#   S3_PREFIX         S3 路径前缀（默认 sagitta-control/db）
 
 set -euo pipefail
 
@@ -22,14 +22,14 @@ set -euo pipefail
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-sagitta}"
-POSTGRES_DB="${POSTGRES_DB:-sagittadb}"
-BACKUP_DIR="${BACKUP_DIR:-/data/sagittadb/backups}"
+POSTGRES_DB="${POSTGRES_DB:-sagitta_control}"
+BACKUP_DIR="${BACKUP_DIR:-/data/sagitta-control/backups}"
 BACKUP_RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-7}"
 S3_BUCKET="${S3_BUCKET:-}"
-S3_PREFIX="${S3_PREFIX:-sagittadb/db}"
+S3_PREFIX="${S3_PREFIX:-sagitta-control/db}"
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-FILENAME="sagittadb_${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
+FILENAME="sagitta_control_${POSTGRES_DB}_${TIMESTAMP}.sql.gz"
 FILEPATH="${BACKUP_DIR}/${FILENAME}"
 
 # ─── 创建备份目录 ──────────────────────────────────────────────────────────────
@@ -63,5 +63,5 @@ fi
 
 # ─── 清理过期备份 ──────────────────────────────────────────────────────────────
 echo "[$(date)] 清理 ${BACKUP_RETAIN_DAYS} 天前的备份..."
-find "${BACKUP_DIR}" -name "sagittadb_*.sql.gz" -mtime "+${BACKUP_RETAIN_DAYS}" -delete
+find "${BACKUP_DIR}" -name "sagitta_control_*.sql.gz" -mtime "+${BACKUP_RETAIN_DAYS}" -delete
 echo "[$(date)] 备份流程结束"

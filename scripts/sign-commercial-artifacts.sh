@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 VERSION="${VERSION:?VERSION is required, e.g. 2.0.0}"
-IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagittadb}"
-PACKAGE_ZIP="${PACKAGE_ZIP:-dist-commercial/SagittaDB-Enterprise-v${VERSION}.zip}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagitta-control}"
+PACKAGE_ZIP="${PACKAGE_ZIP:-dist-commercial/Sagitta-Control-v${VERSION}.zip}"
 MANIFEST_OUT="${MANIFEST_OUT:-backend/COMMERCIAL-MANIFEST.json}"
 SBOM_DIR="${SBOM_DIR:-dist-commercial/sbom}"
 PYTHON_BIN="${PYTHON:-}"
@@ -47,7 +47,7 @@ cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-backend:${VERSION}"
 cosign sign --yes "${cosign_args[@]}" "${IMAGE_REPOSITORY}-frontend:${VERSION}"
 
 for component in backend frontend; do
-  sbom="${SBOM_DIR}/sagittadb-${component}-${VERSION}.cyclonedx.json"
+  sbom="${SBOM_DIR}/sagitta-control-${component}-${VERSION}.cyclonedx.json"
   if [[ ! -s "${sbom}" ]]; then
     echo "Required SBOM is missing or empty: ${sbom}" >&2
     exit 1
@@ -83,7 +83,7 @@ else:
     padded = key + "=" * (-len(key) % 4)
     private_key = Ed25519PrivateKey.from_private_bytes(base64.urlsafe_b64decode(padded.encode()))
 payload = {
-    "product": "sagittadb",
+    "product": "sagitta-control",
     "artifact": zip_path.name,
     "sha256": hashlib.sha256(zip_path.read_bytes()).hexdigest(),
     "issued_at": datetime.now(UTC).isoformat(),

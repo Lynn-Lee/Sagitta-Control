@@ -24,7 +24,7 @@ from app.models.system import LicenseRecord
 from app.models.user import Users
 
 LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", "instance"}
-LICENSE_PROJECT_CODE = "sagittadb"
+LICENSE_PROJECT_CODE = "sagitta-control"
 LICENSE_PROJECT_NAME = "Sagitta Control"
 TRIAL_FEATURES = sorted(LICENSE_FEATURES)
 LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
@@ -173,7 +173,7 @@ class LicenseService:
     def deployment_fingerprint(customer_id: str = "") -> str:
         deployment_id = settings.LICENSE_DEPLOYMENT_ID.strip() or settings.SECRET_KEY.strip()
         customer = customer_id or settings.LICENSE_CUSTOMER_ID.strip() or "trial"
-        material = f"sagittadb:{customer}:{deployment_id}".encode()
+        material = f"sagitta-control:{customer}:{deployment_id}".encode()
         return hashlib.sha256(material).hexdigest()
 
     @staticmethod

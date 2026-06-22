@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 VERSION="${VERSION:?VERSION is required, e.g. 2.2.0}"
-PACKAGE_NAME="${PACKAGE_NAME:-SagittaDB-Enterprise-v${VERSION}}"
+PACKAGE_NAME="${PACKAGE_NAME:-Sagitta-Control-v${VERSION}}"
 DIST_DIR="${DIST_DIR:-dist-commercial}"
 SBOM_DIR="${SBOM_DIR:-${DIST_DIR}/sbom}"
 
@@ -60,8 +60,8 @@ payload = doc.get("payload")
 signature = doc.get("signature")
 if not isinstance(payload, dict) or not isinstance(signature, str) or not signature:
     raise SystemExit(f"{signature_path} must contain payload and signature")
-if payload.get("product") != "sagittadb":
-    raise SystemExit(f"{signature_path} product must be sagittadb")
+if payload.get("product") != "sagitta-control":
+    raise SystemExit(f"{signature_path} product must be sagitta-control")
 if payload.get("artifact") != zip_path.name:
     raise SystemExit(f"{signature_path} artifact does not match {zip_path.name}")
 actual = hashlib.sha256(zip_path.read_bytes()).hexdigest()
@@ -70,7 +70,7 @@ if payload.get("sha256") != actual:
 PY
 
 for component in backend frontend; do
-  sbom="${SBOM_DIR}/sagittadb-${component}-${VERSION}.cyclonedx.json"
+  sbom="${SBOM_DIR}/sagitta-control-${component}-${VERSION}.cyclonedx.json"
   sbom_sha256="${sbom}.sha256"
   sbom_bundle="${sbom}.bundle"
   require_file "${sbom}"

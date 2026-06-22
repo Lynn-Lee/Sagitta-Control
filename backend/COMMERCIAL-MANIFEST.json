@@ -444,7 +444,7 @@
       }
     ],
     "issued_at": "2026-05-29T14:09:54.433417+00:00",
-    "product": "sagittadb",
+    "product": "sagitta-control",
     "version": "2.2.0"
   },
   "signature": "jHzzC86oLzeTcVIawniYbIDKHdbtnCQE9EoExmS_4jCQz7kNfP6kKs5kxKJzcacTMKfLTt-7WJ3a5fnCI5s_BQ"

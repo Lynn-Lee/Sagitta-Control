@@ -1,6 +1,6 @@
 apiVersion: v2
-name: sagittadb
-description: SagittaDB 矢准数据 — 企业级多引擎数据库管控平台
+name: sagitta-control
+description: Sagitta Control 矢准数据库安全管控平台 — 企业级多引擎数据库管控平台
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
@@ -11,9 +11,9 @@ keywords:
   - dba
   - workflow
 
-home: https://github.com/Lynn-Lee/SagittaDB-Enterprise
+home: https://github.com/Lynn-Lee/Sagitta-Control
 maintainers:
-  - name: SagittaDB Team
+  - name: Sagitta Control Team
 
 dependencies:
   - name: postgresql

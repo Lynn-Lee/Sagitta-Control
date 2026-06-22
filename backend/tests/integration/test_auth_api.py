@@ -316,13 +316,13 @@ class TestMe:
         access, _ = await _init_and_login(client)
         resp = await client.patch(
             "/api/v1/auth/me/",
-            json={"display_name": "平台管理员", "email": "admin@sagittadb.local"},
+            json={"display_name": "平台管理员", "email": "admin@sagitta-control.local"},
             headers={"Authorization": f"Bearer {access}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["display_name"] == "平台管理员"
-        assert data["email"] == "admin@sagittadb.local"
+        assert data["email"] == "admin@sagitta-control.local"
 
     @pytest.mark.asyncio
     async def test_me_with_malformed_token_returns_401(self, client: AsyncClient):

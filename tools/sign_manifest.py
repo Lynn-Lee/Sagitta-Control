@@ -40,7 +40,7 @@ def load_private_key() -> Ed25519PrivateKey:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="签名 SagittaDB 商业镜像完整性 Manifest")
+    parser = argparse.ArgumentParser(description="签名 Sagitta Control 商业镜像完整性 Manifest")
     parser.add_argument("--root", default="backend", help="Manifest root directory")
     parser.add_argument("--version", required=True)
     parser.add_argument("--out", required=True)
@@ -82,7 +82,7 @@ def main() -> int:
         for path in iter_files(root, args.paths)
     ]
     payload = {
-        "product": "sagittadb",
+        "product": "sagitta-control",
         "version": args.version,
         "algorithm": "sha256",
         "issued_at": datetime.now(UTC).isoformat(),

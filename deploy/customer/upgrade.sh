@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-TARGET_VERSION="${1:-__SAGITTADB_VERSION__}"
+TARGET_VERSION="${1:-__SAGITTA_CONTROL_VERSION__}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-http://127.0.0.1:8000/health}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-http://127.0.0.1/health}"
@@ -43,15 +43,15 @@ tmp_file="$(mktemp)"
 sed -E "s#(__IMAGE_REPOSITORY__-(backend|frontend):)[0-9]+\.[0-9]+\.[0-9]+([-A-Za-z0-9.]+)?#\1${TARGET_VERSION}#g" docker-compose.yml > "${tmp_file}"
 mv "${tmp_file}" docker-compose.yml
 
-log "拉取 SagittaDB Enterprise 镜像"
+log "拉取 Sagitta Control 镜像"
 docker compose pull backend frontend celery_worker celery_beat
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
-backup_file="${BACKUP_DIR}/sagittadb_${timestamp}.sql.gz"
+backup_file="${BACKUP_DIR}/sagitta_control_${timestamp}.sql.gz"
 log "创建 PostgreSQL 备份：${backup_file}"
 docker compose up -d postgres redis
 docker compose exec -T postgres sh -ec \
-  'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagittadb}" --no-owner --no-acl --format=plain' \
+  'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagitta_control}" --no-owner --no-acl --format=plain' \
   | gzip > "${backup_file}"
 
 log "执行数据库迁移"

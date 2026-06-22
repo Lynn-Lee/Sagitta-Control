@@ -1,4 +1,4 @@
-# SagittaDB Enterprise 客户部署包。
+# Sagitta Control 客户部署包。
 # 该文件由 CI 按具体商业版本渲染生成。
 
 services:
@@ -6,7 +6,7 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-sagittadb}
+      POSTGRES_DB: ${POSTGRES_DB:-sagitta_control}
       POSTGRES_USER: ${POSTGRES_USER:-sagitta}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
@@ -30,7 +30,7 @@ services:
       retries: 5
 
   backend:
-    image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
+    image: __IMAGE_REPOSITORY__-backend:__SAGITTA_CONTROL_VERSION__
     restart: always
     read_only: true
     cap_drop:
@@ -42,8 +42,8 @@ services:
       APP_ENV: production
       DEBUG: "false"
       LOG_LEVEL: WARNING
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagittadb}
-      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagitta_control}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
@@ -65,7 +65,7 @@ services:
       start_period: 30s
 
   celery_worker:
-    image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
+    image: __IMAGE_REPOSITORY__-backend:__SAGITTA_CONTROL_VERSION__
     restart: always
     read_only: true
     cap_drop:
@@ -75,7 +75,7 @@ services:
     env_file: .env
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
@@ -100,7 +100,7 @@ services:
       start_period: 30s
 
   celery_beat:
-    image: __IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__
+    image: __IMAGE_REPOSITORY__-backend:__SAGITTA_CONTROL_VERSION__
     restart: always
     read_only: true
     cap_drop:
@@ -110,7 +110,7 @@ services:
     env_file: .env
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
@@ -128,7 +128,7 @@ services:
       start_period: 30s
 
   frontend:
-    image: __IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__
+    image: __IMAGE_REPOSITORY__-frontend:__SAGITTA_CONTROL_VERSION__
     restart: always
     read_only: true
     cap_drop:

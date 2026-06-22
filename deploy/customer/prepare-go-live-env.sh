@@ -10,7 +10,7 @@ usage() {
   cat <<'EOF'
 Usage: ./prepare-go-live-env.sh [--customer-id <id>] [--env-file .env] [--force]
 
-Generate production-safe random values for SagittaDB Enterprise customer
+Generate production-safe random values for Sagitta Control customer
 deployments. Existing non-placeholder values are preserved unless --force is
 provided.
 EOF
@@ -72,7 +72,7 @@ random_values = {
     "POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(36),
     "REDIS_PASSWORD": lambda: secrets.token_urlsafe(36),
     "SECRET_KEY": lambda: base64.urlsafe_b64encode(secrets.token_bytes(48)).decode().rstrip("="),
-    "LICENSE_DEPLOYMENT_ID": lambda: "sagittadb-" + secrets.token_hex(16),
+    "LICENSE_DEPLOYMENT_ID": lambda: "sagitta-control-" + secrets.token_hex(16),
 }
 
 placeholder_prefixes = ("CHANGE_ME", "")

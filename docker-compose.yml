@@ -4,7 +4,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-sagittadb}
+      POSTGRES_DB: ${POSTGRES_DB:-sagitta_control}
       POSTGRES_USER: ${POSTGRES_USER:-sagitta}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sagitta123}
     volumes:
@@ -39,8 +39,8 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagittadb}
-      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagitta_control}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
     ports:
       - "8000:8000"
@@ -70,7 +70,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
     depends_on:
       postgres:
@@ -98,7 +98,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagittadb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sagitta}:${POSTGRES_PASSWORD:-sagitta123}@postgres:5432/${POSTGRES_DB:-sagitta_control}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
     depends_on:
       - redis

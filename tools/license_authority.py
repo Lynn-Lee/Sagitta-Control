@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""用于内部商业运营的轻量 SagittaDB 授权中心兼容工具。
+"""用于内部商业运营的轻量 Sagitta Control 授权中心兼容工具。
 
 该工具只适合私有内部环境。它用一个小型 JSON 文件保存激活码和已签发 License，
-使用 LICENSE_PRIVATE_KEY 签名，并提供与 SagittaDB 在线授权客户端兼容的激活和刷新接口。
+使用 LICENSE_PRIVATE_KEY 签名，并提供与 Sagitta Control 在线授权客户端兼容的激活和刷新接口。
 正式商业运营以统一授权中心 License-Server-Center 为准。
 """
 
@@ -24,7 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
 DEFAULT_DB = "license_authority.json"
-LICENSE_PROJECT_CODE = "sagittadb"
+LICENSE_PROJECT_CODE = "sagitta-control"
 
 
 def b64url(data: bytes) -> str:
@@ -184,10 +184,10 @@ def create_app(db_path: Path) -> Any:
         features: list[str] | None = None
         limits: dict[str, int] | None = None
 
-    app = FastAPI(title="SagittaDB License-Server-Center Compatibility Authority", version="0.1.0")
+    app = FastAPI(title="Sagitta Control License-Server-Center Compatibility Authority", version="0.1.0")
 
     def verify_token(authorization: str | None) -> None:
-        expected = os.environ.get("SAGITTADB_LICENSE_AUTHORITY_TOKEN", "").strip()
+        expected = os.environ.get("SAGITTA_CONTROL_LICENSE_AUTHORITY_TOKEN", "").strip()
         if not expected:
             return
         if authorization != f"Bearer {expected}":
@@ -500,7 +500,7 @@ def command_serve(args: argparse.Namespace) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="SagittaDB License-Server-Center compatibility authority")
+    parser = argparse.ArgumentParser(description="Sagitta Control License-Server-Center compatibility authority")
     parser.add_argument("--generate-keypair", action="store_true", help="print a new Ed25519 keypair and exit")
     subparsers = parser.add_subparsers(dest="command")
 

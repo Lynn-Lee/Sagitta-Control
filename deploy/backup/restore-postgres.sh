@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# ─── SagittaDB PostgreSQL 恢复脚本 ────────────────────────────────────────────
+# ─── Sagitta Control PostgreSQL 恢复脚本 ────────────────────────────────────────────
 # 用法:
-#   ./restore-postgres.sh /path/to/sagittadb_sagittadb_20260101_020000.sql.gz
-#   ./restore-postgres.sh s3://my-bucket/sagittadb/db/sagittadb_sagittadb_20260101_020000.sql.gz
+#   ./restore-postgres.sh /path/to/sagitta_control_sagitta_control_20260101_020000.sql.gz
+#   ./restore-postgres.sh s3://my-bucket/sagitta-control/db/sagitta_control_sagitta_control_20260101_020000.sql.gz
 
 set -euo pipefail
 
@@ -15,7 +15,7 @@ fi
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-sagitta}"
-POSTGRES_DB="${POSTGRES_DB:-sagittadb}"
+POSTGRES_DB="${POSTGRES_DB:-sagitta_control}"
 
 export PGPASSWORD="${POSTGRES_PASSWORD:-}"
 

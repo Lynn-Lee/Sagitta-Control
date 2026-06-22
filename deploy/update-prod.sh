@@ -13,7 +13,7 @@ DEFAULT_BACKEND_HEALTH_URL="http://127.0.0.1:8000/health"
 DEFAULT_FRONTEND_HEALTH_URL="http://127.0.0.1/health"
 DEFAULT_GIT_REMOTE="origin"
 DEFAULT_RELEASE_BRANCH="main"
-DEFAULT_BACKUP_DIR="/data/sagittadb/backups"
+DEFAULT_BACKUP_DIR="/data/sagitta-control/backups"
 DEFAULT_BACKUP_RETAIN_DAYS="7"
 DB_CHANGE_PATTERNS=(
   "backend/alembic/"
@@ -52,8 +52,8 @@ usage() {
   8. 等待健康检查并展示服务状态
 
 默认约定：
-  - ECS 测试/生产源码部署目录直接保留 Git 工作区，例如 /opt/sagittadb/source。
-  - origin 使用 SSH deploy key，例如 git@github.com-sagittadb:Lynn-Lee/SagittaDB.git。
+  - ECS 测试/生产源码部署目录直接保留 Git 工作区，例如 /opt/sagitta-control/source。
+  - origin 使用 SSH deploy key，例如 git@github.com-sagitta-control:Lynn-Lee/Sagitta-Control.git。
   - 未显式传 --ref 时，脚本部署 origin/main 的最新快进版本。
 
 选项：
@@ -72,14 +72,14 @@ usage() {
   GIT_REMOTE               Git remote 名称，默认 origin。
   RELEASE_BRANCH           默认发布分支，默认 main。
   REQUIRE_SSH_GIT_REMOTE   是否要求 remote 为 SSH URL，默认 1；临时 HTTPS 凭据场景可设为 0。
-  BACKUP_DIR               数据库备份目录，默认 /data/sagittadb/backups。
+  BACKUP_DIR               数据库备份目录，默认 /data/sagitta-control/backups。
   BACKUP_RETAIN_DAYS       备份保留天数，默认 7。
-  COMPOSE_PROJECT_NAME     Compose 项目名；ECS 测试环境使用 sagittadb-source-test。
-  SAGITTADB_BACKEND_IMAGE  后端/Worker/Beat/Flower 共享镜像名，默认 <COMPOSE_PROJECT_NAME>-backend:latest。
-  SAGITTADB_FRONTEND_IMAGE 前端镜像名，默认 <COMPOSE_PROJECT_NAME>-frontend:latest。
+  COMPOSE_PROJECT_NAME     Compose 项目名；ECS 测试环境使用 sagitta-control-source-test。
+  SAGITTA_CONTROL_BACKEND_IMAGE  后端/Worker/Beat/Flower 共享镜像名，默认 <COMPOSE_PROJECT_NAME>-backend:latest。
+  SAGITTA_CONTROL_FRONTEND_IMAGE 前端镜像名，默认 <COMPOSE_PROJECT_NAME>-frontend:latest。
 
 示例：
-  COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
+  COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
   bash deploy/update-prod.sh --ref v2.0.0
@@ -138,13 +138,13 @@ ensure_git_remote_ready() {
   local remote_url
 
   if ! remote_url="$(git remote get-url "${GIT_REMOTE_NAME}" 2>/dev/null)"; then
-    die "未找到 Git remote：${GIT_REMOTE_NAME}。请先配置 origin SSH remote，例如 git@github.com-sagittadb:Lynn-Lee/SagittaDB.git。"
+    die "未找到 Git remote：${GIT_REMOTE_NAME}。请先配置 origin SSH remote，例如 git@github.com-sagitta-control:Lynn-Lee/Sagitta-Control.git。"
   fi
 
   log "Git remote ${GIT_REMOTE_NAME}: ${remote_url}"
 
   if [[ "${REQUIRE_SSH_GIT_REMOTE}" == "1" && ! "${remote_url}" =~ ^(git@|ssh://) ]]; then
-    die "生产发布要求使用 SSH Git remote。当前 ${GIT_REMOTE_NAME}=${remote_url}。请配置 GitHub deploy key 后执行：git remote set-url ${GIT_REMOTE_NAME} git@github.com-sagittadb:Lynn-Lee/SagittaDB.git；如确需使用 HTTPS，可临时设置 REQUIRE_SSH_GIT_REMOTE=0。"
+    die "生产发布要求使用 SSH Git remote。当前 ${GIT_REMOTE_NAME}=${remote_url}。请配置 GitHub deploy key 后执行：git remote set-url ${GIT_REMOTE_NAME} git@github.com-sagitta-control:Lynn-Lee/Sagitta-Control.git；如确需使用 HTTPS，可临时设置 REQUIRE_SSH_GIT_REMOTE=0。"
   fi
 
   log "校验 Git 远端访问"
@@ -167,22 +167,22 @@ run_container_backup() {
   local postgres_db
   local timestamp filename filepath
 
-  postgres_db="$(compose exec -T postgres sh -ec 'printf "%s" "${POSTGRES_DB:-sagittadb}"')"
+  postgres_db="$(compose exec -T postgres sh -ec 'printf "%s" "${POSTGRES_DB:-sagitta_control}"')"
   timestamp="$(date +%Y%m%d_%H%M%S)"
-  filename="sagittadb_${postgres_db}_${timestamp}.sql.gz"
+  filename="sagitta_control_${postgres_db}_${timestamp}.sql.gz"
   filepath="${backup_dir}/${filename}"
 
   mkdir -p "${backup_dir}"
 
   log "通过容器执行 PostgreSQL 备份：${filepath}"
   compose exec -T postgres sh -ec \
-    'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagittadb}" --no-owner --no-acl --format=plain' \
+    'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagitta_control}" --no-owner --no-acl --format=plain' \
     | gzip > "${filepath}"
 
   log "备份完成：${filepath} ($(du -sh "${filepath}" | cut -f1))"
 
   log "从 ${backup_dir} 清理超过 ${retain_days} 天的备份"
-  find "${backup_dir}" -name "sagittadb_*.sql.gz" -mtime "+${retain_days}" -delete
+  find "${backup_dir}" -name "sagitta_control_*.sql.gz" -mtime "+${retain_days}" -delete
 }
 
 db_changes_between_revisions() {
@@ -312,9 +312,9 @@ require_cmd curl
 
 cd "${ROOT_DIR}"
 
-compose_project_name="${COMPOSE_PROJECT_NAME:-sagittadb}"
-export SAGITTADB_BACKEND_IMAGE="${SAGITTADB_BACKEND_IMAGE:-${compose_project_name}-backend:latest}"
-export SAGITTADB_FRONTEND_IMAGE="${SAGITTADB_FRONTEND_IMAGE:-${compose_project_name}-frontend:latest}"
+compose_project_name="${COMPOSE_PROJECT_NAME:-sagitta-control}"
+export SAGITTA_CONTROL_BACKEND_IMAGE="${SAGITTA_CONTROL_BACKEND_IMAGE:-${compose_project_name}-backend:latest}"
+export SAGITTA_CONTROL_FRONTEND_IMAGE="${SAGITTA_CONTROL_FRONTEND_IMAGE:-${compose_project_name}-frontend:latest}"
 
 [[ -f "${COMPOSE_FILE}" ]] || die "未找到 Compose 文件：${COMPOSE_FILE}"
 [[ -f "${ENV_FILE}" ]] || die "未找到 .env：${ENV_FILE}，请在部署前从 .env.example 创建。"

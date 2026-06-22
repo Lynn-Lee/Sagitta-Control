@@ -43,8 +43,8 @@ def valid_payload():
         "license_id": "lic-001",
         "customer_id": "acme",
         "company_name": "Acme Corp",
-        "project": "sagittadb",
-        "product": "sagittadb",
+        "project": "sagitta-control",
+        "product": "sagitta-control",
         "edition": "enterprise",
         "issued_at": now.isoformat(),
         "not_before": now.isoformat(),
@@ -140,7 +140,7 @@ async def test_status_uses_sagitta_control_display_name(monkeypatch):
 
     result = await LicenseService.status(SimpleNamespace(commit=AsyncMock()))
 
-    assert result["project_code"] == "sagittadb"
+    assert result["project_code"] == "sagitta-control"
     assert result["project_name"] == "Sagitta Control"
 
 
@@ -291,8 +291,8 @@ async def test_activate_imports_online_license(monkeypatch, keypair, valid_paylo
     call_server.assert_awaited_once()
     request_payload = call_server.await_args.args[1]
     assert request_payload["deployment_fingerprint"]
-    assert request_payload["project"] == "sagittadb"
-    assert request_payload["product"] == "sagittadb"
+    assert request_payload["project"] == "sagitta-control"
+    assert request_payload["product"] == "sagitta-control"
     store_license.assert_awaited_once()
     assert store_license.await_args.kwargs["source"] == "online"
     assert store_license.await_args.kwargs["activation_id"] == "act-001"
@@ -320,8 +320,8 @@ async def test_refresh_marks_revoked_license_invalid(monkeypatch):
 
     assert result["status"] == "invalid"
     request_payload = LicenseService._call_license_server.await_args.args[1]
-    assert request_payload["project"] == "sagittadb"
-    assert request_payload["product"] == "sagittadb"
+    assert request_payload["project"] == "sagitta-control"
+    assert request_payload["product"] == "sagitta-control"
     assert record.status == "invalid"
     assert record.remote_status == "revoked"
     assert record.last_check_status == "invalid"

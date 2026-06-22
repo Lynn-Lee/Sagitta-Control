@@ -1,6 +1,6 @@
-# Sagitta Control / SagittaDB 专属 Agent 工作规则
+# Sagitta Control 专属 Agent 工作规则
 
-本文件是 Sagitta Control 项目专属的 Codex / Agent 工作规则；当前源码仓库和部分技术标识仍沿用 SagittaDB / sagittadb 兼容名称。本文记录后续研发、交付和测试环境更新时必须遵守的协作约定。每次开始编码、调试、重构、文档或部署任务前，应先阅读并遵守本文；如用户明确给出更具体要求，以用户当次要求为准。
+本文件是 Sagitta Control 项目专属的 Codex / Agent 工作规则。本文记录后续研发、交付和测试环境更新时必须遵守的协作约定。每次开始编码、调试、重构、文档或部署任务前，应先阅读并遵守本文；如用户明确给出更具体要求，以用户当次要求为准。
 
 根目录 `AGENT.md` 是本项目唯一有效规则文件；如本地出现 `AGENT_*CaseConflict.md` 等同步冲突副本，一律不作为规则来源，并以当前 `AGENT.md` 为准。
 
@@ -10,8 +10,8 @@
 - 后端目录为 `backend/`，技术栈为 Python 3.12、FastAPI、SQLAlchemy 2 async、Alembic、Celery、Redis、PostgreSQL。
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
-- 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 `Lynn-Lee/SagittaDB-Enterprise` 公开交付仓库。
-- 商业部署版、商业交付包和 `Lynn-Lee/SagittaDB-Enterprise` 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
+- 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 `Lynn-Lee/Sagitta-Control` 公开交付仓库。
+- 商业部署版、商业交付包和 `Lynn-Lee/Sagitta-Control` 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
 
 ## 语言与文档规则
 
@@ -30,8 +30,8 @@
 - 默认对外品牌名称为 `Sagitta Control`，中文产品名为 `矢准数据库安全管控平台`，软著备案推荐名称为 `矢准数据库安全管控平台软件`。
 - 顶部导航品牌区默认只展示 Logo 图标和英文名称 `Sagitta Control`，不再显示中文副标；不要再使用旧文案 `数据管控`。
 - 登录页默认使用引文版品牌语：`Sagitta Control · Aim at Data, Govern with Precision`，底部版权署名为 `Lynn-Lee`，并链接到 `https://github.com/Lynn-Lee`。
-- 阶段一品牌切换只改变对外展示、文档和默认平台名；`LICENSE_PROJECT_CODE=sagittadb`、历史客户包名、公开交付仓库、ECS 目录、Helm chart 目录和镜像仓库名先保持兼容，除非用户明确要求执行技术标识迁移。
-- 如修改品牌、登录页、导航、系统配置展示或默认文案，必须同步更新 `docs/sagittadb_prd.md`、`README.md` 或其他相关文档。
+- 登录页底部版本描述统一为 `Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability`。
+- 如修改品牌、登录页、导航、系统配置展示或默认文案，必须同步更新 `docs/sagitta_control_prd.md`、`README.md` 或其他相关文档。
 - 页面、菜单、按钮、表单控件、弹窗和抽屉等前端界面必须保持统一字体和字号体系，优先复用 Ant Design 主题 Token 或项目已有全局样式，不得在局部页面随意新增不一致的字体、字号或行高。
 - 前端所有按钮必须遵循统一按钮规划：按钮高度保持统一；按钮宽度根据图标和文字内容自适应，不固定成同一长度；按钮内容统一采用“图标 + 文字”形式，图标需按功能选择最合适的语义图标；按钮文字颜色、图标颜色和背景色需与功能语义及主题色协调。
 - 登录入口接入方式的图标按钮、分页页码按钮和分页翻页按钮不按“图标 + 文字”和“宽度按图标文字自适应”硬性要求处理，可继续使用纯图标、数字页码、等宽分页控件或 Ant Design 默认分页按钮样式，但仍需保证可访问性和交互状态清晰。
@@ -43,9 +43,9 @@
 每次完成项目新的功能代码或 UI 调整后，必须完成以下收尾动作，除非用户明确要求暂停、只做局部分析或不提交：
 
 - 每次功能完成后都要同步更新本地代码和相关文档，提交到 git 并推送 GitHub 主远端和 Gitee 国内镜像远端，然后更新云 ECS 测试环境到最新源码。
-- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 `Lynn-Lee/SagittaDB-Enterprise` 后续仅按用户明确指令更新。
+- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 `Lynn-Lee/Sagitta-Control` 后续仅按用户明确指令更新。
 
-1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagittadb_prd.md`、`docs/user_manual.md`、`docs/operations_guide.md`、`docs/public_commercial_delivery.md` 和本文件。
+1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagitta_control_prd.md`、`docs/user_manual.md`、`docs/operations_guide.md`、`docs/public_commercial_delivery.md` 和本文件。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。
 3. 查看 `git status --short` 和 diff，确认只包含本次任务需要的代码与文档。
 4. 提交代码并推送到 GitHub 主远端 `origin` 和 Gitee 国内镜像远端 `gitee`。
@@ -57,7 +57,7 @@
 ## Git 规则
 
 - 开始改动前先检查 `git status --short --branch`。
-- 标准远端约定：`origin` 指向 GitHub 主仓库 `https://github.com/Lynn-Lee/SagittaDB.git`，用于主源码记录和 GitHub Actions；`gitee` 指向 Gitee 国内镜像仓库 `git@gitee.com:lynn-lee/sagitta-db.git`，用于国内网络环境下的源码拉取和部署更新。
+- 标准远端约定：`origin` 指向 GitHub 主仓库 `https://github.com/Lynn-Lee/Sagitta-Control.git`，用于主源码记录和 GitHub Actions；`gitee` 指向 Gitee 国内镜像仓库 `git@gitee.com:lynn-lee/sagitta-control.git`，用于国内网络环境下的源码拉取和部署更新。
 - 不要回滚用户已有改动；如果工作区已有无关变更，只处理当前任务相关文件。
 - 不要使用 `git reset --hard`、`git checkout -- <file>`、`docker compose down -v`、`docker volume rm` 等破坏性命令，除非用户明确要求。
 - 提交前查看 staged diff，确保没有误提交 `.env`、真实数据库连接串、Token、私钥、License、激活码或客户数据。
@@ -81,14 +81,14 @@ ssh -i ~/.ssh/zovjudan.pem ecs-user@47.102.146.147 -p 2222
 - 云 ECS 源码测试环境目录固定为：
 
 ```bash
-/opt/sagittadb/source
+/opt/sagitta-control/source
 ```
 
 - 云 ECS 测试环境直接从 Gitee 国内镜像源码仓库 clone/fetch；GitHub 保留为主源码和 Actions 远端，不作为服务器源码更新的优先拉取源。若私有仓库需要 token，只能通过临时 `GIT_ASKPASS`、临时环境变量或一次性输入使用；不得把 token 写入 git remote、`.env`、脚本、文档或 shell profile。
 - 云 ECS 和生产内网服务器使用源码方式更新时，推荐 remote 为：
 
 ```bash
-git@gitee.com:lynn-lee/sagitta-db.git
+git@gitee.com:lynn-lee/sagitta-control.git
 ```
 
 并在服务器上单独配置 Gitee SSH 公钥，避免复用个人开发机私钥。
@@ -96,7 +96,7 @@ git@gitee.com:lynn-lee/sagitta-db.git
 - 源码测试环境 Compose project 固定为：
 
 ```bash
-COMPOSE_PROJECT_NAME=sagittadb-source-test
+COMPOSE_PROJECT_NAME=sagitta-control-source-test
 ```
 
 - 源码测试环境不得强制启用商业镜像完整性 Manifest；如果从商业部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
@@ -109,7 +109,7 @@ ln -sfn ../.env deploy/.env
 - 标准源码部署命令：
 
 ```bash
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh
 ```
 
 - `deploy/update-prod.sh` 会根据当前版本到目标版本的变更路径自动判断是否执行 PostgreSQL 备份、Alembic 迁移、镜像构建和服务重建；只有 Alembic、模型、数据库连接核心文件或 Compose/Helm 部署配置变化时才默认 `pg_dump` 和迁移。`backend/` 变更只构建一次后端共享镜像并重建 backend、celery_worker、celery_beat、flower；`frontend/` 变更只构建并重建 frontend；普通文档、CI 或验证报告变更应自动跳过镜像构建和服务重建。如确需全量更新可传 `--full`，如确需留档备份可传 `--force-backup`，如已人工确认可传 `--skip-backup`。

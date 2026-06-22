@@ -1,14 +1,12 @@
 # Sagitta Control 公开商业交付说明
 
-本文档定义 Sagitta Control Enterprise 的公开商业交付方式：公开部署包和商业镜像，源码、签发工具、私钥和内部构建流程继续保留在私有仓库。
-
-> 阶段一兼容说明：对外产品名切换为 `Sagitta Control`，但公开交付仓库、历史 Release、客户包文件名、镜像名、Helm chart 目录和授权项目码暂保留 `SagittaDB-Enterprise` / `sagittadb`，避免影响现有发布、升级和授权链路。
+本文档定义 Sagitta Control 的公开商业交付方式：公开部署包和商业镜像，源码、签发工具、私钥和内部构建流程继续保留在私有仓库。
 
 ## 1. 交付模型
 
 Sagitta Control 采用以下边界：
 
-- 公开交付仓库：`Lynn-Lee/SagittaDB-Enterprise` 是 Sagitta Control Enterprise 阶段一继续沿用的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
+- 公开交付仓库：`Lynn-Lee/Sagitta-Control` 是 Sagitta Control 的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
 - 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
@@ -26,7 +24,7 @@ go-live-check.sh
 upgrade.sh
 verify-license.sh
 helm/
-  sagittadb/
+  sagitta-control/
 docs/
   installation.md
   operations-upgrade.md
@@ -38,9 +36,9 @@ screenshots/
   24-audit-log.png
 releases/
   v2.2.0/
-    SagittaDB-Enterprise-v2.2.0.zip
-    SagittaDB-Enterprise-v2.2.0.zip.sha256
-    SagittaDB-Enterprise-v2.2.0.zip.sig.json
+    Sagitta-Control-v2.2.0.zip
+    Sagitta-Control-v2.2.0.zip.sha256
+    Sagitta-Control-v2.2.0.zip.sig.json
 ```
 
 公开仓库根 `README.md` 由 Sagitta Control 私有源码仓库的商业发布 workflow 渲染生成，是客户下载、安装、授权和运维文档的第一入口。
@@ -51,7 +49,7 @@ releases/
 
 公开仓库根 `README.md` 应作为用户入口，包含：
 
-- Sagitta Control Enterprise 产品定位和核心功能。
+- Sagitta Control 产品定位和核心功能。
 - 测试环境页面截图，展示 Dashboard、实例、SQL 工单、在线查询、字典、脱敏、监控、归档、权限、系统配置和审计等核心界面。
 - Docker Compose 快速开始。
 - Kubernetes / Helm 部署入口。
@@ -79,11 +77,11 @@ releases/
 
 ## 3. 镜像命名
 
-Sagitta Control 阶段一镜像继续发布到既有公开 GHCR 仓库，并只在部署包中引用完整版本号：
+Sagitta Control 镜像发布到公开 GHCR 仓库，并只在部署包中引用完整版本号：
 
 ```text
-ghcr.io/<org>/sagittadb-backend:2.2.0
-ghcr.io/<org>/sagittadb-frontend:2.2.0
+ghcr.io/<org>/sagitta-control-backend:2.2.0
+ghcr.io/<org>/sagitta-control-frontend:2.2.0
 ```
 
 发布规则：
@@ -94,32 +92,32 @@ ghcr.io/<org>/sagittadb-frontend:2.2.0
 - 商业后端镜像构建阶段必须执行源码残留门禁，`/app/app` 下不得存在非白名单 `.py`、`.pyc` 或 `.pyo`。
 - 商业根上下文构建必须通过 `.dockerignore` 门禁，禁止将虚拟环境、测试目录、前端依赖、`dist-commercial`、私钥、License 文件或激活材料送入 Docker build context。
 - 前端镜像只包含 build 产物，构建后必须拒绝 `.map` sourcemap 和 `sourceMappingURL` 引用，并使用生产压缩/混淆配置。
-- 商业镜像默认启用 Manifest 完整性校验；商业构建标识 `SAGITTADB_COMMERCIAL_BUILD=true` 时，即使客户把 `APP_INTEGRITY_REQUIRED` 设为 false，启动也必须校验 Manifest。
+- 商业镜像默认启用 Manifest 完整性校验；商业构建标识 `SAGITTA_CONTROL_COMMERCIAL_BUILD=true` 时，即使客户把 `APP_INTEGRITY_REQUIRED` 设为 false，启动也必须校验 Manifest。
 - 客户部署模板默认启用容器只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载，降低本地运行态篡改面；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。
 
 ## 4. GitHub Release 规则
 
-Sagitta Control 在专用公开仓库中按版本发版，阶段一继续使用既有仓库和资产命名：
+Sagitta Control 在专用公开仓库中按版本发版：
 
 ```text
-Repository: Lynn-Lee/SagittaDB-Enterprise
+Repository: Lynn-Lee/Sagitta-Control
 Tag: v2.2.0
-Title: Sagitta Control Enterprise v2.2.0
+Title: Sagitta Control v2.2.0
 Assets:
-  SagittaDB-Enterprise-v2.2.0.zip
-  SagittaDB-Enterprise-v2.2.0.zip.sha256
+  Sagitta-Control-v2.2.0.zip
+  Sagitta-Control-v2.2.0.zip.sha256
 ```
 
-Release 发布说明使用 [Sagitta Control 公开发布模板](release_templates/sagittadb_public_release.md)。
+Release 发布说明使用 [Sagitta Control 公开发布模板](release_templates/sagitta_control_public_release.md)。
 
 用户安装命令示例：
 
 ```bash
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v2.2.0/SagittaDB-Enterprise-v2.2.0.zip
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v2.2.0/SagittaDB-Enterprise-v2.2.0.zip.sha256
-sha256sum -c SagittaDB-Enterprise-v2.2.0.zip.sha256
-unzip SagittaDB-Enterprise-v2.2.0.zip
-cd SagittaDB-Enterprise-v2.2.0
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip.sha256
+sha256sum -c Sagitta-Control-v2.2.0.zip.sha256
+unzip Sagitta-Control-v2.2.0.zip
+cd Sagitta-Control-v2.2.0
 
 cp .env.example .env
 vim .env
@@ -133,18 +131,18 @@ docker compose ps
 
 ## 5. License 策略
 
-Sagitta Control 当前阶段固定授权项目码：
+Sagitta Control 固定授权项目码：
 
 ```text
-project=sagittadb
-product=sagittadb
+project=sagitta-control
+product=sagitta-control
 ```
 
 客户端必须校验：
 
 - License 文档包含 `payload` 和 `signature`。
 - `LICENSE_PUBLIC_KEY` 可以验证 Ed25519 签名。
-- `project` 或兼容字段 `product` 等于 `sagittadb`。
+- `project` 或兼容字段 `product` 等于 `sagitta-control`。
 - `deployment_fingerprint` 如存在，必须匹配当前部署。
 - `not_before`、`expires_at`、签名、客户标识和项目码均有效。
 
@@ -164,8 +162,8 @@ product=sagittadb
 ```text
 GET /api/v1/system/license/deployment-fingerprint?customer_id=<customer_id>
 response:
-  project=sagittadb
-  product=sagittadb
+  project=sagitta-control
+  product=sagitta-control
   customer_id
   deployment_fingerprint
 
@@ -174,8 +172,8 @@ payload:
   activation_code
   customer_id
   deployment_fingerprint
-  project=sagittadb
-  product=sagittadb
+  project=sagitta-control
+  product=sagitta-control
 ```
 
 授权管理页在在线激活区域输入客户 ID 后，会调用部署指纹预览接口生成正式激活部署指纹。运营侧应在用户授权中心录入该指纹，再生成并交付激活码。复制指纹时，HTTPS 站点使用浏览器剪贴板 API，HTTP 试用部署自动降级到兼容复制方式。
@@ -189,8 +187,8 @@ payload:
   license_id
   customer_id
   deployment_fingerprint
-  project=sagittadb
-  product=sagittadb
+  project=sagitta-control
+  product=sagitta-control
 ```
 
 离线授权：
@@ -212,8 +210,8 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 私有仓库负责生成公开交付资产：
 
 1. 确认版本号，例如 `2.2.0`。
-2. 构建并推送 `ghcr.io/<org>/sagittadb-backend:2.2.0`。
-3. 构建并推送 `ghcr.io/<org>/sagittadb-frontend:2.2.0`。
+2. 构建并推送 `ghcr.io/<org>/sagitta-control-backend:2.2.0`。
+3. 构建并推送 `ghcr.io/<org>/sagitta-control-frontend:2.2.0`。
 4. 生成并签名商业 Manifest。
 5. 渲染客户部署包。
 6. 生成 zip 和 sha256。
@@ -222,7 +220,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 9. 检查商业构建上下文 `.dockerignore`，确认 `.venv`、测试目录、依赖缓存、`dist-commercial`、私钥和 License 文件不会进入 Docker context。
 10. 生成前后端镜像 CycloneDX SBOM，签名前后端镜像、SBOM 和客户部署包。
 11. 执行 `scripts/validate-commercial-release-materials.sh`，确认 zip、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且可校验。
-12. 同步部署文件到公开仓库 `Lynn-Lee/SagittaDB-Enterprise` 根目录。
+12. 同步部署文件到公开仓库 `Lynn-Lee/Sagitta-Control` 根目录。
 13. 在公开仓库创建或更新 `v2.2.0` Release。
 14. 上传 zip、sha256、签名文件和 SBOM。
 
@@ -230,10 +228,10 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 
 - 推送到 `main` 时，只触发 `.github/workflows/ci.yml` 和 `.github/workflows/release-version-record.yml`，用于源码构建校验和版本记录，不构建或发布商业包。
 - 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.2.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步公开交付仓库。
-- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/SagittaDB-Enterprise`。
+- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/Sagitta-Control`。
 - 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到公开交付仓库，只有显式勾选发布时才同步公开发布仓库。
-- 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagittadb-backend:<version>` 和 `ghcr.io/lynn-lee/sagittadb-frontend:<version>`。
-- 工作流会更新 `Lynn-Lee/SagittaDB-Enterprise` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
+- 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagitta-control-backend:<version>` 和 `ghcr.io/lynn-lee/sagitta-control-frontend:<version>`。
+- 工作流会更新 `Lynn-Lee/Sagitta-Control` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 - 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免海外 runner 访问国内镜像源时出现依赖下载超时。
 
@@ -244,21 +242,21 @@ MANIFEST_PRIVATE_KEY
 PUBLIC_RELEASES_TOKEN
 ```
 
-`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/SagittaDB-Enterprise` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
+`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Sagitta-Control` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
 
 现有脚本入口：
 
 ```bash
 VERSION=2.2.0 \
-IMAGE_REPOSITORY=ghcr.io/<org>/sagittadb \
+IMAGE_REPOSITORY=ghcr.io/<org>/sagitta-control \
 MANIFEST_PRIVATE_KEY_FILE=/path/to/manifest_private_key \
 ./scripts/build-commercial-images.sh
 
 python scripts/render-customer-package.py \
   --version 2.2.0 \
-  --image-repository ghcr.io/<org>/sagittadb \
+  --image-repository ghcr.io/<org>/sagitta-control \
   --output-dir dist-commercial \
-  --package-name SagittaDB-Enterprise-v2.2.0
+  --package-name Sagitta-Control-v2.2.0
 ```
 
 ## 8. 验收清单
@@ -272,7 +270,7 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 
 每个公开商业发布必须满足：
 
-- 公开 Release 可下载 `SagittaDB-Enterprise-vX.Y.Z.zip` 和 `.sha256`。
+- 公开 Release 可下载 `Sagitta-Control-vX.Y.Z.zip` 和 `.sha256`。
 - GHCR 镜像可匿名拉取。
 - 部署包不需要源码即可启动。
 - `docker-compose.yml` 和 Helm values 使用固定版本镜像。
@@ -280,7 +278,7 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 - 在线授权超过联网校验宽限期后会 fail closed。
 - 试用到期后业务功能阻断，授权管理入口仍可访问。
 - 在线激活、联网刷新和离线 challenge-response 均可用。
-- License 项目码必须是 `sagittadb`。
+- License 项目码必须是 `sagitta-control`。
 - `商业交付` → `交付与支持` 页能展示推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、客户环境用量和推广前待处理项；支持幂等初始化商业试用资源组、用户组、标准审批流和演示链路数据，且未接入实例时不得伪造活跃实例或保存真实数据库密码；验收报告包含 `可推广`、`需补配置` 或 `阻塞` 结论。
 - 客户正式推广前必须执行客户包内 `prepare-go-live-env.sh` 和 `go-live-check.sh`。前者生成生产随机密钥和稳定部署 ID，后者严格校验生产环境变量、正式 License、客户 ID、部署指纹、活跃实例、实施向导、验收报告、运行健康和推广就绪度；任一失败均不得进入正式推广。
 - 篡改商业镜像关键文件时完整性校验失败。
@@ -295,14 +293,14 @@ v2.1 交付验收需额外覆盖 Oracle 观测中心能力：
 ## 9. 推荐默认值
 
 ```text
-Product Code: sagittadb
+Product Code: sagitta-control
 Product Name: Sagitta Control
 Edition: enterprise
 Trial Days: 30
 Release Tag: v2.2.0
-Package Name: SagittaDB-Enterprise-v2.2.0.zip
-Backend Image: ghcr.io/<org>/sagittadb-backend:2.2.0
-Frontend Image: ghcr.io/<org>/sagittadb-frontend:2.2.0
+Package Name: Sagitta-Control-v2.2.0.zip
+Backend Image: ghcr.io/<org>/sagitta-control-backend:2.2.0
+Frontend Image: ghcr.io/<org>/sagitta-control-frontend:2.2.0
 License Server: License-Server-Center
 Expired Behavior: 保留登录和授权管理入口，业务 API 阻断
 ```

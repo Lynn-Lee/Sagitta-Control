@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 VERSION="${VERSION:?VERSION is required, e.g. 2.0.0}"
-IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagittadb}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagitta-control}"
 OUTPUT_DIR="${SBOM_OUTPUT_DIR:-dist-commercial/sbom}"
 
 command -v syft >/dev/null 2>&1 || {
@@ -27,7 +27,7 @@ write_sha256() {
 
 for component in backend frontend; do
   image="${IMAGE_REPOSITORY}-${component}:${VERSION}"
-  out="${OUTPUT_DIR}/sagittadb-${component}-${VERSION}.cyclonedx.json"
+  out="${OUTPUT_DIR}/sagitta-control-${component}-${VERSION}.cyclonedx.json"
   syft "${image}" -o cyclonedx-json="${out}"
   write_sha256 "${out}"
   echo "SBOM generated: ${out}"

@@ -5,8 +5,8 @@ export type Branding = {
   platform_logo_url: string
 }
 
-export const BRANDING_STORAGE_KEY = 'sagittadb:branding'
-export const FALLBACK_DOCUMENT_TITLE = '数据管控平台'
+export const BRANDING_STORAGE_KEY = 'sagitta-control:branding'
+export const FALLBACK_DOCUMENT_TITLE = 'Sagitta Control · 矢准数据库安全管控平台'
 
 export const DEFAULT_BRANDING: Branding = {
   platform_name: 'Sagitta Control',

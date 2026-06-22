@@ -43,7 +43,7 @@ def test_engine_matrix_db_types_match_registered_engines():
 def test_acceptance_markdown_renders_check_results():
     report = {
         "project": "Sagitta Control",
-        "project_code": "sagittadb",
+        "project_code": "sagitta-control",
         "generated_at": "2026-05-28T00:00:00+00:00",
         "generated_by": "admin",
         "status": "success",
@@ -98,13 +98,13 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
 
     release_dir = tmp_path / "dist-commercial"
     release_dir.mkdir()
-    (release_dir / "SagittaDB-Enterprise-v2.2.2.zip.sha256").write_text("checksum\n", encoding="utf-8")
-    (release_dir / "SagittaDB-Enterprise-v2.2.2.zip.sig.json").write_text("{}", encoding="utf-8")
+    (release_dir / "Sagitta-Control-v2.2.2.zip.sha256").write_text("checksum\n", encoding="utf-8")
+    (release_dir / "Sagitta-Control-v2.2.2.zip.sig.json").write_text("{}", encoding="utf-8")
     sbom_dir = release_dir / "sbom"
     sbom_dir.mkdir()
-    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json").write_text("{}", encoding="utf-8")
-    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
-    (sbom_dir / "sagittadb-backend-2.2.2.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
+    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json").write_text("{}", encoding="utf-8")
+    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
+    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
 
     result = CommercialOpsService.delivery_preflight(tmp_path)
 
@@ -125,11 +125,11 @@ def test_delivery_preflight_can_use_release_manifest(tmp_path):
             {"path": "scripts/validate-commercial-images.sh", "executable": True},
             {"path": "scripts/generate-commercial-sbom.sh", "executable": True},
             {"path": "scripts/sign-commercial-artifacts.sh", "executable": True},
-            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.2.zip.sha256", "executable": False},
-            {"path": "dist-commercial/SagittaDB-Enterprise-v2.2.2.zip.sig.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json.sha256", "executable": False},
-            {"path": "dist-commercial/sbom/sagittadb-backend-2.2.2.cyclonedx.json.bundle", "executable": False},
+            {"path": "dist-commercial/Sagitta-Control-v2.2.2.zip.sha256", "executable": False},
+            {"path": "dist-commercial/Sagitta-Control-v2.2.2.zip.sig.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json", "executable": False},
+            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json.sha256", "executable": False},
+            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json.bundle", "executable": False},
         ],
     }
 

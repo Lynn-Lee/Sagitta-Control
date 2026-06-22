@@ -1,6 +1,6 @@
 """Generate repeatable observability workload for the ECS test engines.
 
-The script reads active SagittaDB instances from the platform database and
+The script reads active Sagitta Control instances from the platform database and
 generates small DML/query workloads against the dedicated test objects below.
 It is intended to be run from the backend container by cron.
 """
@@ -160,7 +160,7 @@ def real_workload_rows(target: Target, count: int = WORKLOAD_ROWS) -> list[dict[
                 "child_node_state": child_states[(row_id + idx) % len(child_states)],
                 "node_state": node_states[(row_id + idx) % len(node_states)],
                 "event": event,
-                "detail": f"SagittaDB observability workload tick={base}, event={event}, seq={idx}",
+                "detail": f"Sagitta Control observability workload tick={base}, event={event}, seq={idx}",
                 "create_name": marker,
                 "update_name": marker,
                 "is_deleted": 0,

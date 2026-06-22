@@ -7,7 +7,7 @@ Archery 1.x → 2.0 数据迁移脚本（Sprint 6）。
     --src-host 127.0.0.1 --src-port 3306 \
     --src-user archery --src-pass archery \
     --src-db archery \
-    --dst-url postgresql+psycopg2://sagitta:sagitta123@localhost:5432/sagittadb \
+    --dst-url postgresql+psycopg2://sagitta:sagitta123@localhost:5432/sagitta_control \
     --dry-run
 """
 import argparse

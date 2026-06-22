@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 VERSION="${VERSION:?VERSION is required, e.g. 2.0.0}"
-IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagittadb}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:?IMAGE_REPOSITORY is required, e.g. ghcr.io/acme/sagitta-control}"
 PULL_IMAGES="${PULL_IMAGES:-true}"
 EXPECTED_PLATFORMS="${EXPECTED_PLATFORMS:-linux/amd64}"
 

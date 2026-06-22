@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成 SagittaDB 性能基线报告。
+"""生成 Sagitta Control 性能基线报告。
 
 脚本可读取 Locust CSV 输出；当 frontend/dist 存在时，会同时写入前端包体预算。
 输出的 Markdown 报告可归档到客户交付记录中。
@@ -137,7 +137,7 @@ def render_report(
     generated_at = datetime.now().isoformat(timespec="seconds")
 
     lines = [
-        "# SagittaDB 性能基线与容量建议",
+        "# Sagitta Control 性能基线与容量建议",
         "",
         f"- 生成时间：{generated_at}",
         f"- 测试环境：{args.environment}",
@@ -204,7 +204,7 @@ def render_report(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="生成 SagittaDB 性能基线报告")
+    parser = argparse.ArgumentParser(description="生成 Sagitta Control 性能基线报告")
     parser.add_argument("--locust-stats", default="", help="Locust *_stats.csv 文件路径")
     parser.add_argument("--frontend-dist", default="frontend/dist")
     parser.add_argument("--environment", default="local or customer staging")

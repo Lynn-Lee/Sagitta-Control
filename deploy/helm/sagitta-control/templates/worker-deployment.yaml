@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-worker
+  name: {{ include "sagitta-control.fullname" . }}-worker
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
 spec:
   replicas: {{ .Values.celeryWorker.replicaCount }}
   selector:
     matchLabels:
-      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: worker
   template:
     metadata:
       labels:
-        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        {{- include "sagitta-control.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
-      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      serviceAccountName: {{ include "sagitta-control.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -35,9 +35,9 @@ spec:
             - --loglevel=info
           envFrom:
             - configMapRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
             - secretRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
           resources:
             {{- toYaml .Values.celeryWorker.resources | nindent 12 }}
           securityContext:
@@ -55,7 +55,7 @@ spec:
       {{ if .Values.persistence.enabled }}
         - name: downloads
           persistentVolumeClaim:
-            claimName: {{ include "sagittadb.fullname" . }}-downloads
+            claimName: {{ include "sagitta-control.fullname" . }}-downloads
       {{ end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -65,23 +65,23 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-beat
+  name: {{ include "sagitta-control.fullname" . }}-beat
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: beat
 spec:
   replicas: 1  # Beat 必须保持单实例运行
   selector:
     matchLabels:
-      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: beat
   template:
     metadata:
       labels:
-        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        {{- include "sagitta-control.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: beat
     spec:
-      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      serviceAccountName: {{ include "sagitta-control.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -91,9 +91,9 @@ spec:
           command: ["celery", "-A", "app.celery_app", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
           envFrom:
             - configMapRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
             - secretRef:
-                name: {{ include "sagittadb.fullname" . }}
+                name: {{ include "sagitta-control.fullname" . }}
           resources:
             {{- toYaml .Values.celeryBeat.resources | nindent 12 }}
           securityContext:

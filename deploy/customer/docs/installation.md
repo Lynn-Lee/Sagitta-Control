@@ -1,6 +1,6 @@
-# SagittaDB Enterprise 安装部署指南
+# Sagitta Control 安装部署指南
 
-本文面向首次部署 SagittaDB Enterprise 的客户运维、DBA 和实施人员。目标是让你在一台新服务器上按顺序完成下载、配置、启动、健康检查、首次登录、授权确认和上线前检查。
+本文面向首次部署 Sagitta Control 的客户运维、DBA 和实施人员。目标是让你在一台新服务器上按顺序完成下载、配置、启动、健康检查、首次登录、授权确认和上线前检查。
 
 部署包只包含部署编排、脚本、Helm Chart、截图和文档；应用以固定版本容器镜像交付。请不要把服务器 IP、`.env`、License 文件、激活码、数据库密码、Token 或未脱敏客户数据发布到公开仓库、工单截图或公共群聊。
 
@@ -38,8 +38,8 @@ curl --version
 
 服务器需要能访问：
 
-- 镜像：`__IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__`
-- 镜像：`__IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__`
+- 镜像：`__IMAGE_REPOSITORY__-backend:__SAGITTA_CONTROL_VERSION__`
+- 镜像：`__IMAGE_REPOSITORY__-frontend:__SAGITTA_CONTROL_VERSION__`
 - 授权服务：`https://license.loveai.asia`
 
 默认端口：
@@ -53,7 +53,7 @@ curl --version
 
 ### 2.3 部署前确认清单
 
-- 已获得 SagittaDB Enterprise 试用许可或商业授权。
+- 已获得 Sagitta Control 试用许可或商业授权。
 - 已规划访问域名、HTTPS 证书、管理员账号、备份目录和日志留存策略。
 - 已确认客户侧防火墙、安全组和反向代理允许访问前端入口。
 - 已确认数据库实例接入账号只授予必要权限。
@@ -65,11 +65,11 @@ curl --version
 在服务器上执行：
 
 ```bash
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v__SAGITTADB_VERSION__/SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v__SAGITTADB_VERSION__/SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sha256
-sha256sum -c SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sha256
-unzip SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
-cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+sha256sum -c Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+unzip Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
 ```
 
 成功信号：
@@ -183,11 +183,11 @@ http://<server>/
 
 首次部署没有正式 License 时会进入 60 天全功能试用期。登录后建议先完成授权确认：
 
-1. 使用初始化管理员账号登录 SagittaDB。
+1. 使用初始化管理员账号登录 Sagitta Control。
 2. 打开 `商业交付` -> `License 授权`。
 3. 确认试用期、客户 ID 和部署指纹。
 4. 如需正式授权，复制正式激活部署指纹。
-5. 将部署指纹提供给 SagittaDB 商业支持。
+5. 将部署指纹提供给 Sagitta Control 商业支持。
 6. 获得激活码后在页面完成在线激活。
 7. 激活后刷新页面，确认授权状态、有效期和授权项目正常。
 
@@ -250,9 +250,9 @@ http://<server>/
 部署包内包含 Helm Chart：
 
 ```bash
-helm dependency update helm/sagittadb
-helm upgrade --install sagittadb helm/sagittadb \
-  -f helm/sagittadb/values-prod.yaml \
+helm dependency update helm/sagitta-control
+helm upgrade --install sagitta-control helm/sagitta-control \
+  -f helm/sagitta-control/values-prod.yaml \
   --set app.secretKey='<random-secret>' \
   --set license.customerId='<customer-id>' \
   --set license.deploymentId='<stable-deployment-id>'
@@ -277,11 +277,11 @@ curl -fsS https://<backend-health-url>
 
 ## 11. 离线镜像导入
 
-如果服务器无法访问 GHCR，请使用 SagittaDB 支持团队提供的镜像包：
+如果服务器无法访问 GHCR，请使用 Sagitta Control 支持团队提供的镜像包：
 
 ```bash
-docker load < sagittadb-backend-__SAGITTADB_VERSION__.tar
-docker load < sagittadb-frontend-__SAGITTADB_VERSION__.tar
+docker load < sagitta-control-backend-__SAGITTA_CONTROL_VERSION__.tar
+docker load < sagitta-control-frontend-__SAGITTA_CONTROL_VERSION__.tar
 docker compose up -d
 ```
 
@@ -292,7 +292,7 @@ docker compose up -d
 ### 容器拉取失败
 
 - 检查服务器是否能访问 GHCR。
-- 确认镜像版本为 `__SAGITTADB_VERSION__`。
+- 确认镜像版本为 `__SAGITTA_CONTROL_VERSION__`。
 - 检查代理、DNS、防火墙和客户侧镜像仓库策略。
 - 离线环境请先导入镜像 tar 包，再执行 `docker compose up -d`。
 
@@ -320,7 +320,7 @@ docker compose up -d
 
 ### 数据库实例连接失败
 
-- 确认 SagittaDB 服务器能访问数据库地址和端口。
+- 确认 Sagitta Control 服务器能访问数据库地址和端口。
 - 确认数据库账号、密码和认证方式正确。
 - 确认数据库账号具备必要只读视图权限。
 - 如使用跳板机，检查 SSH 隧道配置和密钥格式。

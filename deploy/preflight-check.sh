@@ -99,7 +99,7 @@ check_port_not_public() {
   fi
 }
 
-info "SagittaDB 部署前预检开始"
+info "Sagitta Control 部署前预检开始"
 info "ROOT_DIR=$ROOT_DIR"
 info "COMPOSE_FILE=$COMPOSE_FILE"
 info "API_BASE_URL=$API_BASE_URL"
@@ -121,11 +121,11 @@ done
 check_http "后端健康检查" "$API_BASE_URL/health"
 check_http "前端入口" "$FRONTEND_URL/"
 
-if compose exec -T backend alembic current >/tmp/sagittadb-alembic-current.txt 2>&1; then
+if compose exec -T backend alembic current >/tmp/sagitta-control-alembic-current.txt 2>&1; then
   pass "Alembic current 可执行"
-  if compose exec -T backend alembic heads >/tmp/sagittadb-alembic-heads.txt 2>&1; then
-    current="$(grep -E '^[0-9]{4}_[a-zA-Z0-9_]+' /tmp/sagittadb-alembic-current.txt | awk '{print $1}' | tail -n 1)"
-    head="$(grep -E '^[0-9]{4}_[a-zA-Z0-9_]+' /tmp/sagittadb-alembic-heads.txt | awk '{print $1}' | tail -n 1)"
+  if compose exec -T backend alembic heads >/tmp/sagitta-control-alembic-heads.txt 2>&1; then
+    current="$(grep -E '^[0-9]{4}_[a-zA-Z0-9_]+' /tmp/sagitta-control-alembic-current.txt | awk '{print $1}' | tail -n 1)"
+    head="$(grep -E '^[0-9]{4}_[a-zA-Z0-9_]+' /tmp/sagitta-control-alembic-heads.txt | awk '{print $1}' | tail -n 1)"
     if [[ -n "$current" && -n "$head" && "$current" == "$head" ]]; then
       pass "Alembic 已在 head: $head"
     else
@@ -136,7 +136,7 @@ else
   fail "Alembic current 执行失败"
 fi
 
-if compose exec -T celery_worker celery -A app.celery_app inspect ping >/tmp/sagittadb-celery-ping.txt 2>&1; then
+if compose exec -T celery_worker celery -A app.celery_app inspect ping >/tmp/sagitta-control-celery-ping.txt 2>&1; then
   pass "Celery worker ping 正常"
 else
   fail "Celery worker ping 失败"

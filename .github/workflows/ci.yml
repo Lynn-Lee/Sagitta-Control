@@ -43,13 +43,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/sagittadb-vite-preview.log 2>&1 &
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/sagitta-control-vite-preview.log 2>&1 &
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173 >/dev/null; then
               break
             fi
             if [[ "$i" == "30" ]]; then
-              cat /tmp/sagittadb-vite-preview.log
+              cat /tmp/sagitta-control-vite-preview.log
               exit 1
             fi
             sleep 1
@@ -63,13 +63,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: sagittadb_test
+          POSTGRES_DB: sagitta_control_test
           POSTGRES_USER: sagitta
           POSTGRES_PASSWORD: sagitta123
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U sagitta -d sagittadb_test"
+          --health-cmd "pg_isready -U sagitta -d sagitta_control_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -85,8 +85,8 @@ jobs:
     env:
       APP_ENV: development
       SECRET_KEY: ci_test_secret_key_please_do_not_use_in_production
-      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:5432/sagittadb_test
-      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:5432/sagittadb_test
+      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
+      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
       REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - name: 检出代码
@@ -114,9 +114,9 @@ jobs:
             --universal \
             --extra dev \
             --custom-compile-command 'uv pip compile --python-version 3.12 --universal --extra dev --output-file backend/requirements.lock backend/pyproject.toml' \
-            --output-file /tmp/sagittadb-backend-requirements.lock \
+            --output-file /tmp/sagitta-control-backend-requirements.lock \
             backend/pyproject.toml
-          diff -u backend/requirements.lock /tmp/sagittadb-backend-requirements.lock
+          diff -u backend/requirements.lock /tmp/sagitta-control-backend-requirements.lock
 
       - name: 安装后端依赖
         run: |

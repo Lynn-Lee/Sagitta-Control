@@ -13,7 +13,7 @@ on:
         required: false
         type: string
       publish_public_repo:
-        description: "是否将渲染后的商业部署包发布到 SagittaDB-Enterprise 公开仓库。正式 tag 始终发布。"
+        description: "是否将渲染后的商业部署包发布到 Sagitta-Control 公开仓库。正式 tag 始终发布。"
         required: false
         default: false
         type: boolean
@@ -34,11 +34,11 @@ permissions:
   id-token: write
 
 env:
-  PRODUCT_CODE: sagittadb
-  PRODUCT_NAME: SagittaDB Enterprise
+  PRODUCT_CODE: sagitta-control
+  PRODUCT_NAME: Sagitta Control
   COMMERCIAL_BASE_VERSION: "2.2.2"
-  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/SagittaDB-Enterprise
-  PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagittadb
+  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Sagitta-Control
+  PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagitta-control
 
 concurrency:
   group: commercial-release-${{ github.ref }}
@@ -76,7 +76,7 @@ jobs:
             version="${COMMERCIAL_BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${short_sha}"
             channel="snapshot"
           fi
-          package_name="SagittaDB-Enterprise-v${version}"
+          package_name="Sagitta-Control-v${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
           echo "package_name=${package_name}" >> "${GITHUB_OUTPUT}"
@@ -133,11 +133,11 @@ jobs:
           secrets: |
             manifest_private_key=${{ secrets.MANIFEST_PRIVATE_KEY }}
           build-args: |
-            SAGITTADB_VERSION=${{ steps.release.outputs.version }}
+            SAGITTA_CONTROL_VERSION=${{ steps.release.outputs.version }}
           tags: |
             ${{ env.PUBLIC_IMAGE_REPOSITORY }}-backend:${{ steps.release.outputs.version }}
           labels: |
-            org.opencontainers.image.title=SagittaDB Backend
+            org.opencontainers.image.title=Sagitta Control Backend
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
@@ -153,7 +153,7 @@ jobs:
           tags: |
             ${{ env.PUBLIC_IMAGE_REPOSITORY }}-frontend:${{ steps.release.outputs.version }}
           labels: |
-            org.opencontainers.image.title=SagittaDB Frontend
+            org.opencontainers.image.title=Sagitta Control Frontend
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
@@ -229,7 +229,7 @@ jobs:
         if: ${{ vars.ENABLE_COMMERCIAL_RELEASE_ARTIFACT == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: sagittadb-commercial-deployment
+          name: sagitta-control-commercial-deployment
           path: |
             dist-commercial/*.zip
             dist-commercial/*.zip.sha256
@@ -262,7 +262,7 @@ jobs:
             git checkout -B main
           fi
 
-      - name: 发布部署包到 SagittaDB-Enterprise
+      - name: 发布部署包到 Sagitta-Control
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         run: |
@@ -297,12 +297,12 @@ jobs:
           cp "dist-commercial/${package_name}.zip" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/${package_name}.zip.sha256" "${public_dir}/releases/${release_dir}/"
           cp "dist-commercial/${package_name}.zip.sig.json" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
-          cp "dist-commercial/sbom/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256" "${public_dir}/releases/${release_dir}/"
+          cp "dist-commercial/sbom/sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle" "${public_dir}/releases/${release_dir}/"
           if [[ "${preserve_public_docs}" != "true" ]]; then
             rsync -a --delete docs/screenshots/user-manual/ "${public_dir}/screenshots/"
           fi
@@ -337,7 +337,7 @@ jobs:
           package_name="${{ steps.release.outputs.package_name }}"
 
           test -f "${public_dir}/README.md"
-          grep -q "SagittaDB Enterprise" "${public_dir}/README.md"
+          grep -q "Sagitta Control" "${public_dir}/README.md"
           grep -q "docker compose" "${public_dir}/README.md"
           grep -q "License" "${public_dir}/README.md"
           grep -q "screenshots/02-dashboard-query.png" "${public_dir}/README.md"
@@ -346,7 +346,7 @@ jobs:
           test -f "${public_dir}/.env.example"
           test -f "${public_dir}/LEGAL-NOTICE.md"
           test -f "${public_dir}/nginx.conf"
-          test -d "${public_dir}/helm/sagittadb"
+          test -d "${public_dir}/helm/sagitta-control"
           test -f "${public_dir}/docs/installation.md"
           test -f "${public_dir}/docs/operations-upgrade.md"
           test -f "${public_dir}/docs/product-manual.md"
@@ -360,16 +360,16 @@ jobs:
           test -f "${public_dir}/releases/${release_dir}/${package_name}.zip"
           test -f "${public_dir}/releases/${release_dir}/${package_name}.zip.sha256"
           test -f "${public_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
-          test -f "${public_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
-          test -f "${public_dir}/releases/${release_dir}/sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
-          test -f "${public_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
-          test -f "${public_dir}/releases/${release_dir}/sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
+          test -f "${public_dir}/releases/${release_dir}/sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${public_dir}/releases/${release_dir}/sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
+          test -f "${public_dir}/releases/${release_dir}/sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json"
+          test -f "${public_dir}/releases/${release_dir}/sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.bundle"
 
           (
             cd "${public_dir}/releases/${release_dir}"
             sha256sum --check "${package_name}.zip.sha256"
-            sha256sum --check "sagittadb-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
-            sha256sum --check "sagittadb-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
+            sha256sum --check "sagitta-control-backend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
+            sha256sum --check "sagitta-control-frontend-${{ steps.release.outputs.version }}.cyclonedx.json.sha256"
           )
 
           if grep -RInE \
@@ -390,7 +390,7 @@ jobs:
             exit 1
           fi
 
-      - name: 提交并推送 SagittaDB-Enterprise 更新
+      - name: 提交并推送 Sagitta-Control 更新
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         working-directory: public-releases
         shell: bash
@@ -412,13 +412,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if git diff --cached --quiet; then
-            echo "SagittaDB-Enterprise 公开仓库没有需要发布的变更。"
+            echo "Sagitta-Control 公开仓库没有需要发布的变更。"
             exit 0
           fi
-          git commit -m "发布 SagittaDB Enterprise ${{ steps.release.outputs.version }}"
+          git commit -m "发布 Sagitta Control ${{ steps.release.outputs.version }}"
           git push origin HEAD:main
 
-      - name: 创建或更新 SagittaDB-Enterprise Release
+      - name: 创建或更新 Sagitta-Control Release
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         env:
@@ -432,24 +432,24 @@ jobs:
           release_dir="${{ steps.release.outputs.release_dir }}"
           public_dir="public-releases"
           tag="v${version}"
-          title="SagittaDB Enterprise v${version}"
+          title="Sagitta Control v${version}"
           notes_file="$(mktemp)"
 
           sed \
             -e "s/X.Y.Z/${version}/g" \
-            -e "s#ghcr.io/<org>/sagittadb#${PUBLIC_IMAGE_REPOSITORY}#g" \
-            docs/release_templates/sagittadb_public_release.md > "${notes_file}"
+            -e "s#ghcr.io/<org>/sagitta-control#${PUBLIC_IMAGE_REPOSITORY}#g" \
+            docs/release_templates/sagitta_control_public_release.md > "${notes_file}"
 
           assets=(
             "${public_dir}/releases/${release_dir}/${package_name}.zip"
             "${public_dir}/releases/${release_dir}/${package_name}.zip.sha256"
             "${public_dir}/releases/${release_dir}/${package_name}.zip.sig.json"
-            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json"
-            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json.sha256"
-            "${public_dir}/releases/${release_dir}/sagittadb-backend-${version}.cyclonedx.json.bundle"
-            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json"
-            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json.sha256"
-            "${public_dir}/releases/${release_dir}/sagittadb-frontend-${version}.cyclonedx.json.bundle"
+            "${public_dir}/releases/${release_dir}/sagitta-control-backend-${version}.cyclonedx.json"
+            "${public_dir}/releases/${release_dir}/sagitta-control-backend-${version}.cyclonedx.json.sha256"
+            "${public_dir}/releases/${release_dir}/sagitta-control-backend-${version}.cyclonedx.json.bundle"
+            "${public_dir}/releases/${release_dir}/sagitta-control-frontend-${version}.cyclonedx.json"
+            "${public_dir}/releases/${release_dir}/sagitta-control-frontend-${version}.cyclonedx.json.sha256"
+            "${public_dir}/releases/${release_dir}/sagitta-control-frontend-${version}.cyclonedx.json.bundle"
           )
 
           release_flags=()

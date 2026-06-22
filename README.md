@@ -5,7 +5,7 @@
 
 Sagitta Control 是面向企业数据库治理和安全控制场景的统一管控平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.2 商业部署版 + v2-lite 授权体系**。
 
-> 品牌切换说明：自当前阶段起，对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`。底层授权项目码、源码目录、历史包名、镜像名和公开交付仓库暂保持 `sagittadb` / `SagittaDB-Enterprise` 兼容，后续再分阶段迁移技术标识。
+> 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
 
 ## 核心能力
 
@@ -87,7 +87,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 | [正式商业推广文案](docs/commercial_promotion_copy.md) | 面向官网、销售、试用邀请和商业推广材料的产品价值与宣传口径。 |
 | [商业版产品使用手册](docs/commercial_product_manual.md) | 面向试用客户和培训场景的正式用户操作指南。 |
 | [商业版运维部署维护升级文档](docs/commercial_ops_deployment_guide.md) | 面向客户运维、实施和 DevOps 的部署、授权、巡检、备份、升级和回滚指南。 |
-| [产品设计文档](docs/sagittadb_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
+| [产品设计文档](docs/sagitta_control_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
 | [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
 
@@ -96,8 +96,8 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 内部 ECS 测试环境和可访问私有仓库的自管环境，统一使用服务器端 SSH deploy key 直接拉取 Git 并部署：
 
 ```bash
-cd /opt/sagittadb/source
-COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref origin/main
+cd /opt/sagitta-control/source
+COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref origin/main
 ```
 
 `deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本，并按变更范围自动选择备份、迁移、镜像构建和服务重建；后端、Worker、Beat、Flower 共用同一个后端镜像，普通文档或 CI 改动会跳过镜像构建。首次配置 deploy key、remote、回滚和发布后验证步骤见 [运维管理手册](docs/operations_guide.md#24-内部-ecs-源码直拉部署约定)。
@@ -117,7 +117,7 @@ COMPOSE_PROJECT_NAME=sagittadb-source-test bash deploy/update-prod.sh --ref orig
 ## 目录结构
 
 ```text
-SagittaDB/
+Sagitta Control/
 ├── backend/                 # FastAPI 后端应用
 │   ├── app/engines/          # 多数据库引擎适配
 │   ├── app/routers/          # API 路由
@@ -188,7 +188,7 @@ v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 �
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。
 
-商业授权接入统一授权中心 `License-Server-Center`。源码部署模板和客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`，并预置官方 License 验签公钥。Sagitta Control 客户端在线激活和联网刷新时会自动提交授权项目码 `sagittadb`，同时保留 `product=sagittadb` 兼容字段；授权管理页会展示 `授权项目：Sagitta Control（sagittadb）`，用于现场确认当前部署正在按 Sagitta Control 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
+商业授权接入统一授权中心 `License-Server-Center`。源码部署模板和客户部署包默认使用 `LICENSE_SERVER_URL=https://license.loveai.asia`，并预置官方 License 验签公钥。Sagitta Control 客户端在线激活和联网刷新时会自动提交授权项目码 `sagitta-control`，同时保留 `product=sagitta-control` 兼容字段；授权管理页会展示 `授权项目：Sagitta Control（sagitta-control）`，用于现场确认当前部署正在按 Sagitta Control 产品线校验授权。在线激活区域输入客户 ID 后，会预览正式激活客户 ID 和正式激活部署指纹，便于在用户授权中心生成对应激活码；复制按钮兼容 HTTPS 和 HTTP 试用部署，HTTP 环境会自动使用降级复制方式。
 
 商业交付闭环已内置到产品：管理员可在 `商业交付` → `交付与支持` 页面完成实施交付向导、生成 Markdown/JSON 验收报告、导出脱敏诊断包、查看合规报表、处理告警事件和确认引擎支持矩阵。在线激活和联网刷新会向授权中心上报 usage/runtime 摘要，便于客户成功、续费和支持排障。
 
@@ -196,7 +196,7 @@ v2.2.0 已完成商业发布链路补强：客户部署包、sha256、Ed25519 �
 
 客户包新增正式推广前硬门禁：`prepare-go-live-env.sh` 会为客户现场生成生产随机密钥和稳定部署 ID，`go-live-check.sh` 会严格校验生产环境变量、正式 License、客户 ID、部署指纹、活跃实例、实施向导、验收报告、运行健康和推广就绪度。该脚本通过后，才视为客户现场具备正式推广上线条件；任一失败项都应先完成配置或补验收。
 
-发布机制与 DataFusionX 对齐：源码 `main` 分支只触发快速 CI 和版本记录，不自动发布商业包；推送 `release/**` 分支生成 RC 候选商业镜像和部署包，但不默认同步公开交付仓库；推送正式 `vX.Y.Z` 标签生成最终商业交付包并同步到 `Lynn-Lee/SagittaDB-Enterprise`，并创建或更新对应 GitHub Release。手动触发商业发布时默认只生成临时包，只有显式勾选发布才同步公开发布仓库。
+发布机制与 DataFusionX 对齐：源码 `main` 分支只触发快速 CI 和版本记录，不自动发布商业包；推送 `release/**` 分支生成 RC 候选商业镜像和部署包，但不默认同步公开交付仓库；推送正式 `vX.Y.Z` 标签生成最终商业交付包并同步到 `Lynn-Lee/Sagitta-Control`，并创建或更新对应 GitHub Release。手动触发商业发布时默认只生成临时包，只有显式勾选发布才同步公开发布仓库。
 
 正式交付包含：
 

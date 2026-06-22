@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-frontend
+  name: {{ include "sagitta-control.fullname" . }}-frontend
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
   selector:
     matchLabels:
-      {{- include "sagittadb.selectorLabels" . | nindent 6 }}
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: frontend
   template:
     metadata:
       labels:
-        {{- include "sagittadb.selectorLabels" . | nindent 8 }}
+        {{- include "sagitta-control.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
     spec:
-      serviceAccountName: {{ include "sagittadb.fullname" . }}
+      serviceAccountName: {{ include "sagitta-control.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -74,9 +74,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sagittadb.fullname" . }}-frontend
+  name: {{ include "sagitta-control.fullname" . }}-frontend
   labels:
-    {{- include "sagittadb.labels" . | nindent 4 }}
+    {{- include "sagitta-control.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   type: {{ .Values.service.frontend.type }}
@@ -86,5 +86,5 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "sagittadb.selectorLabels" . | nindent 4 }}
+    {{- include "sagitta-control.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: frontend

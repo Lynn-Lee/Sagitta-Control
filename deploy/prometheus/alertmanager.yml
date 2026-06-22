@@ -17,7 +17,7 @@ route:
 receivers:
   - name: 'default'
     webhook_configs:
-      # SagittaDB 平台接收告警并转发到对应资源组通知渠道
+      # Sagitta Control 平台接收告警并转发到对应资源组通知渠道
       - url: 'http://backend:8000/api/v1/monitor/alerts/webhook'
         send_resolved: true
 

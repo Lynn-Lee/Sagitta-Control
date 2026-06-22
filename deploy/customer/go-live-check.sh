@@ -238,7 +238,7 @@ check_json_nonempty() {
 
 require_python
 
-printf '[INFO] SagittaDB Enterprise go-live check\n'
+printf '[INFO] Sagitta Control go-live check\n'
 printf '[INFO] API_BASE_URL=%s\n' "$API_BASE_URL"
 printf '[INFO] FRONTEND_URL=%s\n' "$FRONTEND_URL"
 printf '[INFO] ENV_FILE=%s\n' "$ENV_FILE"
@@ -279,7 +279,7 @@ if [[ -n "$TOKEN" ]]; then
   code="$(api_request GET /api/v1/system/support/about "$about_json")"
   if [[ "$code" == "200" ]]; then
     pass "商业支持状态接口可访问"
-    check_json_equals "$about_json" project_code sagittadb "授权项目码为 sagittadb"
+    check_json_equals "$about_json" project_code sagitta-control "授权项目码为 sagitta-control"
     check_json_equals "$about_json" license.status licensed "License 为正式授权"
     check_json_equals "$about_json" license.is_trial False "License 非试用"
     check_json_nonempty "$about_json" license.activation_customer_id "正式激活客户 ID 已生成"

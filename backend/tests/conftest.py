@@ -20,7 +20,7 @@ from app.models.base import Base
 
 # 测试数据库 URL：只替换最后一段数据库名，保留用户名不变
 _db_url_base, _, _ = settings.DATABASE_URL.rpartition("/")
-TEST_DATABASE_URL = f"{_db_url_base}/sagittadb_test"
+TEST_DATABASE_URL = f"{_db_url_base}/sagitta_control_test"
 
 
 @pytest_asyncio.fixture

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""签发 SagittaDB Enterprise License 文件。
+"""签发 Sagitta Control License 文件。
 
 私钥必须通过 LICENSE_PRIVATE_KEY 提供，禁止提交到仓库或复制到客户镜像。
 """
@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 DEFAULT_FEATURES = ["workflow", "query", "archive", "monitor", "ai", "masking", "instance"]
-LICENSE_PROJECT_CODE = "sagittadb"
+LICENSE_PROJECT_CODE = "sagitta-control"
 
 
 def b64url(data: bytes) -> str:
@@ -59,7 +59,7 @@ def generate_keypair() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="签发 SagittaDB Enterprise License")
+    parser = argparse.ArgumentParser(description="签发 Sagitta Control License")
     parser.add_argument("--generate-keypair", action="store_true", help="生成一组新的 Ed25519 密钥后退出")
     parser.add_argument("--license-id", required=False, help="License 标识")
     parser.add_argument("--customer-id", required=False, help="客户标识")
@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--features", default=",".join(DEFAULT_FEATURES), help="逗号分隔的功能列表")
     parser.add_argument("--max-instances", type=int, default=0, help="0 表示不限制")
     parser.add_argument("--max-users", type=int, default=0, help="0 表示不限制")
-    parser.add_argument("--deployment-fingerprint", default="", help="将 License 绑定到单个 SagittaDB 部署")
+    parser.add_argument("--deployment-fingerprint", default="", help="将 License 绑定到单个 Sagitta Control 部署")
     parser.add_argument("--challenge-file", default="", help="离线 Challenge JSON；自动填充 customer_id 和 deployment_fingerprint")
     parser.add_argument("--response-out", default="", help="输出 challenge-response JSON 路径；为空则只输出 License")
     parser.add_argument("--out", default="", help="输出路径；为空时输出到 stdout")

@@ -1,6 +1,6 @@
-# Sagitta Control Enterprise 生产部署排障模板
+# Sagitta Control 生产部署排障模板
 
-本文用于记录 Sagitta Control Enterprise 客户现场 go-live 的通用排障步骤和案例复盘模板。
+本文用于记录 Sagitta Control 客户现场 go-live 的通用排障步骤和案例复盘模板。
 公开仓库只保留可复用方法，不记录真实客户名称、客户 ID、域名、公网 IP、
 License、token、内部验收结论或授权中心操作记录。
 
@@ -30,7 +30,7 @@ no matching manifest for linux/amd64 in the manifest list entries
 
 ```bash
 VERSION=2.2.0 \
-IMAGE_REPOSITORY=ghcr.io/<org>/sagittadb \
+IMAGE_REPOSITORY=ghcr.io/<org>/sagitta-control \
 EXPECTED_PLATFORMS=linux/amd64 \
 ./scripts/validate-commercial-images.sh
 ```
@@ -58,8 +58,8 @@ POST /api/v1/auth/login/
 正式激活需要授权中心已录入以下材料：
 
 ```text
-project=sagittadb
-product=sagittadb
+project=sagitta-control
+product=sagitta-control
 customer_id=<customer_id>
 deployment_fingerprint=<fingerprint>
 ```

@@ -1,5 +1,5 @@
 {
-  "name": "sagittadb-frontend",
+  "name": "sagitta-control-frontend",
   "private": true,
   "version": "2.2.2",
   "type": "module",

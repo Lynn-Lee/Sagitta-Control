@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""渲染并校验 SagittaDB Enterprise 客户部署包。"""
+"""渲染并校验 Sagitta Control 客户部署包。"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ PACKAGE_FILES = {
 PACKAGE_DIRS = {
     "deploy/customer/docs": "docs",
     "docs/screenshots/user-manual": "screenshots",
-    "deploy/helm/sagittadb": "helm/sagittadb",
+    "deploy/helm/sagitta-control": "helm/sagitta-control",
 }
 
 SECRET_PATTERNS = [
@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image-repository",
         required=True,
-        help="镜像仓库前缀，例如 ghcr.io/acme/sagittadb",
+        help="镜像仓库前缀，例如 ghcr.io/acme/sagitta-control",
     )
     parser.add_argument(
         "--output-dir",
@@ -67,7 +67,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--package-name",
-        help="可选客户包目录/压缩包名称，默认 SagittaDB-Enterprise-v<version>。",
+        help="可选客户包目录/压缩包名称，默认 Sagitta-Control-v<version>。",
     )
     return parser.parse_args()
 
@@ -92,15 +92,15 @@ def render_placeholders(package_dir: Path, version: str, image_repository: str) 
         if path.suffix.lower() in BINARY_ASSET_SUFFIXES:
             continue
         text = path.read_text(encoding="utf-8")
-        text = text.replace("__SAGITTADB_VERSION__", version)
+        text = text.replace("__SAGITTA_CONTROL_VERSION__", version)
         text = text.replace("__IMAGE_REPOSITORY__", image_repository)
         if path.name == "Chart.yaml":
             text = re.sub(r"^version: .*$", f"version: {version}", text, flags=re.MULTILINE)
             text = re.sub(r"^appVersion: .*$", f'appVersion: "{version}"', text, flags=re.MULTILINE)
         if path.name.startswith("values"):
             text = text.replace("registry: ghcr.io", f"registry: {registry}")
-            text = text.replace("repository: your-org/sagittadb-frontend", f"repository: {repository}-frontend")
-            text = text.replace("repository: your-org/sagittadb", f"repository: {repository}-backend")
+            text = text.replace("repository: your-org/sagitta-control-frontend", f"repository: {repository}-frontend")
+            text = text.replace("repository: your-org/sagitta-control", f"repository: {repository}-backend")
             text = re.sub(r'tag: "1\.0\.0"', f'tag: "{version}"', text)
         path.write_text(text, encoding="utf-8")
 
@@ -108,7 +108,7 @@ def render_placeholders(package_dir: Path, version: str, image_repository: str) 
 def split_image_repository(image_repository: str) -> tuple[str, str]:
     parts = image_repository.split("/", 1)
     if len(parts) != 2:
-        raise ValueError("--image-repository 必须包含 registry/repository，例如 ghcr.io/acme/sagittadb")
+        raise ValueError("--image-repository 必须包含 registry/repository，例如 ghcr.io/acme/sagitta-control")
     return parts[0], parts[1]
 
 
@@ -125,7 +125,7 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
             combined_text += f"\n--- {path.name} ---\n"
             combined_text += path.read_text(encoding="utf-8")
 
-    if "__SAGITTADB_VERSION__" in combined_text or "__IMAGE_REPOSITORY__" in combined_text:
+    if "__SAGITTA_CONTROL_VERSION__" in combined_text or "__IMAGE_REPOSITORY__" in combined_text:
         errors.append("客户包中仍存在未渲染占位符")
 
     screenshot_dir = package_dir / "screenshots"
@@ -242,7 +242,7 @@ def main() -> int:
     args = parse_args()
     repo_root = Path(__file__).resolve().parents[1]
     output_dir = (repo_root / args.output_dir).resolve()
-    package_name = args.package_name or f"SagittaDB-Enterprise-v{args.version}"
+    package_name = args.package_name or f"Sagitta-Control-v{args.version}"
     package_dir = output_dir / package_name
 
     if package_dir.exists():

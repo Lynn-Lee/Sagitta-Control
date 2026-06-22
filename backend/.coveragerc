@@ -24,7 +24,7 @@ exclude_lines =
 
 [html]
 directory = htmlcov
-title = SagittaDB Coverage Report
+title = Sagitta Control Coverage Report
 
 [xml]
 output = coverage.xml

@@ -41,7 +41,7 @@ jobs:
       - name: 写入任务摘要
         run: |
           {
-            echo "## SagittaDB 发布版本记录"
+            echo "## Sagitta Control 发布版本记录"
             echo ""
             echo "- 版本：\`${{ steps.version.outputs.version }}\`"
             echo "- 提交：\`${{ github.sha }}\`"

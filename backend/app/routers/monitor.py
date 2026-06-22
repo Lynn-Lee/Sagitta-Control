@@ -577,7 +577,7 @@ async def prometheus_sd_targets(db: AsyncSession = Depends(get_db)):
     """
     Prometheus HTTP SD 端点。
     在 prometheus.yml 中配置：
-      - job_name: sagittadb_sd
+      - job_name: sagitta_control_sd
         http_sd_configs:
           - url: http://backend:8000/internal/prometheus/sd-targets
             refresh_interval: 60s

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """客户同构环境引擎验证脚本。
 
-脚本只通过 HTTP API 访问已部署的 SagittaDB 环境，便于实施人员在客户现场
+脚本只通过 HTTP API 访问已部署的 Sagitta Control 环境，便于实施人员在客户现场
 或内部验证环境生成可归档的 JSON/Markdown 记录。
 """
 
@@ -694,7 +694,7 @@ def write_reports(results: list[CheckResult], targets: list[Target], out_dir: Pa
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="SagittaDB customer engine validation")
+    parser = argparse.ArgumentParser(description="Sagitta Control customer engine validation")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--username", default="")
     parser.add_argument("--password", default="")

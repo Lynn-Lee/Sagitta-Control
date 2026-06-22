@@ -1,6 +1,6 @@
 """Optional real-service integration matrix for database engines.
 
-These tests are skipped by default. Set SAGITTADB_REAL_ENGINE_MATRIX_CONFIG to a
+These tests are skipped by default. Set SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG to a
 JSON file path to run them against customer-like database services.
 """
 
@@ -18,7 +18,7 @@ from app.engines.registry import get_engine
 
 
 def _load_cases() -> list[dict[str, Any]]:
-    config_path = os.getenv("SAGITTADB_REAL_ENGINE_MATRIX_CONFIG")
+    config_path = os.getenv("SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG")
     if not config_path:
         return []
     path = Path(config_path)
@@ -26,14 +26,14 @@ def _load_cases() -> list[dict[str, Any]]:
     if isinstance(data, dict):
         data = data.get("engines", [])
     if not isinstance(data, list):
-        raise TypeError("SAGITTADB_REAL_ENGINE_MATRIX_CONFIG must contain a list or {engines: []}")
+        raise TypeError("SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG must contain a list or {engines: []}")
     return data
 
 
 CASES = _load_cases()
 pytestmark = pytest.mark.skipif(
     not CASES,
-    reason="Set SAGITTADB_REAL_ENGINE_MATRIX_CONFIG to run real engine integration matrix",
+    reason="Set SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG to run real engine integration matrix",
 )
 
 

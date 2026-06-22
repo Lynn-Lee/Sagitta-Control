@@ -1,6 +1,6 @@
-# SagittaDB Enterprise v__SAGITTADB_VERSION__
+# Sagitta Control v__SAGITTA_CONTROL_VERSION__
 
-SagittaDB Enterprise 是面向企业数据库治理场景的一体化管控平台，帮助企业把数据库实例、SQL 变更、在线查询、权限申请、数据字典、数据脱敏、运行观测、数据归档和审计日志统一到一个可审批、可追踪、可运营的工作台中。
+Sagitta Control 是面向企业数据库治理场景的一体化管控平台，帮助企业把数据库实例、SQL 变更、在线查询、权限申请、数据字典、数据脱敏、运行观测、数据归档和审计日志统一到一个可审批、可追踪、可运营的工作台中。
 
 平台适合 DBA、研发团队、运维团队、数据安全负责人和审计人员共同使用：管理员接入数据库并配置组织权限，研发在授权范围内提交工单或执行查询，DBA 与审批人完成审核和执行，审计人员通过日志与看板追踪关键操作。
 
@@ -41,12 +41,12 @@ SagittaDB Enterprise 是面向企业数据库治理场景的一体化管控平�
 
 ## 当前版本
 
-- 产品版本：`__SAGITTADB_VERSION__`
-- 后端镜像：`__IMAGE_REPOSITORY__-backend:__SAGITTADB_VERSION__`
-- 前端镜像：`__IMAGE_REPOSITORY__-frontend:__SAGITTADB_VERSION__`
+- 产品版本：`__SAGITTA_CONTROL_VERSION__`
+- 后端镜像：`__IMAGE_REPOSITORY__-backend:__SAGITTA_CONTROL_VERSION__`
+- 前端镜像：`__IMAGE_REPOSITORY__-frontend:__SAGITTA_CONTROL_VERSION__`
 - 镜像标签：固定版本标签，不使用 `latest`
 
-SagittaDB 支持试用和正式授权，部署完成后可在产品内完成激活或续期。
+Sagitta Control 支持试用和正式授权，部署完成后可在产品内完成激活或续期。
 
 ## 文档入口
 
@@ -57,7 +57,7 @@ SagittaDB 支持试用和正式授权，部署完成后可在产品内完成激�
 
 ## 5 分钟理解部署流程
 
-SagittaDB Enterprise 的客户部署包已经包含 `docker-compose.yml`、`.env.example`、初始化脚本、升级脚本、上线检查脚本、Helm Chart 和文档。首次部署建议按下面顺序执行：
+Sagitta Control 的客户部署包已经包含 `docker-compose.yml`、`.env.example`、初始化脚本、升级脚本、上线检查脚本、Helm Chart 和文档。首次部署建议按下面顺序执行：
 
 1. 下载并校验 Release 包。
 2. 复制 `.env.example` 为 `.env`，生成随机密钥和稳定部署 ID。
@@ -74,11 +74,11 @@ SagittaDB Enterprise 的客户部署包已经包含 `docker-compose.yml`、`.env
 在 Linux 服务器上下载完整部署包：
 
 ```bash
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v__SAGITTADB_VERSION__/SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
-wget https://github.com/Lynn-Lee/SagittaDB-Enterprise/releases/download/v__SAGITTADB_VERSION__/SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sha256
-sha256sum -c SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sha256
-unzip SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
-cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+sha256sum -c Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+unzip Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
 ```
 
 准备 `.env`。`prepare-go-live-env.sh` 会保留已有正式值，并为占位符生成强随机值：
@@ -119,16 +119,16 @@ curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1/health
 ```
 
-两个命令都成功后，使用客户侧域名或服务器入口访问 SagittaDB。生产环境建议通过 HTTPS 域名访问，不建议长期使用裸 IP。
+两个命令都成功后，使用客户侧域名或服务器入口访问 Sagitta Control。生产环境建议通过 HTTPS 域名访问，不建议长期使用裸 IP。
 
 ## Kubernetes / Helm
 
 仓库内包含 Helm Chart。使用 Helm 前，请先准备 Ingress、证书、Secret、外部 PostgreSQL/Redis 或客户侧存储策略：
 
 ```bash
-helm dependency update helm/sagittadb
-helm upgrade --install sagittadb helm/sagittadb \
-  -f helm/sagittadb/values-prod.yaml \
+helm dependency update helm/sagitta-control
+helm upgrade --install sagitta-control helm/sagitta-control \
+  -f helm/sagitta-control/values-prod.yaml \
   --set app.secretKey='<random-secret>' \
   --set license.customerId='<customer-id>' \
   --set license.deploymentId='<stable-deployment-id>'
@@ -157,9 +157,9 @@ helm upgrade --install sagittadb helm/sagittadb \
 升级前先下载新版本部署包并校验 sha256，然后把旧部署目录的 `.env` 复制到新目录。不要重新生成 `SECRET_KEY` 或 `LICENSE_DEPLOYMENT_ID`。
 
 ```bash
-cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
-cp /path/to/old/SagittaDB-Enterprise-v<old_version>/.env .env
-./upgrade.sh __SAGITTADB_VERSION__
+cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
+cp /path/to/old/Sagitta-Control-v<old_version>/.env .env
+./upgrade.sh __SAGITTA_CONTROL_VERSION__
 ```
 
 升级脚本会更新镜像标签、拉取固定版本镜像、备份 PostgreSQL、执行 Alembic 迁移、重启服务并检查前后端健康状态。升级前请阅读 [运维升级指南](docs/operations-upgrade.md)，确认维护窗口、备份文件和回滚路径都已准备好。
@@ -168,9 +168,9 @@ cp /path/to/old/SagittaDB-Enterprise-v<old_version>/.env .env
 
 每个 Release 提供：
 
-- `SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip`
-- `SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sha256`
-- `SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip.sig.json`
+- `Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip`
+- `Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256`
+- `Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sig.json`
 - 后端镜像 CycloneDX SBOM、sha256 和签名 bundle
 - 前端镜像 CycloneDX SBOM、sha256 和签名 bundle
 

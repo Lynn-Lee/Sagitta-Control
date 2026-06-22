@@ -1,15 +1,15 @@
-# Sagitta Control Enterprise 运维部署维护升级文档
+# Sagitta Control 运维部署维护升级文档
 
-> 文档版本：v1.0  
-> 适用产品：Sagitta Control Enterprise 正式商业版 2.2.0  
-> 目标读者：运维工程师、DevOps、DBA、系统管理员、实施顾问  
-> 授权项目码：`sagittadb`
+> 文档版本：v1.0
+> 适用产品：Sagitta Control 正式商业版 2.2.0
+> 目标读者：运维工程师、DevOps、DBA、系统管理员、实施顾问
+> 授权项目码：`sagitta-control`
 
-本文面向客户正式试用和生产推广，说明 Sagitta Control Enterprise 的部署、授权、初始化、巡检、备份恢复、升级回滚、维护、安全检查和常见故障处理。阶段一品牌切换仅调整对外产品名，客户包文件名、Helm release、Kubernetes namespace 和授权项目码仍保留 `SagittaDB-Enterprise` / `sagittadb` 兼容示例。
+本文面向客户正式试用和生产推广，说明 Sagitta Control 的部署、授权、初始化、巡检、备份恢复、升级回滚、维护、安全检查和常见故障处理。客户包文件名、Helm release、Kubernetes namespace 和授权项目码统一使用 `Sagitta-Control` / `sagitta-control`。
 
 ## 1. 部署架构
 
-Sagitta Control Enterprise 由以下核心服务组成：
+Sagitta Control 由以下核心服务组成：
 
 | 服务 | 作用 |
 |---|---|
@@ -53,7 +53,7 @@ Sagitta Control Enterprise 由以下核心服务组成：
 | 信息 | 示例 |
 |---|---|
 | 客户 ID | `acme-prod` |
-| 平台域名 | `https://sagittadb.example.com` |
+| 平台域名 | `https://sagitta-control.example.com` |
 | 管理员账号 | 首次初始化后创建或由系统初始化接口生成 |
 | 首个数据库实例 | 用于验证连接、查询、工单和观测链路 |
 | 通知渠道 | 邮件、钉钉、飞书或企业微信至少一种 |
@@ -99,9 +99,9 @@ Sagitta Control Enterprise 由以下核心服务组成：
 ### 3.1 解压客户包
 
 ```bash
-sha256sum -c SagittaDB-Enterprise-v2.2.0.zip.sha256
-unzip SagittaDB-Enterprise-v2.2.0.zip
-cd SagittaDB-Enterprise-v2.2.0
+sha256sum -c Sagitta-Control-v2.2.0.zip.sha256
+unzip Sagitta-Control-v2.2.0.zip
+cd Sagitta-Control-v2.2.0
 ```
 
 ### 3.2 准备配置
@@ -156,7 +156,7 @@ curl -fsS http://127.0.0.1/health
 如使用域名和 HTTPS：
 
 ```bash
-curl -I https://sagittadb.example.com
+curl -I https://sagitta-control.example.com
 ```
 
 ### 3.7 初始化管理员
@@ -185,8 +185,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/system/init/
 示例命令：
 
 ```bash
-helm upgrade --install sagittadb ./helm/sagittadb \
-  --namespace sagittadb \
+helm upgrade --install sagitta-control ./helm/sagitta-control \
+  --namespace sagitta-control \
   --create-namespace \
   -f values-prod.yaml
 ```
@@ -194,9 +194,9 @@ helm upgrade --install sagittadb ./helm/sagittadb \
 升级后验证：
 
 ```bash
-kubectl -n sagittadb get pods
-kubectl -n sagittadb logs deploy/sagittadb-backend --tail=100
-kubectl -n sagittadb logs deploy/sagittadb-worker --tail=100
+kubectl -n sagitta-control get pods
+kubectl -n sagitta-control logs deploy/sagitta-control-backend --tail=100
+kubectl -n sagitta-control logs deploy/sagitta-control-worker --tail=100
 ```
 
 注意事项：
@@ -240,8 +240,8 @@ kubectl -n sagittadb logs deploy/sagittadb-worker --tail=100
 授权项目固定为：
 
 ```text
-project=sagittadb
-product=sagittadb
+project=sagitta-control
+product=sagitta-control
 ```
 
 标准功能模块：
@@ -472,14 +472,14 @@ bash deploy/backup/backup-postgres.sh
 
 ```bash
 docker compose exec postgres pg_dump -U <postgres_user> <postgres_db> \
-  | gzip > sagittadb_$(date +%Y%m%d_%H%M%S).sql.gz
+  | gzip > sagitta_control_$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
 备份后检查：
 
 ```bash
 ls -lh *.sql.gz
-gzip -t sagittadb_*.sql.gz
+gzip -t sagitta_control_*.sql.gz
 ```
 
 ### 9.4 恢复流程
@@ -495,7 +495,7 @@ gzip -t sagittadb_*.sql.gz
 
 ```bash
 docker compose stop backend celery_worker celery_beat frontend
-gunzip -c sagittadb_backup.sql.gz | docker compose exec -T postgres psql -U <postgres_user> <postgres_db>
+gunzip -c sagitta_control_backup.sql.gz | docker compose exec -T postgres psql -U <postgres_user> <postgres_db>
 docker compose up -d
 ```
 
@@ -526,7 +526,7 @@ docker compose up -d
 标准流程：
 
 ```bash
-cd SagittaDB-Enterprise-v<target_version>
+cd Sagitta-Control-v<target_version>
 docker compose pull
 docker compose up -d postgres redis
 docker compose run --rm backend alembic upgrade head
@@ -554,17 +554,17 @@ curl -fsS http://127.0.0.1/health
 ### 10.3 Helm 升级
 
 ```bash
-helm upgrade sagittadb ./helm/sagittadb \
-  --namespace sagittadb \
+helm upgrade sagitta-control ./helm/sagitta-control \
+  --namespace sagitta-control \
   -f values-prod.yaml
 ```
 
 升级后：
 
 ```bash
-kubectl -n sagittadb rollout status deploy/sagittadb-backend
-kubectl -n sagittadb rollout status deploy/sagittadb-frontend
-kubectl -n sagittadb rollout status deploy/sagittadb-worker
+kubectl -n sagitta-control rollout status deploy/sagitta-control-backend
+kubectl -n sagitta-control rollout status deploy/sagitta-control-frontend
+kubectl -n sagitta-control rollout status deploy/sagitta-control-worker
 ```
 
 ### 10.4 数据库迁移
@@ -594,7 +594,7 @@ docker compose run --rm backend alembic upgrade head
 使用上一版本客户包：
 
 ```bash
-cd SagittaDB-Enterprise-v<previous_version>
+cd Sagitta-Control-v<previous_version>
 docker compose pull
 docker compose up -d
 docker compose ps
@@ -744,7 +744,7 @@ docker compose ps
 
 1. 检查客户 ID 是否与授权中心一致。
 2. 检查激活码是否属于 Sagitta Control 项目。
-3. 检查授权项目码是否为 `sagittadb`。
+3. 检查授权项目码是否为 `sagitta-control`。
 4. 检查部署指纹是否与授权中心记录一致。
 5. 检查授权中心激活码状态是否 active。
 6. 检查服务器网络是否可访问授权中心。

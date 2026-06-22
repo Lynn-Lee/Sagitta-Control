@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-/app}"
-OUTPUT_DIR="${NUITKA_OUTPUT_DIR:-/tmp/sagittadb-nuitka}"
+OUTPUT_DIR="${NUITKA_OUTPUT_DIR:-/tmp/sagitta-control-nuitka}"
 MODULES="${NUITKA_MODULES:-}"
 
 cd "${ROOT_DIR}"

@@ -377,7 +377,7 @@ class CommercialOpsService:
         return {
             "version": "2.2.2",
             "app_env": settings.APP_ENV,
-            "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",
+            "deployment_mode": "commercial" if settings.SAGITTA_CONTROL_COMMERCIAL_BUILD else "standard",
             "license_source": license_source,
             "health": "warning" if failed_collects else "ok",
             "failed_monitor_collect_configs": failed_collects,
@@ -1424,7 +1424,7 @@ class CommercialOpsService:
             "version": "2.2.2",
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,
-            "deployment_mode": "commercial" if settings.SAGITTADB_COMMERCIAL_BUILD else "standard",
+            "deployment_mode": "commercial" if settings.SAGITTA_CONTROL_COMMERCIAL_BUILD else "standard",
             "app_env": settings.APP_ENV,
             "deployment_fingerprint": license_status.get("deployment_fingerprint") or "",
             "license": license_status,

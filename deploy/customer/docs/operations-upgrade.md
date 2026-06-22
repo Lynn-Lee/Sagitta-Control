@@ -1,6 +1,6 @@
-# SagittaDB Enterprise 运维升级指南
+# Sagitta Control 运维升级指南
 
-本文面向客户运维、DBA 和平台管理员，说明 SagittaDB Enterprise 的日常巡检、备份、升级、回滚、日志诊断和安全基线。建议把本文和实际部署目录、访问域名、负责人、备份位置一起纳入客户侧运维交接材料。
+本文面向客户运维、DBA 和平台管理员，说明 Sagitta Control 的日常巡检、备份、升级、回滚、日志诊断和安全基线。建议把本文和实际部署目录、访问域名、负责人、备份位置一起纳入客户侧运维交接材料。
 
 共享运维截图、日志和诊断包前，请先确认没有暴露服务器 IP、`.env`、License 文件、激活码、数据库密码、Token 或未脱敏客户数据。
 
@@ -48,15 +48,15 @@ curl -fsS http://127.0.0.1:8080/health
 mkdir -p backups
 timestamp="$(date +%Y%m%d_%H%M%S)"
 docker compose exec -T postgres sh -ec \
-  'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagittadb}" --no-owner --no-acl --format=plain' \
-  | gzip > "backups/sagittadb_${timestamp}.sql.gz"
+  'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; pg_dump -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagitta_control}" --no-owner --no-acl --format=plain' \
+  | gzip > "backups/sagitta_control_${timestamp}.sql.gz"
 ```
 
 验证备份文件存在且非空：
 
 ```bash
-ls -lh "backups/sagittadb_${timestamp}.sql.gz"
-gzip -t "backups/sagittadb_${timestamp}.sql.gz"
+ls -lh "backups/sagitta_control_${timestamp}.sql.gz"
+gzip -t "backups/sagitta_control_${timestamp}.sql.gz"
 ```
 
 ### 2.2 同步备份这些材料
@@ -76,7 +76,7 @@ gzip -t "backups/sagittadb_${timestamp}.sql.gz"
 
 - 已阅读目标版本 Release Notes。
 - 已下载新版本部署包和 sha256 文件。
-- `sha256sum -c SagittaDB-Enterprise-v<version>.zip.sha256` 已通过。
+- `sha256sum -c Sagitta-Control-v<version>.zip.sha256` 已通过。
 - 已完成 PostgreSQL 备份，并验证 gzip 文件可读。
 - 旧版本部署目录、旧版本 zip 和旧版本 `.env` 仍保留。
 - 已确认维护窗口、通知范围和回滚负责人。
@@ -87,15 +87,15 @@ gzip -t "backups/sagittadb_${timestamp}.sql.gz"
 
 ## 4. 标准升级流程
 
-假设旧版本目录为 `/opt/sagittadb/SagittaDB-Enterprise-v<old_version>`，新版本目录为 `/opt/sagittadb/SagittaDB-Enterprise-v__SAGITTADB_VERSION__`。
+假设旧版本目录为 `/opt/sagitta-control/Sagitta-Control-v<old_version>`，新版本目录为 `/opt/sagitta-control/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__`。
 
 解压新版本并复制旧配置：
 
 ```bash
-cd /opt/sagittadb
-unzip SagittaDB-Enterprise-v__SAGITTADB_VERSION__.zip
-cd SagittaDB-Enterprise-v__SAGITTADB_VERSION__
-cp /opt/sagittadb/SagittaDB-Enterprise-v<old_version>/.env .env
+cd /opt/sagitta-control
+unzip Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
+cp /opt/sagitta-control/Sagitta-Control-v<old_version>/.env .env
 ```
 
 确认关键配置已继承：
@@ -107,7 +107,7 @@ grep -E '^(SECRET_KEY|LICENSE_CUSTOMER_ID|LICENSE_DEPLOYMENT_ID|BACKEND_PORT|FRO
 执行升级：
 
 ```bash
-./upgrade.sh __SAGITTADB_VERSION__
+./upgrade.sh __SAGITTA_CONTROL_VERSION__
 ```
 
 升级脚本会执行：
@@ -158,7 +158,7 @@ docker compose logs --tail=200 frontend > frontend-upgrade-error.log
 | 后端健康失败 | `.env`、PostgreSQL、Redis、License 公钥、商业完整性 Manifest。 |
 | 前端健康失败 | `frontend` 容器、`nginx.conf`、后端容器、端口和反向代理。 |
 
-如果失败发生在数据库迁移前，通常可以直接回到旧目录继续运行旧版本。如果失败发生在数据库迁移后，请先评估迁移是否可逆；不确定时联系 SagittaDB 支持团队后再回滚。
+如果失败发生在数据库迁移前，通常可以直接回到旧目录继续运行旧版本。如果失败发生在数据库迁移后，请先评估迁移是否可逆；不确定时联系 Sagitta Control 支持团队后再回滚。
 
 ## 6. 回滚流程
 
@@ -174,23 +174,23 @@ docker compose logs --tail=200 frontend > frontend-upgrade-error.log
 停止新版本服务：
 
 ```bash
-cd /opt/sagittadb/SagittaDB-Enterprise-v__SAGITTADB_VERSION__
+cd /opt/sagitta-control/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
 docker compose down
 ```
 
 切回旧版本目录并启动基础服务：
 
 ```bash
-cd /opt/sagittadb/SagittaDB-Enterprise-v<old_version>
+cd /opt/sagitta-control/Sagitta-Control-v<old_version>
 docker compose up -d postgres redis
 ```
 
-恢复升级前数据库备份。备份文件可以来自旧目录手工备份，也可以来自新版本 `upgrade.sh` 生成的 `backups/sagittadb_<timestamp>.sql.gz`：
+恢复升级前数据库备份。备份文件可以来自旧目录手工备份，也可以来自新版本 `upgrade.sh` 生成的 `backups/sagitta_control_<timestamp>.sql.gz`：
 
 ```bash
-gunzip -c /path/to/sagittadb_<timestamp>.sql.gz \
+gunzip -c /path/to/sagitta_control_<timestamp>.sql.gz \
   | docker compose exec -T postgres sh -ec \
-      'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; psql -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagittadb}"'
+      'export PGPASSWORD="${POSTGRES_PASSWORD:-}"; psql -U "${POSTGRES_USER:-sagitta}" -d "${POSTGRES_DB:-sagitta_control}"'
 ```
 
 启动旧版本服务并检查：
@@ -202,7 +202,7 @@ curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1/health
 ```
 
-登录后验证授权、实例、SQL 工单、在线查询、查询权限和审计入口。生产回滚前请先评估数据库迁移是否可逆；若不确定，请联系 SagittaDB 支持团队后再操作。
+登录后验证授权、实例、SQL 工单、在线查询、查询权限和审计入口。生产回滚前请先评估数据库迁移是否可逆；若不确定，请联系 Sagitta Control 支持团队后再操作。
 
 ## 7. 日志和诊断
 
@@ -230,7 +230,7 @@ docker compose logs -f backend celery_worker celery_beat
 
 提交支持请求时建议提供：
 
-- SagittaDB 版本号。
+- Sagitta Control 版本号。
 - 部署方式：Docker Compose 或 Helm。
 - 后端健康接口结果。
 - `docker compose ps` 输出。

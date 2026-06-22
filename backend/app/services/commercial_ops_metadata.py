@@ -63,7 +63,7 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
         "kind": "executable",
         "paths": [
             "deploy/customer/upgrade.sh",
-            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}/upgrade.sh",
+            f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}/upgrade.sh",
             "upgrade.sh",
         ],
         "path": "/commercial",
@@ -100,7 +100,7 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
         "name": "客户包 sha256",
         "blocking": False,
         "kind": "file",
-        "paths": [f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sha256"],
+        "paths": [f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sha256"],
         "path": "/commercial",
     },
     {
@@ -110,9 +110,9 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
         "blocking": False,
         "kind": "file",
         "paths": [
-            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sig.json",
-            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.asc",
-            f"dist-commercial/SagittaDB-Enterprise-v{COMMERCIAL_VERSION}.zip.sig",
+            f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sig.json",
+            f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.asc",
+            f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sig",
         ],
         "path": "/commercial",
     },

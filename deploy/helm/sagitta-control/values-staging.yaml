@@ -1,5 +1,5 @@
 # ─── Staging 环境覆盖值 ────────────────────────────────────────────────────────
-# 用法: helm upgrade --install sagittadb ./sagittadb -f values-staging.yaml
+# 用法: helm upgrade --install sagitta-control ./sagitta-control -f values-staging.yaml
 
 app:
   env: staging
@@ -18,7 +18,7 @@ frontend:
 
 ingress:
   hosts:
-    - host: staging.sagittadb.example.com
+    - host: staging.sagitta-control.example.com
       paths:
         - path: /api
           pathType: Prefix

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SagittaDB 2.0 商业部署版验收冒烟检查。
+"""Sagitta Control 2.0 商业部署版验收冒烟检查。
 
 默认只执行非破坏性检查。提交工单、申请查询权限、提交归档任务、
 激活 License 和通知测试等会改变业务数据的检查，必须显式传入对应参数。
@@ -548,7 +548,7 @@ def needs_authenticated_checks(args: argparse.Namespace) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="SagittaDB v2.0 acceptance smoke check"
+        description="Sagitta Control v2.0 acceptance smoke check"
     )
     parser.add_argument(
         "--base-url", default="http://127.0.0.1:8000", help="Backend base URL"
