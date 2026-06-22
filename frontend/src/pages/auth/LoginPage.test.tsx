@@ -52,7 +52,9 @@ describe('LoginPage', () => {
       await screen.findByText('Sagitta Control · Aim at Data, Govern with Precision'),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('Sagitta Control v2.2.2 · Database Security Control Platform'),
+      screen.getByText(
+        'Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability',
+      ),
     ).toBeInTheDocument()
   })
 

@@ -915,7 +915,10 @@ export default function LoginPage() {
           </a>
           . All rights reserved.
         </div>
-        <div>{branding.platform_name} v2.2.2 · Database Security Control Platform</div>
+        <div>
+          {branding.platform_name} v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End
+          Observability
+        </div>
       </div>
     </div>
   )
