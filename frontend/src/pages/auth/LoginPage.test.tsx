@@ -41,16 +41,16 @@ vi.mock('@/api/auth', () => ({
 }))
 
 describe('LoginPage', () => {
-  it('uses the Sagitta Control precision governance slogan', async () => {
+  it('uses the concise Sagitta Control precision governance slogan', async () => {
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>,
     )
 
-    expect(
-      await screen.findByText('Sagitta Control · Aim at Data, Govern with Precision'),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('矢 准 管 控')).toBeInTheDocument()
+    expect(await screen.findByText('Aim at Data, Govern with Precision')).toBeInTheDocument()
+    expect(screen.queryByText('Sagitta Control · Aim at Data, Govern with Precision')).not.toBeInTheDocument()
     expect(
       screen.getByText(
         'Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability',

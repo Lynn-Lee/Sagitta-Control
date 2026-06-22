@@ -427,7 +427,7 @@ export default function LoginPage() {
             color: 'rgba(226,237,255,0.68)',
             letterSpacing: '1.5px', marginTop: 12,
           }}>
-            {branding.platform_name} · Aim at Data, Govern with Precision
+            Aim at Data, Govern with Precision
           </div>
         </div>
 
