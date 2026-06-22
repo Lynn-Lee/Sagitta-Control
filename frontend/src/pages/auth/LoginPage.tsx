@@ -417,9 +417,9 @@ export default function LoginPage() {
             fontFamily: "'Noto Sans SC', sans-serif",
             fontWeight: 500, fontSize: 13,
             color: '#8FB3FF',
-            letterSpacing: '7px', marginTop: 7, textAlign: 'center',
+            letterSpacing: '1px', marginTop: 7, textAlign: 'center',
           }}>
-            矢 准 管 控
+            矢准数据库安全管控平台
           </div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
