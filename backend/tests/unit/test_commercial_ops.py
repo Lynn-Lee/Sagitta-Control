@@ -2,6 +2,7 @@ import json
 
 from app.engines.registry import supported_engines
 from app.services.commercial_ops import CommercialOpsService
+from app.services.commercial_ops_metadata import COMMERCIAL_VERSION
 from app.services.monitor import MonitorService
 
 
@@ -78,6 +79,13 @@ def test_delivery_preflight_requires_backup_restore_and_upgrade_scripts(tmp_path
     )
 
 
+def test_bundled_delivery_manifest_matches_current_commercial_version():
+    manifest = CommercialOpsService._load_delivery_manifest()
+
+    assert manifest is not None
+    assert manifest["version"] == COMMERCIAL_VERSION
+
+
 def test_delivery_preflight_detects_release_materials(tmp_path):
     files = [
         "deploy/backup/backup-postgres.sh",
@@ -98,13 +106,13 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
 
     release_dir = tmp_path / "dist-commercial"
     release_dir.mkdir()
-    (release_dir / "Sagitta-Control-v2.2.2.zip.sha256").write_text("checksum\n", encoding="utf-8")
-    (release_dir / "Sagitta-Control-v2.2.2.zip.sig.json").write_text("{}", encoding="utf-8")
+    (release_dir / f"Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sha256").write_text("checksum\n", encoding="utf-8")
+    (release_dir / f"Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sig.json").write_text("{}", encoding="utf-8")
     sbom_dir = release_dir / "sbom"
     sbom_dir.mkdir()
-    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json").write_text("{}", encoding="utf-8")
-    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
-    (sbom_dir / "sagitta-control-backend-2.2.2.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
+    (sbom_dir / f"sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json").write_text("{}", encoding="utf-8")
+    (sbom_dir / f"sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json.sha256").write_text("checksum\n", encoding="utf-8")
+    (sbom_dir / f"sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json.bundle").write_text("{}", encoding="utf-8")
 
     result = CommercialOpsService.delivery_preflight(tmp_path)
 
@@ -114,7 +122,7 @@ def test_delivery_preflight_detects_release_materials(tmp_path):
 
 def test_delivery_preflight_can_use_release_manifest(tmp_path):
     manifest = {
-        "version": "2.2.2",
+        "version": COMMERCIAL_VERSION,
         "materials": [
             {"path": "deploy/backup/backup-postgres.sh", "executable": True},
             {"path": "deploy/backup/restore-postgres.sh", "executable": True},
@@ -125,11 +133,11 @@ def test_delivery_preflight_can_use_release_manifest(tmp_path):
             {"path": "scripts/validate-commercial-images.sh", "executable": True},
             {"path": "scripts/generate-commercial-sbom.sh", "executable": True},
             {"path": "scripts/sign-commercial-artifacts.sh", "executable": True},
-            {"path": "dist-commercial/Sagitta-Control-v2.2.2.zip.sha256", "executable": False},
-            {"path": "dist-commercial/Sagitta-Control-v2.2.2.zip.sig.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json", "executable": False},
-            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json.sha256", "executable": False},
-            {"path": "dist-commercial/sbom/sagitta-control-backend-2.2.2.cyclonedx.json.bundle", "executable": False},
+            {"path": f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sha256", "executable": False},
+            {"path": f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sig.json", "executable": False},
+            {"path": f"dist-commercial/sbom/sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json", "executable": False},
+            {"path": f"dist-commercial/sbom/sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json.sha256", "executable": False},
+            {"path": f"dist-commercial/sbom/sagitta-control-backend-{COMMERCIAL_VERSION}.cyclonedx.json.bundle", "executable": False},
         ],
     }
 
