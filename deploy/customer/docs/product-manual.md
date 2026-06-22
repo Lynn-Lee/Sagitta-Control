@@ -244,6 +244,10 @@ SQL 洞察用于分析 Top SQL、SQL 样本、SQL 指纹、聚合指标和异常
 
 诊断工作台与舰队总览共用 `观测中心` 入口，进入实例后按页签切换查看性能、SQL 洞察和采集诊断。
 
+![SQL 洞察 Top SQL](../screenshots/12-monitor-sql-analysis.png)
+
+![SQL 洞察汇总](../screenshots/12-monitor-sql-insight.png)
+
 ## 6. 数据归档
 
 入口：`运维工具` -> `数据归档`。
