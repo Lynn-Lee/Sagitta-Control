@@ -23,6 +23,7 @@
 - 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
 - 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 - 前端发布后如发现日期选择器仍显示 `Today`、`Select date`、`Start date`、英文月份或英文星期，应优先按旧静态资源缓存排查：确认前端已重新执行生产构建，Nginx/CDN 没有继续服务旧 `/assets/*.js`，浏览器侧已强制刷新或清理缓存。
+- 前端日期时间类数据应统一显示为 `YYYY-MM-DD HH:mm:ss`，例如 `2026-06-02 22:32:33`。如果表格、详情、通知或运维面板仍出现斜杠日期、上下午或仅月日时间，优先确认前端静态资源已刷新，再检查对应页面是否绕过了公共 `formatDateTime` 工具。
 
 Docker Compose 首次部署示例：
 

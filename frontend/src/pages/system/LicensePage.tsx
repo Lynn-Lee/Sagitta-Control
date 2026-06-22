@@ -19,6 +19,7 @@ import {
   UploadOutlined, ThunderboltOutlined, FileSyncOutlined,
 } from '@ant-design/icons'
 import { licenseApi, type LicenseFingerprintPreview, type LicenseStatus } from '@/api/license'
+import { formatDateTime } from '@/utils/datetime'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -35,11 +36,6 @@ const statusLabel: Record<string, string> = {
   licensed: '正式授权',
   expired: '已过期',
   invalid: '无效',
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString()
 }
 
 async function copyTextToClipboard(value: string) {
@@ -293,10 +289,10 @@ export default function LicensePage() {
                   </Space>
                 ) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="最后联网校验">{formatDate(status?.last_online_check_at)}</Descriptions.Item>
-              <Descriptions.Item label="签发时间">{formatDate(status?.issued_at)}</Descriptions.Item>
-              <Descriptions.Item label="生效时间">{formatDate(status?.not_before)}</Descriptions.Item>
-              <Descriptions.Item label="过期时间">{formatDate(status?.expires_at)}</Descriptions.Item>
+              <Descriptions.Item label="最后联网校验">{formatDateTime(status?.last_online_check_at, '-')}</Descriptions.Item>
+              <Descriptions.Item label="签发时间">{formatDateTime(status?.issued_at, '-')}</Descriptions.Item>
+              <Descriptions.Item label="生效时间">{formatDateTime(status?.not_before, '-')}</Descriptions.Item>
+              <Descriptions.Item label="过期时间">{formatDateTime(status?.expires_at, '-')}</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>

@@ -1,9 +1,46 @@
+export const DATE_TIME_DISPLAY_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+
+const pad2 = (value: string | undefined) => String(value || '0').padStart(2, '0').slice(0, 2)
+
+function isValidDateTime(year: number, month: number, day: number, hour: number, minute: number, second: number) {
+  const date = new Date(year, month - 1, day, hour, minute, second)
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date.getHours() === hour &&
+    date.getMinutes() === minute &&
+    date.getSeconds() === second
+  )
+}
+
 export function formatDateTime(value?: string | null, fallback = '—') {
-  if (!value) return fallback
-  return value
+  const rawValue = String(value || '').trim()
+  if (!rawValue) return fallback
+
+  const normalized = rawValue
+    .replace(/\//g, '-')
     .replace('T', ' ')
     .replace(/\.\d+/, '')
     .replace(/Z$/, '')
     .replace(/[+-]\d{2}:?\d{2}$/, '')
-    .slice(0, 19)
+    .trim()
+  const [datePart = '', timePart = ''] = normalized.split(/\s+/)
+  const dateMatch = datePart.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (!dateMatch) return fallback
+
+  const timeMatch = timePart.match(/^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?/)
+  const year = Number(dateMatch[1])
+  const month = Number(dateMatch[2])
+  const day = Number(dateMatch[3])
+  const hour = Number(timeMatch?.[1] || 0)
+  const minute = Number(timeMatch?.[2] || 0)
+  const second = Number(timeMatch?.[3] || 0)
+
+  if (!isValidDateTime(year, month, day, hour, minute, second)) return fallback
+
+  return [
+    `${dateMatch[1]}-${pad2(dateMatch[2])}-${pad2(dateMatch[3])}`,
+    `${pad2(timeMatch?.[1])}:${pad2(timeMatch?.[2])}:${pad2(timeMatch?.[3])}`,
+  ].join(' ')
 }

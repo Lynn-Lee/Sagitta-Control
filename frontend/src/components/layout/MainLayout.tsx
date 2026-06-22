@@ -16,6 +16,7 @@ import { notificationApi, type SystemNotification } from '@/api/system'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal'
 import ProfileSettingsModal from '@/components/auth/ProfileSettingsModal'
 import { useAuthStore } from '@/store/auth'
+import { formatDateTime } from '@/utils/datetime'
 import { getPostLoginPath } from '@/utils/postLogin'
 import BrandLogo from '@/components/common/BrandLogo'
 import { useBranding } from '@/hooks/useBranding'
@@ -170,17 +171,7 @@ type NavItem = NonNullable<MenuProps['items']>[number] & {
 }
 
 const formatNotificationTime = (value: string) => {
-  if (!value) return ''
-  try {
-    return new Intl.DateTimeFormat('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(value))
-  } catch {
-    return ''
-  }
+  return formatDateTime(value, '')
 }
 
 const notificationPreview = (content: string) => (
@@ -379,7 +370,7 @@ export default function MainLayout() {
         items.push({
           key: `notification-${notice.id}`,
           label: (
-            <div style={{ width: 340, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ width: 390, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <span
                 style={{
                   width: 7,
@@ -392,7 +383,7 @@ export default function MainLayout() {
               />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <Text strong={!notice.is_read} ellipsis style={{ maxWidth: 230 }}>
+                  <Text strong={!notice.is_read} ellipsis style={{ maxWidth: 220 }}>
                     {notice.title}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12, flex: '0 0 auto' }}>

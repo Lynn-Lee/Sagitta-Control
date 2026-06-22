@@ -12,6 +12,7 @@ import { approvalFlowApi, type ApprovalFlowNode } from '@/api/approvalFlow'
 import { userApi } from '@/api/system'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
@@ -165,7 +166,7 @@ export default function ApprovalFlowPage() {
     },
     {
       title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 160,
-      render: (value: string) => value ? new Date(value).toLocaleString('zh-CN') : '—',
+      render: (value: string) => formatDateTime(value),
     },
     {
       title: '操作', key: 'actions', width: 160,

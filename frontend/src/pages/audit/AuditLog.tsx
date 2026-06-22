@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Button, DatePicker, Input, Select, Space, Table, Tag, Typography, Grid } from 'antd'
 import { ClearOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import dayjs from 'dayjs'
 import apiClient from '@/api/client'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
@@ -59,7 +59,7 @@ export default function AuditLog() {
   const columns = [
     {
       title: '时间', dataIndex: 'created_at', width: 155,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm:ss') : '—',
+      render: (v: string) => formatDateTime(v),
     },
     {
       title: '操作人', dataIndex: 'username', width: 110,

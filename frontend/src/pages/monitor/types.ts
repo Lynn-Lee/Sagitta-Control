@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
+import { DATE_TIME_DISPLAY_FORMAT } from '@/utils/datetime'
 
 export const TOP_SQL_WINDOW_OPTIONS = [5, 15, 30, 60, 180, 360, 720, 1440]
-export const TOP_SQL_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+export const TOP_SQL_TIME_FORMAT = DATE_TIME_DISPLAY_FORMAT
 
 export interface MonitorSnapshot {
   collected_at?: string | null

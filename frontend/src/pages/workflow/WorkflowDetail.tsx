@@ -10,6 +10,7 @@ import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import { useAuthStore } from '@/store/auth'
+import { formatDateTime } from '@/utils/datetime'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -95,7 +96,7 @@ export default function WorkflowDetail() {
     { title: '操作人', dataIndex: 'operator', width: 120 },
     { title: '操作', dataIndex: 'operation_type', width: 120 },
     { title: '备注', dataIndex: 'remark', width: 320, ellipsis: true },
-    { title: '时间', dataIndex: 'created_at', width: 180, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
+    { title: '时间', dataIndex: 'created_at', width: 180, render: (v: string) => formatDateTime(v, '-') },
   ]
 
   const isHighRisk = wf.risk_plan?.level === 'high'
@@ -193,23 +194,23 @@ export default function WorkflowDetail() {
           </Descriptions.Item>
           <Descriptions.Item label="数据库">{wf.db_name}</Descriptions.Item>
           <Descriptions.Item label="资源组">{wf.group_name}</Descriptions.Item>
-          <Descriptions.Item label="提交时间">{wf.created_at ? new Date(wf.created_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+          <Descriptions.Item label="提交时间">{formatDateTime(wf.created_at, '-')}</Descriptions.Item>
           <Descriptions.Item label="执行方式">
             {wf.execute_mode ? <Tag color="blue">{executionModeLabel[wf.execute_mode] || wf.execute_mode}</Tag> : <Text type="secondary">—</Text>}
           </Descriptions.Item>
           <Descriptions.Item label="预约执行时间">
-            {wf.scheduled_execute_at ? new Date(wf.scheduled_execute_at).toLocaleString('zh-CN') : '—'}
+            {formatDateTime(wf.scheduled_execute_at)}
           </Descriptions.Item>
           <Descriptions.Item label="执行决策人">{wf.executed_by_name || '—'}</Descriptions.Item>
           <Descriptions.Item label="外部执行时间">
-            {wf.external_executed_at ? new Date(wf.external_executed_at).toLocaleString('zh-CN') : '—'}
+            {formatDateTime(wf.external_executed_at)}
           </Descriptions.Item>
           <Descriptions.Item label="外部执行结果">
             {wf.external_result_status
               ? <Tag color={wf.external_result_status === 'success' ? 'success' : 'error'}>{wf.external_result_status === 'success' ? '成功' : '失败'}</Tag>
               : <Text type="secondary">—</Text>}
           </Descriptions.Item>
-          <Descriptions.Item label="完成时间">{wf.finish_time ? new Date(wf.finish_time).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+          <Descriptions.Item label="完成时间">{formatDateTime(wf.finish_time, '-')}</Descriptions.Item>
           {wf.external_result_remark && (
             <Descriptions.Item label="外部执行备注" span={3}>{wf.external_result_remark}</Descriptions.Item>
           )}

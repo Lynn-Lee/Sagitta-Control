@@ -184,6 +184,8 @@ v2.1.3 重点打磨前端操作体验：统一系统管理、观测中心、查�
 
 前端中文化最终口径已收口到全局入口：Ant Design 日期选择器和日期范围选择器统一使用简体中文 locale，月份、星期、`Today`、`Select date`、`Start date`、`End date` 等默认文案分别显示为 `今天`、`请选择日期`、`开始日期`、`结束日期` 等中文文案。若生产环境仍出现英文日期控件，按旧前端静态资源或浏览器缓存未刷新处理，应重新构建发布前端并清理 Nginx/CDN/浏览器缓存。
 
+前端日期时间展示统一使用 `YYYY-MM-DD HH:mm:ss`，例如 `2026-06-02 22:32:33`。表格列、详情项、抽屉、弹窗、通知和运维面板不得直接使用浏览器本地化时间字符串，纯日期业务字段如授权有效期可继续保持 `YYYY-MM-DD`。
+
 v2.2.3 已完成商业发布链路补强：客户部署包、sha256、Ed25519 客户包签名、前后端 CycloneDX SBOM、SBOM sha256 和 cosign bundle 均已生成；后端 Nuitka 商业镜像和前端生产镜像已完成真实构建、GHCR 推送、cosign 镜像签名、SBOM attestation 和反向验签。商业发布 workflow 已接入 `scripts/validate-commercial-release-materials.sh`，发布侧会校验客户包、签名、SBOM 与 bundle 材料；产品内 `CommercialOpsService.delivery_preflight()` 会把备份恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料纳入推广就绪度，当前本地 2.2.3 交付预检结果为 `ready`。容器运行态会随后端带入 `commercial_delivery_manifest.json`，在看不到宿主机交付目录时使用已验证发布清单兜底，避免商业页把材料文件布局误判为交付阻塞。
 
 系统配置页继续对齐 DataFusionX-Enterprise 的接入方式视觉：钉钉、飞书、企微测试发送按钮使用发送图标，CAS/OIDC 增加与 LDAP 同样样式的连通性测试，CAS/OIDC 图标分别使用全局网络和 Key 图标。

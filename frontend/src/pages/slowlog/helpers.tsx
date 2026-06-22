@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { Tag, Tooltip } from 'antd'
-import dayjs from 'dayjs'
 import type { SlowQueryGroupTrend } from '@/api/slowlog'
+import { formatDateTime } from '@/utils/datetime'
 
 export const SOURCE_OPTIONS = [
   { label: '平台历史', value: 'platform' },
@@ -52,7 +52,7 @@ export const TREND_COLORS = ['#165DFF', '#00B42A', '#FF7D00', '#C41D7F', '#6F42C
 
 export const sourceLabel = (source: string) => SOURCE_LABELS[source] || source
 
-export const formatTime = (value?: string | null) => value ? dayjs(value).format('MM-DD HH:mm:ss') : '—'
+export const formatTime = (value?: string | null) => formatDateTime(value)
 
 export const formatMs = (value?: number) => `${Number(value || 0).toLocaleString()} ms`
 

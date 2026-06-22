@@ -16,6 +16,7 @@ import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { DB_TYPES, formatDbTypeLabel, getEngineSupport, isExperimentalDbType } from '@/utils/dbType'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
@@ -100,7 +101,7 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
     {
       title: '同步时间', dataIndex: 'sync_at', width: 140,
       render: (v: string) => v
-        ? <Text type="secondary">{new Date(v).toLocaleString('zh-CN')}</Text>
+        ? <Text type="secondary">{formatDateTime(v)}</Text>
         : <Text type="secondary">手动添加</Text>,
     },
     {

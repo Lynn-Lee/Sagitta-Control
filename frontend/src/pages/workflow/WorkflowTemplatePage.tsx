@@ -40,6 +40,7 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Title, Text, Paragraph } = Typography
@@ -337,7 +338,7 @@ export default function WorkflowTemplatePage() {
       title: '更新时间',
       dataIndex: 'updated_at',
       width: 170,
-      render: (value: string) => value ? new Date(value).toLocaleString('zh-CN') : '—',
+      render: (value: string) => formatDateTime(value),
     },
     {
       title: '操作',

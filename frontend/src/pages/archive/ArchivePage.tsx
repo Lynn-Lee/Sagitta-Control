@@ -27,6 +27,7 @@ import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text, Paragraph } = Typography
@@ -46,7 +47,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   failed: { label: '执行失败', color: 'error' },
 }
 
-const fmtTime = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+const fmtTime = (value?: string | null) => formatDateTime(value, '-')
 const displayJobNo = (job?: ArchiveJob) => job?.workflow_id || job?.id
 const progressPercent = (job?: ArchiveJob) => {
   if (!job || !job.estimated_rows) return 0

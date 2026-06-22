@@ -43,6 +43,7 @@ import {
 } from '@ant-design/icons'
 import { commercialApi, type AlertEvent, type OnboardingStatus, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { formatDateTime } from '@/utils/datetime'
 
 const { Text, Paragraph } = Typography
 
@@ -281,7 +282,7 @@ export default function CommercialOpsPage() {
               <Descriptions size="small" column={1}>
                 <Descriptions.Item label="客户 ID">{about?.license?.activation_customer_id || about?.license?.customer_id || '-'}</Descriptions.Item>
                 <Descriptions.Item label="剩余天数">{about?.license?.days_remaining ?? '-'}</Descriptions.Item>
-                <Descriptions.Item label="到期时间">{about?.license?.expires_at || '-'}</Descriptions.Item>
+                <Descriptions.Item label="到期时间">{formatDateTime(about?.license?.expires_at, '-')}</Descriptions.Item>
               </Descriptions>
               <Space wrap>
                 <Button className="sagitta-action-btn sagitta-action-btn--copy" icon={<CopyOutlined />} onClick={() => copyText(about?.license?.activation_deployment_fingerprint || about?.deployment_fingerprint || '', '部署指纹已复制')}>
@@ -492,7 +493,7 @@ export default function CommercialOpsPage() {
                   { title: '实例', dataIndex: 'instance_name' },
                   { title: '规则', dataIndex: 'rule_key' },
                   { title: '详情', dataIndex: 'message' },
-                  { title: '最近触发', dataIndex: 'last_seen_at' },
+                  { title: '最近触发', dataIndex: 'last_seen_at', render: value => formatDateTime(value, '-') },
                   {
                     title: '操作',
                     width: 270,

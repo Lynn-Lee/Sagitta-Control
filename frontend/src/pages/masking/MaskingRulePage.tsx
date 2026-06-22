@@ -10,6 +10,7 @@ import apiClient from '@/api/client'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
@@ -220,7 +221,7 @@ export default function MaskingRulePage() {
       render: (v: boolean) => v ? <Tag color="success">启用</Tag> : <Tag>停用</Tag> },
     { title: '创建人', dataIndex: 'created_by', width: 110 },
     { title: '创建时间', dataIndex: 'created_at', width: 160,
-      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '—' },
+      render: (v: string) => formatDateTime(v) },
     { title: '操作', width: 160, render: (_: any, r: any) => (
       <Space>
         <Button className="sagitta-action-btn sagitta-action-btn--edit" icon={<EditOutlined />} onClick={() => openEdit(r)}>

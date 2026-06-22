@@ -11,13 +11,14 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
+import { formatDateTime } from '@/utils/datetime'
 
 const { Text } = Typography
 const { RangePicker } = DatePicker
 
 type HistorySource = 'platform' | 'ash' | 'awr'
 
-const renderDate = (value?: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+const renderDate = (value?: string | null) => formatDateTime(value, '-')
 const defaultHistoryRange = () => [dayjs().subtract(24, 'hour'), dayjs()] as [Dayjs, Dayjs]
 const durationValue = (value?: number | string | null) => {
   if (value === null || value === undefined || value === '') return null
