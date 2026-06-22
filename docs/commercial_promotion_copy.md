@@ -7,14 +7,14 @@
 
 ## 1. 品牌定位
 
-Sagitta Control 矢准数据库安全管控平台是一款面向企业数据库治理场景的多引擎数据库安全管控平台。
+Sagitta Control 矢准管控是一款面向企业数据库治理场景的多引擎数据库安全管控平台。
 
 它帮助企业把数据库访问、SQL 变更、查询授权、运行诊断、数据归档和审计追踪统一到一个安全、可控、可交付的工作台中，形成统一入口、权限收敛、流程审批、异步执行和全程审计的数据库治理体系。
 
 品牌主张：
 
 ```text
-Sagitta Control 矢准数据库安全管控平台
+Sagitta Control 矢准管控
 矢向数据，精准管控
 ```
 
@@ -296,7 +296,7 @@ Sagitta Control 让数据库使用链路有据可查，帮助企业建立可追�
 ### 首屏标题
 
 ```text
-Sagitta Control 矢准数据库安全管控平台
+Sagitta Control 矢准管控
 企业级多引擎数据库安全管控平台
 ```
 
@@ -442,7 +442,7 @@ max_instances
 
 正式推广前，所有客户材料应统一以下口径：
 
-- 产品名：`Sagitta Control 矢准数据库安全管控平台` 或 `Sagitta Control`。
+- 产品名：`Sagitta Control 矢准管控` 或 `Sagitta Control`。
 - 授权项目展示：`Sagitta Control（sagitta-control）`。
 - 产品版本：`Sagitta Control 正式商业版`。
 - 商业部署版本：`2.2.0`。

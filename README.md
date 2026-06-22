@@ -1,11 +1,11 @@
-# Sagitta Control 矢准数据库安全管控平台
+# Sagitta Control 矢准管控
 
 > 企业级多引擎数据库安全管控平台
 > 矢向数据，精准管控
 
 Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.2 商业部署版 + v2-lite 授权体系**。
 
-> 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
+> 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准管控软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
 
 ## 核心能力
 

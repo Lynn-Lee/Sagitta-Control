@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Sagitta Control — 矢准数据库安全管控平台",
+    title="Sagitta Control — 矢准管控",
     description="企业级数据库安全管控、SQL 工单审核、在线查询、观测中心 API",
     version="2.2.2",
     docs_url="/docs" if settings.APP_ENV == "development" else None,
@@ -130,4 +130,4 @@ async def health_check():
 
 @app.get("/", tags=["健康检查"])
 async def root():
-    return {"message": "Sagitta Control 矢准数据库安全管控平台", "docs": "/docs"}
+    return {"message": "Sagitta Control 矢准管控", "docs": "/docs"}

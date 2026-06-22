@@ -48,8 +48,11 @@ describe('LoginPage', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('矢准数据库安全管控平台')).toBeInTheDocument()
+    const previousLongName = ['矢准', '数据', '库安全', '管控', '平台'].join('')
+
+    expect(await screen.findByText('矢准管控')).toBeInTheDocument()
     expect(await screen.findByText('Aim at Data, Govern with Precision')).toBeInTheDocument()
+    expect(screen.queryByText(previousLongName)).not.toBeInTheDocument()
     expect(screen.queryByText('Sagitta Control · Aim at Data, Govern with Precision')).not.toBeInTheDocument()
     expect(
       screen.getByText(

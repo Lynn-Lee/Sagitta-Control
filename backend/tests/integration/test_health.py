@@ -22,6 +22,16 @@ async def test_root_endpoint():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/")
     assert response.status_code == 200
+    payload = response.json()
+    previous_long_name = "".join(["矢准", "数据", "库安全", "管控", "平台"])
+    assert payload["message"] == "Sagitta Control 矢准管控"
+    assert previous_long_name not in payload["message"]
+
+
+def test_openapi_title_uses_short_chinese_brand():
+    previous_long_name = "".join(["矢准", "数据", "库安全", "管控", "平台"])
+    assert app.title == "Sagitta Control — 矢准管控"
+    assert previous_long_name not in app.title
 
 
 @pytest.mark.asyncio
