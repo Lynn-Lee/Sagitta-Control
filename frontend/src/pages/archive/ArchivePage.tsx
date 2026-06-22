@@ -26,6 +26,7 @@ import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
+import { renderTruncatedCell, TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -383,9 +384,7 @@ export default function ArchivePage() {
             <Tag color={job.archive_mode === 'dest' ? 'blue' : 'red'}>{job.archive_mode}</Tag>
             {renderRiskTag(job.risk_level, job.risk_summary)}
           </Space>
-          <Text type="secondary" ellipsis={{ tooltip: `${job.source_db}.${job.source_table}` }}>
-            {job.source_db}.{job.source_table}
-          </Text>
+          <TruncatedCell value={`${job.source_db}.${job.source_table}`} type="secondary" />
         </Space>
       ),
     },
@@ -397,7 +396,7 @@ export default function ArchivePage() {
         <Progress percent={progressPercent(job)} size="small" format={() => `${job.processed_rows}/${job.estimated_rows}`} />
       ),
     },
-    { title: '提交人', dataIndex: 'created_by_display', width: 140, ellipsis: true, render: (v: string, job: ArchiveJob) => v || job.created_by || '-' },
+    { title: '提交人', dataIndex: 'created_by_display', width: 140, ellipsis: { showTitle: false }, render: (v: string, job: ArchiveJob) => <TruncatedCell value={v || job.created_by} /> },
     { title: '创建时间', dataIndex: 'created_at', width: 180, render: fmtTime },
     {
       title: '操作',
@@ -479,14 +478,14 @@ export default function ArchivePage() {
     { title: '选中', dataIndex: 'selected_rows', width: 90 },
     { title: '插入', dataIndex: 'inserted_rows', width: 90 },
     { title: '删除', dataIndex: 'deleted_rows', width: 90 },
-    { title: '信息', dataIndex: 'message', ellipsis: true },
+    { title: '信息', dataIndex: 'message', ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '完成时间', dataIndex: 'finished_at', width: 180, render: fmtTime },
   ]
 
   const workflowLogColumns = [
-    { title: '操作人', dataIndex: 'operator', width: 140, ellipsis: true },
+    { title: '操作人', dataIndex: 'operator', width: 140, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '操作', dataIndex: 'operation_type', width: 120 },
-    { title: '备注', dataIndex: 'remark', ellipsis: true },
+    { title: '备注', dataIndex: 'remark', ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '时间', dataIndex: 'created_at', width: 180, render: fmtTime },
   ]
 

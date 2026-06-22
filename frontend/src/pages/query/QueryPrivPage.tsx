@@ -10,6 +10,7 @@ import { instanceApi } from '@/api/instance'
 import DateTimeCell from '@/components/common/DateTimeCell'
 import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
+import { renderTruncatedCell, TruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
@@ -303,9 +304,9 @@ export default function QueryPrivPage() {
       title: '目标实例', dataIndex: 'instance_id', width: 180,
       render: (instanceIdValue: number) => instanceNameMap.get(instanceIdValue) || `实例#${instanceIdValue}`,
     },
-    { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: true },
+    { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: { showTitle: false }, render: (v: string, r: any) => <TruncatedCell value={v} empty={r.scope_type === 'instance' ? '全实例' : '全库'} /> },
     { title: '行数限制', dataIndex: 'limit_num', width: 90 },
     {
       title: '有效期', dataIndex: 'valid_date', width: 110,
@@ -343,9 +344,9 @@ export default function QueryPrivPage() {
       title: '目标实例', dataIndex: 'instance_name', width: 180,
       render: (instanceName: string, r: any) => instanceName || instanceNameMap.get(r.instance_id) || `实例#${r.instance_id}`,
     },
-    { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: true },
+    { title: '数据库', dataIndex: 'db_name', width: 160, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: { showTitle: false }, render: (v: string, r: any) => <TruncatedCell value={v} empty={r.scope_type === 'instance' ? '全实例' : '全库'} /> },
     { title: '行数限制', dataIndex: 'limit_num', width: 90 },
     { title: '有效期', dataIndex: 'valid_date', width: 120, render: (v: string) => <Tag color="success">{v}</Tag> },
     {
@@ -379,8 +380,8 @@ export default function QueryPrivPage() {
       render: renderDateTimeCell,
     },
     {
-      title: '撤销原因', dataIndex: 'revoke_reason', width: 220, ellipsis: true,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      title: '撤销原因', dataIndex: 'revoke_reason', width: 220, ellipsis: { showTitle: false },
+      render: renderTruncatedCell,
     },
   ]
 
@@ -401,45 +402,30 @@ export default function QueryPrivPage() {
         </Button>
       ),
     },
-    { title: '标题', dataIndex: 'title', width: 220, ellipsis: true },
+    { title: '标题', dataIndex: 'title', width: 220, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: '目标实例', dataIndex: 'instance_name', width: 180,
       render: (instanceName: string, r: any) => instanceName || instanceNameMap.get(r.instance_id) || `实例#${r.instance_id}`,
     },
     { title: '申请人', dataIndex: 'applicant_name', width: 120, render: (v: string, r: any) => v || r.applicant_username || '—' },
-    { title: '申请数据库', dataIndex: 'db_name', width: 150, ellipsis: true },
+    { title: '申请数据库', dataIndex: 'db_name', width: 150, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '范围', dataIndex: 'scope_type', width: 90, render: (v: string) => <Tag color={SCOPE_META[v]?.color || 'default'}>{SCOPE_META[v]?.label || v}</Tag> },
-    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: true, render: (v: string, r: any) => v || <Text type="secondary">{r.scope_type === 'instance' ? '全实例' : '全库'}</Text> },
+    { title: '表名', dataIndex: 'table_name', width: 180, ellipsis: { showTitle: false }, render: (v: string, r: any) => <TruncatedCell value={v} empty={r.scope_type === 'instance' ? '全实例' : '全库'} /> },
     { title: '行数限制', dataIndex: 'limit_num', width: 100 },
     { title: '有效期', dataIndex: 'valid_date', width: 120 },
-    { title: '申请理由', dataIndex: 'apply_reason', width: 220, ellipsis: true },
+    { title: '申请理由', dataIndex: 'apply_reason', width: 220, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: '风险',
       dataIndex: 'risk_level',
       width: 100,
       render: (v: string, r: any) => renderRiskTag(v, r.risk_summary),
     },
-    { title: '当前节点', dataIndex: 'current_node_name', width: 150, ellipsis: true, render: (v: string) => v || '—' },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 150, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: '审批链路',
       dataIndex: 'approval_progress',
       width: 320,
-      render: (v: string) => v ? (
-        <Tooltip title={v} placement="topLeft">
-          <Text
-            ellipsis={{ tooltip: false }}
-            style={{
-              display: 'inline-block',
-              maxWidth: 300,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {v}
-          </Text>
-        </Tooltip>
-      ) : '—',
+      render: (v: string) => <TruncatedCell value={v} style={{ maxWidth: 300 }} />,
     },
     {
       title: '状态', dataIndex: 'status', width: 90,

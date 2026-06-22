@@ -10,6 +10,7 @@ import { workflowApi, type RiskPlan } from '@/api/workflow'
 import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import apiClient from '@/api/client'
 import { formatDbTypeLabel } from '@/utils/dbType'
@@ -333,7 +334,7 @@ export default function WorkflowSubmit() {
 
   const checkColumns = [
     { title: '#', dataIndex: 'id', width: 50 },
-    { title: 'SQL', dataIndex: 'sql', ellipsis: true },
+    { title: 'SQL', dataIndex: 'sql', ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '级别', dataIndex: 'errlevel', width: 80,
       render: (v: number) => {
         if (v === 0) return <Tag color="success">通过</Tag>
@@ -341,7 +342,7 @@ export default function WorkflowSubmit() {
         if (riskPlan?.level === 'high' && (riskPlanCanSubmitHighRiskSql ?? canSubmitHighRiskSql)) return <Tag color="error">高危</Tag>
         return <Tag color="error">错误</Tag>
       } },
-    { title: '信息', dataIndex: 'msg', ellipsis: true },
+    { title: '信息', dataIndex: 'msg', ellipsis: { showTitle: false }, render: renderTruncatedCell },
   ]
 
   return (

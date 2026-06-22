@@ -14,6 +14,7 @@ import DateTimeCell from '@/components/common/DateTimeCell'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -30,7 +31,7 @@ const STATUS_COLOR: Record<number, string> = {
 
 const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth = 350) =>
   (name: string, r: any) => (
-    <Tooltip title={name}>
+    <Tooltip title={name} placement="topLeft" overlayClassName="sagitta-table-truncated-tooltip">
       <Button
         className="sagitta-action-btn sagitta-action-btn--inspect sagitta-table-link-button"
         icon={<EyeOutlined />}
@@ -47,51 +48,26 @@ const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth =
 
 const renderPersonName = (_: unknown, r: any) => {
   const value = r.engineer_display || r.engineer || r.applicant_name || r.applicant_username || '—'
-  return (
-    <Tooltip title={value}>
-      <Text className="sagitta-nowrap-cell" style={{ maxWidth: 136 }}>
-        {value}
-      </Text>
-    </Tooltip>
-  )
+  return <TruncatedCell value={value} style={{ maxWidth: 136 }} />
 }
 
 const renderInstance = (_: unknown, r: any) => {
   const value = r.instance_name || `ID:${r.instance_id}`
-  return (
-    <Tooltip title={value}>
-      <Text className="sagitta-nowrap-cell" type={r.instance_name ? undefined : 'secondary'} style={{ fontWeight: 500 }}>
-        {value}
-      </Text>
-    </Tooltip>
-  )
+  return <TruncatedCell value={value} type={r.instance_name ? undefined : 'secondary'} textStyle={{ fontWeight: 500 }} />
 }
 
 const renderDbName = (v?: string) =>
-  v ? <Text>{v}</Text> : <Text type="secondary">—</Text>
+  <TruncatedCell value={v} />
 
 const renderAuditChain = (v?: string, maxWidth = 420) => (
-  <Tooltip title={v || '—'}>
-    <Text
-      style={{
-        color: '#5f6470',
-        display: 'inline-block',
-        maxWidth,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}
-    >
-      {v || '—'}
-    </Text>
-  </Tooltip>
+  <TruncatedCell value={v} style={{ maxWidth }} textStyle={{ color: '#5f6470' }} />
 )
 
 const renderCurrentNode = (v: string | undefined, r: any) => {
   const currentNode = r.status === 0 ? (v || '—') : '—'
   if (currentNode === '—') return <Text type="secondary">—</Text>
   return (
-    <Tooltip title={currentNode}>
+    <Tooltip title={currentNode} placement="topLeft" overlayClassName="sagitta-table-truncated-tooltip">
       <Tag
         color="processing"
         style={{
@@ -262,11 +238,11 @@ export default function WorkflowList() {
     { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 290, render: renderWorkflowName(navigate, 260) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
-    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: { showTitle: false }, render: renderDbName },
     { title: '风险', dataIndex: 'risk_level', width: 100, align: 'center', render: (v, r) => renderRisk(v, r.risk_summary) },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
-    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
-    { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: true, render: renderCurrentNode },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: { showTitle: false }, render: (v) => renderAuditChain(v, 290) },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: { showTitle: false }, render: renderCurrentNode },
     { title: '提交时间', dataIndex: 'created_at', width: 210, render: renderDate },
     detailColumn,
   ]
@@ -277,11 +253,11 @@ export default function WorkflowList() {
     { title: '申请人', key: 'engineer', width: 165, render: renderPersonName },
     { title: '工单名称', dataIndex: 'workflow_name', width: 255, render: renderWorkflowName(navigate, 225) },
     { title: '目标实例', key: 'instance', width: 210, render: renderInstance },
-    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: { showTitle: false }, render: renderDbName },
     { title: '风险', dataIndex: 'risk_level', width: 100, align: 'center', render: (v, r) => renderRisk(v, r.risk_summary) },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
-    { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: true, render: renderCurrentNode },
-    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
+    { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: { showTitle: false }, render: renderCurrentNode },
+    { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: { showTitle: false }, render: (v) => renderAuditChain(v, 290) },
     { title: '提交时间', dataIndex: 'created_at', width: 210, render: renderDate },
     detailColumn,
   ]
@@ -291,7 +267,7 @@ export default function WorkflowList() {
     { title: '类型', dataIndex: 'workflow_type_label', width: 115, align: 'center', render: renderWorkflowType },
     { title: '工单名称', dataIndex: 'workflow_name', width: 340, render: renderWorkflowName(navigate, 310) },
     { title: '目标实例', key: 'instance', width: 220, render: renderInstance },
-    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: true, render: renderDbName },
+    { title: '数据库', dataIndex: 'db_name', width: 150, ellipsis: { showTitle: false }, render: renderDbName },
     { title: '提交人', key: 'engineer', width: 165, render: renderPersonName },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '执行方式', key: 'execute_mode', width: 130, render: renderExecutionInfo },

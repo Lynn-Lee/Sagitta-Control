@@ -14,6 +14,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionLoading from '@/components/common/SectionLoading'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -116,30 +117,7 @@ export default function DataDictPage() {
       return <Text type="secondary">{options?.placeholder || '—'}</Text>
     }
 
-    const content = options?.code
-      ? (
-        <Text code style={{ whiteSpace: 'nowrap' }}>
-          {text}
-        </Text>
-      )
-      : (
-        <Text style={{ whiteSpace: 'nowrap' }}>
-          {text}
-        </Text>
-      )
-    return (
-      <Tooltip title={text}>
-        <span style={{
-          display: 'block',
-          width: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {content}
-        </span>
-      </Tooltip>
-    )
+    return <TruncatedCell value={text} code={options?.code} />
   }
 
   const renderEllipsisTag = (value?: string | number | null, color = 'default') => {
@@ -147,7 +125,7 @@ export default function DataDictPage() {
       ? '—'
       : String(value)
     return (
-      <Tooltip title={text}>
+      <Tooltip title={text} placement="topLeft" overlayClassName="sagitta-table-truncated-tooltip">
         <Tag color={color} style={{
           display: 'inline-block',
           maxWidth: '100%',
@@ -171,18 +149,7 @@ export default function DataDictPage() {
     key: t, title: (
       <Space size={4}>
         <TableOutlined style={{ color: '#165DFF' }} />
-        <Tooltip title={t}>
-          <Text style={{
-            display: 'inline-block',
-            maxWidth: 180,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          >
-            {t}
-          </Text>
-        </Tooltip>
+        <TruncatedCell value={t} style={{ maxWidth: 180 }} inline />
       </Space>
     ),
     icon: null,
@@ -274,7 +241,7 @@ export default function DataDictPage() {
   }, [columns, constraints, indexes])
 
   const colTableCols = [
-    { title: '列名', dataIndex: 'column_name', key: 'column_name', width: 220, ellipsis: true,
+    { title: '列名', dataIndex: 'column_name', key: 'column_name', width: 220, ellipsis: { showTitle: false },
       render: (v: string) => renderNoWrapText(v, { code: true }) },
     { title: '数据类型', dataIndex: 'column_type', key: 'column_type', width: 170,
       render: (v: string) => renderEllipsisTag(v, 'geekblue') },
@@ -283,7 +250,7 @@ export default function DataDictPage() {
         const nullable = v === 'YES' || v === true
         return <Tag color={nullable ? 'default' : 'red'}>{nullable ? 'YES' : 'NO'}</Tag>
       }},
-    { title: '默认值', dataIndex: 'column_default', key: 'column_default', width: 180, ellipsis: true,
+    { title: '默认值', dataIndex: 'column_default', key: 'column_default', width: 180, ellipsis: { showTitle: false },
       render: (v: any) => v !== null && v !== undefined && v !== ''
         ? renderNoWrapText(String(v), { code: true })
         : <Text type="secondary">NULL</Text> },
@@ -301,7 +268,7 @@ export default function DataDictPage() {
           </Space>
         ) : <Text type="secondary">—</Text>
       ) },
-    { title: '注释', dataIndex: 'column_comment', key: 'column_comment', width: 560, ellipsis: true,
+    { title: '注释', dataIndex: 'column_comment', key: 'column_comment', width: 560, ellipsis: { showTitle: false },
       render: (v: string) => renderNoWrapText(v) },
   ]
 
@@ -331,7 +298,7 @@ export default function DataDictPage() {
       dataIndex: 'constraint_name',
       key: 'constraint_name',
       width: 260,
-      ellipsis: true,
+      ellipsis: { showTitle: false },
       render: (v: string) => renderNoWrapText(v, { code: true }),
     },
     {
@@ -339,7 +306,7 @@ export default function DataDictPage() {
       dataIndex: 'column_names',
       key: 'column_names',
       width: 240,
-      ellipsis: true,
+      ellipsis: { showTitle: false },
       render: (v: string) => renderNoWrapText(v),
     },
     {
@@ -347,7 +314,7 @@ export default function DataDictPage() {
       dataIndex: 'check_clause',
       key: 'check_clause',
       width: 360,
-      ellipsis: true,
+      ellipsis: { showTitle: false },
       render: (v: string) => renderNoWrapText(v, { code: true }),
     },
     {

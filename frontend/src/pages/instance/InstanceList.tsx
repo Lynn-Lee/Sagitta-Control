@@ -15,6 +15,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { DB_TYPES, formatDbTypeLabel, getEngineSupport, isExperimentalDbType } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -89,8 +90,8 @@ function InstanceDatabasePanel({ instance }: { instance: InstanceItem }) {
         </Space>
       ),
     },
-    { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true, align: 'left',
-      render: (v: string) => v || <Text type="secondary">—</Text> },
+    { title: '备注', dataIndex: 'remark', width: 120, ellipsis: { showTitle: false }, align: 'left',
+      render: (v: string) => <TruncatedCell value={v} /> },
     {
       title: '状态', dataIndex: 'is_active', width: 90,
       render: (v: boolean, r: any) => (
@@ -270,10 +271,8 @@ export default function InstanceList() {
       title: '实例名称', dataIndex: 'instance_name', width: 260,
       render: (v: string, r: InstanceItem) => (
         <Space direction="vertical" size={0} style={{ maxWidth: 224 }}>
-          <Text strong ellipsis={{ tooltip: v }} style={{ maxWidth: 224 }}>{v}</Text>
-          <Text type="secondary" ellipsis={{ tooltip: `${r.host}:${r.port}` }} style={{ maxWidth: 224 }}>
-            {r.host}:{r.port}
-          </Text>
+          <TruncatedCell value={v} strong style={{ maxWidth: 224 }} />
+          <TruncatedCell value={`${r.host}:${r.port}`} type="secondary" style={{ maxWidth: 224 }} />
         </Space>
       ),
     },
@@ -282,14 +281,14 @@ export default function InstanceList() {
       render: (v: string) => <Tag color={DB_TYPE_COLORS[v] || 'default'}>{formatDbTypeLabel(v)}</Tag>,
     },
     {
-      title: '连接用户', dataIndex: 'user', width: 130, ellipsis: true,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      title: '连接用户', dataIndex: 'user', width: 130, ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} />,
     },
-    { title: '默认连接', dataIndex: 'db_name', width: 150, ellipsis: true,
-      render: (v: string) => v || <Text type="secondary">—</Text> },
+    { title: '默认连接', dataIndex: 'db_name', width: 150, ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} /> },
     {
-      title: '备注', dataIndex: 'remark', width: 260, ellipsis: true,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      title: '备注', dataIndex: 'remark', width: 260, ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} />,
     },
     {
       title: '状态', dataIndex: 'is_active', width: 90,

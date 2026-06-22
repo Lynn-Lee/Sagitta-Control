@@ -12,6 +12,7 @@ import { userGroupApi, userApi, resourceGroupApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { Text } = Typography
@@ -382,8 +383,8 @@ const UserGroupManagement: React.FC = () => {
 
   const columns: ColumnsType<any> = [
     { title: 'ID', dataIndex: 'id', width: 70 },
-    { title: '组标识', dataIndex: 'name', width: 140, ellipsis: true },
-    { title: '中文名', dataIndex: 'name_cn', width: 140, ellipsis: true },
+    { title: '组标识', dataIndex: 'name', width: 140, ellipsis: { showTitle: false }, render: renderTruncatedCell },
+    { title: '中文名', dataIndex: 'name_cn', width: 140, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: '组长',
       dataIndex: 'leader_id',
@@ -398,7 +399,7 @@ const UserGroupManagement: React.FC = () => {
       render: (parentId: number | null | undefined) =>
         parentId ? groupNameMap.get(parentId) || `用户组#${parentId}` : <span style={{ color: '#999' }}>顶级组</span>,
     },
-    { title: '描述', dataIndex: 'description', width: 220, ellipsis: true },
+    { title: '描述', dataIndex: 'description', width: 220, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '成员数', dataIndex: 'member_count', width: 90 },
     {
       title: '关联资源组', dataIndex: 'resource_group_ids', width: 260,

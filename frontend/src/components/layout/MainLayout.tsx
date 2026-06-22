@@ -19,6 +19,7 @@ import { useAuthStore } from '@/store/auth'
 import { formatDateTime } from '@/utils/datetime'
 import { getPostLoginPath } from '@/utils/postLogin'
 import BrandLogo from '@/components/common/BrandLogo'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { useBranding } from '@/hooks/useBranding'
 
 const { Header, Sider, Content } = Layout
@@ -383,16 +384,12 @@ export default function MainLayout() {
               />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <Text strong={!notice.is_read} ellipsis style={{ maxWidth: 220 }}>
-                    {notice.title}
-                  </Text>
+                  <TruncatedCell value={notice.title} strong={!notice.is_read} style={{ maxWidth: 220 }} />
                   <Text type="secondary" style={{ fontSize: 12, flex: '0 0 auto' }}>
                     {formatNotificationTime(notice.created_at)}
                   </Text>
                 </div>
-                <Text type="secondary" ellipsis style={{ display: 'block', fontSize: 12 }}>
-                  {notificationPreview(notice.content) || '点击查看详情'}
-                </Text>
+                <TruncatedCell value={notificationPreview(notice.content) || '点击查看详情'} type="secondary" textStyle={{ fontSize: 12 }} />
               </div>
             </div>
           ),

@@ -1,6 +1,7 @@
 import { Descriptions, Progress, Space, Table } from 'antd'
 
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 
 import { formatBytes, formatMetric, formatPercent } from '../../formatters'
 import type { EnginePanelContext } from '../../types'
@@ -8,7 +9,7 @@ import { MetricCard } from '../MonitorStatus'
 
 const clickHouseDiskColumns = [
   { title: '磁盘', dataIndex: 'name', width: 160 },
-  { title: '路径', dataIndex: 'path', ellipsis: true },
+  { title: '路径', dataIndex: 'path', ellipsis: { showTitle: false }, render: renderTruncatedCell },
   { title: '使用率', dataIndex: 'used_pct', width: 160, render: (value: number) => <Progress percent={Math.round(Number(value || 0))} size="small" /> },
   { title: '已用', dataIndex: 'used_space', width: 140, render: formatBytes },
   { title: '总量', dataIndex: 'total_space', width: 140, render: formatBytes },

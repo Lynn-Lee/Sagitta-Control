@@ -13,6 +13,7 @@ import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
@@ -253,9 +254,9 @@ export default function QueryPage() {
         title: col,
         dataIndex: idx,
         key: col,
-        ellipsis: true,
+        ellipsis: { showTitle: false },
         width: 150,
-        render: (v: any) => v === null ? <Text type="secondary" italic>NULL</Text> : String(v),
+        render: (v: any) => v === null ? <Text type="secondary" italic>NULL</Text> : <TruncatedCell value={String(v)} />,
       })) ?? []
     ),
   ]

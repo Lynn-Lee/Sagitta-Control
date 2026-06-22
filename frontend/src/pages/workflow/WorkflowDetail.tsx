@@ -9,6 +9,7 @@ import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDateTime } from '@/utils/datetime'
 
@@ -95,7 +96,7 @@ export default function WorkflowDetail() {
   const logColumns = [
     { title: '操作人', dataIndex: 'operator', width: 120 },
     { title: '操作', dataIndex: 'operation_type', width: 120 },
-    { title: '备注', dataIndex: 'remark', width: 320, ellipsis: true },
+    { title: '备注', dataIndex: 'remark', width: 320, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     { title: '时间', dataIndex: 'created_at', width: 180, render: (v: string) => formatDateTime(v, '-') },
   ]
 

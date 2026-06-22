@@ -9,6 +9,7 @@ import { instanceApi, type InstanceItem } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
@@ -50,7 +51,7 @@ const renderBytes = (value?: number | string | null) => {
 const renderCommandTag = (value?: string | null) => {
   if (!value) return '-'
   return (
-    <Tooltip title={value}>
+    <Tooltip title={value} placement="topLeft" overlayClassName="sagitta-table-truncated-tooltip">
       <Tag
         style={{
           display: 'inline-block',
@@ -67,6 +68,13 @@ const renderCommandTag = (value?: string | null) => {
     </Tooltip>
   )
 }
+const truncatedTextColumn = (title: string, dataIndex: keyof SessionItem | string, width: number) => ({
+  title,
+  dataIndex,
+  width,
+  ellipsis: { showTitle: false },
+  render: renderTruncatedCell,
+})
 const isIdleSession = (row: SessionItem) => {
   const command = row.command?.toLowerCase() || ''
   const state = row.state?.toLowerCase() || ''
@@ -179,28 +187,28 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
     { title: '会话ID', dataIndex: 'session_id', width: 110, fixed: 'left' },
     { title: 'Serial', dataIndex: 'serial', width: 90 },
     ...(isOracle ? [
-      { title: 'RAC', dataIndex: 'inst_id', width: 80, ellipsis: true },
-      { title: 'OS PID', dataIndex: 'process_id', width: 100, ellipsis: true },
+      truncatedTextColumn('RAC', 'inst_id', 80),
+      truncatedTextColumn('OS PID', 'process_id', 100),
     ] as ColumnsType<SessionItem> : []),
     ...(isTidb ? [
-      { title: 'TiDB 节点', dataIndex: 'tidb_instance', width: 190, ellipsis: true },
-      { title: '资源组', dataIndex: 'resource_group', width: 110, ellipsis: true },
+      truncatedTextColumn('TiDB 节点', 'tidb_instance', 190),
+      truncatedTextColumn('资源组', 'resource_group', 110),
     ] as ColumnsType<SessionItem> : []),
-    { title: '用户', dataIndex: 'username', width: 120, ellipsis: true },
-    { title: '来源', dataIndex: 'host', width: 170, ellipsis: true },
+    truncatedTextColumn('用户', 'username', 120),
+    truncatedTextColumn('来源', 'host', 170),
     ...(isTidb ? [
       { title: 'TiDB 内存', dataIndex: 'mem_bytes', width: 110, render: renderBytes },
       { title: 'TiDB 磁盘', dataIndex: 'disk_bytes', width: 110, render: renderBytes },
-      { title: 'TxnStart', dataIndex: 'txn_start', width: 170, ellipsis: true },
+      truncatedTextColumn('TxnStart', 'txn_start', 170),
     ] as ColumnsType<SessionItem> : []),
-    { title: '程序', dataIndex: 'program', width: 160, ellipsis: true },
+    truncatedTextColumn('程序', 'program', 160),
     ...(isOracle ? [
-      { title: '模块', dataIndex: 'module', width: 130, ellipsis: true },
-      { title: '操作', dataIndex: 'action', width: 130, ellipsis: true },
+      truncatedTextColumn('模块', 'module', 130),
+      truncatedTextColumn('操作', 'action', 130),
     ] as ColumnsType<SessionItem> : []),
-    { title: '库/Schema', dataIndex: 'db_name', width: 130, ellipsis: true },
-    { title: '命令', dataIndex: 'command', width: 110, ellipsis: true, render: renderCommandTag },
-    { title: '状态', dataIndex: 'state', width: 160, ellipsis: true },
+    truncatedTextColumn('库/Schema', 'db_name', 130),
+    { title: '命令', dataIndex: 'command', width: 110, ellipsis: { showTitle: false }, render: renderCommandTag },
+    truncatedTextColumn('状态', 'state', 160),
     {
       title: '连接时长(ms)',
       dataIndex: 'connection_age_ms',
@@ -223,21 +231,27 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
       render: renderDuration,
     },
     { title: '事务时长(ms)', dataIndex: 'transaction_age_ms', width: 130, render: renderDuration },
-    { title: 'SQL ID', dataIndex: 'sql_id', width: 130, ellipsis: true },
+    truncatedTextColumn('SQL ID', 'sql_id', 130),
     {
       title: 'SQL',
       dataIndex: 'sql_text',
       width: 300,
-      ellipsis: true,
+      ellipsis: { showTitle: false },
       render: (v: string, row) => v
-        ? <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<EyeOutlined />} onClick={() => setSqlDetail(row)}>{v}</Button>
+        ? (
+          <Tooltip title={v} placement="topLeft" overlayClassName="sagitta-table-truncated-tooltip">
+            <Button className="sagitta-action-btn sagitta-action-btn--inspect sagitta-table-link-button" icon={<EyeOutlined />} onClick={() => setSqlDetail(row)}>
+              {v}
+            </Button>
+          </Tooltip>
+        )
         : <Text type="secondary">-</Text>,
     },
-    { title: '等待事件', dataIndex: 'event', width: 180, ellipsis: true },
+    truncatedTextColumn('等待事件', 'event', 180),
     ...(isOracle ? [
-      { title: '等待类别', dataIndex: 'wait_class', width: 120, ellipsis: true },
+      truncatedTextColumn('等待类别', 'wait_class', 120),
       { title: '等待秒数', dataIndex: 'seconds_in_wait', width: 100, render: renderDuration },
-      { title: '阻塞实例', dataIndex: 'blocking_instance', width: 100, ellipsis: true },
+      truncatedTextColumn('阻塞实例', 'blocking_instance', 100),
       { title: 'PGA Used', dataIndex: 'pga_used_mem', width: 110, render: renderBytes },
     ] as ColumnsType<SessionItem> : []),
     { title: '阻塞会话', dataIndex: 'blocking_session', width: 110 },
@@ -265,11 +279,11 @@ export function SessionInsightPanel({ embedded = false, instanceId: externalInst
 
   const historyColumns: ColumnsType<SessionItem> = [
     { title: '采集时间', dataIndex: 'collected_at', width: 170, fixed: 'left', render: renderDate },
-    { title: '实例', dataIndex: 'instance_name', width: 150, ellipsis: true },
+    truncatedTextColumn('实例', 'instance_name', 150),
     { title: '类型', dataIndex: 'db_type', width: 95, render: (v) => v ? <Tag color="blue">{formatDbTypeLabel(v)}</Tag> : '-' },
     ...sessionColumns.filter((col: any) => col.key !== 'action'),
     { title: '来源', dataIndex: 'source', width: 110, render: (v) => <Tag>{v}</Tag> },
-    { title: '错误', dataIndex: 'collect_error', width: 220, ellipsis: true },
+    truncatedTextColumn('错误', 'collect_error', 220),
   ]
   const sessionTableScrollX = isTidb ? 2800 : isOracle ? 3150 : 2100
   const historyTableScrollX = isTidb ? 3150 : isOracle ? 3500 : 2450

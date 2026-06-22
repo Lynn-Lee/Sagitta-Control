@@ -38,6 +38,7 @@ import {
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
@@ -265,8 +266,8 @@ export default function WorkflowTemplatePage() {
       title: '适用场景',
       dataIndex: 'scene_desc',
       width: 220,
-      ellipsis: true,
-      render: (value: string) => value || <Text type="secondary">—</Text>,
+      ellipsis: { showTitle: false },
+      render: (value: string) => <TruncatedCell value={value} />,
     },
     {
       title: '默认实例/库',

@@ -458,6 +458,37 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   vertical-align: middle;
 }
 
+.sagitta-table-truncated-cell {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sagitta-table-truncated-cell--inline {
+  display: inline-block;
+}
+
+.sagitta-table-truncated-cell .ant-typography {
+  max-width: 100%;
+  margin-bottom: 0;
+}
+
+.sagitta-table-truncated-tooltip {
+  max-width: min(980px, calc(100vw - 48px)) !important;
+}
+
+.sagitta-table-truncated-tooltip .ant-tooltip-inner {
+  min-width: min(420px, calc(100vw - 48px));
+  max-width: min(980px, calc(100vw - 48px));
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
 .sagitta-date-time-cell {
   min-width: 19ch;
   font-family: var(--font-mono);

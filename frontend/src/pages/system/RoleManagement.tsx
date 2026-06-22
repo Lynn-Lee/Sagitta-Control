@@ -8,6 +8,7 @@ import { roleApi, permissionApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { useBreakpoint } = Grid
@@ -98,9 +99,9 @@ const RoleManagement: React.FC = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 70 },
-    { title: '角色标识', dataIndex: 'name', width: 140, ellipsis: true },
-    { title: '中文名', dataIndex: 'name_cn', width: 140, ellipsis: true },
-    { title: '描述', dataIndex: 'description', width: 220, ellipsis: true },
+    { title: '角色标识', dataIndex: 'name', width: 140, ellipsis: { showTitle: false }, render: renderTruncatedCell },
+    { title: '中文名', dataIndex: 'name_cn', width: 140, ellipsis: { showTitle: false }, render: renderTruncatedCell },
+    { title: '描述', dataIndex: 'description', width: 220, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: '内置', dataIndex: 'is_system', width: 80,
       render: (v: boolean) => v ? <Tag color="blue">内置</Tag> : <Tag>自定义</Tag>,

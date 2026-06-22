@@ -10,6 +10,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
@@ -118,7 +119,7 @@ export default function QueryHistoryPage() {
       width: 220,
       render: (_: unknown, row: QueryLogItem) => (
         <Space direction="vertical" size={0}>
-          <Text strong ellipsis style={{ maxWidth: 190 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
+          <TruncatedCell value={row.instance_name || `#${row.instance_id || '-'}`} strong style={{ maxWidth: 190 }} />
           <Text type="secondary">
             {formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}
           </Text>
@@ -129,8 +130,8 @@ export default function QueryHistoryPage() {
       title: 'SQL 摘要',
       dataIndex: 'sqllog',
       width: 360,
-      ellipsis: true,
-      render: (v: string) => <Text code>{v}</Text>,
+      ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} textStyle={{ fontFamily: 'var(--font-mono)' }} />,
     },
     {
       title: '行数',

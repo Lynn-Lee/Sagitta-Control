@@ -1,6 +1,7 @@
 import { Space, Table } from 'antd'
 
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 
 import { compactSqlText, formatBytes, formatMetric } from '../../formatters'
 import type { EnginePanelContext } from '../../types'
@@ -29,7 +30,7 @@ export function MssqlEnginePanel({ metricGroups, isMobile }: EnginePanelContext)
         { title: 'Session', dataIndex: 'session_id' },
         { title: 'Blocking', dataIndex: 'blocking_session_id' },
         { title: '等待', dataIndex: 'wait_type' },
-        { title: 'SQL', dataIndex: 'sql_text', ellipsis: true, render: compactSqlText },
+        { title: 'SQL', dataIndex: 'sql_text', ellipsis: { showTitle: false }, render: (value: string) => <TruncatedCell value={compactSqlText(value)} tooltipValue={value} /> },
       ]} locale={{ emptyText: <TableEmptyState title="暂无阻塞会话" /> }} />
     </Space>
   )

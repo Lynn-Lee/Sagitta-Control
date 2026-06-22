@@ -3,6 +3,7 @@ import { CopyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
 import type { OptimizeAnalyzeResponse, OptimizeFinding, OptimizeRecommendation } from '@/api/optimize'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 import { RISK_COLOR, SEVERITY_COLOR } from '../helpers'
@@ -18,7 +19,7 @@ const findingColumns: ColumnsType<OptimizeFinding> = [
   { title: '级别', dataIndex: 'severity', width: 92, render: (v: string) => <Tag color={SEVERITY_COLOR[v]}>{v?.toUpperCase()}</Tag> },
   { title: '问题', dataIndex: 'title', width: 170 },
   { title: '说明', dataIndex: 'detail' },
-  { title: '证据', dataIndex: 'evidence', width: 180, ellipsis: true },
+  { title: '证据', dataIndex: 'evidence', width: 180, ellipsis: { showTitle: false }, render: renderTruncatedCell },
 ]
 
 const recommendationColumns: ColumnsType<OptimizeRecommendation> = [

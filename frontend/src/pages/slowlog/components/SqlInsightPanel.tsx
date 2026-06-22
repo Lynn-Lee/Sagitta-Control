@@ -21,6 +21,7 @@ import {
 } from '@/api/slowlog'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell, TruncatedCell } from '@/components/common/TruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import {
@@ -290,7 +291,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 240,
       render: (_, row) => (
         <Space direction="vertical" size={0} style={{ minWidth: 0, width: '100%' }}>
-          <Text strong ellipsis style={{ maxWidth: '100%' }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
+          <TruncatedCell value={row.instance_name || `#${row.instance_id || '-'}`} strong />
           <Text type="secondary">{formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}</Text>
         </Space>
       ),
@@ -299,8 +300,8 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       title: 'SQL 摘要',
       dataIndex: 'sql_text',
       width: 360,
-      ellipsis: true,
-      render: (v: string) => <Text code>{v}</Text>,
+      ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} code />,
     },
     {
       title: '耗时',
@@ -326,7 +327,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
           raw.sql_exec_id ? `Exec ${raw.sql_exec_id}` : '',
           raw.plan_hash_value ? `PHV ${raw.plan_hash_value}` : '',
         ].filter(Boolean).join(' / ')
-        return value ? <Text ellipsis={{ tooltip: value }}>{value}</Text> : <Text type="secondary">—</Text>
+        return <TruncatedCell value={value} />
       },
     },
     {
@@ -364,7 +365,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 240,
       render: (_, row) => (
         <Space direction="vertical" size={0}>
-          <Text strong ellipsis style={{ maxWidth: 210 }}>{row.group_name}</Text>
+          <TruncatedCell value={row.group_name} strong style={{ maxWidth: 210 }} />
           <Text type="secondary">
             {instanceId ? (row.instance_name || '当前实例') : formatDbTypeLabel(row.db_type)}
           </Text>
@@ -409,8 +410,8 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       title: 'SQL 指纹',
       dataIndex: 'fingerprint_text',
       width: 360,
-      ellipsis: true,
-      render: (v: string) => <Text code>{v}</Text>,
+      ellipsis: { showTitle: false },
+      render: (v: string) => <TruncatedCell value={v} code />,
     },
     {
       title: '实例 / 数据库',
@@ -418,7 +419,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
       width: 240,
       render: (_, row) => (
         <Space direction="vertical" size={0}>
-          <Text strong ellipsis style={{ maxWidth: 210 }}>{row.instance_name || `#${row.instance_id || '-'}`}</Text>
+          <TruncatedCell value={row.instance_name || `#${row.instance_id || '-'}`} strong style={{ maxWidth: 210 }} />
           <Text type="secondary">
             {formatDbTypeLabel(row.db_type)} / {row.db_name || '—'}
           </Text>
@@ -475,9 +476,9 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
     title: k,
     dataIndex: k,
     key: k,
-    ellipsis: true,
+    ellipsis: { showTitle: false },
     width: k.toLowerCase().includes('query') || k.toLowerCase().includes('info') ? 420 : 140,
-    render: (v: any) => v === null ? <Text type="secondary">NULL</Text> : String(v),
+    render: (v: any) => v === null ? <Text type="secondary">NULL</Text> : <TruncatedCell value={String(v)} />,
     })),
     {
       title: '操作',
@@ -755,7 +756,7 @@ export function SqlInsightPanel({ embedded = false, instanceId: externalInstance
                   <Card key={title as string} size="small" title={title as string} style={{ width: 190 }}>
                     <Space direction="vertical" size={4}>
                       {(items as any[]).slice(0, 5).map(item => (
-                        <Text key={item.name} ellipsis style={{ maxWidth: 150 }}>{item.name}: {item.count}</Text>
+                        <TruncatedCell key={item.name} value={`${item.name}: ${item.count}`} style={{ maxWidth: 150 }} />
                       ))}
                     </Space>
                   </Card>

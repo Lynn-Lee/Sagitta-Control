@@ -8,6 +8,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { SessionInsightPanel } from '@/pages/diagnostic/DiagnosticPage'
 import { SqlInsightPanel } from '@/pages/slowlog/SlowlogPage'
 import DateTimeCell from '@/components/common/DateTimeCell'
@@ -354,7 +355,7 @@ export default function MonitorPage() {
         </Space>
       ),
     },
-    { title: '风险原因', width: 260, ellipsis: true, render: (_: any, row: MonitorInstance) => <Text ellipsis={{ tooltip: riskReasonText(row) }}>{riskReasonText(row)}</Text> },
+    { title: '风险原因', width: 260, ellipsis: { showTitle: false }, render: (_: any, row: MonitorInstance) => <TruncatedCell value={riskReasonText(row)} /> },
     { title: '采集开关', width: 120, render: (_: any, row: MonitorInstance) => <ConfigStatusTag row={row} /> },
     { title: '采集状态', width: 120, render: (_: any, row: MonitorInstance) => <StatusTag status={row.last_collect_status} /> },
     { title: '连接使用率', width: 130, render: (_: any, row: MonitorInstance) => row.latest?.connection_usage !== null && row.latest?.connection_usage !== undefined ? <Progress percent={Math.round(row.latest.connection_usage * 100)} size="small" /> : <Text type="secondary">暂无数据</Text> },
@@ -433,23 +434,15 @@ export default function MonitorPage() {
       dataIndex: 'table_name',
       fixed: 'left' as const,
       width: 260,
-      ellipsis: true,
-      render: (value: string) => (
-        <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 230 }}>
-          {value}
-        </Text>
-      ),
+      ellipsis: { showTitle: false },
+      render: (value: string) => <TruncatedCell value={value} style={{ maxWidth: 230 }} />,
     },
     {
       title: '库/Schema',
       dataIndex: 'db_name',
       width: 200,
-      ellipsis: true,
-      render: (value: string) => (
-        <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 170 }}>
-          {value}
-        </Text>
-      ),
+      ellipsis: { showTitle: false },
+      render: (value: string) => <TruncatedCell value={value} style={{ maxWidth: 170 }} />,
     },
     { title: '总大小', dataIndex: 'total_size_bytes', sorter: (a: any, b: any) => a.total_size_bytes - b.total_size_bytes, render: formatBytes },
     { title: '数据大小', dataIndex: 'data_size_bytes', sorter: (a: any, b: any) => a.data_size_bytes - b.data_size_bytes, render: formatBytes },
@@ -473,7 +466,7 @@ export default function MonitorPage() {
       width: 280,
       render: (_: any, row: any) => {
         const value = row.sql_id || row.source_ref || row.digest || '-'
-        return <Text ellipsis={{ tooltip: value }} style={{ maxWidth: 250 }}>{value}</Text>
+        return <TruncatedCell value={value} style={{ maxWidth: 250 }} />
       },
     },
     { title: topSqlHeader('Schema'), width: 110, render: (_: any, row: any) => row.schema_name || row.db_name || '-' },
@@ -532,7 +525,7 @@ export default function MonitorPage() {
     { title: '等待时间', width: 120, render: (_: any, row: any) => formatMetric(row.time_waited ?? row.seconds_in_wait ?? row.duration_ms) },
     { title: '阻塞源', width: 120, render: (_: any, row: any) => formatMetric(row.blocking_session ?? row.holding_trx_id) },
     { title: '用户', width: 140, render: (_: any, row: any) => row.username || '-' },
-    { title: 'SQL', render: (_: any, row: any) => <Text ellipsis={{ tooltip: row.sql_text }}>{row.sql_text || row.sql_id || '-'}</Text> },
+    { title: 'SQL', render: (_: any, row: any) => <TruncatedCell value={row.sql_text || row.sql_id || '-'} /> },
   ]
 
   const growthColumns = [

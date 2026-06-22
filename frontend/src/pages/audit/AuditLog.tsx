@@ -7,6 +7,7 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { renderTruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
@@ -69,8 +70,8 @@ export default function AuditLog() {
       title: '模块', dataIndex: 'module', width: 90,
       render: (v: string) => <Tag color={MODULE_COLOR[v] || 'default'}>{v}</Tag>,
     },
-    { title: '操作', dataIndex: 'action', width: 180, ellipsis: true },
-    { title: '详情', dataIndex: 'detail', width: 340, ellipsis: true },
+    { title: '操作', dataIndex: 'action', width: 180, ellipsis: { showTitle: false }, render: renderTruncatedCell },
+    { title: '详情', dataIndex: 'detail', width: 340, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
       title: 'IP', dataIndex: 'ip_address', width: 130,
       render: (v: string) => <Text type="secondary">{v || '—'}</Text>,
