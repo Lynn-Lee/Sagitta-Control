@@ -1,6 +1,6 @@
 apiVersion: v2
 name: sagitta-control
-description: Sagitta Control 矢准数据库安全管控平台 — 企业级多引擎数据库管控平台
+description: Sagitta Control 矢准数据库安全管控平台 — 企业级多引擎数据库安全管控平台
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
