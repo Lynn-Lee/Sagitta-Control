@@ -9,7 +9,7 @@ import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
-import { renderTruncatedCell } from '@/components/common/TruncatedCell'
+import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDateTime } from '@/utils/datetime'
 

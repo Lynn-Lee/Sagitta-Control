@@ -8,7 +8,7 @@ import { roleApi, permissionApi } from '@/api/system'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
-import { renderTruncatedCell } from '@/components/common/TruncatedCell'
+import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
 
 const { useBreakpoint } = Grid

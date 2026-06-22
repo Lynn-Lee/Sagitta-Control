@@ -53,7 +53,3 @@ export function TruncatedCell({
     </Tooltip>
   )
 }
-
-export const renderTruncatedCell = (value?: unknown, tooltipValue?: unknown) => (
-  <TruncatedCell value={value} tooltipValue={tooltipValue} />
-)

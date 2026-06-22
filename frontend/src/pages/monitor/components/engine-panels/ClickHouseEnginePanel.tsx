@@ -1,7 +1,7 @@
 import { Descriptions, Progress, Space, Table } from 'antd'
 
 import TableEmptyState from '@/components/common/TableEmptyState'
-import { renderTruncatedCell } from '@/components/common/TruncatedCell'
+import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 
 import { formatBytes, formatMetric, formatPercent } from '../../formatters'
 import type { EnginePanelContext } from '../../types'

@@ -3,7 +3,7 @@ import { CopyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
 import type { OptimizeAnalyzeResponse, OptimizeFinding, OptimizeRecommendation } from '@/api/optimize'
-import { renderTruncatedCell } from '@/components/common/TruncatedCell'
+import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 
 import { RISK_COLOR, SEVERITY_COLOR } from '../helpers'

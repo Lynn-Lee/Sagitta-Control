@@ -21,7 +21,8 @@ import {
 } from '@/api/slowlog'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
-import { renderTruncatedCell, TruncatedCell } from '@/components/common/TruncatedCell'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
+import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import {
