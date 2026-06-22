@@ -58,3 +58,5 @@ backend/celerybeat-schedule
 
 # ─── Alembic ──────────────────────────────────────────────────
 # 版本文件需要提交，这里不忽略
+
+.codegraph/
