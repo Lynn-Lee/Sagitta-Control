@@ -10,13 +10,13 @@ import { useNavigate } from 'react-router-dom'
 import { workflowApi } from '@/api/workflow'
 import { instanceApi } from '@/api/instance'
 import FilterCard from '@/components/common/FilterCard'
+import DateTimeCell from '@/components/common/DateTimeCell'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
-import dayjs from 'dayjs'
 
 const { Text } = Typography
 const { Option } = Select
@@ -56,11 +56,16 @@ const renderPersonName = (_: unknown, r: any) => {
   )
 }
 
-const renderInstance = (_: unknown, r: any) => (
-  <Text style={{ fontWeight: 500 }}>
-    {r.instance_name || <Text type="secondary">ID:{r.instance_id}</Text>}
-  </Text>
-)
+const renderInstance = (_: unknown, r: any) => {
+  const value = r.instance_name || `ID:${r.instance_id}`
+  return (
+    <Tooltip title={value}>
+      <Text className="sagitta-nowrap-cell" type={r.instance_name ? undefined : 'secondary'} style={{ fontWeight: 500 }}>
+        {value}
+      </Text>
+    </Tooltip>
+  )
+}
 
 const renderDbName = (v?: string) =>
   v ? <Text>{v}</Text> : <Text type="secondary">—</Text>
@@ -136,7 +141,7 @@ const renderWorkflowType = (label?: string) => {
   return <Tag color={text === '数据归档' ? 'blue' : 'default'}>{text}</Tag>
 }
 
-const renderDate = (v?: string) => v ? dayjs(v).format('MM-DD HH:mm') : '—'
+const renderDate = (v?: string) => <DateTimeCell value={v} />
 
 const EXECUTION_MODE_LABEL: Record<string, string> = {
   immediate: '立即',
@@ -152,8 +157,8 @@ const renderExecutionInfo = (_: unknown, r: any) => {
       <Tag color={color} style={{ width: 'fit-content', marginInlineEnd: 0 }}>
         {EXECUTION_MODE_LABEL[r.execute_mode] || r.execute_mode}
       </Tag>
-      {r.scheduled_execute_at && <Text type="secondary">{renderDate(r.scheduled_execute_at)}</Text>}
-      {r.external_executed_at && <Text type="secondary">{renderDate(r.external_executed_at)}</Text>}
+      {r.scheduled_execute_at && <DateTimeCell value={r.scheduled_execute_at} />}
+      {r.external_executed_at && <DateTimeCell value={r.external_executed_at} />}
     </Space>
   )
 }
@@ -262,7 +267,7 @@ export default function WorkflowList() {
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
     { title: '当前节点', dataIndex: 'current_node_name', width: 180, align: 'center', ellipsis: true, render: renderCurrentNode },
-    { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
+    { title: '提交时间', dataIndex: 'created_at', width: 210, render: renderDate },
     detailColumn,
   ]
 
@@ -277,7 +282,7 @@ export default function WorkflowList() {
     { title: '状态', dataIndex: 'status', width: 110, align: 'center', render: renderStatus },
     { title: '当前节点', dataIndex: 'current_node_name', width: 190, align: 'center', ellipsis: true, render: renderCurrentNode },
     { title: '审批链路', dataIndex: 'audit_chain_text', width: 320, ellipsis: true, render: (v) => renderAuditChain(v, 290) },
-    { title: '提交时间', dataIndex: 'created_at', width: 170, render: renderDate },
+    { title: '提交时间', dataIndex: 'created_at', width: 210, render: renderDate },
     detailColumn,
   ]
 
@@ -293,13 +298,13 @@ export default function WorkflowList() {
     {
       title: '完成时间',
       dataIndex: 'finish_time',
-      width: 170,
+      width: 210,
       render: renderDate,
     },
     {
       title: '提交时间',
       dataIndex: 'created_at',
-      width: 170,
+      width: 210,
       render: renderDate,
     },
     detailColumn,
