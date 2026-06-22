@@ -73,8 +73,8 @@ describe('WorkflowList', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: /工单视图/ }))
     expect(screen.getByRole('button', { name: /Codex E2E 清理临时表/ })).toHaveClass('sagitta-table-link-button')
-    expect(screen.getByText('Codex 全链路申请人')).toHaveClass('sagitta-nowrap-cell')
-    expect(screen.getByText('MySQL84-Test')).toHaveClass('sagitta-nowrap-cell')
+    expect(screen.getByText('Codex 全链路申请人').closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
+    expect(screen.getByText('MySQL84-Test').closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
     expect(screen.getByText('2026-06-12 09:22:23')).toBeInTheDocument()
   })
 })
