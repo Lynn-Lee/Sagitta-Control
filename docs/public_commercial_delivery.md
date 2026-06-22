@@ -6,7 +6,7 @@
 
 Sagitta Control 采用以下边界：
 
-- 公开交付仓库：`Lynn-Lee/Sagitta-Control` 是 Sagitta Control 的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
+- 公开交付仓库：`Lynn-Lee/Sagitta-Deploy` 是 Sagitta Control 的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
 - 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
@@ -100,7 +100,7 @@ ghcr.io/<org>/sagitta-control-frontend:2.2.0
 Sagitta Control 在专用公开仓库中按版本发版：
 
 ```text
-Repository: Lynn-Lee/Sagitta-Control
+Repository: Lynn-Lee/Sagitta-Deploy
 Tag: v2.2.0
 Title: Sagitta Control v2.2.0
 Assets:
@@ -113,8 +113,8 @@ Release 发布说明使用 [Sagitta Control 公开发布模板](release_template
 用户安装命令示例：
 
 ```bash
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip.sha256
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v2.2.0/Sagitta-Control-v2.2.0.zip.sha256
 sha256sum -c Sagitta-Control-v2.2.0.zip.sha256
 unzip Sagitta-Control-v2.2.0.zip
 cd Sagitta-Control-v2.2.0
@@ -220,7 +220,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 9. 检查商业构建上下文 `.dockerignore`，确认 `.venv`、测试目录、依赖缓存、`dist-commercial`、私钥和 License 文件不会进入 Docker context。
 10. 生成前后端镜像 CycloneDX SBOM，签名前后端镜像、SBOM 和客户部署包。
 11. 执行 `scripts/validate-commercial-release-materials.sh`，确认 zip、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且可校验。
-12. 同步部署文件到公开仓库 `Lynn-Lee/Sagitta-Control` 根目录。
+12. 同步部署文件到公开仓库 `Lynn-Lee/Sagitta-Deploy` 根目录。
 13. 在公开仓库创建或更新 `v2.2.0` Release。
 14. 上传 zip、sha256、签名文件和 SBOM。
 
@@ -228,10 +228,10 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 
 - 推送到 `main` 时，只触发 `.github/workflows/ci.yml` 和 `.github/workflows/release-version-record.yml`，用于源码构建校验和版本记录，不构建或发布商业包。
 - 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.2.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步公开交付仓库。
-- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/Sagitta-Control`。
+- 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/Sagitta-Deploy`。
 - 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到公开交付仓库，只有显式勾选发布时才同步公开发布仓库。
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagitta-control-backend:<version>` 和 `ghcr.io/lynn-lee/sagitta-control-frontend:<version>`。
-- 工作流会更新 `Lynn-Lee/Sagitta-Control` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
+- 工作流会更新 `Lynn-Lee/Sagitta-Deploy` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 - 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免海外 runner 访问国内镜像源时出现依赖下载超时。
 
@@ -242,7 +242,7 @@ MANIFEST_PRIVATE_KEY
 PUBLIC_RELEASES_TOKEN
 ```
 
-`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Sagitta-Control` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
+`MANIFEST_PRIVATE_KEY` 用于商业镜像 Manifest 签名。`PUBLIC_RELEASES_TOKEN` 必须是可写 `Lynn-Lee/Sagitta-Deploy` 的 GitHub token，建议只授予该公开仓库的 contents read/write 权限。
 
 现有脚本入口：
 

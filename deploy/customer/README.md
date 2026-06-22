@@ -74,8 +74,8 @@ Sagitta Control 的客户部署包已经包含 `docker-compose.yml`、`.env.exam
 在 Linux 服务器上下载完整部署包：
 
 ```bash
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
 sha256sum -c Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
 unzip Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
 cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__

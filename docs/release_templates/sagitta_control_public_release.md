@@ -10,8 +10,8 @@
 下载 `Sagitta-Control-vX.Y.Z.zip` 和 sha256 文件，校验后解压，并按包内 `README.md` 和 `docs/installation.md` 部署。
 
 ```bash
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip.sha256
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/vX.Y.Z/Sagitta-Control-vX.Y.Z.zip.sha256
 sha256sum -c Sagitta-Control-vX.Y.Z.zip.sha256
 unzip Sagitta-Control-vX.Y.Z.zip
 cd Sagitta-Control-vX.Y.Z

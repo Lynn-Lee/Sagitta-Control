@@ -13,7 +13,7 @@ on:
         required: false
         type: string
       publish_public_repo:
-        description: "是否将渲染后的商业部署包发布到 Sagitta-Control 公开仓库。正式 tag 始终发布。"
+        description: "是否将渲染后的商业部署包发布到 Sagitta-Deploy 公开仓库。正式 tag 始终发布。"
         required: false
         default: false
         type: boolean
@@ -37,7 +37,7 @@ env:
   PRODUCT_CODE: sagitta-control
   PRODUCT_NAME: Sagitta Control
   COMMERCIAL_BASE_VERSION: "2.2.2"
-  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Sagitta-Control
+  PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Sagitta-Deploy
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagitta-control
 
 concurrency:
@@ -262,7 +262,7 @@ jobs:
             git checkout -B main
           fi
 
-      - name: 发布部署包到 Sagitta-Control
+      - name: 发布部署包到 Sagitta-Deploy
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         run: |
@@ -390,7 +390,7 @@ jobs:
             exit 1
           fi
 
-      - name: 提交并推送 Sagitta-Control 更新
+      - name: 提交并推送 Sagitta-Deploy 更新
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         working-directory: public-releases
         shell: bash
@@ -412,13 +412,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if git diff --cached --quiet; then
-            echo "Sagitta-Control 公开仓库没有需要发布的变更。"
+            echo "Sagitta-Deploy 公开仓库没有需要发布的变更。"
             exit 0
           fi
           git commit -m "发布 Sagitta Control ${{ steps.release.outputs.version }}"
           git push origin HEAD:main
 
-      - name: 创建或更新 Sagitta-Control Release
+      - name: 创建或更新 Sagitta-Deploy Release
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
         shell: bash
         env:

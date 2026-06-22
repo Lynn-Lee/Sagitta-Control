@@ -328,7 +328,7 @@ v2.1 商业版重点补强 Oracle 可观测性：实时会话支持 RAC 实例�
 - 前端仅交付生产 build 产物，构建阶段禁止 sourcemap 和 `sourceMappingURL`，并启用生产压缩/混淆配置。
 - 在线授权使用短期本地缓存，默认 7 天内必须成功回源刷新；长期离线客户使用 challenge-response 离线授权。
 - 商业发布产物包含镜像 SBOM 和签名材料，支持客户侧供应链验收。
-- 发布机制参考 DataFusionX：源码 `main` 提交只跑 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` 标签或显式手动发布才同步 `Lynn-Lee/Sagitta-Control` 公开交付仓库。
+- 发布机制参考 DataFusionX：源码 `main` 提交只跑 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` 标签或显式手动发布才同步 `Lynn-Lee/Sagitta-Deploy` 公开交付仓库。
 - 离线授权采用 challenge-response：客户生成 Challenge，运营侧按 Challenge 签发绑定部署指纹的响应文件。
 - 商业镜像启动时校验 Ed25519 签名 Manifest 和关键文件摘要；发布侧需保留镜像签名、客户包签名和 sha256 记录。
 - 合同、订单或授权函需明确禁止逆向、篡改、绕过授权和二次分发。

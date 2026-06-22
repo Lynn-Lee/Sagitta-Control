@@ -65,8 +65,8 @@ curl --version
 在服务器上执行：
 
 ```bash
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
-wget https://github.com/Lynn-Lee/Sagitta-Control/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v__SAGITTA_CONTROL_VERSION__/Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
 sha256sum -c Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip.sha256
 unzip Sagitta-Control-v__SAGITTA_CONTROL_VERSION__.zip
 cd Sagitta-Control-v__SAGITTA_CONTROL_VERSION__
