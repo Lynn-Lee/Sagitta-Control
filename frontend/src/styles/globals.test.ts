@@ -4,7 +4,7 @@ import globalsCss from './globals.css?raw'
 describe('global menu styles', () => {
   it('keeps root menu items visually stronger than submenu items', () => {
     expect(globalsCss).toMatch(
-      /\.ant-menu\.ant-menu-root\s*>\s*\.ant-menu-item,\s*\.ant-menu\.ant-menu-root\s*>\s*\.ant-menu-submenu\s*>\s*\.ant-menu-submenu-title\s*{[^}]*font-size:\s*14px\s*!important;[^}]*font-weight:\s*700\s*!important;/s,
+      /\.ant-menu\.ant-menu-root\s*>\s*\.ant-menu-item,\s*\.ant-menu\.ant-menu-root\s*>\s*\.ant-menu-submenu\s*>\s*\.ant-menu-submenu-title\s*{[^}]*font-size:\s*14px\s*!important;[^}]*font-weight:\s*500\s*!important;/s,
     )
   })
 

@@ -830,7 +830,7 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 .ant-menu.ant-menu-root > .ant-menu-item,
 .ant-menu.ant-menu-root > .ant-menu-submenu > .ant-menu-submenu-title {
   font-size: 14px !important;
-  font-weight: 700 !important;
+  font-weight: 500 !important;
 }
 
 .ant-menu-item-icon + span,
