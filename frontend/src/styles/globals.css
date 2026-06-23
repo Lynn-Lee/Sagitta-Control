@@ -827,6 +827,12 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   border-color: var(--color-primary) !important;
 }
 
+.ant-menu.ant-menu-root > .ant-menu-item,
+.ant-menu.ant-menu-root > .ant-menu-submenu > .ant-menu-submenu-title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
 .ant-menu-item-icon + span,
 .anticon + .ant-menu-title-content {
   margin-inline-start: 10px !important;
