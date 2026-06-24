@@ -11,7 +11,7 @@ permissions:
 jobs:
   record:
     name: 记录版本
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, sagitta-control]
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
