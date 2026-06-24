@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MenuProps } from 'antd'
 import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
-import { AlertOutlined, ApiOutlined, BarChartOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
+import { AlertOutlined, ApiOutlined, BarChartOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -81,6 +81,7 @@ export default function MonitorPage() {
     growthData,
     engineDetail,
     alertRules,
+    alertEvents,
     dbCapacity,
     tableCapacity,
     tableLoading,
@@ -126,6 +127,7 @@ export default function MonitorPage() {
     collectNow,
     collectAll,
     saveAlertRules,
+    changeAlertEvent,
   } = useMonitorMutations({
     activeId,
     alertRulesText,
@@ -535,6 +537,51 @@ export default function MonitorPage() {
     { title: '采集时间', dataIndex: 'collected_at', width: 210, render: (value: string) => <DateTimeCell value={value} fallback="暂无数据" /> },
   ]
 
+  const alertEventColumns = [
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 120,
+      render: (value: string) => {
+        const colors: Record<string, string> = {
+          firing: 'red',
+          acknowledged: 'blue',
+          silenced: 'gold',
+          resolved: 'green',
+          closed: 'default',
+        }
+        const labels: Record<string, string> = {
+          firing: '触发中',
+          acknowledged: '已确认',
+          silenced: '已静默',
+          resolved: '已恢复',
+          closed: '已关闭',
+        }
+        return <Tag color={colors[value] || 'default'}>{labels[value] || value}</Tag>
+      },
+    },
+    { title: '级别', dataIndex: 'severity', width: 100, render: (value: string) => <Tag color={value === 'critical' ? 'red' : 'orange'}>{value === 'critical' ? '严重' : '警告'}</Tag> },
+    { title: '规则', dataIndex: 'rule_key', width: 190 },
+    { title: '详情', dataIndex: 'message', ellipsis: { showTitle: false }, render: (value: string) => <TruncatedCell value={value || '-'} style={{ maxWidth: 420 }} /> },
+    { title: '最近触发', dataIndex: 'last_seen_at', width: 190, render: (value: string) => <DateTimeCell value={value} fallback="暂无数据" /> },
+    {
+      title: '操作',
+      width: 360,
+      render: (_: any, row: any) => {
+        if (!canManageAlerts) return <Text type="secondary">暂无处理权限</Text>
+        const isTerminal = ['resolved', 'closed'].includes(row.status)
+        return (
+          <Space wrap>
+            {!isTerminal && <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} loading={changeAlertEvent.isPending} onClick={() => changeAlertEvent.mutate({ id: row.id, action: 'ack' })}>确认</Button>}
+            {!isTerminal && <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<PauseCircleOutlined />} loading={changeAlertEvent.isPending} onClick={() => changeAlertEvent.mutate({ id: row.id, action: 'silence' })}>静默</Button>}
+            {row.status !== 'closed' && <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<ReloadOutlined />} loading={changeAlertEvent.isPending} onClick={() => changeAlertEvent.mutate({ id: row.id, action: 'resolve' })}>恢复</Button>}
+            <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseCircleOutlined />} loading={changeAlertEvent.isPending} onClick={() => changeAlertEvent.mutate({ id: row.id, action: 'close' })}>关闭</Button>
+          </Space>
+        )
+      },
+    },
+  ]
+
   const currentDbType = (active?.db_type || detail?.instance?.db_type || '').toLowerCase()
   const metricGroups = engineDetail?.metric_groups || latest?.metric_groups || latest?.extra_metrics || {}
   const engineDiagnosticTabs = getEngineDiagnosticTabs(currentDbType, { metricGroups, isMobile }) || []
@@ -915,6 +962,18 @@ export default function MonitorPage() {
                           <Descriptions bordered size="small" column={1}>
                             <Descriptions.Item label="默认规则">{JSON.stringify(alertRules?.defaults || {})}</Descriptions.Item>
                           </Descriptions>
+                          <Table
+                            dataSource={alertEvents?.items || []}
+                            columns={alertEventColumns}
+                            rowKey="id"
+                            scroll={{ x: 1180 }}
+                            pagination={getTablePaginationConfig({
+                              pageSize: 10,
+                              total: alertEvents?.items?.length,
+                              showTotal: t => `共 ${t} 条告警`,
+                            })}
+                            locale={{ emptyText: <TableEmptyState title="当前实例暂无告警事件" /> }}
+                          />
                           <Input.TextArea
                             rows={10}
                             value={alertRulesText}

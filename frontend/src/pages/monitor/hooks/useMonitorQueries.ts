@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
+import type { AlertEvent } from '@/api/commercial'
 import apiClient from '@/api/client'
 
 import { formatWindowMinutes } from '../formatters'
@@ -123,6 +124,11 @@ export function useMonitorQueries(params: MonitorQueryParams) {
     queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/alerts/`).then(r => r.data),
     enabled: !!activeId,
   })
+  const { data: alertEvents } = useQuery<{ total: number; items: AlertEvent[] }>({
+    queryKey: ['monitor-alert-events', activeId],
+    queryFn: () => apiClient.get('/monitor/alerts/events', { params: { instance_id: activeId, page_size: 20 } }).then(r => r.data),
+    enabled: !!activeId,
+  })
   const { data: dbCapacity } = useQuery({
     queryKey: ['native-monitor-db-capacity', activeId],
     queryFn: () => apiClient.get(`/monitor/native/instances/${activeId}/databases/`).then(r => r.data),
@@ -153,6 +159,7 @@ export function useMonitorQueries(params: MonitorQueryParams) {
     growthData,
     engineDetail,
     alertRules,
+    alertEvents,
     dbCapacity,
     tableCapacity,
     tableLoading,

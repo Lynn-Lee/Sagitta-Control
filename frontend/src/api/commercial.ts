@@ -49,6 +49,13 @@ export type AlertEvent = {
   threshold?: number | null
   first_seen_at?: string | null
   last_seen_at?: string | null
+  resolved_at?: string | null
+  acknowledged_at?: string | null
+  acknowledged_by?: string | null
+  silenced_until?: string | null
+  closed_at?: string | null
+  closed_by?: string | null
+  close_reason?: string | null
 }
 
 export type RetentionPolicy = {
@@ -126,6 +133,7 @@ export const commercialApi = {
   ackAlert: (id: number) => apiClient.post(`/monitor/alerts/events/${id}/ack`).then(r => r.data),
   silenceAlert: (id: number, minutes = 60) =>
     apiClient.post(`/monitor/alerts/events/${id}/silence`, { minutes }).then(r => r.data),
+  resolveAlert: (id: number) => apiClient.post(`/monitor/alerts/events/${id}/resolve`).then(r => r.data),
   closeAlert: (id: number, reason = '') =>
     apiClient.post(`/monitor/alerts/events/${id}/close`, { reason }).then(r => r.data),
   downloadFile: async (path: string, fallbackName: string) => {

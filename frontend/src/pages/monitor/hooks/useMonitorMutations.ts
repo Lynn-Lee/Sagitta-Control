@@ -137,6 +137,20 @@ export function useMonitorMutations({
     },
     onError: (e: any) => msgApi.error(e instanceof SyntaxError ? '告警规则 JSON 格式不正确' : e.response?.data?.msg || '保存告警规则失败'),
   })
+  const changeAlertEvent = useMutation({
+    mutationFn: ({ id, action }: { id: number; action: 'ack' | 'silence' | 'resolve' | 'close' }) => {
+      if (action === 'ack') return apiClient.post(`/monitor/alerts/events/${id}/ack`).then(r => r.data)
+      if (action === 'silence') return apiClient.post(`/monitor/alerts/events/${id}/silence`, { minutes: 60 }).then(r => r.data)
+      if (action === 'resolve') return apiClient.post(`/monitor/alerts/events/${id}/resolve`).then(r => r.data)
+      return apiClient.post(`/monitor/alerts/events/${id}/close`, { reason: '监控页面关闭' }).then(r => r.data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['monitor-alert-events', activeId] })
+      queryClient.invalidateQueries({ queryKey: ['native-monitor-alerts', activeId] })
+      msgApi.success('告警状态已更新')
+    },
+    onError: (e: any) => msgApi.error(e.response?.data?.msg || '告警状态更新失败'),
+  })
 
   return {
     saveConfig,
@@ -145,6 +159,7 @@ export function useMonitorMutations({
     collectNow,
     collectAll,
     saveAlertRules,
+    changeAlertEvent,
     invalidateCollectConfigQueries,
   }
 }

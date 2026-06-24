@@ -182,9 +182,10 @@ export default function CommercialOpsPage() {
     message.success(`已清理 ${result.deleted || 0} 条过期数据`)
   }
 
-  const handleAlertAction = async (id: number, action: 'ack' | 'silence' | 'close') => {
+  const handleAlertAction = async (id: number, action: 'ack' | 'silence' | 'resolve' | 'close') => {
     if (action === 'ack') await commercialApi.ackAlert(id)
     if (action === 'silence') await commercialApi.silenceAlert(id, 60)
+    if (action === 'resolve') await commercialApi.resolveAlert(id)
     if (action === 'close') await commercialApi.closeAlert(id, '交付与支持页面关闭')
     message.success('告警状态已更新')
     const data = await commercialApi.alertEvents({ page_size: 50 })
@@ -496,11 +497,18 @@ export default function CommercialOpsPage() {
                   { title: '最近触发', dataIndex: 'last_seen_at', render: value => formatDateTime(value, '-') },
                   {
                     title: '操作',
-                    width: 270,
+                    width: 360,
                     render: (_, row) => (
-                      <Space>
-                        <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} onClick={() => handleAlertAction(row.id, 'ack')}>确认</Button>
-                        <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<PauseCircleOutlined />} onClick={() => handleAlertAction(row.id, 'silence')}>静默</Button>
+                      <Space wrap>
+                        {!['resolved', 'closed'].includes(row.status) && (
+                          <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} onClick={() => handleAlertAction(row.id, 'ack')}>确认</Button>
+                        )}
+                        {!['resolved', 'closed'].includes(row.status) && (
+                          <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<PauseCircleOutlined />} onClick={() => handleAlertAction(row.id, 'silence')}>静默</Button>
+                        )}
+                        {row.status !== 'closed' && (
+                          <Button className="sagitta-action-btn sagitta-action-btn--inspect" icon={<ReloadOutlined />} onClick={() => handleAlertAction(row.id, 'resolve')}>恢复</Button>
+                        )}
                         <Button className="sagitta-action-btn sagitta-action-btn--neutral" icon={<CloseCircleOutlined />} onClick={() => handleAlertAction(row.id, 'close')}>关闭</Button>
                       </Space>
                     ),

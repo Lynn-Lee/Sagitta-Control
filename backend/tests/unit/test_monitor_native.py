@@ -6,9 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.exceptions import AppException
-from app.models.monitor import MonitorMetricSnapshot
+from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
 from app.schemas.monitor import UnifiedCollectConfigUpsert
 from app.services.monitor import MonitorService
+from app.services.monitor_alerts import MonitorAlertService
 
 
 def test_normalize_metric_payload_keeps_missing_values_none():
@@ -162,6 +163,107 @@ def test_evaluate_health_scores_redis_and_clickhouse_engine_risks():
     assert "ClickHouse 延迟写入 1" in clickhouse_health["risk_reasons"]
     assert "ClickHouse 拒绝写入 1" in clickhouse_health["risk_reasons"]
     assert "default 磁盘 92%" in clickhouse_health["risk_reasons"]
+
+
+@pytest.mark.asyncio
+async def test_sync_alert_events_notifies_when_active_alert_recovers(monkeypatch):
+    event = SimpleNamespace(
+        id=12,
+        instance_id=8,
+        rule_key="connection_usage",
+        severity="warning",
+        status="firing",
+        title="prod-mysql connection_usage 告警",
+        message="connection_usage 当前值 0.9，触发条件 >= 0.8",
+        metric_value=0.9,
+        threshold=0.8,
+        snapshot_id=99,
+        first_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        last_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        resolved_at=None,
+        acknowledged_at=None,
+        acknowledged_by="",
+        silenced_until=None,
+        closed_at=None,
+        closed_by="",
+        close_reason="",
+        extra={},
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(
+            return_value=SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [event]))
+        )
+    )
+    instance = SimpleNamespace(id=8, instance_name="prod-mysql", db_type="mysql")
+    cfg = MonitorCollectConfig(
+        instance_id=8,
+        alert_rules_override={"connection_usage": {"threshold": 0.8, "recover_notify": True}},
+    )
+    snapshot = MonitorMetricSnapshot(
+        id=100,
+        instance_id=8,
+        collected_at=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        connection_usage=0.2,
+        extra_metrics={},
+    )
+    enqueue = MagicMock()
+    monkeypatch.setattr("app.services.monitor_alerts.NotifyService.enqueue_event", enqueue)
+
+    await MonitorAlertService.sync_alert_events_for_snapshot(db, instance, cfg, snapshot)
+
+    assert event.status == "resolved"
+    assert event.resolved_at == snapshot.collected_at
+    enqueue.assert_called_once()
+    assert enqueue.call_args.args[0]["event_type"] == "alert_resolved"
+
+
+@pytest.mark.asyncio
+async def test_change_alert_event_supports_manual_resolve(monkeypatch):
+    event = SimpleNamespace(
+        id=12,
+        instance_id=8,
+        rule_key="connection_usage",
+        severity="warning",
+        status="acknowledged",
+        title="prod-mysql connection_usage 告警",
+        message="connection_usage 当前值 0.9，触发条件 >= 0.8",
+        metric_value=0.9,
+        threshold=0.8,
+        snapshot_id=99,
+        first_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        last_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        resolved_at=None,
+        acknowledged_at=datetime(2026, 1, 1, tzinfo=UTC),
+        acknowledged_by="值班同学",
+        silenced_until=None,
+        closed_at=None,
+        closed_by="",
+        close_reason="",
+        extra={},
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    instance = SimpleNamespace(id=8, instance_name="prod-mysql", db_type="mysql")
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(first=lambda: (event, instance))),
+        commit=AsyncMock(),
+        refresh=AsyncMock(),
+    )
+    enqueue = MagicMock()
+    monkeypatch.setattr("app.services.monitor_alerts.NotifyService.enqueue_event", enqueue)
+
+    result = await MonitorAlertService.change_alert_event(
+        db,
+        12,
+        "resolve",
+        {"is_superuser": True, "display_name": "运维负责人"},
+    )
+
+    assert result["status"] == "resolved"
+    assert event.resolved_at is not None
+    db.commit.assert_awaited_once()
+    enqueue.assert_called_once()
+    assert enqueue.call_args.args[0]["event_type"] == "alert_resolved"
 
 
 def test_apply_delta_rates_prefers_interval_counters():

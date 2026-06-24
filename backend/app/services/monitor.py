@@ -25,6 +25,7 @@ from app.models.monitor import (
 from app.models.user import ResourceGroup, Users
 from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
 from app.services.dashboard import DashboardService
+from app.services.monitor_alerts import MonitorAlertService
 
 logger = logging.getLogger(__name__)
 
@@ -1234,50 +1235,15 @@ class MonitorService:
 
     @staticmethod
     def _alert_rule_defaults() -> dict[str, dict[str, Any]]:
-        return {
-            "connection_usage": {"operator": ">=", "threshold": 0.8, "duration_count": 1},
-            "replication_lag_seconds": {"operator": ">=", "threshold": 60, "duration_count": 1},
-            "tablespace_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
-            "fra_used_pct": {"operator": ">=", "threshold": 85, "duration_count": 1},
-            "lock_waits": {"operator": ">", "threshold": 0, "duration_count": 1},
-        }
+        return MonitorAlertService.alert_rule_defaults()
 
     @staticmethod
     def _metric_for_alert(snapshot: MonitorMetricSnapshot, rule_key: str) -> float | None:
-        extra = snapshot.extra_metrics or {}
-        if rule_key == "connection_usage":
-            return float(snapshot.connection_usage) if snapshot.connection_usage is not None else None
-        if rule_key == "replication_lag_seconds":
-            return (
-                float(snapshot.replication_lag_seconds)
-                if snapshot.replication_lag_seconds is not None
-                else None
-            )
-        if rule_key == "lock_waits":
-            return float(snapshot.lock_waits or 0)
-        if rule_key == "tablespace_used_pct":
-            values = [
-                MonitorService._coerce_float(item.get("used_pct"))
-                for item in (extra.get("tablespaces") or [])
-                if isinstance(item, dict)
-            ]
-            values = [value for value in values if value is not None]
-            return max(values) if values else None
-        if rule_key == "fra_used_pct":
-            return MonitorService._coerce_float((extra.get("fra") or {}).get("used_pct"))
-        return None
+        return MonitorAlertService.metric_for_alert(snapshot, rule_key)
 
     @staticmethod
     def _compare_alert_value(value: float, operator: str, threshold: float) -> bool:
-        if operator == ">":
-            return value > threshold
-        if operator == "<":
-            return value < threshold
-        if operator == "<=":
-            return value <= threshold
-        if operator == "==":
-            return value == threshold
-        return value >= threshold
+        return MonitorAlertService.compare_alert_value(value, operator, threshold)
 
     @staticmethod
     async def sync_alert_events_for_snapshot(
@@ -1286,117 +1252,11 @@ class MonitorService:
         cfg: MonitorCollectConfig,
         snapshot: MonitorMetricSnapshot,
     ) -> None:
-        rules = {**MonitorService._alert_rule_defaults(), **(cfg.alert_rules_override or {})}
-        now = snapshot.collected_at or datetime.now(UTC)
-        triggered: set[str] = set()
-        for rule_key, rule in rules.items():
-            if not isinstance(rule, dict) or rule.get("enabled") is False:
-                continue
-            value = MonitorService._metric_for_alert(snapshot, rule_key)
-            if value is None:
-                continue
-            threshold = float(rule.get("threshold", 0))
-            operator = str(rule.get("operator") or ">=")
-            if not MonitorService._compare_alert_value(value, operator, threshold):
-                continue
-            triggered.add(rule_key)
-            severity = "critical" if rule_key in {"tablespace_used_pct", "fra_used_pct"} and value >= 90 else "warning"
-            title = f"{inst.instance_name} {rule_key} 告警"
-            message = f"{rule_key} 当前值 {value}，触发条件 {operator} {threshold}"
-            event = (
-                await db.execute(
-                    select(MonitorAlertEvent)
-                    .where(
-                        MonitorAlertEvent.instance_id == inst.id,
-                        MonitorAlertEvent.rule_key == rule_key,
-                        MonitorAlertEvent.status.in_(["firing", "acknowledged", "silenced"]),
-                    )
-                    .order_by(MonitorAlertEvent.id.desc())
-                    .limit(1)
-                )
-            ).scalar_one_or_none()
-            if event:
-                event.last_seen_at = now
-                event.metric_value = value
-                event.threshold = threshold
-                event.snapshot_id = snapshot.id
-                event.message = message
-                if event.status == "silenced" and event.silenced_until and event.silenced_until < now:
-                    event.status = "firing"
-            else:
-                event = MonitorAlertEvent(
-                    instance_id=inst.id,
-                    rule_key=rule_key,
-                    severity=severity,
-                    status="firing",
-                    title=title,
-                    message=message,
-                    metric_value=value,
-                    threshold=threshold,
-                    snapshot_id=snapshot.id,
-                    first_seen_at=now,
-                    last_seen_at=now,
-                    extra={"db_type": inst.db_type},
-                )
-                db.add(event)
-                await db.flush()
-                from app.services.notify import NotifyService
-
-                NotifyService.enqueue_event(
-                    {
-                        "event_type": "alert_firing",
-                        "subject_type": "monitor_alert_event",
-                        "subject_id": event.id,
-                        "app_type": "监控告警",
-                        "title": title,
-                        "instance_name": inst.instance_name,
-                        "risk_level": severity,
-                        "remark": message,
-                        "permissions": ["observability_alert_manage"],
-                        "detail_path": f"/monitor?instance_id={inst.id}",
-                    }
-                )
-
-        active_events = (
-            await db.execute(
-                select(MonitorAlertEvent).where(
-                    MonitorAlertEvent.instance_id == inst.id,
-                    MonitorAlertEvent.status.in_(["firing", "acknowledged", "silenced"]),
-                )
-            )
-        ).scalars().all()
-        for event in active_events:
-            if event.rule_key not in triggered:
-                event.status = "resolved"
-                event.resolved_at = now
+        await MonitorAlertService.sync_alert_events_for_snapshot(db, inst, cfg, snapshot)
 
     @staticmethod
     def _alert_event_to_dict(event: MonitorAlertEvent, instance_name: str = "", db_type: str = "") -> dict[str, Any]:
-        return {
-            "id": event.id,
-            "instance_id": event.instance_id,
-            "instance_name": instance_name,
-            "db_type": db_type,
-            "rule_key": event.rule_key,
-            "severity": event.severity,
-            "status": event.status,
-            "title": event.title,
-            "message": event.message,
-            "metric_value": event.metric_value,
-            "threshold": event.threshold,
-            "snapshot_id": event.snapshot_id,
-            "first_seen_at": event.first_seen_at.isoformat() if event.first_seen_at else None,
-            "last_seen_at": event.last_seen_at.isoformat() if event.last_seen_at else None,
-            "resolved_at": event.resolved_at.isoformat() if event.resolved_at else None,
-            "acknowledged_at": event.acknowledged_at.isoformat() if event.acknowledged_at else None,
-            "acknowledged_by": event.acknowledged_by,
-            "silenced_until": event.silenced_until.isoformat() if event.silenced_until else None,
-            "closed_at": event.closed_at.isoformat() if event.closed_at else None,
-            "closed_by": event.closed_by,
-            "close_reason": event.close_reason,
-            "extra": event.extra or {},
-            "created_at": event.created_at.isoformat() if event.created_at else "",
-        }
+        return MonitorAlertService.alert_event_to_dict(event, instance_name, db_type)
 
     @staticmethod
     async def list_alert_events(
@@ -1407,48 +1267,13 @@ class MonitorService:
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[int, list[dict[str, Any]]]:
-        query = select(MonitorAlertEvent, Instance).join(Instance, MonitorAlertEvent.instance_id == Instance.id)
-        if instance_id:
-            query = query.where(MonitorAlertEvent.instance_id == instance_id)
-        if status:
-            query = query.where(MonitorAlertEvent.status == status)
-        if not (user.get("is_superuser") or "observability_instance_all" in user.get("permissions", [])):
-            user_rg_ids = user.get("resource_groups", [])
-            if not user_rg_ids:
-                return 0, []
-            query = (
-                query.join(Instance.resource_groups.of_type(ResourceGroup))
-                .where(ResourceGroup.id.in_(user_rg_ids))
-                .distinct()
-            )
-        total = int((await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one())
-        rows = (
-            await db.execute(
-                query.order_by(MonitorAlertEvent.updated_at.desc())
-                .offset((page - 1) * page_size)
-                .limit(page_size)
-            )
-        ).all()
-        return total, [
-            MonitorService._alert_event_to_dict(event, inst.instance_name, inst.db_type)
-            for event, inst in rows
-        ]
+        return await MonitorAlertService.list_alert_events(
+            db, user, status=status, instance_id=instance_id, page=page, page_size=page_size
+        )
 
     @staticmethod
     async def get_alert_event(db: AsyncSession, event_id: int, user: dict) -> dict[str, Any]:
-        row = (
-            await db.execute(
-                select(MonitorAlertEvent, Instance)
-                .join(Instance, MonitorAlertEvent.instance_id == Instance.id)
-                .where(MonitorAlertEvent.id == event_id)
-            )
-        ).first()
-        if not row:
-            raise NotFoundException("告警事件不存在")
-        event, inst = row
-        if not MonitorService._can_access_instance(user, inst):
-            raise AppException("没有该实例的告警查看权限", code=403)
-        return MonitorService._alert_event_to_dict(event, inst.instance_name, inst.db_type)
+        return await MonitorAlertService.get_alert_event(db, event_id, user)
 
     @staticmethod
     async def change_alert_event(
@@ -1460,39 +1285,9 @@ class MonitorService:
         minutes: int = 60,
         reason: str = "",
     ) -> dict[str, Any]:
-        row = (
-            await db.execute(
-                select(MonitorAlertEvent, Instance)
-                .join(Instance, MonitorAlertEvent.instance_id == Instance.id)
-                .where(MonitorAlertEvent.id == event_id)
-            )
-        ).first()
-        if not row:
-            raise NotFoundException("告警事件不存在")
-        event, inst = row
-        if not MonitorService._can_access_instance(user, inst):
-            raise AppException("没有该实例的告警处理权限", code=403)
-        now = datetime.now(UTC)
-        operator = user.get("display_name") or user.get("username") or ""
-        if action == "ack":
-            event.status = "acknowledged"
-            event.acknowledged_at = now
-            event.acknowledged_by = operator
-        elif action == "silence":
-            event.status = "silenced"
-            event.silenced_until = now + timedelta(minutes=max(1, minutes))
-            event.acknowledged_by = operator
-            event.acknowledged_at = event.acknowledged_at or now
-        elif action == "close":
-            event.status = "closed"
-            event.closed_at = now
-            event.closed_by = operator
-            event.close_reason = reason[:500]
-        else:
-            raise AppException("不支持的告警操作", code=400)
-        await db.commit()
-        await db.refresh(event)
-        return MonitorService._alert_event_to_dict(event, inst.instance_name, inst.db_type)
+        return await MonitorAlertService.change_alert_event(
+            db, event_id, action, user, minutes=minutes, reason=reason
+        )
 
     @staticmethod
     async def get_waits(db: AsyncSession, instance_id: int, user: dict) -> dict:

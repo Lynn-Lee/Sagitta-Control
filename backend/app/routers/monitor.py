@@ -151,6 +151,15 @@ async def silence_alert_event(
     )
 
 
+@router.post("/alerts/events/{event_id}/resolve", summary="恢复告警事件")
+async def resolve_alert_event(
+    event_id: int,
+    user: dict = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await MonitorService.change_alert_event(db, event_id, "resolve", user)
+
+
 @router.post("/alerts/events/{event_id}/close", summary="关闭告警事件")
 async def close_alert_event(
     event_id: int,

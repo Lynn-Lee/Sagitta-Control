@@ -333,7 +333,7 @@ Prometheus 配置位于 `deploy/prometheus/`，Grafana provisioning 位于 `depl
 
 Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。会话页优先读取 `GV$SESSION`、`GV$PROCESS`、`GV$SQL` 和 `GV$TRANSACTION`，兼容 RAC 与 11g；SQL 洞察优先读取 `GV$SQL_MONITOR`，再降级到 `DBA_HIST_SQLSTAT`、`GV$SQL` 和当前会话 SQL。客户账号没有 AWR、SQL Monitor 或部分动态性能视图权限时，页面会保留已采集数据并展示缺失权限 warning。所有 Oracle 采集均为只读查询，不会执行会话 kill、trace dump、SQL profile、baseline、patch 等变更类诊断操作。
 
-告警规则命中阈值后会生成告警事件，事件状态为 `firing`、`acknowledged`、`silenced`、`resolved`、`closed`。采集恢复后系统自动标记为 `resolved`，人工处理完成后可关闭为 `closed`。通知链路复用现有邮件、飞书、钉钉和企业微信配置，建议在客户验收时至少验证一个通知渠道可用。
+告警规则命中阈值后会生成告警事件，事件状态为 `firing`、`acknowledged`、`silenced`、`resolved`、`closed`。采集恢复后系统自动标记为 `resolved` 并投递 `alert_resolved` 恢复通知；值班人员也可在观测中心或商业交付的告警中心手动执行确认、静默、恢复和关闭。人工处理完成后可关闭为 `closed`。通知链路复用现有邮件、飞书、钉钉和企业微信配置，建议在客户验收时至少验证告警触发和恢复各一个通知事件。
 
 测试环境的观测模拟任务通过系统 cron 触发，默认每分钟执行 3 轮，用于给观测中心持续产生连接、查询、事务、容量和等待类指标。云 ECS 测试环境的当前配置如下：
 
