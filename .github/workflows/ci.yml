@@ -27,6 +27,9 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: 前端依赖安全审计
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
@@ -122,6 +125,9 @@ jobs:
         run: |
           uv pip install --system -r backend/requirements.lock
           uv pip install --system --no-deps -e backend
+
+      - name: 后端依赖安全审计
+        run: uvx pip-audit --no-deps -r backend/requirements.lock
 
       - name: 后端 Lint
         working-directory: backend
