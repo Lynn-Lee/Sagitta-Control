@@ -52,7 +52,20 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="$(mktemp)"
+          curl -fsSL --retry 3 --connect-timeout 20 \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+            -o "${archive}"
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          tar -xzf "${archive}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${archive}"
 
       - name: 解析发布元数据
         id: release
@@ -66,13 +79,13 @@ jobs:
             version="${{ inputs.version }}"
             channel="stable"
           elif [[ "${GITHUB_REF_NAME}" == release/* ]]; then
-            short_sha="$(git rev-parse --short=7 HEAD)"
+            short_sha="${GITHUB_SHA::7}"
             base_version="${GITHUB_REF_NAME#release/}"
             base_version="${base_version//\//-}"
             version="${base_version}-rc.${GITHUB_RUN_NUMBER}.${short_sha}"
             channel="rc"
           else
-            short_sha="$(git rev-parse --short=7 HEAD)"
+            short_sha="${GITHUB_SHA::7}"
             version="${COMMERCIAL_BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${short_sha}"
             channel="snapshot"
           fi
