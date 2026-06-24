@@ -14,29 +14,7 @@ jobs:
     runs-on: [self-hosted, Linux, ARM64, sagitta-control]
     steps:
       - name: 检出代码
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          archive="$(mktemp)"
-          for attempt in 1 2 3 4; do
-            rm -f "${archive}"
-            if curl --http1.1 -fsSL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 900 \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
-              -o "${archive}"; then
-              break
-            fi
-            if [ "${attempt}" = "4" ]; then
-              exit 1
-            fi
-            sleep $((attempt * 10))
-          done
-          find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-          tar -xzf "${archive}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${archive}"
+        uses: actions/checkout@v4
 
       - name: 生成版本元数据
         id: version

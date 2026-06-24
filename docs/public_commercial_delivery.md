@@ -233,7 +233,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagitta-control-backend:<version>` 和 `ghcr.io/lynn-lee/sagitta-control-frontend:<version>`。
 - 工作流会更新 `Lynn-Lee/Sagitta-Deploy` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
-- GitHub Actions 默认调度到本机 Ubuntu VM 的 self-hosted runner `sagitta-control-vm`，标签为 `[self-hosted, Linux, ARM64, sagitta-control]`；workflow 使用 GitHub API tarball 检出源码且不默认使用 GitHub 托管缓存，下载时强制 HTTP/1.1 并启用多轮重试，避免私有仓库 CI 被 hosted runner、缓存计费状态或 codeload 网络状态阻断。
+- GitHub Actions 默认调度到本机 Ubuntu VM 的 self-hosted runner `sagitta-control-vm`，标签为 `[self-hosted, Linux, ARM64, sagitta-control]`；workflow 使用 `actions/checkout` 检出源码且不默认使用 GitHub 托管缓存，避免私有仓库 CI 被 hosted runner 或缓存计费状态阻断。
 - 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免 runner 访问依赖源时出现下载超时。
 
 私有仓库需要配置 GitHub Secrets：
