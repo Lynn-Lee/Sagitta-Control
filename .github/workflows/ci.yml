@@ -114,8 +114,8 @@ jobs:
 
       - name: 安装后端依赖
         run: |
-          uv pip install --system --break-system-packages -r backend/requirements.lock
-          uv pip install --system --break-system-packages --no-deps -e backend
+          sudo uv pip install --system --break-system-packages -r backend/requirements.lock
+          sudo uv pip install --system --break-system-packages --no-deps -e backend
 
       - name: 后端依赖安全审计
         run: uvx pip-audit --disable-pip --no-deps -r backend/requirements.lock
