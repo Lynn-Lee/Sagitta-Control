@@ -19,6 +19,7 @@ import {
   type ArchivePayload,
   type ArchiveSupportInfo,
 } from '@/api/archive'
+import { runArchiveJobAction, type ArchiveJobAction } from './archiveActions'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
 import { workflowApi } from '@/api/workflow'
@@ -174,9 +175,8 @@ export default function ArchivePage() {
     },
     onError: (e: any) => msgApi.error(e.response?.data?.msg || e.response?.data?.detail || '提交失败'),
   })
-  const actionMut = useMutation<ArchiveActionResponse, unknown, { id: number; action: 'start' | 'pause' | 'resume' | 'cancel'; payload?: ArchiveExecutePayload }>({
-    mutationFn: ({ id, action, payload }: { id: number; action: 'start' | 'pause' | 'resume' | 'cancel'; payload?: ArchiveExecutePayload }) =>
-      action === 'start' ? archiveApi.start(id, payload) : archiveApi[action](id),
+  const actionMut = useMutation<ArchiveActionResponse, unknown, { id: number; action: ArchiveJobAction; payload?: ArchiveExecutePayload }>({
+    mutationFn: runArchiveJobAction,
     onSuccess: (res) => {
       invalidateJobs()
       setExecuteModalOpen(false)

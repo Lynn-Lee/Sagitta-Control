@@ -142,13 +142,15 @@ uv pip install -r requirements.lock
 uv pip install --no-deps -e .
 uvicorn app.main:app --reload --port 8000
 alembic upgrade head
-pytest tests/unit/ -v --cov=app --cov-fail-under=35
+pytest tests/unit/ -v --cov=app --cov-fail-under=45
 ruff format . && ruff check .
 while IFS= read -r target; do
   mypy --follow-imports=silent "$target"
 done < mypy-baseline.txt
 uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
+
+后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 45%，后续按模块补测后继续向 55% 提升。
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
 

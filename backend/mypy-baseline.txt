@@ -10,6 +10,7 @@ app/engines/doris.py
 app/engines/elasticsearch.py
 app/engines/models.py
 app/engines/mysql.py
+app/engines/oracle_capacity.py
 app/engines/opensearch.py
 app/engines/protocol.py
 app/engines/starrocks.py
@@ -41,7 +42,9 @@ app/schemas/role.py
 app/schemas/slowlog.py
 app/schemas/user.py
 app/services/__init__.py
+app/services/commercial_readiness.py
 app/services/dashboard.py
+app/services/dashboard_metrics.py
 app/services/ldap_auth.py
 app/services/oauth_auth.py
 app/services/risk_plan.py

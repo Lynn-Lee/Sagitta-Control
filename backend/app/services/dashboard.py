@@ -21,6 +21,7 @@ from app.models.workflow import (
     WorkflowType,
 )
 from app.services.audit import OP_CANCEL, OP_PASS, OP_REJECT, AuditService
+from app.services.dashboard_metrics import build_date_keys, build_query_trend_payload
 from app.services.governance_scope import GovernanceScopeService
 
 
@@ -203,15 +204,7 @@ class DashboardService:
             }
             for row in trend_rows
         }
-        dates: list[str] = []
-        query_count: list[int] = []
-        query_user_count: list[int] = []
-        for offset in range(days):
-            day = period_start.date() + timedelta(days=offset)
-            day_key = day.isoformat()
-            dates.append(day_key)
-            query_count.append(trend_map.get(day_key, {}).get("query_count", 0))
-            query_user_count.append(trend_map.get(day_key, {}).get("query_user_count", 0))
+        dates = build_date_keys(period_start, days)
 
         query_failure_stmt = DashboardService._apply_query_scope(
             select(
@@ -276,18 +269,8 @@ class DashboardService:
         revoked_rows = (await db.execute(revoked_stmt)).all()
         revoked_map = {str(row.d): int(row.revoked_count or 0) for row in revoked_rows}
 
-        failure_count: list[int] = []
-        masked_count: list[int] = []
-        approved_count: list[int] = []
-        rejected_count: list[int] = []
-        revoked_count: list[int] = []
         pending_stock_count: list[int] = []
         for day_key in dates:
-            failure_count.append(query_failure_map.get(day_key, 0) + rejected_map.get(day_key, 0))
-            masked_count.append(masked_map.get(day_key, 0))
-            approved_count.append(approved_map.get(day_key, 0))
-            rejected_count.append(rejected_map.get(day_key, 0))
-            revoked_count.append(revoked_map.get(day_key, 0))
             day_end = datetime.fromisoformat(day_key).replace(tzinfo=UTC) + timedelta(days=1)
             pending_stock_stmt = DashboardService._apply_query_apply_scope(
                 select(QueryPrivilegeApply).where(
@@ -349,15 +332,17 @@ class DashboardService:
             },
             "trend": {
                 "range_label": f"最近{days}天",
-                "dates": dates,
-                "query_count": query_count,
-                "query_user_count": query_user_count,
-                "failure_count": failure_count,
-                "masked_count": masked_count,
-                "approved_count": approved_count,
-                "rejected_count": rejected_count,
-                "revoked_count": revoked_count,
-                "pending_stock_count": pending_stock_count,
+                **build_query_trend_payload(
+                    period_start=period_start,
+                    days=days,
+                    query_map=trend_map,
+                    query_failure_map=query_failure_map,
+                    masked_map=masked_map,
+                    approved_map=approved_map,
+                    rejected_map=rejected_map,
+                    revoked_map=revoked_map,
+                    pending_stock_count=pending_stock_count,
+                ),
             },
             "top_users": [
                 {
