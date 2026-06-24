@@ -150,7 +150,7 @@ done < mypy-baseline.txt
 uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
 
-后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 45%，后续按模块补测后继续向 55% 提升。私有源码仓库的 GitHub Actions 默认运行在 JD 云 ECS 上的 repository 级 self-hosted runner `sagitta-control-jd`，workflow 通过 `[self-hosted, Linux, X64, sagitta-control]` 标签调度；runner 以 systemd 服务运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。JD 到 GitHub git endpoint 不稳定，workflow 使用 GitHub API tarball 完成源码检出。
+后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 45%，后续按模块补测后继续向 55% 提升。私有源码仓库的 GitHub Actions 默认运行在本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，workflow 通过 `[self-hosted, Linux, ARM64, sagitta-control]` 标签调度；runner 以 `ubuntu` 用户和 systemd 服务运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。workflow 使用 GitHub API tarball 完成源码检出，并强制 HTTP/1.1 与多轮重试，降低 codeload 中途断流对 CI 的影响。
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
 

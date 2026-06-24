@@ -468,10 +468,10 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 提交与发布策略参考 DataFusionX：`main` 只触发源码 CI 和版本记录；`release/**` 生成 RC 候选商业包和固定版本镜像，但不默认同步公开仓库；正式 `vX.Y.Z` tag 生成最终商业交付包并同步 `Lynn-Lee/Sagitta-Deploy`，同时创建或更新对应 GitHub Release；手动商业发布默认只生成临时包，除非显式勾选发布。商业部署包默认不上传为 Actions artifact，如需临时留存可设置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 
-私有源码仓库 GitHub Actions 使用 JD 云 ECS 上的 repository 级 self-hosted runner，runner 名称为 `sagitta-control-jd`，调度标签为 `[self-hosted, Linux, X64, sagitta-control]`，服务目录为 `/opt/actions-runner/sagitta-control`，systemd 服务名为 `actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-jd.service`。JD runner 已配置 8G swap、Node.js 22、Python 3.12、uv、Docker Compose 和 GitHub CLI。JD 到 `github.com` git endpoint 不稳定，workflow 使用 GitHub API tarball 检出源码；如后续恢复标准 `actions/checkout`，需先重新验证 JD 到 GitHub git endpoint 的连通性。如 workflow 长时间排队，应先检查 GitHub runner 状态、ECS 服务状态和磁盘/内存资源：
+私有源码仓库 GitHub Actions 使用本机 Ubuntu VM 上的 repository 级 self-hosted runner，runner 名称为 `sagitta-control-vm`，调度标签为 `[self-hosted, Linux, ARM64, sagitta-control]`，服务目录为 `/opt/actions-runner/sagitta-control`，systemd 服务名为 `actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-vm.service`。VM 使用 `ubuntu` 用户运行 runner，root SSH 登录已禁用；当前配置为 2 vCPU、2GB 内存、8GB swap、30GB 系统盘，并已安装 Node.js 22、Python 3.12、uv、Docker Compose 和 GitHub CLI。workflow 使用 GitHub API tarball 检出源码，下载时强制 HTTP/1.1、启用多轮重试和单次下载超时；如后续恢复标准 `actions/checkout`，需先重新验证 VM 到 GitHub git endpoint 的连通性。如 workflow 长时间排队，应先检查 GitHub runner 状态、VM 服务状态和磁盘/内存资源：
 
 ```bash
 gh api repos/Lynn-Lee/Sagitta-Control/actions/runners --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
-ssh -i ~/.ssh/jd-loveai.pem ubuntu@111.228.30.126 -p 2222 \
-  'sudo systemctl status actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-jd.service --no-pager'
+ssh -i ~/.ssh/sagitta-control-vm-runner ubuntu@10.211.55.18 -p 22 \
+  'sudo systemctl status actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-vm.service --no-pager'
 ```

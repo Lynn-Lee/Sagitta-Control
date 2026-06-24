@@ -47,7 +47,7 @@ concurrency:
 jobs:
   package:
     name: 构建并发布商业部署包
-    runs-on: [self-hosted, Linux, X64, sagitta-control]
+    runs-on: [self-hosted, Linux, ARM64, sagitta-control]
     timeout-minutes: 90
 
     steps:
@@ -58,11 +58,20 @@ jobs:
         run: |
           set -euo pipefail
           archive="$(mktemp)"
-          curl -fsSL --retry 3 --connect-timeout 20 \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
-            -o "${archive}"
+          for attempt in 1 2 3 4; do
+            rm -f "${archive}"
+            if curl --http1.1 -fsSL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 900 \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+              -o "${archive}"; then
+              break
+            fi
+            if [ "${attempt}" = "4" ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
           find "${GITHUB_WORKSPACE}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           tar -xzf "${archive}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
           rm -f "${archive}"

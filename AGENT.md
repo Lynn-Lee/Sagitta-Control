@@ -59,7 +59,7 @@
 
 - 开始改动前先检查 `git status --short --branch`。
 - 标准远端约定：`origin` 指向 GitHub 主仓库 `https://github.com/Lynn-Lee/Sagitta-Control.git`，用于主源码记录和 GitHub Actions；`gitee` 指向 Gitee 国内镜像仓库 `git@gitee.com:lynn-lee/sagitta-control.git`，用于国内网络环境下的源码拉取和部署更新。
-- GitHub Actions 默认使用 JD 云 ECS 上的 repository 级 self-hosted runner `sagitta-control-jd`，调度标签为 `[self-hosted, Linux, X64, sagitta-control]`；runner 服务目录为 `/opt/actions-runner/sagitta-control`，systemd 服务名为 `actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-jd.service`。JD 到 `github.com` git endpoint 不稳定，workflow 默认使用 GitHub API tarball 检出源码。
+- GitHub Actions 默认使用本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，调度标签为 `[self-hosted, Linux, ARM64, sagitta-control]`；runner 以 `ubuntu` 用户运行，服务目录为 `/opt/actions-runner/sagitta-control`，systemd 服务名为 `actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-vm.service`。workflow 默认使用 GitHub API tarball 检出源码，并强制 HTTP/1.1 与多轮重试来降低 codeload 中途断流影响。
 - 不要回滚用户已有改动；如果工作区已有无关变更，只处理当前任务相关文件。
 - 不要使用 `git reset --hard`、`git checkout -- <file>`、`docker compose down -v`、`docker volume rm` 等破坏性命令，除非用户明确要求。
 - 提交前查看 staged diff，确保没有误提交 `.env`、真实数据库连接串、Token、私钥、License、激活码或客户数据。
