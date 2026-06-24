@@ -92,7 +92,7 @@ vi.mock('@/api/commercial', () => ({
 }))
 
 describe('CommercialOpsPage', () => {
-  it('renders alert table data as single-line truncated cells with full tooltip content', async () => {
+  it('keeps alert text columns truncated while showing last trigger time in full', async () => {
     render(<CommercialOpsPage />)
 
     await waitFor(() => expect(screen.getByText('告警中心')).toBeInTheDocument())
@@ -106,6 +106,7 @@ describe('CommercialOpsPage', () => {
     expect(instanceCell.closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
     expect(ruleCell.closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
     expect(messageCell.closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
-    expect(lastSeenCell.closest('.sagitta-table-truncated-cell')).toBeInTheDocument()
+    expect(lastSeenCell.closest('.sagitta-table-truncated-cell')).not.toBeInTheDocument()
+    expect(lastSeenCell).toHaveAttribute('style', expect.stringContaining('white-space: nowrap'))
   })
 })

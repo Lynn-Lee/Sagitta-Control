@@ -609,9 +609,8 @@ export default function CommercialOpsPage() {
                   {
                     title: '最近触发',
                     dataIndex: 'last_seen_at',
-                    width: 170,
-                    ellipsis: { showTitle: false },
-                    render: value => <TruncatedCell value={formatDateTime(value, '-')} />,
+                    width: 190,
+                    render: value => nowrapText(formatDateTime(value, '-')),
                   },
                   {
                     title: '操作',
