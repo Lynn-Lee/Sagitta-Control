@@ -41,7 +41,7 @@ jobs:
         run: npm run build:check
 
       - name: 安装 Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --no-shell chromium
 
       - name: 前端冒烟 E2E
         shell: bash
