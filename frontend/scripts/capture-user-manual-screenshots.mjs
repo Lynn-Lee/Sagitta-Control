@@ -7,6 +7,7 @@ const username = process.env.E2E_USERNAME || ''
 const password = process.env.E2E_PASSWORD || ''
 const outputDir = resolve(process.env.E2E_SCREENSHOT_DIR || '../docs/screenshots/user-manual')
 const smokeOnly = process.env.E2E_SMOKE_ONLY === 'true'
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined
 
 const pages = [
   ['01-login.png', '/login', '登录页'],
@@ -70,7 +71,7 @@ async function capture(page, fileName, path, label) {
 
 mkdirSync(outputDir, { recursive: true })
 
-const browser = await chromium.launch()
+const browser = await chromium.launch(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined)
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 })
 
 try {
