@@ -41,7 +41,7 @@ import {
   ToolOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { commercialApi, type AlertEvent, type OnboardingStatus, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
+import { commercialApi, type AlertEvent, type OnboardingStatus, type OnboardingStep, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDateTime } from '@/utils/datetime'
 
@@ -83,6 +83,16 @@ const supportLevelColor: Record<string, string> = {
 }
 
 const nowrapText = (value: unknown) => <span style={{ whiteSpace: 'nowrap' }}>{String(value ?? '-')}</span>
+const onboardingStatusColor: Record<string, string> = {
+  done: 'green',
+  blocked: 'red',
+  todo: 'orange',
+}
+const onboardingStatusLabel: Record<string, string> = {
+  done: '已完成',
+  blocked: '阻塞',
+  todo: '待处理',
+}
 
 export default function CommercialOpsPage() {
   const navigate = useNavigate()
@@ -237,11 +247,98 @@ export default function CommercialOpsPage() {
     )
   }
 
+  const completeOnboardingStep = async (step: OnboardingStep) => {
+    const next = await commercialApi.completeStep(step.key)
+    setOnboarding(next)
+    message.success(`${step.label} 已标记完成`)
+  }
+
+  const handleOnboardingStepAction = async (step: OnboardingStep) => {
+    if (step.quick_action === 'trial_bootstrap') {
+      await bootstrapTrial()
+      return
+    }
+    if (step.quick_action === 'generate_acceptance') {
+      await createAcceptance()
+      return
+    }
+    goPath(step.path)
+  }
+
   const renderReadinessAction = (item: ReadinessCheck) => (
     <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<RightOutlined />} onClick={() => goPath(item.path)}>
       去处理
     </Button>
   )
+
+  const onboardingColumns = [
+    {
+      title: '阶段',
+      width: 120,
+      render: (_: unknown, row: OnboardingStep) => <Tag color={row.required ? 'red' : 'blue'}>{row.category || '实施步骤'}</Tag>,
+    },
+    {
+      title: '检查项',
+      width: 190,
+      render: (_: unknown, row: OnboardingStep) => (
+        <Space direction="vertical" size={2}>
+          <Space size={6}>
+            <CheckCircleOutlined style={{ color: row.completed ? '#00A870' : '#A0AEC0' }} />
+            <Text strong>{row.label}</Text>
+          </Space>
+          <Text type="secondary">{row.required ? '上线必需' : '建议补齐'}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '状态',
+      width: 120,
+      render: (_: unknown, row: OnboardingStep) => (
+        <Space direction="vertical" size={2}>
+          <Tag color={onboardingStatusColor[row.status] || 'default'}>{onboardingStatusLabel[row.status] || row.status}</Tag>
+          <Text type="secondary">{row.detect_source || (row.auto_detected ? '自动检测' : '待配置')}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '检测依据',
+      width: 220,
+      render: (_: unknown, row: OnboardingStep) => <Text>{row.evidence || row.reason}</Text>,
+    },
+    {
+      title: '建议处理',
+      render: (_: unknown, row: OnboardingStep) => (
+        <Space direction="vertical" size={2}>
+          <Text>{row.suggested_action || row.reason}</Text>
+          {row.fix_hint && <Text type="secondary">{row.fix_hint}</Text>}
+        </Space>
+      ),
+    },
+    {
+      title: '操作',
+      width: 220,
+      render: (_: unknown, row: OnboardingStep) => (
+        <Space wrap>
+          <Button
+            className="sagitta-action-btn sagitta-action-btn--manage"
+            icon={row.quick_action === 'trial_bootstrap' ? <RocketOutlined /> : row.quick_action === 'generate_acceptance' ? <FileDoneOutlined /> : <SettingOutlined />}
+            loading={bootstrapping && row.quick_action === 'trial_bootstrap'}
+            onClick={() => handleOnboardingStepAction(row)}
+          >
+            {row.action_label || '去处理'}
+          </Button>
+          <Button
+            className="sagitta-action-btn sagitta-action-btn--success"
+            icon={<CheckCircleOutlined />}
+            disabled={row.completed}
+            onClick={() => completeOnboardingStep(row)}
+          >
+            手动完成
+          </Button>
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <div>
@@ -356,6 +453,34 @@ export default function CommercialOpsPage() {
                         <Progress style={{ flex: 1 }} percent={onboarding ? Math.round((onboarding.completed_count / onboarding.total) * 100) : 0} />
                         <Button type="primary" icon={<RocketOutlined />} loading={bootstrapping} onClick={bootstrapTrial}>初始化试用环境</Button>
                       </Space>
+                      {!!onboarding?.risk_items?.length && (
+                        <Alert
+                          type="error"
+                          showIcon
+                          message="上线阻塞项"
+                          description={(
+                            <Space direction="vertical" size={4}>
+                              {onboarding.risk_items.map(step => (
+                                <Text key={step.key}>{step.label}：{step.suggested_action || step.reason}</Text>
+                              ))}
+                            </Space>
+                          )}
+                        />
+                      )}
+                      {!onboarding?.risk_items?.length && !!onboarding?.next_actions?.length && (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          message="建议补齐项"
+                          description={(
+                            <Space direction="vertical" size={4}>
+                              {onboarding.next_actions.slice(0, 3).map(step => (
+                                <Text key={step.key}>{step.label}：{step.suggested_action || step.reason}</Text>
+                              ))}
+                            </Space>
+                          )}
+                        />
+                      )}
                       {bootstrapResult && (
                         <Alert
                           type="success"
@@ -370,30 +495,14 @@ export default function CommercialOpsPage() {
                           }
                         />
                       )}
-                      <Row gutter={[12, 12]}>
-                        {(onboarding?.steps || []).map(step => (
-                          <Col xs={24} md={8} key={step.key}>
-                            <Card size="small">
-                              <Space direction="vertical" style={{ width: '100%' }}>
-                                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                  <Space>
-                                    <CheckCircleOutlined style={{ color: step.completed ? '#00A870' : '#A0AEC0' }} />
-                                    <Text>{step.label}</Text>
-                                  </Space>
-                                  <Tag color={step.completed ? 'green' : 'orange'}>
-                                    {step.auto_detected ? '自动检测' : step.completed ? '手动确认' : '未完成'}
-                                  </Tag>
-                                </Space>
-                                <Text type="secondary">{step.reason}</Text>
-                                <Space>
-                                  <Button className="sagitta-action-btn sagitta-action-btn--manage" icon={<SettingOutlined />} onClick={() => goPath(step.path)}>去配置</Button>
-                                  <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} disabled={step.completed} onClick={() => commercialApi.completeStep(step.key).then(setOnboarding)}>手动完成</Button>
-                                </Space>
-                              </Space>
-                            </Card>
-                          </Col>
-                        ))}
-                      </Row>
+                      <Table
+                        dataSource={onboarding?.steps || []}
+                        columns={onboardingColumns}
+                        rowKey="key"
+                        pagination={false}
+                        scroll={{ x: 1080 }}
+                        locale={{ emptyText: <TableEmptyState title="暂无实施步骤" /> }}
+                      />
                     </Space>
                   </Card>
                 </Col>

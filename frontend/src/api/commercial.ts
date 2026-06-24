@@ -1,15 +1,29 @@
 import apiClient from './client'
 
+export type OnboardingStep = {
+  key: string
+  label: string
+  path: string
+  completed: boolean
+  auto_detected: boolean
+  status: string
+  category?: string
+  required?: boolean
+  priority?: string
+  reason: string
+  evidence?: string
+  suggested_action?: string
+  fix_hint?: string
+  action_label?: string
+  quick_action?: 'navigate' | 'trial_bootstrap' | 'generate_acceptance' | string
+  can_auto_fix?: boolean
+  detect_source?: string
+}
+
 export type OnboardingStatus = {
-  steps: Array<{
-    key: string
-    label: string
-    path: string
-    completed: boolean
-    auto_detected: boolean
-    status: string
-    reason: string
-  }>
+  steps: OnboardingStep[]
+  next_actions?: OnboardingStep[]
+  risk_items?: OnboardingStep[]
   completed_count: number
   total: number
   is_complete: boolean

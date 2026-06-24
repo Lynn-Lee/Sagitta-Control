@@ -79,6 +79,36 @@ def test_delivery_preflight_requires_backup_restore_and_upgrade_scripts(tmp_path
     )
 
 
+def test_onboarding_step_contract_exposes_go_live_guidance():
+    steps = CommercialOpsService._build_onboarding_steps(
+        completed=set(),
+        system_hints={
+            "branding": False,
+            "license": False,
+            "auth": False,
+            "notification": False,
+            "first_instance": False,
+            "governance": False,
+            "acceptance": False,
+        },
+    )
+
+    by_key = {item["key"]: item for item in steps}
+    assert by_key["first_instance"]["required"] is True
+    assert by_key["first_instance"]["status"] == "blocked"
+    assert by_key["first_instance"]["evidence"] == "未检测到活跃实例"
+    assert by_key["first_instance"]["action_label"] == "接入实例"
+    assert by_key["first_instance"]["quick_action"] == "navigate"
+
+    assert by_key["notification"]["required"] is False
+    assert by_key["notification"]["status"] == "todo"
+    assert "连通性测试" in by_key["notification"]["suggested_action"]
+
+    assert by_key["governance"]["can_auto_fix"] is True
+    assert by_key["governance"]["quick_action"] == "trial_bootstrap"
+    assert by_key["acceptance"]["quick_action"] == "generate_acceptance"
+
+
 def test_bundled_delivery_manifest_matches_current_commercial_version():
     manifest = CommercialOpsService._load_delivery_manifest()
 
