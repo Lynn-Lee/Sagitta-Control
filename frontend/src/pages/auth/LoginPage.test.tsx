@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { APP_VERSION } from '@/config/appVersion'
 import LoginPage from './LoginPage'
 
 vi.mock('@/store/auth', () => ({
@@ -58,7 +59,7 @@ describe('LoginPage', () => {
     expect(screen.queryByText('Sagitta Control · Aim at Data, Govern with Precision')).not.toBeInTheDocument()
     expect(
       screen.getByText(
-        'Sagitta Control v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability',
+        `Sagitta Control v${APP_VERSION} · Database Security Control Platform · Full Engine Compatibility, End-to-End Observability`,
       ),
     ).toBeInTheDocument()
   })

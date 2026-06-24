@@ -1,7 +1,7 @@
 # Sagitta Control 运维文档
 
-> 文档版本：v2.2
-> 适用版本：Sagitta Control v2.2 商业部署版 + v2-lite 授权体系
+> 文档版本：v2.3.0
+> 适用版本：Sagitta Control v2.3.0 商业部署版 + v2-lite 授权体系
 > 目标读者：运维工程师、DBA、DevOps、系统管理员
 
 ## 1. 运维范围

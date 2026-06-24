@@ -10,6 +10,7 @@ import apiClient from '@/api/client'
 import { authApi } from '@/api/auth'
 import { getPostLoginPath } from '@/utils/postLogin'
 import BrandLogo from '@/components/common/BrandLogo'
+import { APP_VERSION } from '@/config/appVersion'
 import { useBranding } from '@/hooks/useBranding'
 
 // ── 平台图标（官方矢量图） ─────────────────────────────────────
@@ -916,7 +917,7 @@ export default function LoginPage() {
           . All rights reserved.
         </div>
         <div>
-          {branding.platform_name} v2.2.2 · Database Security Control Platform · Full Engine Compatibility, End-to-End
+          {branding.platform_name} v{APP_VERSION} · Database Security Control Platform · Full Engine Compatibility, End-to-End
           Observability
         </div>
       </div>
