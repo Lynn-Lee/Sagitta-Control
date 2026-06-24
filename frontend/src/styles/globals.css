@@ -477,11 +477,12 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 
 .sagitta-table-truncated-tooltip {
+  width: max-content !important;
   max-width: min(980px, calc(100vw - 48px)) !important;
 }
 
 .sagitta-table-truncated-tooltip .ant-tooltip-inner {
-  min-width: min(420px, calc(100vw - 48px));
+  width: max-content;
   max-width: min(980px, calc(100vw - 48px));
   white-space: normal;
   word-break: break-word;
