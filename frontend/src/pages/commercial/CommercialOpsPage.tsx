@@ -43,6 +43,7 @@ import {
 } from '@ant-design/icons'
 import { commercialApi, type AlertEvent, type OnboardingStatus, type OnboardingStep, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
+import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDateTime } from '@/utils/datetime'
 
 const { Text, Paragraph } = Typography
@@ -596,19 +597,27 @@ export default function CommercialOpsPage() {
                 dataSource={alerts}
                 rowKey="id"
                 pagination={false}
+                tableLayout="fixed"
+                scroll={{ x: 1180 }}
                 locale={{ emptyText: <TableEmptyState title="暂无告警事件" /> }}
                 columns={[
-                  { title: '状态', dataIndex: 'status', render: value => <Tag>{value}</Tag> },
-                  { title: '级别', dataIndex: 'severity', render: value => <Tag color={value === 'critical' ? 'red' : 'orange'}>{value}</Tag> },
-                  { title: '实例', dataIndex: 'instance_name' },
-                  { title: '规则', dataIndex: 'rule_key' },
-                  { title: '详情', dataIndex: 'message' },
-                  { title: '最近触发', dataIndex: 'last_seen_at', render: value => formatDateTime(value, '-') },
+                  { title: '状态', dataIndex: 'status', width: 96, render: value => <Tag>{value}</Tag> },
+                  { title: '级别', dataIndex: 'severity', width: 96, render: value => <Tag color={value === 'critical' ? 'red' : 'orange'}>{value}</Tag> },
+                  { title: '实例', dataIndex: 'instance_name', width: 170, ellipsis: { showTitle: false }, render: value => <TruncatedCell value={value} /> },
+                  { title: '规则', dataIndex: 'rule_key', width: 170, ellipsis: { showTitle: false }, render: value => <TruncatedCell value={value} /> },
+                  { title: '详情', dataIndex: 'message', width: 360, ellipsis: { showTitle: false }, render: value => <TruncatedCell value={value} /> },
+                  {
+                    title: '最近触发',
+                    dataIndex: 'last_seen_at',
+                    width: 170,
+                    ellipsis: { showTitle: false },
+                    render: value => <TruncatedCell value={formatDateTime(value, '-')} />,
+                  },
                   {
                     title: '操作',
-                    width: 360,
+                    width: 280,
                     render: (_, row) => (
-                      <Space wrap>
+                      <Space>
                         {!['resolved', 'closed'].includes(row.status) && (
                           <Button className="sagitta-action-btn sagitta-action-btn--success" icon={<CheckCircleOutlined />} onClick={() => handleAlertAction(row.id, 'ack')}>确认</Button>
                         )}
