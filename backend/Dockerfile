@@ -53,23 +53,23 @@ RUN pip install --no-cache-dir \
     asyncpg>=0.29.0 \
     psycopg2-binary>=2.9.9 \
     "passlib[bcrypt]>=1.7.4" \
-    cryptography>=42.0.0 \
+    "cryptography>=48.0.1,<49.0.0" \
     "redis[hiredis]>=5.0.1"
 
 RUN pip install --no-cache-dir \
-    "fastapi>=0.110.0" \
+    "fastapi>=0.138.0,<0.139.0" \
     python-multipart>=0.0.9 \
     "sqlalchemy>=2.0.0" \
     "alembic>=1.13.0" \
     "pydantic>=2.6.0" \
     "pydantic-settings>=2.2.0" \
-    "python-jose[cryptography]>=3.3.0" \
+    "pyjwt[crypto]>=2.13.0,<3.0.0" \
     "pyotp>=2.9.0" \
     "celery>=5.3.6" \
     "flower>=2.0.1" \
     "sqlglot>=23.0.0" \
     "httpx>=0.27.0" \
-    "aiomysql>=0.2.0" \
+    "aiomysql>=0.3.0,<0.4.0" \
     "clickhouse-connect>=0.7.0" \
     "oracledb>=2.2.0" \
     "python-tds>=1.16.0" \
@@ -87,6 +87,8 @@ RUN pip install --no-cache-dir \
     "openpyxl>=3.1.0"
 
 COPY . .
+
+RUN python -c "import jwt; from app.main import app; print(app.title)"
 
 RUN adduser --disabled-password --gecos "" --uid 1000 appuser && chown -R appuser:appuser /app
 USER appuser
