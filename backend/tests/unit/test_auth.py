@@ -78,7 +78,8 @@ class TestJWT:
         assert decoded["type"] == "password_change"
 
     def test_invalid_token_raises(self):
-        from jose import JWTError
+        from jwt import PyJWTError as JWTError
+
         with pytest.raises(JWTError):
             decode_token("not.a.valid.token")
 

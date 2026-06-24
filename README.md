@@ -35,7 +35,7 @@ Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆�
 
 | 层级 | 技术栈 |
 |---|---|
-| 后端 | FastAPI 0.110、SQLAlchemy 2.0 async、Alembic、Celery 5、PostgreSQL 16、Redis |
+| 后端 | FastAPI 0.138、SQLAlchemy 2.0 async、Alembic、Celery 5、PostgreSQL 16、Redis |
 | 前端 | React 18、Vite 8、TypeScript、Ant Design 5、TanStack Query v5、Zustand |
 | SQL 解析 | sqlglot，支持多方言 SQL 解析、列提取和治理辅助。 |
 | 异步任务 | Celery 队列：`default`、`execute`、`notify`、`archive`、`monitor`。 |
@@ -147,6 +147,7 @@ ruff format . && ruff check .
 while IFS= read -r target; do
   mypy --follow-imports=silent "$target"
 done < mypy-baseline.txt
+uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
@@ -165,6 +166,7 @@ npm install
 npm run dev
 npm run typecheck
 npm run lint
+npm audit --audit-level=high
 npm run build
 ```
 

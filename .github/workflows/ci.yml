@@ -127,7 +127,7 @@ jobs:
           uv pip install --system --no-deps -e backend
 
       - name: 后端依赖安全审计
-        run: uvx pip-audit --no-deps -r backend/requirements.lock
+        run: uvx pip-audit --disable-pip --no-deps -r backend/requirements.lock
 
       - name: 后端 Lint
         working-directory: backend

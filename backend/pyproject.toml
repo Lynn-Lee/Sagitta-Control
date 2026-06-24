@@ -9,7 +9,7 @@ description = "数据库管理平台 2.0 后端"
 requires-python = ">=3.12"
 dependencies = [
     # Web 框架
-    "fastapi~=0.110.0",
+    "fastapi>=0.138.0,<0.139.0",
     "uvicorn[standard]~=0.27.0",
     "python-multipart~=0.0.9",
     # ORM & 数据库
@@ -22,10 +22,10 @@ dependencies = [
     "pydantic~=2.6",
     "pydantic-settings~=2.2",
     # 安全 & 认证（版本变动可能破坏哈希/加密行为，约束到 minor）
-    "python-jose[cryptography]~=3.3.0",
+    "pyjwt[crypto]>=2.13.0,<3.0.0",
     "bcrypt~=4.0",
     "passlib[bcrypt]~=1.7.4",
-    "cryptography~=42.0",
+    "cryptography>=48.0.1,<49.0.0",
     "pyotp~=2.9",
     "ldap3~=2.9",
     # Redis
@@ -40,7 +40,7 @@ dependencies = [
     # 对象存储
     "aioboto3~=12.3",
     # 数据库引擎驱动
-    "aiomysql~=0.2.0",
+    "aiomysql>=0.3.0,<0.4.0",
     "pymysql~=1.1",
     "pymongo~=4.6",
     "motor~=3.3",
@@ -83,8 +83,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "httpx>=0.27.0",              # TestClient 依赖
     "factory-boy>=3.3.0",
+    "coverage==7.14.3",
     "mypy>=1.8.0",
-    "ruff>=0.3.0",
+    "ruff==0.15.19",
     "pre-commit>=3.6.0",
 ]
 

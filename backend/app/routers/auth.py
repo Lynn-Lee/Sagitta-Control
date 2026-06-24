@@ -2,8 +2,8 @@
 认证路由：本地登录、LDAP、第三方 OAuth2/OIDC（钉钉/飞书/企微/CAS/OIDC）、2FA、Token 管理。
 """
 
-import logging
 import json
+import logging
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -13,7 +13,7 @@ from urllib.parse import urlencode as urllib_urlencode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from jose import JWTError
+from jwt import PyJWTError as JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
