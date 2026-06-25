@@ -107,11 +107,14 @@ jobs:
           uv --version
 
       - name: 校验后端依赖锁
+        shell: bash
         run: |
+          lock_cutoff="$(git log -1 --format=%cI -- backend/requirements.lock)"
           uv pip compile \
             --python-version 3.12 \
             --universal \
             --extra dev \
+            --exclude-newer "${lock_cutoff}" \
             --custom-compile-command 'uv pip compile --python-version 3.12 --universal --extra dev --output-file backend/requirements.lock backend/pyproject.toml' \
             --output-file /tmp/sagitta-control-backend-requirements.lock \
             backend/pyproject.toml
