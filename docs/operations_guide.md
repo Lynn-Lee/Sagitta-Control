@@ -1,7 +1,7 @@
 # Sagitta Control 运维文档
 
-> 文档版本：v2.3.0
-> 适用版本：Sagitta Control v2.3.0 商业部署版 + v2-lite 授权体系
+> 文档版本：v2.3.5
+> 适用版本：Sagitta Control v2.3.5 商业部署版 + v2-lite 授权体系
 > 目标读者：运维工程师、DBA、DevOps、系统管理员
 
 ## 1. 运维范围
@@ -245,7 +245,7 @@ COMPOSE_PROJECT_NAME=<project_name> BACKUP_DIR=/data/sagitta-control/backups bas
 ```bash
 bash deploy/update-prod.sh                  # 默认部署 origin/main
 bash deploy/update-prod.sh --ref origin/main
-bash deploy/update-prod.sh --ref v2.3.0
+bash deploy/update-prod.sh --ref v2.3.5
 bash deploy/update-prod.sh --ref <commit_sha>
 bash deploy/update-prod.sh --full           # 强制全量构建并重建应用服务
 ```
@@ -460,7 +460,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 包含真实客户 ID、域名、公网 IP、License、token、部署指纹、内部验收记录、数据库
 连接信息或客户现场截图。
 
-当前商业部署版本为 `2.3.0`。Sagitta Control 授权项目码当前阶段固定为 `sagitta-control`，源码部署模板和客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagitta-control` 与兼容字段 `product=sagitta-control`。验收时应在授权管理页确认 `授权项目：Sagitta Control（sagitta-control）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
+当前商业部署版本为 `2.3.5`。Sagitta Control 授权项目码当前阶段固定为 `sagitta-control`，源码部署模板和客户包模板默认授权服务地址为 `https://license.loveai.asia`，在线激活和联网刷新请求会自动携带 `project=sagitta-control` 与兼容字段 `product=sagitta-control`。验收时应在授权管理页确认 `授权项目：Sagitta Control（sagitta-control）`，输入正式客户 ID 后复制“正式激活部署指纹”，并在统一授权中心 `License-Server-Center` 保留对应客户的激活、刷新和状态变更记录。HTTP 试用部署下浏览器可能限制 Clipboard API，授权管理页会自动使用降级复制方式；验收时仍建议确认剪贴板内容与页面展示的指纹一致。
 
 离线授权必须使用 challenge-response：客户现场在授权管理页生成 Challenge，商务/运营侧通过 `tools/license_issue.py --challenge-file <challenge.json> --response-out <response.json>` 签发响应文件，再由客户导入响应文件。生产环境默认 `LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false`，不接受未绑定 Challenge 的裸 License JSON。
 

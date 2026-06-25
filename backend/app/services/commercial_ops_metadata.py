@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-COMMERCIAL_VERSION = "2.3.0"
+COMMERCIAL_VERSION = "2.3.5"
 DEMO_RESOURCE_GROUP_NAME = "commercial_trial_rg"
 DEMO_USER_GROUP_NAME = "commercial_trial_team"
 DEMO_APPROVAL_FLOW_NAME = "商业试用标准审批流"

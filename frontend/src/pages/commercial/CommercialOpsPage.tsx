@@ -27,10 +27,8 @@ import {
   CopyOutlined,
   CloudDownloadOutlined,
   DeleteOutlined,
-  ExportOutlined,
   FileDoneOutlined,
   FileSearchOutlined,
-  KeyOutlined,
   PauseCircleOutlined,
   RightOutlined,
   ReloadOutlined,
@@ -39,61 +37,23 @@ import {
   SaveOutlined,
   SettingOutlined,
   ToolOutlined,
-  WarningOutlined,
 } from '@ant-design/icons'
 import { commercialApi, type AlertEvent, type OnboardingStatus, type OnboardingStep, type ReadinessCheck, type SupportAbout } from '@/api/commercial'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDateTime } from '@/utils/datetime'
+import {
+  licenseStatusColor,
+  licenseStatusLabel,
+  nowrapText,
+  onboardingStatusColor,
+  onboardingStatusLabel,
+  readinessColor,
+  reportTypes,
+  supportLevelColor,
+} from './commercialOpsConfig'
 
 const { Text, Paragraph } = Typography
-
-const reportTypes = [
-  { key: 'high_risk_operations', label: '高风险操作', icon: <WarningOutlined />, className: 'sagitta-action-btn--danger' },
-  { key: 'query_export', label: '查询导出', icon: <ExportOutlined />, className: 'sagitta-action-btn--download' },
-  { key: 'permission_changes', label: '权限变更', icon: <KeyOutlined />, className: 'sagitta-action-btn--inspect' },
-  { key: 'license_operations', label: 'License 操作', icon: <SafetyCertificateOutlined />, className: 'sagitta-action-btn--manage' },
-]
-
-const licenseStatusColor: Record<string, string> = {
-  trial: 'gold',
-  licensed: 'green',
-  expired: 'red',
-  invalid: 'red',
-}
-
-const licenseStatusLabel: Record<string, string> = {
-  trial: '试用中',
-  licensed: '正式授权',
-  expired: '已过期',
-  invalid: '无效',
-}
-
-const readinessColor: Record<string, string> = {
-  ready: 'green',
-  needs_configuration: 'orange',
-  blocked: 'red',
-}
-
-const supportLevelColor: Record<string, string> = {
-  ga: 'green',
-  validated_minimal: 'blue',
-  read_only_metadata: 'gold',
-  experimental: 'orange',
-  backlog: 'default',
-}
-
-const nowrapText = (value: unknown) => <span style={{ whiteSpace: 'nowrap' }}>{String(value ?? '-')}</span>
-const onboardingStatusColor: Record<string, string> = {
-  done: 'green',
-  blocked: 'red',
-  todo: 'orange',
-}
-const onboardingStatusLabel: Record<string, string> = {
-  done: '已完成',
-  blocked: '阻塞',
-  todo: '待处理',
-}
 
 export default function CommercialOpsPage() {
   const navigate = useNavigate()

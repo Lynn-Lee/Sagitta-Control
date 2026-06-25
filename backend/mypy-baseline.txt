@@ -5,6 +5,7 @@ app/core/config.py
 app/core/database.py
 app/core/integrity.py
 app/core/logging.py
+app/core/security.py
 app/engines/__init__.py
 app/engines/doris.py
 app/engines/elasticsearch.py
@@ -42,6 +43,8 @@ app/schemas/role.py
 app/schemas/slowlog.py
 app/schemas/user.py
 app/services/__init__.py
+app/services/commercial_delivery_preflight.py
+app/services/commercial_ops_metadata.py
 app/services/commercial_readiness.py
 app/services/dashboard.py
 app/services/dashboard_metrics.py

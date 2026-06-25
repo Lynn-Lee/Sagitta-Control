@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     configure_logging()
     verify_startup_integrity()
-    logger.info("Sagitta Control starting env=%s version=2.3.0", settings.APP_ENV)
+    logger.info("Sagitta Control starting env=%s version=2.3.5", settings.APP_ENV)
     yield
     await engine.dispose()
     logger.info("Sagitta Control shutdown complete")
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Sagitta Control — 矢准数据库安全管控平台",
     description="企业级数据库安全管控、SQL 工单审核、在线查询、观测中心 API",
-    version="2.3.0",
+    version="2.3.5",
     docs_url="/docs" if settings.APP_ENV == "development" else None,
     redoc_url="/redoc" if settings.APP_ENV == "development" else None,
     lifespan=lifespan,
@@ -125,7 +125,7 @@ app.include_router(sd_router, prefix="/internal", tags=["内部接口"])
 
 @app.get("/health", tags=["健康检查"])
 async def health_check():
-    return {"status": "ok", "version": "2.3.0"}
+    return {"status": "ok", "version": "2.3.5"}
 
 
 @app.get("/", tags=["健康检查"])

@@ -3,7 +3,7 @@
 > 企业级多引擎数据库安全管控平台
 > 矢向数据，精准管控
 
-Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.3.0 商业部署版 + v2-lite 授权体系**。
+Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.3.5 商业部署版 + v2-lite 授权体系**。
 
 > 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
 
@@ -142,7 +142,7 @@ uv pip install -r requirements.lock
 uv pip install --no-deps -e .
 uvicorn app.main:app --reload --port 8000
 alembic upgrade head
-pytest tests/unit/ -v --cov=app --cov-fail-under=45
+pytest tests/unit/ -v --cov=app --cov-fail-under=55
 ruff format . && ruff check .
 while IFS= read -r target; do
   mypy --follow-imports=silent "$target"
@@ -150,7 +150,7 @@ done < mypy-baseline.txt
 uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
 
-后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 45%，后续按模块补测后继续向 55% 提升。私有源码仓库的 GitHub Actions 默认运行在本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，workflow 通过 `[self-hosted, Linux, ARM64, sagitta-control]` 标签调度；runner 以 `ubuntu` 用户和 systemd 服务运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。
+后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 55%，后续按模块补测后继续提升关键服务覆盖率。私有源码仓库的 GitHub Actions 默认运行在本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，workflow 通过 `[self-hosted, Linux, ARM64, sagitta-control]` 标签调度；runner 以 `ubuntu` 用户运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
 
@@ -174,7 +174,7 @@ npm run build
 
 ## 商业交付
 
-当前源码版本对应商业部署版本 `2.3.0`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
+当前源码版本对应商业部署版本 `2.3.5`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
 
 商业交付包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与商业发布 workflow 均使用同一组 self-hosted runner 标签，并避免使用 GitHub 托管缓存作为默认构建路径。
 

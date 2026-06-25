@@ -36,7 +36,7 @@ permissions:
 env:
   PRODUCT_CODE: sagitta-control
   PRODUCT_NAME: Sagitta Control
-  COMMERCIAL_BASE_VERSION: "2.3.0"
+  COMMERCIAL_BASE_VERSION: "2.3.5"
   PUBLIC_RELEASE_REPOSITORY: Lynn-Lee/Sagitta-Deploy
   PUBLIC_IMAGE_REPOSITORY: ghcr.io/lynn-lee/sagitta-control
 

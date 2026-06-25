@@ -1,7 +1,7 @@
 # Sagitta Control 产品使用手册
 
 > 文档版本：v1.0
-> 适用产品：Sagitta Control 正式商业版 2.3.0
+> 适用产品：Sagitta Control 正式商业版 2.3.5
 > 目标读者：试用客户、研发工程师、DBA、系统管理员、运维工程师、安全审计员、实施顾问
 > 授权项目码：`sagitta-control`
 

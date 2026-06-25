@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "generated_at": "2026-06-22T23:45:00+08:00",
+  "version": "2.3.5",
+  "generated_at": "2026-06-25T13:15:00+08:00",
   "source": "scripts/validate-commercial-release-materials.sh",
   "materials": [
     {
@@ -24,15 +24,15 @@
       "executable": true
     },
     {
-      "path": "dist-commercial/Sagitta-Control-v2.3.0/upgrade.sh",
+      "path": "dist-commercial/Sagitta-Control-v2.3.5/upgrade.sh",
       "executable": true
     },
     {
-      "path": "dist-commercial/Sagitta-Control-v2.3.0/prepare-go-live-env.sh",
+      "path": "dist-commercial/Sagitta-Control-v2.3.5/prepare-go-live-env.sh",
       "executable": true
     },
     {
-      "path": "dist-commercial/Sagitta-Control-v2.3.0/go-live-check.sh",
+      "path": "dist-commercial/Sagitta-Control-v2.3.5/go-live-check.sh",
       "executable": true
     },
     {
@@ -56,35 +56,35 @@
       "executable": true
     },
     {
-      "path": "dist-commercial/Sagitta-Control-v2.3.0.zip.sha256",
+      "path": "dist-commercial/Sagitta-Control-v2.3.5.zip.sha256",
       "executable": false
     },
     {
-      "path": "dist-commercial/Sagitta-Control-v2.3.0.zip.sig.json",
+      "path": "dist-commercial/Sagitta-Control-v2.3.5.zip.sig.json",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.0.cyclonedx.json",
+      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.5.cyclonedx.json",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.0.cyclonedx.json.sha256",
+      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.5.cyclonedx.json.sha256",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.0.cyclonedx.json.bundle",
+      "path": "dist-commercial/sbom/sagitta-control-backend-2.3.5.cyclonedx.json.bundle",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.0.cyclonedx.json",
+      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.5.cyclonedx.json",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.0.cyclonedx.json.sha256",
+      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.5.cyclonedx.json.sha256",
       "executable": false
     },
     {
-      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.0.cyclonedx.json.bundle",
+      "path": "dist-commercial/sbom/sagitta-control-frontend-2.3.5.cyclonedx.json.bundle",
       "executable": false
     }
   ]
