@@ -48,7 +48,7 @@ jobs:
         run: npm run build:check
 
       - name: 安装 Playwright Chromium
-        run: npx playwright install --with-deps --no-shell chromium
+        run: npx playwright install --with-deps chromium
 
       - name: 前端冒烟 E2E
         shell: bash
@@ -65,12 +65,7 @@ jobs:
             fi
             sleep 1
           done
-          chromium_path="$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -type f | head -1)"
-          if [[ -z "$chromium_path" ]]; then
-            echo "Playwright Chromium executable was not found in $HOME/.cache/ms-playwright"
-            exit 1
-          fi
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$chromium_path" E2E_BASE_URL=http://127.0.0.1:4173 npm run e2e:smoke
+          E2E_BASE_URL=http://127.0.0.1:4173 npm run e2e:smoke
 
   backend:
     name: 后端质量门禁
