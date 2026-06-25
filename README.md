@@ -84,12 +84,14 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 
 | 文档 | 用途 |
 |---|---|
-| [正式商业推广文案](docs/commercial_promotion_copy.md) | 面向官网、销售、试用邀请和商业推广材料的产品价值与宣传口径。 |
-| [商业版产品使用手册](docs/commercial_product_manual.md) | 面向试用客户和培训场景的正式用户操作指南。 |
-| [商业版运维部署维护升级文档](docs/commercial_ops_deployment_guide.md) | 面向客户运维、实施和 DevOps 的部署、授权、巡检、备份、升级和回滚指南。 |
 | [产品设计文档](docs/sagitta_control_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
 | [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
+| [公开商业交付说明](docs/public_commercial_delivery.md) | 商业部署包、公开部署仓库、镜像、Release、License 和验收规则。 |
+| [公开发布说明模板](docs/release_templates/sagitta_control_public_release.md) | 发布 `vX.Y.Z` 时使用的 Release 说明模板。 |
+| [客户部署文档模板](deploy/customer/README.md) | 生成用户部署仓库和商业部署包时使用的客户文档源模板。 |
+
+源码仓库只保留长期维护文档和客户交付模板；历史计划、一次性验证报告、阶段性测试记录不再作为正式文档入口维护。用户部署仓库文档由 `deploy/customer/` 模板生成。
 
 ## 内部源码发布
 
