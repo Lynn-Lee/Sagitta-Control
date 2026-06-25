@@ -192,6 +192,8 @@ jobs:
             manifest_private_key=${{ secrets.MANIFEST_PRIVATE_KEY }}
           build-args: |
             SAGITTA_CONTROL_VERSION=${{ steps.release.outputs.version }}
+            APT_MIRROR=http://deb.debian.org/debian
+            APT_SECURITY_MIRROR=http://security.debian.org/debian-security
           tags: |
             ${{ env.PUBLIC_IMAGE_REPOSITORY }}-backend:${{ steps.release.outputs.version }}
           labels: |
