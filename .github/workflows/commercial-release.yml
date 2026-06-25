@@ -91,6 +91,8 @@ jobs:
 
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
 
       - name: 校验商业构建上下文
         shell: bash
@@ -130,6 +132,7 @@ jobs:
           context: .
           file: backend/Dockerfile.commercial
           push: true
+          provenance: false
           secrets: |
             manifest_private_key=${{ secrets.MANIFEST_PRIVATE_KEY }}
           build-args: |
@@ -148,6 +151,7 @@ jobs:
         with:
           context: ./frontend
           push: true
+          provenance: false
           tags: |
             ${{ env.PUBLIC_IMAGE_REPOSITORY }}-frontend:${{ steps.release.outputs.version }}
           labels: |
