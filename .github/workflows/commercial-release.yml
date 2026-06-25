@@ -47,7 +47,7 @@ concurrency:
 jobs:
   package:
     name: 构建并发布商业部署包
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
 
     steps:

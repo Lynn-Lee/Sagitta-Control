@@ -468,10 +468,9 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 提交与发布策略参考 DataFusionX：`main` 只触发源码 CI 和版本记录；`release/**` 生成 RC 候选商业包和固定版本镜像，但不默认同步公开仓库；正式 `vX.Y.Z` tag 生成最终商业交付包并同步 `Lynn-Lee/Sagitta-Deploy`，同时创建或更新对应 GitHub Release；手动商业发布默认只生成临时包，除非显式勾选发布。商业部署包默认不上传为 Actions artifact，如需临时留存可设置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
 
-私有源码仓库 GitHub Actions 使用本机 Ubuntu VM 上的 repository 级 self-hosted runner，runner 名称为 `sagitta-control-vm`，调度标签为 `[self-hosted, Linux, ARM64, sagitta-control]`，服务目录为 `/opt/actions-runner/sagitta-control`，systemd 服务名为 `actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-vm.service`。VM 使用 `ubuntu` 用户运行 runner，root SSH 登录已禁用；当前配置为 2 vCPU、2GB 内存、8GB swap、30GB 系统盘，并已安装 Node.js 22、Python 3.12、uv、Docker Compose 和 GitHub CLI。workflow 使用 `actions/checkout` 检出源码。如 workflow 长时间排队，应先检查 GitHub runner 状态、VM 服务状态和磁盘/内存资源：
+源码仓库转为 public 后，GitHub Actions 使用 GitHub-hosted 默认 runner，workflow 统一配置 `runs-on: ubuntu-latest`；CI 中显式安装 Node.js 22、Python 3.12 和 uv，不再依赖旧 self-hosted runner。若 workflow 长时间排队，应先检查 GitHub Actions 服务状态、仓库并发限制和 workflow 运行记录：
 
 ```bash
-gh api repos/Lynn-Lee/Sagitta-Control/actions/runners --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
-ssh -i ~/.ssh/sagitta-control-vm-runner ubuntu@10.211.55.18 -p 22 \
-  'sudo systemctl status actions.runner.Lynn-Lee-Sagitta-Control.sagitta-control-vm.service --no-pager'
+gh run list --repo Lynn-Lee/Sagitta-Control --limit 10
+gh run view --repo Lynn-Lee/Sagitta-Control <run-id> --log-failed
 ```
