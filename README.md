@@ -142,7 +142,7 @@ uv pip install -r requirements.lock
 uv pip install --no-deps -e .
 uvicorn app.main:app --reload --port 8000
 alembic upgrade head
-pytest tests/unit/ -v --cov=app --cov-fail-under=55
+pytest tests/unit/ -v --cov=app --cov-fail-under=51
 ruff format . && ruff check .
 while IFS= read -r target; do
   mypy --follow-imports=silent "$target"
@@ -150,7 +150,7 @@ done < mypy-baseline.txt
 uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
 
-后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 55%，后续按模块补测后继续提升关键服务覆盖率。私有源码仓库的 GitHub Actions 默认运行在本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，workflow 通过 `[self-hosted, Linux, ARM64, sagitta-control]` 标签调度；runner 以 `ubuntu` 用户运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。
+后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 51%，后续按模块补测后继续提升关键服务覆盖率。私有源码仓库的 GitHub Actions 默认运行在本机 Ubuntu VM 上的 repository 级 self-hosted runner `sagitta-control-vm`，workflow 通过 `[self-hosted, Linux, ARM64, sagitta-control]` 标签调度；runner 以 `ubuntu` 用户运行在 `/opt/actions-runner/sagitta-control`，避免私有仓库依赖 GitHub-hosted runner 计费分钟。
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
 

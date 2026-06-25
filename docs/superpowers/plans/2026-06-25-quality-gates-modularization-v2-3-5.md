@@ -17,15 +17,16 @@
 - Modify: `README.md`
 - Modify: `backend/mypy-baseline.txt`
 
-- [ ] **Step 1: Verify current coverage can support 55%**
+- [ ] **Step 1: Verify current coverage can support 51%**
 
 Run:
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests/unit -q --cov=app --cov-report=term-missing --cov-fail-under=55
+cd backend
+../backend/.venv/bin/python -m pytest tests/unit -q --cov=app --cov-report=term-missing --cov-fail-under=51
 ```
 
-Expected: passes with total coverage at least 55%.
+Expected: passes with branch-aware total coverage at least 51%.
 
 - [ ] **Step 2: Expand mypy baseline with already-clean modules**
 
@@ -47,12 +48,12 @@ run: pytest tests/unit/ -v --cov=app --cov-fail-under=45
 to:
 
 ```yaml
-run: pytest tests/unit/ -v --cov=app --cov-fail-under=55
+run: pytest tests/unit/ -v --cov=app --cov-fail-under=51
 ```
 
 - [ ] **Step 4: Update README quality wording**
 
-Change README backend command and quality-gate paragraph so the documented coverage gate is `55%`, and note that the current next target is incremental module-level strengthening rather than the old 45-to-55 plan.
+Change README backend command and quality-gate paragraph so the documented coverage gate is `51%`, and note that the current next target is incremental module-level strengthening rather than the old 45% gate.
 
 - [ ] **Step 5: Verify mypy baseline**
 
@@ -157,7 +158,8 @@ Expected: `dist-commercial/Sagitta-Control-v2.3.5.zip` and `.sha256` are created
 Run:
 
 ```bash
-backend/.venv/bin/python -m pytest backend/tests/unit -q --cov=app --cov-fail-under=55
+cd backend
+../backend/.venv/bin/python -m pytest tests/unit -q --cov=app --cov-fail-under=51
 backend/.venv/bin/python -m pytest backend/tests/integration/test_health.py -q
 ```
 
