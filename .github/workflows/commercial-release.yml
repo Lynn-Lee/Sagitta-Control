@@ -98,8 +98,6 @@ jobs:
           buildkitd-config-inline: |
             [dns]
               nameservers = ["223.5.5.5", "114.114.114.114", "8.8.8.8"]
-            [registry."docker.io"]
-              mirrors = ["https://docker.1ms.run", "https://dockerproxy.net", "https://docker.m.daocloud.io"]
 
       - name: 校验商业构建上下文
         shell: bash
