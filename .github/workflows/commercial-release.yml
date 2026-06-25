@@ -95,6 +95,9 @@ jobs:
           driver: docker-container
           driver-opts: |
             network=host
+          config-inline: |
+            [registry."docker.io"]
+              mirrors = ["https://docker.m.daocloud.io", "https://docker.1ms.run", "https://dockerproxy.net"]
 
       - name: 校验商业构建上下文
         shell: bash
