@@ -92,7 +92,9 @@ jobs:
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver: docker
+          driver: docker-container
+          driver-opts: |
+            network=host
 
       - name: 校验商业构建上下文
         shell: bash
@@ -115,12 +117,61 @@ jobs:
             exit 0
           fi
 
-          if docker buildx imagetools inspect "${backend_image}" >/dev/null 2>&1 \
-            && docker buildx imagetools inspect "${frontend_image}" >/dev/null 2>&1; then
+          image_has_required_platform() {
+            local image="$1"
+            local manifest_file
+            manifest_file="$(mktemp)"
+            docker manifest inspect --verbose "${image}" >"${manifest_file}"
+            python3 - "${manifest_file}" <<'PY'
+          from __future__ import annotations
+
+          import json
+          import sys
+
+          payload = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          expected = "linux/amd64"
+          platforms: set[str] = set()
+
+          items = payload if isinstance(payload, list) else [payload]
+          for item in items:
+              for manifest in item.get("manifests", []):
+                  platform = manifest.get("platform") or {}
+                  os_name = platform.get("os")
+                  arch = platform.get("architecture")
+                  variant = platform.get("variant")
+                  if os_name and arch:
+                      value = f"{os_name}/{arch}"
+                      if variant:
+                          value += f"/{variant}"
+                      platforms.add(value)
+
+              descriptor_platform = (item.get("Descriptor") or {}).get("platform") or {}
+              os_name = descriptor_platform.get("os")
+              arch = descriptor_platform.get("architecture")
+              variant = descriptor_platform.get("variant")
+              if os_name and arch:
+                  value = f"{os_name}/{arch}"
+                  if variant:
+                      value += f"/{variant}"
+                  platforms.add(value)
+
+              os_name = item.get("os")
+              arch = item.get("architecture")
+              if os_name and arch:
+                  platforms.add(f"{os_name}/{arch}")
+
+          if expected not in platforms:
+              print(f"missing {expected}; platforms={','.join(sorted(platforms)) or '<none>'}", file=sys.stderr)
+              sys.exit(1)
+          PY
+          }
+
+          if image_has_required_platform "${backend_image}" \
+            && image_has_required_platform "${frontend_image}"; then
             echo "商业镜像已存在，跳过重复构建：${backend_image}, ${frontend_image}"
             echo "images_exist=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "商业镜像不存在或不完整，将执行构建。"
+            echo "商业镜像不存在、不可检查或平台不完整，将执行构建。"
             echo "images_exist=false" >> "${GITHUB_OUTPUT}"
           fi
 
@@ -132,6 +183,7 @@ jobs:
           context: .
           file: backend/Dockerfile.commercial
           push: true
+          platforms: linux/amd64
           provenance: false
           secrets: |
             manifest_private_key=${{ secrets.MANIFEST_PRIVATE_KEY }}
@@ -151,6 +203,7 @@ jobs:
         with:
           context: ./frontend
           push: true
+          platforms: linux/amd64
           provenance: false
           tags: |
             ${{ env.PUBLIC_IMAGE_REPOSITORY }}-frontend:${{ steps.release.outputs.version }}

@@ -18,7 +18,8 @@ validate_manifest_platforms() {
     return
   fi
 
-  docker manifest inspect "${image}" >"${tmpdir}/manifest.json"
+  docker manifest inspect --verbose "${image}" >"${tmpdir}/manifest.json"
+  set +e
   EXPECTED_PLATFORMS="${EXPECTED_PLATFORMS}" python3 - "${image}" "${tmpdir}/manifest.json" <<'PY'
 from __future__ import annotations
 
@@ -27,29 +28,77 @@ import os
 import sys
 
 image = sys.argv[1]
-manifest = json.loads(open(sys.argv[2], encoding="utf-8").read())
+manifest_payload = json.loads(open(sys.argv[2], encoding="utf-8").read())
 expected = {item.strip() for item in os.environ["EXPECTED_PLATFORMS"].split(",") if item.strip()}
 
 platforms: set[str] = set()
-for item in manifest.get("manifests", []):
-    platform = item.get("platform") or {}
-    os_name = platform.get("os")
-    arch = platform.get("architecture")
-    variant = platform.get("variant")
+manifests = manifest_payload if isinstance(manifest_payload, list) else [manifest_payload]
+for manifest in manifests:
+    for item in manifest.get("manifests", []):
+        platform = item.get("platform") or {}
+        os_name = platform.get("os")
+        arch = platform.get("architecture")
+        variant = platform.get("variant")
+        if os_name and arch:
+            value = f"{os_name}/{arch}"
+            if variant:
+                value += f"/{variant}"
+            platforms.add(value)
+
+    descriptor_platform = (manifest.get("Descriptor") or {}).get("platform") or {}
+    os_name = descriptor_platform.get("os")
+    arch = descriptor_platform.get("architecture")
+    variant = descriptor_platform.get("variant")
     if os_name and arch:
         value = f"{os_name}/{arch}"
         if variant:
             value += f"/{variant}"
         platforms.add(value)
 
-if not platforms and manifest.get("architecture") and manifest.get("os"):
-    platforms.add(f"{manifest['os']}/{manifest['architecture']}")
+    if manifest.get("architecture") and manifest.get("os"):
+        platforms.add(f"{manifest['os']}/{manifest['architecture']}")
+
+if not platforms:
+    sys.exit(2)
 
 missing = expected - platforms
 if missing:
     print(
         f"{image} is missing required platform(s): {', '.join(sorted(missing))}. "
         f"Published platform(s): {', '.join(sorted(platforms)) or '<none>'}.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
+  local status="$?"
+  set -e
+
+  if [[ "${status}" == "0" ]]; then
+    return
+  fi
+  if [[ "${status}" != "2" ]]; then
+    return "${status}"
+  fi
+
+  docker pull "${image}" >/dev/null
+  local local_platform
+  local_platform="$(docker image inspect \
+    --format '{{.Os}}/{{.Architecture}}{{if .Variant}}/{{.Variant}}{{end}}' \
+    "${image}")"
+  EXPECTED_PLATFORMS="${EXPECTED_PLATFORMS}" python3 - "${image}" "${local_platform}" <<'PY'
+from __future__ import annotations
+
+import os
+import sys
+
+image = sys.argv[1]
+platform = sys.argv[2].strip()
+expected = {item.strip() for item in os.environ["EXPECTED_PLATFORMS"].split(",") if item.strip()}
+
+if platform not in expected:
+    print(
+        f"{image} is missing required platform(s): {', '.join(sorted(expected - {platform}))}. "
+        f"Published platform(s): {platform or '<none>'}.",
         file=sys.stderr,
     )
     sys.exit(1)
