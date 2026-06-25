@@ -56,6 +56,8 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+ARG APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+ARG APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
 ARG SAGITTA_CONTROL_VERSION=0.0.0
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -69,8 +71,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SAGITTA_CONTROL_VERSION="${SAGITTA_CONTROL_VERSION}"
 
 RUN set -eux; \
+    sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+    sed -i "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
     apt-get update -o Acquire::Retries=5; \
-    apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+    apt-get install -y --fix-missing --no-install-recommends -o Acquire::Retries=5 \
       libpq5 \
       curl \
       procps \
