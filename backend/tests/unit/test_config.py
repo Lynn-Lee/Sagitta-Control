@@ -6,7 +6,11 @@ from app.core.config import Settings
 
 def test_production_rejects_default_secret_key():
     with pytest.raises(ValidationError, match="生产环境禁止使用默认 SECRET_KEY"):
-        Settings(_env_file=None, APP_ENV="production")
+        Settings(
+            _env_file=None,
+            APP_ENV="production",
+            SECRET_KEY="CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS",
+        )
 
 
 def test_production_rejects_short_secret_key():
