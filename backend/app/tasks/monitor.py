@@ -149,7 +149,14 @@ async def _collect_session_snapshots_async(retention_days: int = DEFAULT_SESSION
     )
 
 
-@celery_app.task(name="collect_session_snapshots", queue="monitor")
+@celery_app.task(
+    name="collect_session_snapshots",
+    queue="monitor",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    max_retries=2,
+)
 def collect_session_snapshots(retention_days: int = 30) -> dict:
     return asyncio.run(_collect_session_snapshots_async(retention_days=retention_days))
 
@@ -214,7 +221,14 @@ async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100
     )
 
 
-@celery_app.task(name="collect_slow_queries", queue="monitor")
+@celery_app.task(
+    name="collect_slow_queries",
+    queue="monitor",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    max_retries=2,
+)
 def collect_slow_queries(retention_days: int = 30, limit: int = 100) -> dict:
     return asyncio.run(_collect_slow_queries_async(retention_days=retention_days, limit=limit))
 
@@ -227,6 +241,13 @@ async def _collect_native_monitoring_async(limit: int | None = None) -> dict:
     return await _run_with_task_session(_collect_native_monitoring_with_db, limit=limit)
 
 
-@celery_app.task(name="collect_native_monitoring", queue="monitor")
+@celery_app.task(
+    name="collect_native_monitoring",
+    queue="monitor",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    max_retries=2,
+)
 def collect_native_monitoring(limit: int | None = None) -> dict:
     return asyncio.run(_collect_native_monitoring_async(limit=limit))

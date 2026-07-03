@@ -417,6 +417,8 @@ def collect_session_snapshots(retention_days: int = 30) -> dict:
 2. 跑上面"验证"里的 eager 模式重试用例并通过 CI。
 `execute_sql`、`archive` 队列的任务定义和行为本次不做任何改动（回归测试确认无变化）。
 
+**落地状态（2026-07-04）**：已完成。`send_notification_event` 已改为只对 `ConnectionError`、`TimeoutError` 做声明式 `autoretry_for`，指数退避上限 120 秒，最多重试 3 次；`collect_session_snapshots`、`collect_slow_queries`、`collect_native_monitoring` 已改为只对 `ConnectionError`、`TimeoutError`、`OSError` 做声明式重试，指数退避上限 60 秒，最多重试 2 次。`execute_sql`、`archive` 队列保持无自动重试，避免非幂等任务重复执行。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_notify_task.py -q`（5 passed，保留默认 SECRET_KEY warning）。
+
 ---
 
 ### P1-3｜CORS `allow_methods`/`allow_headers` 显式化

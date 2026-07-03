@@ -10,7 +10,15 @@ from app.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, name="send_notification_event", max_retries=0, queue="notify")
+@celery_app.task(
+    bind=True,
+    name="send_notification_event",
+    queue="notify",
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_backoff_max=120,
+    max_retries=3,
+)
 def send_notification_event_task(self, payload: dict):
     logger.info(
         "send_notification_event start: event=%s subject=%s:%s",

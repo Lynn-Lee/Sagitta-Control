@@ -16,7 +16,12 @@ class _FakeCelery:
         self.conf = _FakeConf()
 
     def task(self, *args, **kwargs):
-        return lambda fn: fn
+        def decorator(fn):
+            fn._celery_task_args = args
+            fn._celery_task_kwargs = kwargs
+            return fn
+
+        return decorator
 
 
 sys.modules.setdefault(
@@ -29,6 +34,7 @@ sys.modules.setdefault(
 )
 
 notify_task_module = importlib.import_module("app.tasks.notify")
+monitor_task_module = importlib.import_module("app.tasks.monitor")
 
 
 class _AsyncSessionContext:
@@ -44,6 +50,38 @@ class _AsyncSessionContext:
 
 def _session_factory(db):
     return lambda: _AsyncSessionContext(db)
+
+
+def _task_kwargs(task):
+    return getattr(task, "_celery_task_kwargs", {})
+
+
+def test_send_notification_event_uses_bounded_autoretry_for_transient_failures():
+    task_kwargs = _task_kwargs(notify_task_module.send_notification_event_task)
+
+    assert task_kwargs["autoretry_for"] == (ConnectionError, TimeoutError)
+    assert task_kwargs["retry_backoff"] is True
+    assert task_kwargs["retry_backoff_max"] == 120
+    assert task_kwargs["max_retries"] == 3
+    assert task_kwargs["queue"] == "notify"
+
+
+@pytest.mark.parametrize(
+    "task",
+    [
+        monitor_task_module.collect_session_snapshots,
+        monitor_task_module.collect_slow_queries,
+        monitor_task_module.collect_native_monitoring,
+    ],
+)
+def test_monitor_collection_tasks_use_bounded_autoretry_for_transient_failures(task):
+    task_kwargs = _task_kwargs(task)
+
+    assert task_kwargs["autoretry_for"] == (ConnectionError, TimeoutError, OSError)
+    assert task_kwargs["retry_backoff"] is True
+    assert task_kwargs["retry_backoff_max"] == 60
+    assert task_kwargs["max_retries"] == 2
+    assert task_kwargs["queue"] == "monitor"
 
 
 @pytest.mark.asyncio
