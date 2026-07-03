@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi import Query as QParam
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
@@ -29,11 +30,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _get_instance(db: AsyncSession, instance_id: int) -> Instance:
-    result = await db.execute(select(Instance).where(Instance.id == instance_id, Instance.is_active))
+async def _get_instance(db: AsyncSession, user: dict, instance_id: int) -> Instance:
+    result = await db.execute(
+        select(Instance)
+        .options(selectinload(Instance.resource_groups))
+        .where(Instance.id == instance_id, Instance.is_active)
+    )
     inst = result.scalar_one_or_none()
     if not inst:
         raise HTTPException(404, f"实例 ID={instance_id} 不存在")
+    if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
+        return inst
+    user_rg_ids = set(user.get("resource_groups", []))
+    instance_rg_ids = {rg.id for rg in inst.resource_groups}
+    if not (user_rg_ids & instance_rg_ids):
+        raise HTTPException(403, "实例不在你的资源组内")
     return inst
 
 
@@ -67,7 +78,7 @@ async def get_processlist(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    inst = await _get_instance(db, instance_id)
+    inst = await _get_instance(db, user, instance_id)
     engine = get_engine(inst)
     processlist = getattr(engine, "processlist", None)
     if not callable(processlist):
@@ -164,7 +175,7 @@ async def upsert_session_collect_config(
     db: AsyncSession = Depends(get_db),
 ):
     cfg = await SessionDiagnosticService.upsert_config(db, data, user)
-    inst = await _get_instance(db, cfg.instance_id)
+    inst = await _get_instance(db, user, cfg.instance_id)
     return SessionCollectConfigItem(
         id=cfg.id,
         instance_id=cfg.instance_id,
@@ -194,7 +205,7 @@ async def update_session_collect_config(
     db: AsyncSession = Depends(get_db),
 ):
     cfg = await SessionDiagnosticService.update_config(db, config_id, data, user)
-    inst = await _get_instance(db, cfg.instance_id)
+    inst = await _get_instance(db, user, cfg.instance_id)
     return SessionCollectConfigItem(
         id=cfg.id,
         instance_id=cfg.instance_id,
@@ -229,7 +240,7 @@ async def list_oracle_ash_history(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    inst = await _get_instance(db, instance_id)
+    inst = await _get_instance(db, user, instance_id)
     if inst.db_type != "oracle":
         raise HTTPException(400, "ASH/AWR 历史仅支持 Oracle 实例")
     engine = get_engine(inst)
@@ -271,7 +282,7 @@ async def kill_session(
     if not instance_id or not session_id:
         raise HTTPException(400, "缺少 instance_id 或 session_id")
 
-    inst = await _get_instance(db, instance_id)
+    inst = await _get_instance(db, user, instance_id)
     engine = get_engine(inst)
 
     if hasattr(engine, 'kill_connection'):
@@ -313,7 +324,7 @@ async def get_variables(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    inst = await _get_instance(db, instance_id)
+    inst = await _get_instance(db, user, instance_id)
     engine = get_engine(inst)
     rs = await engine.get_variables()
     if rs.error:

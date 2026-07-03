@@ -222,6 +222,8 @@ async def _get_instance(db: AsyncSession, user: dict, instance_id: int) -> Insta
 
 **验收标准**：`backend/tests/integration/` 下新增至少 2 个用例覆盖"跨资源组访问被拒绝"和"全局权限用户不受影响"。
 
+**落地状态（2026-07-04）**：已完成。`diagnostic.py` 的 `_get_instance()` 已改为预加载 `Instance.resource_groups` 并执行观测域 L2 资源组校验；超级管理员或持有 `observability_instance_all` 的用户保留全局访问，其余用户只能访问所属资源组实例。全部诊断路由调用点已同步传入 `user`，停用实例仍保持 404 行为。新增集成测试覆盖 `kill_session` 跨资源组拒绝与全局观测权限放行。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/integration/test_diagnostic_resource_scope.py -q`（2 passed，保留默认 SECRET_KEY warning）。
+
 ---
 
 ### P0-4｜SECRET_KEY 只做默认值等值校验，无长度/熵校验
