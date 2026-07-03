@@ -179,7 +179,7 @@ class DataMaskingService:
                         # 三段式脱敏：隐藏指定分组
                         def _mask_group(m: re.Match) -> str:
                             groups = list(m.groups())
-                            if hide_group <= len(groups):
+                            if hide_group <= len(groups) and groups[hide_group - 1] is not None:
                                 groups[hide_group - 1] = "*" * len(groups[hide_group - 1])
                             return "".join(g for g in groups if g)
                         return re.sub(pattern, _mask_group, value)

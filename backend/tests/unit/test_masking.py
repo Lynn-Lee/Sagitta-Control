@@ -224,3 +224,45 @@ class TestDataMaskingService:
         masked = svc.mask_result(rs, "SELECT address, bank_card FROM users", "mysql")
         assert masked.rows[0][0] == "上海市浦东新***"
         assert masked.rows[0][1] == "622202 **** **** 4567"
+
+    def test_custom_regex_replacement_masking(self):
+        rules = [
+            {
+                "column_name": "api_token",
+                "rule_type": "regex",
+                "rule_regex": r"(sk-)[A-Za-z0-9]{6}(.+)",
+                "rule_regex_replace": r"\1***\2",
+            }
+        ]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["api_token"],
+            rows=[("sk-ABC123-prod",)],
+        )
+
+        result = svc.mask_result_with_meta(rs, "SELECT api_token FROM credentials", "mysql")
+
+        assert result.resultset.rows[0][0] == "sk-***-prod"
+        assert result.hit_rule is True
+        assert result.masked is True
+
+    def test_custom_regex_hide_group_ignores_unmatched_optional_group(self):
+        rules = [
+            {
+                "column_name": "api_token",
+                "rule_type": "regex",
+                "rule_regex": r"(prefix-)?(secret)",
+                "hide_group": 1,
+            }
+        ]
+        svc = DataMaskingService(rules=rules)
+        rs = ResultSet(
+            column_list=["api_token"],
+            rows=[("secret",)],
+        )
+
+        result = svc.mask_result_with_meta(rs, "SELECT api_token FROM credentials", "mysql")
+
+        assert result.resultset.rows[0][0] == "secret"
+        assert result.hit_rule is True
+        assert result.masked is False
