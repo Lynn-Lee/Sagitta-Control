@@ -56,130 +56,128 @@ async def _execute_async(workflow_id: int, operator_id: int):
     importlib.import_module("app.models")  # 预加载全部模型，确保 metadata 中包含审批流等外键目标表
 
     engine = create_async_engine(settings.DATABASE_URL)
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with async_session_local() as db:
-        # 加载工单
-        result = await db.execute(
-            select(SqlWorkflow)
-            .options(selectinload(SqlWorkflow.content))
-            .where(SqlWorkflow.id == workflow_id)
-        )
-        wf = result.scalar_one_or_none()
-        if not wf:
-            logger.error("workflow not found: %s", workflow_id)
-            await engine.dispose()
-            return
-        if wf.status not in (WorkflowStatus.QUEUING, WorkflowStatus.TIMING_TASK):
-            logger.warning(
-                "workflow status is not executable: workflow_id=%s status=%s",
-                workflow_id,
-                wf.status,
+        async with async_session_local() as db:
+            # 加载工单
+            result = await db.execute(
+                select(SqlWorkflow)
+                .options(selectinload(SqlWorkflow.content))
+                .where(SqlWorkflow.id == workflow_id)
             )
-            await engine.dispose()
-            return
+            wf = result.scalar_one_or_none()
+            if not wf:
+                logger.error("workflow not found: %s", workflow_id)
+                return
+            if wf.status not in (WorkflowStatus.QUEUING, WorkflowStatus.TIMING_TASK):
+                logger.warning(
+                    "workflow status is not executable: workflow_id=%s status=%s",
+                    workflow_id,
+                    wf.status,
+                )
+                return
 
-        # 加载操作人
-        user_result = await db.execute(select(Users).where(Users.id == operator_id))
-        user = user_result.scalar_one_or_none()
-        operator = {"id": operator_id, "username": user.username if user else "system"}
+            # 加载操作人
+            user_result = await db.execute(select(Users).where(Users.id == operator_id))
+            user = user_result.scalar_one_or_none()
+            operator = {"id": operator_id, "username": user.username if user else "system"}
 
-        # 加载实例
-        inst_result = await db.execute(
-            select(Instance).where(Instance.id == wf.instance_id)
-        )
-        inst = inst_result.scalar_one_or_none()
-        if not inst:
-            wf.status = WorkflowStatus.EXCEPTION
+            # 加载实例
+            inst_result = await db.execute(
+                select(Instance).where(Instance.id == wf.instance_id)
+            )
+            inst = inst_result.scalar_one_or_none()
+            if not inst:
+                wf.status = WorkflowStatus.EXCEPTION
+                await db.commit()
+                return
+
+            # 更新为执行中
+            wf.execute_mode = wf.execute_mode or "immediate"
+            wf.executed_by_id = wf.executed_by_id or operator_id
+            wf.executed_by_name = wf.executed_by_name or (user.username if user else "system")
+            wf.status = WorkflowStatus.EXECUTING
             await db.commit()
-            await engine.dispose()
-            return
+            from app.services.notify import NotifyService
 
-        # 更新为执行中
-        wf.execute_mode = wf.execute_mode or "immediate"
-        wf.executed_by_id = wf.executed_by_id or operator_id
-        wf.executed_by_name = wf.executed_by_name or (user.username if user else "system")
-        wf.status = WorkflowStatus.EXECUTING
-        await db.commit()
-        from app.services.notify import NotifyService
-
-        workflow_title = getattr(wf, "workflow_name", f"工单 #{wf.id}")
-        applicant_id = getattr(wf, "engineer_id", 0) or 0
-        applicant_name = (
-            getattr(wf, "engineer_display", "")
-            or getattr(wf, "engineer", "")
-            or "system"
-        )
-        instance_name = getattr(inst, "instance_name", "")
-        notify_user_ids = [user_id for user_id in {applicant_id, operator_id} if user_id]
-        NotifyService.enqueue_event(
-            {
-                "event_type": "execution_started",
-                "subject_type": "workflow",
-                "subject_id": wf.id,
-                "app_type": "SQL 工单",
-                "title": workflow_title,
-                "applicant_id": applicant_id,
-                "applicant_name": applicant_name,
-                "user_ids": notify_user_ids,
-                "instance_id": wf.instance_id,
-                "instance_name": instance_name,
-                "db_name": wf.db_name,
-                "remark": "SQL 工单开始执行",
-                "detail_path": f"/workflow/{wf.id}",
-            }
-        )
-
-        # 执行 SQL
-        db_engine = get_engine(inst)
-        sql = wf.content.sql_content if wf.content else ""
-
-        try:
-            review_set = await db_engine.execute(db_name=wf.db_name, sql=sql)
-            result_json = json.dumps(
-                {"success": not review_set.error, "error": review_set.error or ""},
-                ensure_ascii=False,
+            workflow_title = getattr(wf, "workflow_name", f"工单 #{wf.id}")
+            applicant_id = getattr(wf, "engineer_id", 0) or 0
+            applicant_name = (
+                getattr(wf, "engineer_display", "")
+                or getattr(wf, "engineer", "")
+                or "system"
             )
-            if wf.content:
-                wf.content.execute_result = result_json
-            wf.status = WorkflowStatus.FINISH if not review_set.error else WorkflowStatus.EXCEPTION
-        except Exception as e:
-            if wf.content:
-                wf.content.execute_result = json.dumps({"error": str(e)})
-            wf.status = WorkflowStatus.EXCEPTION
-
-        wf.finish_time = datetime.now(UTC)
-
-        # 写日志
-        audit_result = await db.execute(
-            select(WorkflowAudit).where(WorkflowAudit.workflow_id == wf.id)
-        )
-        audit = audit_result.scalar_one_or_none()
-        if audit:
-            await AuditService._write_log(
-                db, audit.id, operator, OP_EXECUTE,
-                remark=f"执行完成，状态：{wf.status}"
+            instance_name = getattr(inst, "instance_name", "")
+            notify_user_ids = [user_id for user_id in {applicant_id, operator_id} if user_id]
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "execution_started",
+                    "subject_type": "workflow",
+                    "subject_id": wf.id,
+                    "app_type": "SQL 工单",
+                    "title": workflow_title,
+                    "applicant_id": applicant_id,
+                    "applicant_name": applicant_name,
+                    "user_ids": notify_user_ids,
+                    "instance_id": wf.instance_id,
+                    "instance_name": instance_name,
+                    "db_name": wf.db_name,
+                    "remark": "SQL 工单开始执行",
+                    "detail_path": f"/workflow/{wf.id}",
+                }
             )
-        await db.commit()
-        NotifyService.enqueue_event(
-            {
-                "event_type": "execution_succeeded" if wf.status == WorkflowStatus.FINISH else "execution_failed",
-                "subject_type": "workflow",
-                "subject_id": wf.id,
-                "app_type": "SQL 工单",
-                "title": workflow_title,
-                "applicant_id": applicant_id,
-                "applicant_name": applicant_name,
-                "user_ids": notify_user_ids,
-                "instance_id": wf.instance_id,
-                "instance_name": instance_name,
-                "db_name": wf.db_name,
-                "remark": f"执行完成，状态：{wf.status}",
-                "detail_path": f"/workflow/{wf.id}",
-            }
-        )
 
-    await engine.dispose()
+            # 执行 SQL
+            db_engine = get_engine(inst)
+            sql = wf.content.sql_content if wf.content else ""
+
+            try:
+                review_set = await db_engine.execute(db_name=wf.db_name, sql=sql)
+                result_json = json.dumps(
+                    {"success": not review_set.error, "error": review_set.error or ""},
+                    ensure_ascii=False,
+                )
+                if wf.content:
+                    wf.content.execute_result = result_json
+                wf.status = WorkflowStatus.FINISH if not review_set.error else WorkflowStatus.EXCEPTION
+            except Exception as e:
+                if wf.content:
+                    wf.content.execute_result = json.dumps({"error": str(e)})
+                wf.status = WorkflowStatus.EXCEPTION
+
+            wf.finish_time = datetime.now(UTC)
+
+            # 写日志
+            audit_result = await db.execute(
+                select(WorkflowAudit).where(WorkflowAudit.workflow_id == wf.id)
+            )
+            audit = audit_result.scalar_one_or_none()
+            if audit:
+                await AuditService._write_log(
+                    db, audit.id, operator, OP_EXECUTE,
+                    remark=f"执行完成，状态：{wf.status}"
+                )
+            await db.commit()
+            NotifyService.enqueue_event(
+                {
+                    "event_type": "execution_succeeded" if wf.status == WorkflowStatus.FINISH else "execution_failed",
+                    "subject_type": "workflow",
+                    "subject_id": wf.id,
+                    "app_type": "SQL 工单",
+                    "title": workflow_title,
+                    "applicant_id": applicant_id,
+                    "applicant_name": applicant_name,
+                    "user_ids": notify_user_ids,
+                    "instance_id": wf.instance_id,
+                    "instance_name": instance_name,
+                    "db_name": wf.db_name,
+                    "remark": f"执行完成，状态：{wf.status}",
+                    "detail_path": f"/workflow/{wf.id}",
+                }
+            )
+    finally:
+        await engine.dispose()
 
 
 async def _dispatch_scheduled_async(limit: int = 50) -> int:
@@ -194,31 +192,33 @@ async def _dispatch_scheduled_async(limit: int = 50) -> int:
     importlib.import_module("app.models")
 
     engine = create_async_engine(settings.DATABASE_URL)
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    now = datetime.now(UTC)
-    dispatched = 0
+    try:
+        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        now = datetime.now(UTC)
+        dispatched = 0
 
-    async with async_session_local() as db:
-        stmt = (
-            select(SqlWorkflow)
-            .where(
-                SqlWorkflow.status == WorkflowStatus.TIMING_TASK,
-                SqlWorkflow.scheduled_execute_at.is_not(None),
-                SqlWorkflow.scheduled_execute_at <= now,
+        async with async_session_local() as db:
+            stmt = (
+                select(SqlWorkflow)
+                .where(
+                    SqlWorkflow.status == WorkflowStatus.TIMING_TASK,
+                    SqlWorkflow.scheduled_execute_at.is_not(None),
+                    SqlWorkflow.scheduled_execute_at <= now,
+                )
+                .order_by(SqlWorkflow.scheduled_execute_at.asc(), SqlWorkflow.id.asc())
+                .limit(limit)
+                .with_for_update(skip_locked=True)
             )
-            .order_by(SqlWorkflow.scheduled_execute_at.asc(), SqlWorkflow.id.asc())
-            .limit(limit)
-            .with_for_update(skip_locked=True)
-        )
-        result = await db.execute(stmt)
-        workflows = result.scalars().all()
-        for wf in workflows:
-            operator_id = wf.executed_by_id or wf.engineer_id
-            wf.status = WorkflowStatus.QUEUING
-            wf.execute_mode = "scheduled"
-            execute_workflow_task.delay(wf.id, operator_id)
-            dispatched += 1
-        await db.commit()
+            result = await db.execute(stmt)
+            workflows = result.scalars().all()
+            for wf in workflows:
+                operator_id = wf.executed_by_id or wf.engineer_id
+                wf.status = WorkflowStatus.QUEUING
+                wf.execute_mode = "scheduled"
+                execute_workflow_task.delay(wf.id, operator_id)
+                dispatched += 1
+            await db.commit()
 
-    await engine.dispose()
-    return dispatched
+        return dispatched
+    finally:
+        await engine.dispose()

@@ -348,6 +348,8 @@ async def _execute_async(workflow_id: int, operator_id: int):
 1. `grep -n "engine.dispose()" backend/app/tasks/*.py`，每个使用了 `create_async_engine` 的函数应该**只有一处** `dispose()` 调用，且位于该函数的 `finally` 块里；不应再出现"函数体中间某个 return 分支手动 dispose"的写法。
 2. 补一个单测：mock 数据库查询在早退分支之前抛异常，断言 `engine.dispose()` 依然被调用到（可以用 `unittest.mock` 包一层 `create_async_engine` 断言 `dispose` 调用次数为 1）。
 
+**落地状态（2026-07-04）**：已完成。`execute_sql.py`、`archive.py` 与 `notify.py` 中由 Celery 任务临时创建的 async engine 均已收敛为 `try/finally` 统一释放，早退分支不再手写 `dispose()`；`license.py` 与 `monitor.py` 既有 `_run_with_session` / `_run_with_task_session` 已符合该模式。新增单测覆盖 SQL 工单执行、预约工单调度、归档执行、归档调度和通知发送在查询/服务异常时仍会释放 engine。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_execute_sql_task.py tests/unit/test_archive_task.py tests/unit/test_notify_task.py -q`（13 passed，保留默认 SECRET_KEY warning）；`grep -n "engine.dispose()" backend/app/tasks/*.py` 确认所有命中均位于 `finally` 释放点或已有会话 helper 中。
+
 ---
 
 ### P1-2｜关键 Celery 任务禁用重试，且需要用正确的 Celery 重试机制

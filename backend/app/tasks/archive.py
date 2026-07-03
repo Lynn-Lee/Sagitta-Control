@@ -42,10 +42,12 @@ async def _execute_archive_async(job_id: int, operator_id: int) -> None:
 
     importlib.import_module("app.models")
     engine = create_async_engine(settings.DATABASE_URL)
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session_local() as db:
-        await ArchiveService.execute_job(db, job_id, operator_id)
-    await engine.dispose()
+    try:
+        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session_local() as db:
+            await ArchiveService.execute_job(db, job_id, operator_id)
+    finally:
+        await engine.dispose()
 
 
 async def _dispatch_scheduled_archive_async() -> int:
@@ -57,8 +59,9 @@ async def _dispatch_scheduled_archive_async() -> int:
 
     importlib.import_module("app.models")
     engine = create_async_engine(settings.DATABASE_URL)
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session_local() as db:
-        dispatched = await ArchiveService.dispatch_scheduled_jobs(db)
-    await engine.dispose()
-    return dispatched
+    try:
+        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session_local() as db:
+            return await ArchiveService.dispatch_scheduled_jobs(db)
+    finally:
+        await engine.dispose()

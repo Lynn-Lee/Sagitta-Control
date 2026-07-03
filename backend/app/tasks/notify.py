@@ -34,7 +34,9 @@ async def _send_notification_async(payload: dict) -> None:
 
     importlib.import_module("app.models")
     engine = create_async_engine(settings.DATABASE_URL)
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session_local() as db:
-        await NotifyService.send_event(db, payload)
-    await engine.dispose()
+    try:
+        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session_local() as db:
+            await NotifyService.send_event(db, payload)
+    finally:
+        await engine.dispose()

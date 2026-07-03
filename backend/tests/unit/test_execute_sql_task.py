@@ -86,6 +86,19 @@ class TestExecuteAsync:
         db.execute.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_execute_async_disposes_engine_when_initial_query_raises(self):
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("database unavailable"))
+        engine = SimpleNamespace(dispose=AsyncMock())
+
+        with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
+            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        ), pytest.raises(RuntimeError, match="database unavailable"):
+            await execute_sql_task_module._execute_async(1, 2)
+
+        engine.dispose.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_execute_async_marks_exception_when_instance_missing(self):
         workflow = SimpleNamespace(
             id=3,
@@ -234,4 +247,17 @@ class TestExecuteAsync:
         assert workflow.status == WorkflowStatus.QUEUING
         delay_mock.assert_called_once_with(8, 9)
         db.commit.assert_awaited_once()
+        engine.dispose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_dispatch_scheduled_async_disposes_engine_when_query_raises(self):
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("lock timeout"))
+        engine = SimpleNamespace(dispose=AsyncMock())
+
+        with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
+            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        ), pytest.raises(RuntimeError, match="lock timeout"):
+            await execute_sql_task_module._dispatch_scheduled_async()
+
         engine.dispose.assert_awaited_once()
