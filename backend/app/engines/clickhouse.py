@@ -50,6 +50,9 @@ class ClickHouseEngine:
     def escape_string(self, value: str) -> str:
         return value.replace("'", "\\'")
 
+    def _escape_identifier(self, value: str) -> str:
+        return value.replace("`", "``")
+
     async def get_all_databases(self) -> ResultSet:
         rs = ResultSet()
         try:
@@ -94,7 +97,9 @@ class ClickHouseEngine:
     async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
         rs = ResultSet()
         try:
-            r = self._client(db_name).query(f"DESCRIBE TABLE `{db_name}`.`{tb_name}`")
+            db_safe = self._escape_identifier(db_name)
+            tb_safe = self._escape_identifier(tb_name)
+            r = self._client(db_name).query(f"DESCRIBE TABLE `{db_safe}`.`{tb_safe}`")
             rs.column_list = list(r.column_names)
             rs.rows = list(r.result_rows)
         except Exception as e:

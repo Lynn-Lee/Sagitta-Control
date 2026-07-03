@@ -82,6 +82,21 @@ def _engine(client=None) -> ClickHouseEngine:
 
 
 @pytest.mark.asyncio
+async def test_clickhouse_describe_table_escapes_identifiers_separately_from_string_literals():
+    client = FakeClient()
+    engine = _engine(client)
+
+    assert engine.escape_string("O'Brien") == "O\\'Brien"
+
+    rs = await engine.describe_table("analytics`prod", "events`daily")
+
+    assert rs.error == ""
+    assert client.queries == [
+        ("DESCRIBE TABLE `analytics``prod`.`events``daily`", None),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_clickhouse_exposes_primary_sorting_and_skip_indexes():
     client = FakeClient()
     engine = _engine(client)

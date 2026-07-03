@@ -165,6 +165,8 @@ grep -rn 'f"[A-Z ]*`{' backend/app/engines/*.py
 ```
 确认清单里的每一行都已处理。
 
+**落地状态（2026-07-04）**：已完成。`ClickHouseEngine.describe_table()` 已新增并使用 `_escape_identifier()` 双写反引号，保留 `escape_string()` 只处理字符串字面量单引号转义。新增单测覆盖 `DESCRIBE TABLE` 库名/表名反引号注入向量，并确认两类转义职责没有混用。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_clickhouse_engine.py -q`（4 passed，保留默认 SECRET_KEY warning）。全局排查 `rg -n 'f"[^\"]*`\\{' backend/app/engines -g '*.py'` 后，ClickHouse 未再直接拼接未转义反引号标识符；剩余命中为 MySQL/StarRocks 已走各自标识符转义方法，以及 OpenSearch 的 index quoting helper。
+
 ---
 
 ### P0-3｜观测诊断接口缺少资源组（L2）校验（范围已修正：仅 diagnostic.py，instance.py 不受影响）
