@@ -15,7 +15,12 @@ class _FakeCelery:
         self.conf = _FakeConf()
 
     def task(self, *args, **kwargs):
-        return lambda fn: fn
+        def decorator(fn):
+            fn._celery_task_args = args
+            fn._celery_task_kwargs = kwargs
+            return fn
+
+        return decorator
 
 
 sys.modules.setdefault("celery", SimpleNamespace(Celery=_FakeCelery))

@@ -53,7 +53,16 @@ def _session_factory(db):
 
 
 def _task_kwargs(task):
-    return getattr(task, "_celery_task_kwargs", {})
+    fake_kwargs = getattr(task, "_celery_task_kwargs", None)
+    if fake_kwargs is not None:
+        return fake_kwargs
+    return {
+        "autoretry_for": task.autoretry_for,
+        "retry_backoff": task.retry_backoff,
+        "retry_backoff_max": task.retry_backoff_max,
+        "max_retries": task.max_retries,
+        "queue": task.queue,
+    }
 
 
 def test_send_notification_event_uses_bounded_autoretry_for_transient_failures():
