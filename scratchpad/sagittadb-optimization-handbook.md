@@ -512,7 +512,9 @@ def _validate_cors(self) -> "Settings":
 
 **验收标准**：每提升一次门槛，CI（`.github/workflows/ci.yml`）必须绿；上述现有测试文件针对本节列出的边界场景，缺失的分支补齐后不应再有遗漏。
 
-**落地状态（2026-07-04）**：进行中。本轮完成 `test_masking.py` 自定义正则脱敏边界补强：新增正则替换正例，并覆盖 `hide_group` 指向未匹配可选分组时不应抛 `TypeError` 的反例。`DataMaskingService._apply_rule()` 已改为仅在目标分组实际匹配时替换为星号，未匹配可选分组保持为空，避免脱敏规则因可选分组缺失导致查询结果处理失败。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_masking.py -q`（23 passed，保留默认 SECRET_KEY warning）。`P2-1` 剩余工作：继续核对 `test_query_guard.py` 的查询治理边界、`test_archive_cancel.py` 的归档暂停/继续/取消状态迁移，以及评估覆盖率门槛是否可从 51% 小步上调。
+**落地状态（2026-07-04）**：进行中。已完成 `test_masking.py` 自定义正则脱敏边界补强：新增正则替换正例，并覆盖 `hide_group` 指向未匹配可选分组时不应抛 `TypeError` 的反例。`DataMaskingService._apply_rule()` 已改为仅在目标分组实际匹配时替换为星号，未匹配可选分组保持为空，避免脱敏规则因可选分组缺失导致查询结果处理失败。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_masking.py -q`（23 passed，保留默认 SECRET_KEY warning）。
+
+**增量落地状态（2026-07-04）**：本轮完成 `test_query_guard.py` 查询治理边界补强：新增无 `WHERE` 的 `UPDATE` / `DELETE` 精确拒绝原因，以及 `INSERT ... SELECT` 写入型语句的规则提示断言。`SqlQueryGuard` 保持 fail-closed，只将写操作拒绝原因细化为更可审计的高风险场景说明。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_query_guard.py -q`（326 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（939 passed，Total coverage 52.30%）。由于距离 55% 仍有明显缺口，本轮暂不把 `README.md` 和 `.github/workflows/ci.yml` 的覆盖率门槛从 51% 上调。`P2-1` 剩余工作：继续核对 `test_archive_cancel.py` 的归档暂停/继续/取消状态迁移，完成后再评估覆盖率门槛是否可小步上调。
 
 ---
 

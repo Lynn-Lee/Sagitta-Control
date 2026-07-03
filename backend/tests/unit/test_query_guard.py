@@ -169,10 +169,10 @@ def test_sql_guards_report_semantic_errors_before_policy_errors(sql):
 @pytest.mark.parametrize(
     ("sql", "expected"),
     [
-        ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作"),
+        ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作：缺少 WHERE 条件"),
         ("INSERT INTO users VALUES (1)", "在线查询不允许执行 INSERT 操作"),
         ("REPLACE INTO users VALUES (1)", "在线查询不允许执行 REPLACE 操作"),
-        ("DELETE FROM users", "在线查询不允许执行 DELETE 操作"),
+        ("DELETE FROM users", "在线查询不允许执行 DELETE 操作：缺少 WHERE 条件"),
         ("CREATE TABLE users (id int)", "在线查询不允许执行 CREATE 操作"),
         ("CREATE VIEW user_view AS SELECT id FROM users", "在线查询不允许执行 CREATE 操作"),
         ("CREATE USER bob", "在线查询不允许执行 CREATE 操作"),
@@ -199,6 +199,30 @@ def test_sql_guards_report_policy_errors_after_successful_parse(sql, expected):
 
     assert result.allowed is False
     assert result.reason == expected
+
+
+@pytest.mark.parametrize(
+    ("sql", "expected"),
+    [
+        ("UPDATE users SET name = 'x'", "在线查询不允许执行 UPDATE 操作：缺少 WHERE 条件"),
+        ("DELETE FROM users", "在线查询不允许执行 DELETE 操作：缺少 WHERE 条件"),
+    ],
+)
+def test_sql_guards_report_missing_where_for_update_delete(sql, expected):
+    result = get_query_guard("mysql").validate(sql, "analytics")
+
+    assert result.allowed is False
+    assert result.reason == expected
+
+
+def test_sql_guards_report_insert_select_policy_hint():
+    result = get_query_guard("mysql").validate(
+        "INSERT INTO archive_users SELECT * FROM users",
+        "analytics",
+    )
+
+    assert result.allowed is False
+    assert result.reason == "在线查询不允许执行 INSERT ... SELECT 写入操作"
 
 
 def test_cassandra_guard_reports_select_typo():

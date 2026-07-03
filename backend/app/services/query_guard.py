@@ -275,6 +275,18 @@ def _semantic_validation_reason(prefix: str, tree: exp.Expression) -> str:
     return ""
 
 
+def _write_policy_reason(prefix: str, tree: exp.Expression) -> str:
+    if prefix == "update" and isinstance(tree, exp.Update) and not tree.args.get("where"):
+        return "在线查询不允许执行 UPDATE 操作：缺少 WHERE 条件"
+    if prefix == "delete" and isinstance(tree, exp.Delete) and not tree.args.get("where"):
+        return "在线查询不允许执行 DELETE 操作：缺少 WHERE 条件"
+    if prefix == "insert" and isinstance(tree, exp.Insert) and isinstance(
+        tree.args.get("expression"), exp.Select
+    ):
+        return "在线查询不允许执行 INSERT ... SELECT 写入操作"
+    return f"在线查询不允许执行 {prefix.upper()} 操作"
+
+
 def _syntax_validation_reason(prefix: str, sql: str, tree: exp.Expression) -> str:
     if prefix in {"select", "with"} and isinstance(tree, exp.Select) and not tree.expressions:
         return "SQL 语法错误：SELECT 语句缺少查询字段"
@@ -529,7 +541,7 @@ class SqlQueryGuard:
         if prefix in WRITE_PREFIXES:
             return QueryGuardResult(
                 False,
-                f"在线查询不允许执行 {prefix.upper()} 操作",
+                _write_policy_reason(prefix, tree),
                 prefix,
                 normalized_sql=normalized,
             )
