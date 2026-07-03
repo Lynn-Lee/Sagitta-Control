@@ -22,6 +22,7 @@
 - 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，要求至少每 7 天成功联网刷新一次；长期离线场景应使用 challenge-response 离线授权。
 - 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；商业构建标识会强制执行校验，即使客户误改 `APP_INTEGRITY_REQUIRED=false` 也不能关闭；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
 - 客户包默认对应用容器启用只读根文件系统、`no-new-privileges`、最小能力集和临时目录挂载；前端 Nginx 仅保留绑定 80 端口及启动运行所需的 `NET_BIND_SERVICE`、`CHOWN`、`SETGID`、`SETUID`。如需额外写入路径，应优先挂载明确的数据卷，而不是关闭整体安全上下文。
+- 前端 Nginx 必须保留 `Content-Security-Policy` 响应头：脚本只允许同源加载，禁止第三方 frame 嵌入，保留同源 API、WebSocket、字体和 data 图片等运行所需来源；如需接入外部可信资源，应先评估 Token 外带和 XSS 风险后再显式放行。
 - 仅暴露 HTTPS 前端入口；禁止公网直接暴露 PostgreSQL、Redis 和后端调试入口。Flower、Prometheus、Grafana 如由客户另行部署，也必须仅限内网或受控运维网络访问。
 - 前端发布后如发现日期选择器仍显示 `Today`、`Select date`、`Start date`、英文月份或英文星期，应优先按旧静态资源缓存排查：确认前端已重新执行生产构建，Nginx/CDN 没有继续服务旧 `/assets/*.js`，浏览器侧已强制刷新或清理缓存。
 - 前端日期时间类数据应统一显示为 `YYYY-MM-DD HH:mm:ss`，例如 `2026-06-02 22:32:33`。如果表格、详情、通知或运维面板仍出现斜杠日期、上下午或仅月日时间，优先确认前端静态资源已刷新，再检查对应页面是否绕过了公共 `formatDateTime` 工具。
@@ -435,6 +436,7 @@ Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。�
 - 用户角色和用户组资源范围符合最小权限原则。
 - 查询权限有效期合理，无长期不必要授权。
 - 审批流责任人仍然有效。
+- 前端入口响应保留 `Content-Security-Policy`，可通过 `curl -I https://<domain>` 确认。
 - 备份文件可恢复，且权限受控。
 - 第三方认证和通知密钥未过期。
 - 系统日志无持续重复错误。

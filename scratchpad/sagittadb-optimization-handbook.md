@@ -487,6 +487,8 @@ def _validate_cors(self) -> "Settings":
 
 **验收标准（Step A 范围内）**：CSP 头在生产响应中生效（`curl -I` 可见）；`dangerouslySetInnerHTML` 全部有 `DOMPurify.sanitize()` 包裹或已确认无用户可控输入。
 
+**落地状态（2026-07-04）**：Step A 已完成。`deploy/nginx.conf` 已增加生产 CSP 响应头，脚本只允许同源加载，保留同源 API、WebSocket、字体和 data 图片等现有前端运行所需来源，并禁止第三方 frame 嵌入与 object 加载；由于 Nginx `add_header` 在 location 中存在继承限制，`/assets/`、`/index.html` 和 SPA `/` 路由均已显式重声明 CSP。`rg -n "dangerouslySetInnerHTML|DOMPurify|dompurify" frontend/src frontend/package.json frontend/package-lock.json` 结果显示 `frontend/src` 当前没有 `dangerouslySetInnerHTML` 渲染点，`dompurify` 依赖仍保留备用。新增 `backend/tests/unit/test_nginx_security_headers.py` 覆盖 CSP 指令和 location 重声明要求。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_nginx_security_headers.py -q`（2 passed，保留默认 SECRET_KEY warning）、`cd frontend && npm run build`。Step B（HttpOnly Cookie + CSRF）仍需单独立项。
+
 ---
 
 ## 阶段 P2：测试与类型债务
