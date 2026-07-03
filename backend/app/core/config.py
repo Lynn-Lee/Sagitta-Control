@@ -7,10 +7,16 @@
 AI_* 环境变量仅作为首次初始化 SystemConfig 时的部署默认值，运行时修改仍以数据库配置为准。
 """
 
+import re
 from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_WEAK_SECRET_PATTERNS = re.compile(
+    r"^(.)\1*$|^(0123456789|abcdefgh|password|changeme).*",
+    re.IGNORECASE,
+)
 
 
 class Settings(BaseSettings):
@@ -106,6 +112,11 @@ class Settings(BaseSettings):
                 "SECRET_KEY 使用默认值，请在生产环境中替换！",
                 stacklevel=2,
             )
+        elif self.APP_ENV == "production":
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("生产环境 SECRET_KEY 长度不足 32 字符。")
+            if _WEAK_SECRET_PATTERNS.match(self.SECRET_KEY):
+                raise ValueError("生产环境 SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式），请更换为随机字符串。")
         return self
 
     @property

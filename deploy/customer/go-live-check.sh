@@ -116,6 +116,14 @@ check_exact_env() {
   fi
 }
 
+secret_key_is_weak() {
+  local value="$1"
+  local first="${value:0:1}"
+  [[ -n "$value" && -z "${value//"$first"/}" ]] && return 0
+  [[ "$value" =~ ^(0123456789|[Aa][Bb][Cc][Dd][Ee][Ff][Gg][Hh]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]) ]] && return 0
+  return 1
+}
+
 http_code() {
   local url="$1"
   curl -k -sS --max-time "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true
@@ -253,10 +261,14 @@ check_exact_env APP_INTEGRITY_REQUIRED true
 check_exact_env LICENSE_ALLOW_LEGACY_LICENSE_IMPORT false
 
 secret_key="$(env_value SECRET_KEY || true)"
-if [[ ${#secret_key} -ge 32 && "$secret_key" != "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS" ]]; then
-  pass "SECRET_KEY 长度满足生产要求"
+if [[ "$secret_key" == "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS" ]]; then
+  fail "SECRET_KEY 仍为默认值"
+elif [[ ${#secret_key} -lt 32 ]]; then
+  fail "SECRET_KEY 长度不足 32 字符"
+elif secret_key_is_weak "$secret_key"; then
+  fail "SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式）"
 else
-  fail "SECRET_KEY 长度不足或仍为默认值"
+  pass "SECRET_KEY 长度和弱模式检查通过"
 fi
 
 grace_days="$(env_value LICENSE_ONLINE_GRACE_DAYS || true)"

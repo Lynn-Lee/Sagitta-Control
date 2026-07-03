@@ -83,6 +83,31 @@ check_env_secret() {
   fi
 }
 
+secret_key_is_weak() {
+  local value="$1"
+  local first="${value:0:1}"
+  [[ -n "$value" && -z "${value//"$first"/}" ]] && return 0
+  [[ "$value" =~ ^(0123456789|[Aa][Bb][Cc][Dd][Ee][Ff][Gg][Hh]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]) ]] && return 0
+  return 1
+}
+
+check_secret_key() {
+  local default_value="$1"
+  local value
+  value="$(env_value SECRET_KEY || true)"
+  if [[ -z "$value" ]]; then
+    warn "SECRET_KEY 未在 $ENV_FILE 中显式配置"
+  elif [[ "$value" == "$default_value" ]]; then
+    fail "SECRET_KEY 仍使用默认值"
+  elif [[ ${#value} -lt 32 ]]; then
+    fail "SECRET_KEY 长度不足 32 字符"
+  elif secret_key_is_weak "$value"; then
+    fail "SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式）"
+  else
+    pass "SECRET_KEY 长度和弱模式检查通过"
+  fi
+}
+
 check_port_not_public() {
   local port="$1"
   local name="$2"
@@ -142,7 +167,7 @@ else
   fail "Celery worker ping 失败"
 fi
 
-check_env_secret SECRET_KEY CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS
+check_secret_key CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS
 check_env_secret POSTGRES_PASSWORD sagitta123
 check_env_secret REDIS_PASSWORD redis123
 

@@ -273,6 +273,8 @@ def _validate_secret_key(self) -> "Settings":
 
 > **落地注意**：上面的示例片段用 `logger.warning(...)` 表达告警意图；实际修改 `backend/app/core/config.py` 时，应先看当前文件已有的告警方式。如果文件仍使用 `warnings.warn(...)`，优先沿用现有写法，避免为了示例额外引入无关 logger 变更。
 
+**落地状态（2026-07-04）**：已完成。`Settings.validate_production_secrets()` 已在生产环境拒绝默认 `SECRET_KEY`、长度不足 32 字符的密钥，以及重复字符、`0123456789`、`abcdefgh`、`password`、`changeme` 等常见弱模式；开发环境默认值仍沿用既有 `warnings.warn(...)` 告警。`deploy/preflight-check.sh` 与 `deploy/customer/go-live-check.sh` 已同步同类检查，`.env.example` 与运维手册已补充生产启动硬校验说明。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_config.py -q`、`bash -n deploy/preflight-check.sh deploy/customer/go-live-check.sh`、`git diff --check`。
+
 ---
 
 ## 阶段 P1：工程健壮性
