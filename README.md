@@ -110,6 +110,7 @@ COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --re
 
 - 将 `.env` 中 `APP_ENV` 设置为 `production`。
 - 替换 `SECRET_KEY`，长度不少于 32 位；生产环境严禁使用默认值。
+- 将 `CORS_ORIGINS` 配置为可信前端域名列表；生产环境禁止使用通配符 `*`。
 - 替换 PostgreSQL、Redis、Grafana 等所有默认密码。
 - 确认 `DATABASE_URL` 与 `DATABASE_URL_SYNC` 使用同一数据库和账号策略。
 - 仅通过 HTTPS 暴露前端入口，禁止直接向公网暴露 PostgreSQL、Redis、Flower 和后端调试接口。

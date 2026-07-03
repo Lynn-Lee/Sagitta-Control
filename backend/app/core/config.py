@@ -119,6 +119,12 @@ class Settings(BaseSettings):
                 raise ValueError("生产环境 SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式），请更换为随机字符串。")
         return self
 
+    @model_validator(mode="after")
+    def validate_cors_origins(self) -> "Settings":
+        if self.APP_ENV == "production" and "*" in self.CORS_ORIGINS:
+            raise ValueError("生产环境禁止 CORS_ORIGINS 使用通配符 '*'。")
+        return self
+
     @property
     def celery_broker_url(self) -> str:
         return self.REDIS_URL

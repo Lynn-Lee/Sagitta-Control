@@ -459,6 +459,8 @@ def _validate_cors(self) -> "Settings":
 
 **验收标准**：前端实际跨域请求（如有）功能不受影响（需要在真实浏览器里跑一次登录+查询流程回归）。
 
+**落地状态（2026-07-04）**：已完成。`CORSMiddleware` 已将 `allow_methods` 显式收敛为 `GET/POST/PUT/PATCH/DELETE/OPTIONS`，`allow_headers` 显式收敛为 `Authorization/Content-Type/X-Requested-With`；`Settings` 在生产环境会拒绝 `CORS_ORIGINS=["*"]`。新增单测覆盖生产 CORS 通配符拒绝和 FastAPI CORS 中间件配置，`README.md` 与 `docs/operations_guide.md` 已同步生产配置提示。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_config.py tests/unit/test_cors_middleware.py -q`（9 passed，保留默认 SECRET_KEY warning）。
+
 ---
 
 ### P1-4｜前端 Token 存储于 localStorage（安全加固，评估后实施）

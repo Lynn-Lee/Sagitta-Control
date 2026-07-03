@@ -40,3 +40,13 @@ def test_production_accepts_random_length_secret_key():
     )
 
     assert settings.SECRET_KEY == "r4ndom-secret-key-with-48-safe-chars-2026"
+
+
+def test_production_rejects_wildcard_cors_origins():
+    with pytest.raises(ValidationError, match="生产环境禁止 CORS_ORIGINS 使用通配符"):
+        Settings(
+            _env_file=None,
+            APP_ENV="production",
+            SECRET_KEY="r4ndom-secret-key-with-48-safe-chars-2026",
+            CORS_ORIGINS=["*"],
+        )

@@ -17,6 +17,7 @@
 - 准备 PostgreSQL、Redis、后端、前端、Worker、Beat 和反向代理运行环境。
 - 将 `.env.example` 复制为 `.env`，替换所有默认密码和 `CHANGE_ME` 值。
 - 设置 `APP_ENV=production`，并使用 32 位以上随机 `SECRET_KEY`；后端启动阶段会硬校验默认值、长度不足 32 字符和重复字符/常见弱口令模式，不满足会拒绝启动。
+- 生产环境 `CORS_ORIGINS` 必须配置为明确的可信前端域名列表，禁止使用通配符 `*`。
 - 配置 `LICENSE_CUSTOMER_ID` 和稳定的 `LICENSE_DEPLOYMENT_ID`；官方授权中心的 `LICENSE_PUBLIC_KEY` 和 `LICENSE_SERVER_URL` 已在源码部署模板和客户包模板中预置，私有授权中心或密钥轮换时需替换。
 - 在线授权默认 `LICENSE_ONLINE_GRACE_DAYS=7`，要求至少每 7 天成功联网刷新一次；长期离线场景应使用 challenge-response 离线授权。
 - 商业镜像默认启用 `APP_INTEGRITY_REQUIRED=true`，启动时会校验 `COMMERCIAL-MANIFEST.json` 的 Ed25519 签名和文件摘要；商业构建标识会强制执行校验，即使客户误改 `APP_INTEGRITY_REQUIRED=false` 也不能关闭；如使用独立 Manifest 密钥，需配置 `MANIFEST_PUBLIC_KEY`。
