@@ -184,17 +184,81 @@ class TestMysqlEscapeString:
     def setup_method(self):
         self.engine = MysqlEngine(instance=MockInstance())
 
-    def test_escape_backtick(self):
+    def test_escape_backtick_identifier_by_doubling(self):
         result = self.engine.escape_string("table`name")
-        assert "`" not in result or result.count("`") == result.count("\\`")
+        assert result == "table``name"
 
-    def test_escape_single_quote(self):
+    def test_single_quote_is_not_identifier_escape_responsibility(self):
         result = self.engine.escape_string("O'Brien")
-        assert "\\'" in result
+        assert result == "O'Brien"
 
     def test_normal_string_unchanged(self):
         result = self.engine.escape_string("normal_table_name")
         assert result == "normal_table_name"
+
+    @pytest.mark.asyncio
+    async def test_get_all_tables_uses_doubled_backtick_identifier(self, monkeypatch):
+        captured: dict = {}
+
+        async def fake_query(db_name, sql, limit_num=0, parameters=None, **kwargs):
+            captured["db_name"] = db_name
+            captured["sql"] = sql
+            captured["limit_num"] = limit_num
+            captured["parameters"] = parameters
+            return ResultSet(column_list=["Tables_in_a`b"], rows=[])
+
+        monkeypatch.setattr(self.engine, "query", fake_query)
+
+        rs = await self.engine.get_all_tables("a`b")
+
+        assert rs.is_success
+        assert captured == {
+            "db_name": "a`b",
+            "sql": "SHOW TABLES FROM `a``b`",
+            "limit_num": 0,
+            "parameters": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_processlist_command_filter_uses_parameters(self, monkeypatch):
+        captured: dict = {}
+
+        async def fake_query(db_name, sql, limit_num=0, parameters=None, **kwargs):
+            captured["db_name"] = db_name
+            captured["sql"] = sql
+            captured["limit_num"] = limit_num
+            captured["parameters"] = parameters
+            return ResultSet(column_list=["session_id"], rows=[])
+
+        monkeypatch.setattr(self.engine, "query", fake_query)
+
+        rs = await self.engine.processlist(command_type="Query' OR '1'='1")
+
+        assert rs.is_success
+        assert "Query' OR '1'='1" not in captured["sql"]
+        assert "p.COMMAND = %(command_type)s" in captured["sql"]
+        assert captured["parameters"] == {"command_type": "Query' OR '1'='1"}
+
+    @pytest.mark.asyncio
+    async def test_tidb_processlist_command_filter_uses_parameters(self, monkeypatch):
+        engine = TidbEngine(instance=MockInstance())
+        captured: dict = {}
+
+        async def fake_query(db_name, sql, limit_num=0, parameters=None, **kwargs):
+            captured["db_name"] = db_name
+            captured["sql"] = sql
+            captured["limit_num"] = limit_num
+            captured["parameters"] = parameters
+            return ResultSet(column_list=["session_id"], rows=[])
+
+        monkeypatch.setattr(engine, "query", fake_query)
+
+        rs = await engine.processlist(command_type="Query' OR '1'='1")
+
+        assert rs.is_success
+        assert "Query' OR '1'='1" not in captured["sql"]
+        assert "COMMAND = %(command_type)s" in captured["sql"]
+        assert captured["parameters"] == {"command_type": "Query' OR '1'='1"}
 
 
 class TestMysqlMonitorMetrics:

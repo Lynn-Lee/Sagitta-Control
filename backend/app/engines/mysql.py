@@ -95,8 +95,8 @@ class MysqlEngine:
         return rs
 
     def escape_string(self, value: str) -> str:
-        """简单转义，仅用于标识符（库名、表名）。变量值请用参数化查询。"""
-        return value.replace("\\", "\\\\").replace("`", "\\`").replace("'", "\\'")
+        """仅用于反引号标识符转义；变量值必须通过 parameters 传递。"""
+        return value.replace("`", "``")
 
     # ── 元数据 ────────────────────────────────────────────────
 
@@ -607,12 +607,12 @@ class MysqlEngine:
         errors: list[str] = []
         last_rs = ResultSet()
         for label, include_performance_schema, include_innodb_trx in attempts:
-            sql = self._processlist_sql(
+            sql, params = self._processlist_sql(
                 command_type=command_type,
                 include_performance_schema=include_performance_schema,
                 include_innodb_trx=include_innodb_trx,
             )
-            rs = await self.query(db_name="", sql=sql, limit_num=0)
+            rs = await self.query(db_name="", sql=sql, parameters=params, limit_num=0)
             if rs.is_success:
                 if errors:
                     rs.warning = "会话增强指标部分不可用，已降级采集：" + "；".join(errors)
@@ -627,7 +627,7 @@ class MysqlEngine:
         command_type: str = "Query",
         include_performance_schema: bool = True,
         include_innodb_trx: bool = True,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any]]:
         active_duration_expr = (
             """
             CASE
@@ -669,9 +669,11 @@ class MysqlEngine:
         if include_innodb_trx:
             joins += "LEFT JOIN information_schema.INNODB_TRX trx ON trx.TRX_MYSQL_THREAD_ID = p.ID "
         command_filter = ""
+        params: dict[str, Any] = {}
         if command_type and command_type != "ALL":
-            command_filter = f" AND p.COMMAND = '{self.escape_string(command_type)}'"
-        return f"""
+            command_filter = " AND p.COMMAND = %(command_type)s"
+            params["command_type"] = command_type
+        sql = f"""
             SELECT
               p.ID AS session_id,
               p.USER AS username,
@@ -693,6 +695,7 @@ class MysqlEngine:
             WHERE 1 = 1
             {command_filter}
         """
+        return sql, params
 
     async def kill_connection(self, thread_id: int) -> ResultSet:
         return await self.query(db_name="", sql=f"KILL {int(thread_id)}", limit_num=0)

@@ -117,6 +117,8 @@ grep -n "escape_string" backend/app/engines/mysql.py backend/app/engines/starroc
 
 **验收标准**：`grep -rn "escape_string" backend/app/engines/*.py` 之后，标识符场景只做双写反引号，字符串字面量场景全部走参数化，无遗留混用。
 
+**落地状态（2026-07-04）**：已完成。`MysqlEngine.escape_string()` 已改为仅双写反引号，`MysqlEngine.processlist()` 与 `TidbEngine.processlist()` 的 `command_type` 过滤已改为 `%(command_type)s` 参数化传参。新增/更新单测覆盖反引号标识符、单引号非标识符转义责任、`` get_all_tables("a`b") `` SQL 生成，以及 MySQL/TiDB processlist 注入向量不进入 SQL 字符串。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_mysql_engine.py -q`（26 passed，保留默认 SECRET_KEY warning）。
+
 ---
 
 ### P0-2｜ClickHouse `describe_table` 完全没有转义（比 P0-1 更直接）

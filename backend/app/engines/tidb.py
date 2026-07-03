@@ -106,32 +106,32 @@ class TidbEngine(MysqlEngine):
     async def processlist(
         self, command_type: str = "Query", **kwargs: Any
     ) -> ResultSet:
-        cluster_sql = self._processlist_sql(
+        cluster_sql, cluster_params = self._processlist_sql(
             table_name="information_schema.CLUSTER_PROCESSLIST",
             include_instance=True,
             command_type=command_type,
         )
-        rs = await self.query(db_name="", sql=cluster_sql, limit_num=0)
+        rs = await self.query(db_name="", sql=cluster_sql, parameters=cluster_params, limit_num=0)
         if rs.is_success:
             return rs
 
-        fallback_sql = self._processlist_sql(
+        fallback_sql, fallback_params = self._processlist_sql(
             table_name="information_schema.PROCESSLIST",
             include_instance=False,
             command_type=command_type,
         )
-        fallback = await self.query(db_name="", sql=fallback_sql, limit_num=0)
+        fallback = await self.query(db_name="", sql=fallback_sql, parameters=fallback_params, limit_num=0)
         if fallback.is_success:
             fallback.warning = f"CLUSTER_PROCESSLIST 不可用，已降级为本节点 PROCESSLIST：{rs.error}"
             return fallback
 
-        minimal_sql = self._processlist_sql(
+        minimal_sql, minimal_params = self._processlist_sql(
             table_name="information_schema.PROCESSLIST",
             include_instance=False,
             include_tidb_columns=False,
             command_type=command_type,
         )
-        minimal = await self.query(db_name="", sql=minimal_sql, limit_num=0)
+        minimal = await self.query(db_name="", sql=minimal_sql, parameters=minimal_params, limit_num=0)
         if minimal.is_success:
             minimal.warning = (
                 "CLUSTER_PROCESSLIST 和 TiDB 扩展字段不可用，已降级为基础 PROCESSLIST："
@@ -147,7 +147,7 @@ class TidbEngine(MysqlEngine):
         include_instance: bool,
         include_tidb_columns: bool = True,
         command_type: str = "Query",
-    ) -> str:
+    ) -> tuple[str, dict[str, Any]]:
         instance_expr = "INSTANCE AS instance," if include_instance else "NULL AS instance,"
         tidb_columns = (
             """
@@ -169,9 +169,11 @@ class TidbEngine(MysqlEngine):
             """
         )
         command_filter = ""
+        params: dict[str, Any] = {}
         if command_type and command_type != "ALL":
-            command_filter = f" AND COMMAND = '{self.escape_string(command_type)}'"
-        return f"""
+            command_filter = " AND COMMAND = %(command_type)s"
+            params["command_type"] = command_type
+        sql = f"""
             SELECT
               {instance_expr}
               ID AS session_id,
@@ -198,6 +200,7 @@ class TidbEngine(MysqlEngine):
             WHERE 1 = 1
             {command_filter}
         """
+        return sql, params
 
     async def collect_metrics(self) -> dict[str, Any]:
         """采集 TiDB 核心指标，并补充观测中心可直接展示的增强项。"""
