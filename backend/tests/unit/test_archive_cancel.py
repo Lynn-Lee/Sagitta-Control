@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.exceptions import AppException
 from app.models.archive import ArchiveJobStatus
 from app.models.workflow import AuditStatus, WorkflowStatus
 from app.services.archive import ArchiveService
@@ -93,6 +94,170 @@ async def test_archive_applicant_cannot_control_after_approval_without_execute_p
         )
 
     assert "没有归档执行权限" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("initial_status", [ArchiveJobStatus.QUEUED, ArchiveJobStatus.RUNNING])
+async def test_archive_execute_permission_can_pause_active_job(initial_status):
+    job = SimpleNamespace(
+        id=13,
+        status=initial_status,
+        workflow_id=42,
+        source_instance_id=8,
+        finished_at=None,
+    )
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock())
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._load_instance",
+        AsyncMock(return_value=SimpleNamespace(resource_groups=[])),
+    ):
+        result = await ArchiveService.set_job_control_state(
+            db,
+            13,
+            "pause",
+            {"id": 2, "username": "lijialin", "permissions": ["archive_execute"], "role": "dba", "is_superuser": False},
+        )
+
+    assert result.status == ArchiveJobStatus.PAUSING
+    assert job.finished_at is None
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(job)
+
+
+@pytest.mark.asyncio
+async def test_archive_execute_permission_can_resume_paused_job():
+    job = SimpleNamespace(
+        id=13,
+        status=ArchiveJobStatus.PAUSED,
+        workflow_id=42,
+        source_instance_id=8,
+        finished_at=None,
+    )
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock())
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._load_instance",
+        AsyncMock(return_value=SimpleNamespace(resource_groups=[])),
+    ):
+        result = await ArchiveService.set_job_control_state(
+            db,
+            13,
+            "resume",
+            {"id": 2, "username": "lijialin", "permissions": ["archive_execute"], "role": "dba", "is_superuser": False},
+        )
+
+    assert result.status == ArchiveJobStatus.QUEUED
+    assert job.finished_at is None
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(job)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("initial_status", "workflow_status"),
+    [
+        (ArchiveJobStatus.APPROVED, WorkflowStatus.REVIEW_PASS),
+        (ArchiveJobStatus.SCHEDULED, WorkflowStatus.TIMING_TASK),
+        (ArchiveJobStatus.QUEUED, WorkflowStatus.QUEUING),
+        (ArchiveJobStatus.PAUSED, WorkflowStatus.QUEUING),
+    ],
+)
+async def test_archive_execute_permission_can_cancel_not_running_jobs(initial_status, workflow_status):
+    job = SimpleNamespace(
+        id=13,
+        status=initial_status,
+        workflow_id=42,
+        source_instance_id=8,
+        finished_at=None,
+    )
+    wf = SimpleNamespace(status=workflow_status)
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock(), get=AsyncMock(return_value=wf))
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._load_instance",
+        AsyncMock(return_value=SimpleNamespace(resource_groups=[])),
+    ):
+        result = await ArchiveService.set_job_control_state(
+            db,
+            13,
+            "cancel",
+            {"id": 2, "username": "lijialin", "permissions": ["archive_execute"], "role": "dba", "is_superuser": False},
+        )
+
+    assert result.status == ArchiveJobStatus.CANCELED
+    assert job.finished_at is not None
+    assert wf.status == WorkflowStatus.ABORT
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(job)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("initial_status", [ArchiveJobStatus.RUNNING, ArchiveJobStatus.PAUSING])
+async def test_archive_execute_permission_marks_active_cancel_as_canceling(initial_status):
+    job = SimpleNamespace(
+        id=13,
+        status=initial_status,
+        workflow_id=42,
+        source_instance_id=8,
+        finished_at=None,
+    )
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock(), get=AsyncMock())
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._load_instance",
+        AsyncMock(return_value=SimpleNamespace(resource_groups=[])),
+    ):
+        result = await ArchiveService.set_job_control_state(
+            db,
+            13,
+            "cancel",
+            {"id": 2, "username": "lijialin", "permissions": ["archive_execute"], "role": "dba", "is_superuser": False},
+        )
+
+    assert result.status == ArchiveJobStatus.CANCELING
+    assert job.finished_at is None
+    db.get.assert_not_called()
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(job)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("action", "initial_status", "message"),
+    [
+        ("pause", ArchiveJobStatus.APPROVED, "只有队列中或执行中的作业可以暂停"),
+        ("resume", ArchiveJobStatus.RUNNING, "只有已暂停的作业可以继续"),
+        ("cancel", ArchiveJobStatus.SUCCESS, "当前作业状态不能取消"),
+        ("cancel", ArchiveJobStatus.FAILED, "当前作业状态不能取消"),
+        ("cancel", ArchiveJobStatus.CANCELED, "当前作业状态不能取消"),
+        ("cancel", ArchiveJobStatus.CANCELING, "当前作业状态不能取消"),
+    ],
+)
+async def test_archive_control_rejects_invalid_state_transitions(action, initial_status, message):
+    job = SimpleNamespace(
+        id=13,
+        status=initial_status,
+        workflow_id=42,
+        source_instance_id=8,
+        finished_at=None,
+    )
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock())
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._load_instance",
+        AsyncMock(return_value=SimpleNamespace(resource_groups=[])),
+    ), pytest.raises(AppException) as exc_info:
+        await ArchiveService.set_job_control_state(
+            db,
+            13,
+            action,
+            {"id": 2, "username": "lijialin", "permissions": ["archive_execute"], "role": "dba", "is_superuser": False},
+        )
+
+    assert message in str(exc_info.value)
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
 
 
 @pytest.mark.asyncio

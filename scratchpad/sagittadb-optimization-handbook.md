@@ -516,6 +516,8 @@ def _validate_cors(self) -> "Settings":
 
 **增量落地状态（2026-07-04）**：本轮完成 `test_query_guard.py` 查询治理边界补强：新增无 `WHERE` 的 `UPDATE` / `DELETE` 精确拒绝原因，以及 `INSERT ... SELECT` 写入型语句的规则提示断言。`SqlQueryGuard` 保持 fail-closed，只将写操作拒绝原因细化为更可审计的高风险场景说明。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_query_guard.py -q`（326 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（939 passed，Total coverage 52.30%）。由于距离 55% 仍有明显缺口，本轮暂不把 `README.md` 和 `.github/workflows/ci.yml` 的覆盖率门槛从 51% 上调。`P2-1` 剩余工作：继续核对 `test_archive_cancel.py` 的归档暂停/继续/取消状态迁移，完成后再评估覆盖率门槛是否可小步上调。
 
+**增量落地状态（2026-07-04）**：本轮完成 `test_archive_cancel.py` 归档状态机边界补强：新增合法暂停（`queued`/`running` -> `pausing`）、合法继续（`paused` -> `queued`）、可直接取消状态（`approved`/`scheduled`/`queued`/`paused` -> `canceled` 并同步工单 `abort`）、运行中取消（`running`/`pausing` -> `canceling`）、以及终态/非法状态（`success`/`failed`/`canceled`/`canceling` 等）拒绝迁移的测试矩阵。状态机现有实现通过新增用例，无需修改生产代码。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_archive_cancel.py -q`（22 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（954 passed，Total coverage 52.43%）。由于距离 55% 仍有明显缺口，本轮暂不把 `README.md` 和 `.github/workflows/ci.yml` 的覆盖率门槛从 51% 上调。`P2-1` 剩余工作：可继续补 archive 执行分支覆盖，或在下一轮进入 `P2-2` mypy baseline 消解。
+
 ---
 
 ### P2-2｜mypy baseline 消解计划
