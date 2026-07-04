@@ -1,6 +1,6 @@
-import { chromium } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { validateScreenshotCaptureConfig } from './capture-user-manual-screenshots.config.mjs'
 
 const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const username = process.env.E2E_USERNAME || ''
@@ -8,6 +8,8 @@ const password = process.env.E2E_PASSWORD || ''
 const outputDir = resolve(process.env.E2E_SCREENSHOT_DIR || '../docs/screenshots/user-manual')
 const smokeOnly = process.env.E2E_SMOKE_ONLY === 'true'
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined
+
+validateScreenshotCaptureConfig({ username, password, smokeOnly })
 
 const pages = [
   ['01-login.png', '/login', '登录页'],
@@ -77,6 +79,7 @@ async function capture(page, fileName, path, label) {
 
 mkdirSync(outputDir, { recursive: true })
 
+const { chromium } = await import('@playwright/test')
 const browser = await chromium.launch(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined)
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 })
 
