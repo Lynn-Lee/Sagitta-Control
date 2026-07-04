@@ -1,6 +1,7 @@
 app/__init__.py
 app/celery_app.py
 app/core/__init__.py
+app/core/auth_cookies.py
 app/core/config.py
 app/core/database.py
 app/core/integrity.py

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core.auth_cookies import CSRF_HEADER_NAME, validate_csrf_request
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import register_exception_handlers
@@ -61,8 +62,16 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", CSRF_HEADER_NAME],
 )
+
+
+@app.middleware("http")
+async def csrf_protection_middleware(request, call_next):
+    csrf_error = validate_csrf_request(request)
+    if csrf_error is not None:
+        return csrf_error
+    return await call_next(request)
 
 
 @app.middleware("http")

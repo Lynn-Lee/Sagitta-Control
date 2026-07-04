@@ -140,16 +140,10 @@ export default function LoginPage() {
     '密码每 30 天必须修改一次',
   ]
 
-  const finishLogin = async (
-    access_token: string,
-    refresh_token: string,
-    provider: AuthProvider = 'local',
-  ) => {
-    setTokens(access_token, refresh_token)
+  const finishLogin = async (provider: AuthProvider = 'local') => {
+    setTokens()
     setAuthProvider(provider)
-    const meRes = await apiClient.get('/auth/me/', {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const meRes = await apiClient.get('/auth/me/')
     setUser(meRes.data)
     const target = getPostLoginPath(meRes.data.permissions || [])
     navigate(target, { replace: true })
@@ -199,11 +193,7 @@ export default function LoginPage() {
       return
     }
 
-    const { access_token, refresh_token } = tokenData
-    if (!access_token || !refresh_token) {
-      throw new Error('登录响应缺少 token')
-    }
-    await finishLogin(access_token, refresh_token, provider)
+    await finishLogin(provider)
   }
 
   const handleLogin = async (values: { username: string; password: string }) => {

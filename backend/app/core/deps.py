@@ -1,16 +1,17 @@
 """FastAPI 公共 Depends 依赖（v2 授权体系：角色权限 + 用户组资源组链路）。"""
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError as JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.auth_cookies import get_access_token
 from app.core.database import get_db
 from app.core.security import decode_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login/form/")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login/form/", auto_error=False)
 
 _401 = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -20,10 +21,15 @@ _401 = HTTPException(
 
 
 async def current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """获取当前登录用户，返回含 permissions + role + user_groups 的完整字典。"""
+    token = token or get_access_token(request)
+    if not token:
+        raise _401
+
     try:
         payload = decode_token(token)
     except JWTError:

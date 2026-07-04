@@ -10,12 +10,18 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import quote as urllib_quote
 from urllib.parse import urlencode as urllib_urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt import PyJWTError as JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_cookies import (
+    clear_auth_cookies,
+    get_access_token,
+    get_refresh_token,
+    set_auth_cookies,
+)
 from app.core.database import get_db
 from app.core.deps import current_user, oauth2_scheme
 from app.core.security import (
@@ -98,6 +104,12 @@ def _issue_login_tokens(user, *, verified_2fa: bool = False) -> TokenResponse:
     )
 
 
+def _issue_login_response(response: Response, user, *, verified_2fa: bool = False) -> TokenResponse:
+    tokens = _issue_login_tokens(user, verified_2fa=verified_2fa)
+    set_auth_cookies(response, tokens)
+    return tokens
+
+
 def _oauth_login_code_key(login_code: str) -> str:
     return f"oauth_login_code:{login_code}"
 
@@ -119,7 +131,11 @@ async def get_redis():
 
 
 @router.post("/login/", response_model=TokenResponse, summary="用户名密码登录")
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    data: LoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     user = await UserService.get_by_username(db, data.username)
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
@@ -152,18 +168,24 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         )
 
     logger.info("user_login")
-    return _issue_login_tokens(user)
+    return _issue_login_response(response, user)
 
 
 @router.post("/login/form/", response_model=TokenResponse, include_in_schema=False)
 async def login_form(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await login(LoginRequest(username=form_data.username, password=form_data.password), db)
+    return await login(LoginRequest(username=form_data.username, password=form_data.password), response, db)
 
 
 @router.post("/ldap/", response_model=TokenResponse, summary="LDAP 登录")
-async def ldap_login(data: LdapLoginRequest, db: AsyncSession = Depends(get_db)):
+async def ldap_login(
+    data: LdapLoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         user = await LdapAuthService.authenticate(db, data.username, data.password)
     except ValueError as e:
@@ -177,13 +199,21 @@ async def ldap_login(data: LdapLoginRequest, db: AsyncSession = Depends(get_db))
             requires_2fa=True,
             two_fa_token=create_access_token({**_build_auth_payload(user), "requires_2fa": True}),
         )
-    return _issue_login_tokens(user)
+    return _issue_login_response(response, user)
 
 
 @router.post("/token/refresh/", response_model=TokenResponse, summary="刷新 access_token")
-async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+    data: RefreshRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    refresh_value = data.refresh_token or get_refresh_token(request)
+    if not refresh_value:
+        raise HTTPException(status_code=401, detail="refresh_token 缺失")
     try:
-        payload = decode_token(data.refresh_token)
+        payload = decode_token(refresh_value)
     except JWTError as e:
         raise HTTPException(status_code=401, detail="refresh_token 无效或已过期") from e
     if payload.get("type") != "refresh":
@@ -194,18 +224,26 @@ async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
 
     verified_2fa = bool(payload.get("2fa_verified"))
-    return _issue_login_tokens(user, verified_2fa=verified_2fa)
+    return _issue_login_response(response, user, verified_2fa=verified_2fa)
 
 
 @router.post("/logout/", summary="登出")
-async def logout(token: str = Depends(oauth2_scheme), redis=Depends(get_redis)):
+async def logout(
+    request: Request,
+    response: Response,
+    token: str | None = Depends(oauth2_scheme),
+    redis=Depends(get_redis),
+):
+    token = token or get_access_token(request)
     try:
-        payload = decode_token(token)
-        ttl = int(payload.get("exp", 0)) - int(time.time())
-        if ttl > 0:
-            await redis.setex(f"blacklist:{token}", ttl, "1")
+        if token:
+            payload = decode_token(token)
+            ttl = int(payload.get("exp", 0)) - int(time.time())
+            if ttl > 0:
+                await redis.setex(f"blacklist:{token}", ttl, "1")
     except JWTError:
         pass
+    clear_auth_cookies(response)
     return {"status": 0, "msg": "已退出登录"}
 
 
@@ -259,7 +297,11 @@ async def verify_2fa(
 
 
 @router.post("/2fa/login/verify/", response_model=TokenResponse, summary="登录二步验证")
-async def verify_login_2fa(data: LoginTwoFAVerifyRequest, db: AsyncSession = Depends(get_db)):
+async def verify_login_2fa(
+    data: LoginTwoFAVerifyRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     import pyotp
 
     try:
@@ -281,7 +323,7 @@ async def verify_login_2fa(data: LoginTwoFAVerifyRequest, db: AsyncSession = Dep
         raise HTTPException(status_code=400, detail="TOTP 验证码错误")
 
     logger.info("user_login_2fa_verified: %s", user.username)
-    return _issue_login_tokens(user, verified_2fa=True)
+    return _issue_login_response(response, user, verified_2fa=True)
 
 
 @router.post("/2fa/disable/", summary="禁用 2FA")
@@ -375,7 +417,11 @@ async def sms_send_code(data: SmsCodeRequest, db: AsyncSession = Depends(get_db)
 
 
 @router.post("/sms/login/", response_model=TokenResponse, summary="短信验证码登录")
-async def sms_login(data: SmsLoginRequest, db: AsyncSession = Depends(get_db)):
+async def sms_login(
+    data: SmsLoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     """用手机号 + 验证码登录。验证码一次性使用，验证成功后自动删除。"""
     from app.services.sms_auth import verify_sms_code
     from app.services.user import UserService
@@ -395,7 +441,7 @@ async def sms_login(data: SmsLoginRequest, db: AsyncSession = Depends(get_db)):
             requires_2fa=True,
             two_fa_token=create_access_token({**_build_auth_payload(user), "requires_2fa": True}),
         )
-    return _issue_login_tokens(user)
+    return _issue_login_response(response, user)
 
 
 # ── 第三方 OAuth2 登录──────────────────────────────
@@ -509,7 +555,11 @@ async def oauth_callback(
 
 
 @router.post("/oauth/exchange/", response_model=TokenResponse, summary="交换第三方登录一次性登录码")
-async def exchange_oauth_login_code(data: OAuthExchangeRequest, redis=Depends(get_redis)):
+async def exchange_oauth_login_code(
+    data: OAuthExchangeRequest,
+    response: Response,
+    redis=Depends(get_redis),
+):
     raw = await redis.get(_oauth_login_code_key(data.login_code))
     if not raw:
         raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
@@ -526,9 +576,11 @@ async def exchange_oauth_login_code(data: OAuthExchangeRequest, redis=Depends(ge
     if not user_id or not username:
         raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
 
-    return TokenResponse(
+    tokens = TokenResponse(
         access_token=create_access_token(
             {"sub": user_id, "username": username, "tenant_id": tenant_id}
         ),
         refresh_token=create_refresh_token({"sub": user_id, "tenant_id": tenant_id}),
     )
+    set_auth_cookies(response, tokens)
+    return tokens

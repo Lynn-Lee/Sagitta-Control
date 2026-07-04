@@ -1,6 +1,6 @@
 /**
  * 认证状态管理。
- * 使用 Zustand persist + localStorage 持久化 token。
+ * 浏览器登录态由后端 HttpOnly Cookie 承载，localStorage 只持久化用户展示状态。
  * 存储名称：'sagitta-control-auth'
  */
 import { create } from 'zustand'
@@ -34,7 +34,7 @@ interface AuthState {
   user: UserInfo | null
   isAuthenticated: boolean
   authProvider: AuthProvider | null
-  setTokens: (access: string, refresh: string) => void
+  setTokens: (access?: string | null, refresh?: string | null) => void
   setUser: (user: UserInfo) => void
   setAuthProvider: (provider: AuthProvider | null) => void
   logout: () => void
@@ -50,8 +50,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       authProvider: null,
 
-      setTokens: (access, refresh) => {
-        set({ accessToken: access, refreshToken: refresh, isAuthenticated: true })
+      setTokens: () => {
+        set({ accessToken: null, refreshToken: null, isAuthenticated: true })
       },
 
       setUser: (user) => set({ user }),
@@ -73,6 +73,17 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'sagitta-control-auth',
       storage: createJSONStorage(() => localStorage),
+      version: 2,
+      migrate: (persistedState) => ({
+        ...(persistedState as Partial<AuthState>),
+        accessToken: null,
+        refreshToken: null,
+      }),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        authProvider: state.authProvider,
+      }),
     }
   )
 )

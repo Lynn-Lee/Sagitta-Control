@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
+from fastapi.responses import Response
 from pydantic import ValidationError
 
 from app.core.security import (
@@ -100,16 +101,20 @@ class TestJWT:
             "provider": "oidc",
         })
 
+        http_response = Response()
         response = await exchange_oauth_login_code(
             OAuthExchangeRequest(login_code=login_code),
+            response=http_response,
             redis=redis,
         )
         assert response.access_token
         assert response.refresh_token
+        assert "access_token=" in http_response.headers["set-cookie"]
 
         with pytest.raises(HTTPException) as exc:
             await exchange_oauth_login_code(
                 OAuthExchangeRequest(login_code=login_code),
+                response=Response(),
                 redis=redis,
             )
         assert exc.value.status_code == 401

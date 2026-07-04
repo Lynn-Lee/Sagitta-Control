@@ -7,14 +7,21 @@ export const apiClient = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
+
+const CSRF_COOKIE_NAME = 'csrf_token'
+const CSRF_HEADER_NAME = 'X-CSRF-Token'
+const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
 const AUTH_SUBMIT_PATHS = new Set([
   '/auth/login/',
+  '/auth/login/form/',
   '/auth/ldap/',
   '/auth/sms/login/',
   '/auth/2fa/login/verify/',
   '/auth/password/change-required/',
+  '/auth/oauth/exchange/',
 ])
 
 const normalizeApiPath = (url?: string) => {
@@ -31,13 +38,35 @@ const isAuthSubmitRequest = (config?: InternalAxiosRequestConfig) => (
   AUTH_SUBMIT_PATHS.has(normalizeApiPath(config?.url))
 )
 
-// ─── 请求拦截器：自动注入 JWT ────────────────────────────────
+const readCookie = (name: string) => {
+  if (typeof document === 'undefined') return ''
+  const prefix = `${name}=`
+  return document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length) || ''
+}
+
+const csrfHeaders = () => {
+  const token = readCookie(CSRF_COOKIE_NAME)
+  return token ? { [CSRF_HEADER_NAME]: token } : {}
+}
+
+const attachCsrfHeader = (config: InternalAxiosRequestConfig) => {
+  if (!UNSAFE_METHODS.has((config.method || 'get').toLowerCase())) {
+    return
+  }
+  const token = readCookie(CSRF_COOKIE_NAME)
+  if (token) {
+    config.headers[CSRF_HEADER_NAME] = token
+  }
+}
+
+// ─── 请求拦截器：Cookie 登录态下为写操作补充 CSRF Header ───────
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = useAuthStore.getState().accessToken
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
+    attachCsrfHeader(config)
     return config
   },
   (error) => Promise.reject(error)
@@ -46,7 +75,7 @@ apiClient.interceptors.request.use(
 // ─── 响应拦截器：Token 自动刷新 ──────────────────────────────
 let isRefreshing = false
 let pendingQueue: Array<{
-  resolve: (token: string) => void
+  resolve: () => void
   reject: (error: unknown) => void
 }> = []
 
@@ -62,20 +91,13 @@ apiClient.interceptors.response.use(
       !originalRequest._retry &&
       !isAuthSubmitRequest(originalRequest)
     ) {
-      const { refreshToken, setTokens, logout } = useAuthStore.getState()
-
-      if (!refreshToken) {
-        logout()
-        window.location.href = '/login'
-        return Promise.reject(error)
-      }
+      const { setTokens, logout } = useAuthStore.getState()
 
       if (isRefreshing) {
         // 等待刷新完成后重发请求
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           pendingQueue.push({ resolve, reject })
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`
+        }).then(() => {
           return apiClient(originalRequest)
         })
       }
@@ -84,17 +106,16 @@ apiClient.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const response = await axios.post(`${BASE_URL}/api/v1/auth/token/refresh/`, {
-          refresh_token: refreshToken,
+        await axios.post(`${BASE_URL}/api/v1/auth/token/refresh/`, {}, {
+          withCredentials: true,
+          headers: csrfHeaders(),
         })
-        const { access_token, refresh_token } = response.data
-        setTokens(access_token, refresh_token)
+        setTokens()
 
         // 刷新成功，重发所有等待的请求
-        pendingQueue.forEach(({ resolve }) => resolve(access_token))
+        pendingQueue.forEach(({ resolve }) => resolve())
         pendingQueue = []
 
-        originalRequest.headers.Authorization = `Bearer ${access_token}`
         return apiClient(originalRequest)
       } catch (refreshError) {
         pendingQueue.forEach(({ reject }) => reject(refreshError))

@@ -34,11 +34,8 @@ export default function OAuthCallbackPage() {
 
     authApi
       .exchangeOAuthLoginCode(loginCode)
-      .then(tokens => {
-        if (!tokens.access_token || !tokens.refresh_token) {
-          throw new Error('登录码交换失败')
-        }
-        setTokens(tokens.access_token, tokens.refresh_token)
+      .then(() => {
+        setTokens()
         setAuthProvider(provider)
         return authApi.me()
       })

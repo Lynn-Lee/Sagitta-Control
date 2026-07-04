@@ -11,8 +11,8 @@ from pyotp import TOTP
 
 # ── 辅助：初始化管理员 ────────────────────────────────────────
 
-async def _init_and_login(client: AsyncClient) -> tuple[str, str]:
-    """确保 admin 用户存在，并在强制改密后返回 (access_token, refresh_token)。"""
+async def _init_and_login_response(client: AsyncClient):
+    """确保 admin 用户存在，并在强制改密后返回最终登录响应。"""
     # 先尝试初始化系统（幂等）
     await client.post("/api/v1/system/init/")
     resp = await client.post("/api/v1/auth/login/", json={
@@ -31,6 +31,13 @@ async def _init_and_login(client: AsyncClient) -> tuple[str, str]:
         })
         assert resp.status_code == 200, f"改密后登录失败: {resp.text}"
         data = resp.json()
+    return resp
+
+
+async def _init_and_login(client: AsyncClient) -> tuple[str, str]:
+    """确保 admin 用户存在，并在强制改密后返回 (access_token, refresh_token)。"""
+    resp = await _init_and_login_response(client)
+    data = resp.json()
     return data["access_token"], data["refresh_token"]
 
 
@@ -49,6 +56,16 @@ async def _enable_totp(client: AsyncClient) -> str:
     )
     assert verify_enable_resp.status_code == 200
     return secret
+
+
+def _csrf_headers(client: AsyncClient) -> dict[str, str]:
+    csrf_token = client.cookies.get("csrf_token")
+    assert csrf_token
+    return {"X-CSRF-Token": csrf_token}
+
+
+def _set_cookie_headers(resp) -> list[str]:
+    return list(resp.headers.get_list("set-cookie"))
 
 
 # ── 登录 ─────────────────────────────────────────────────────
@@ -72,6 +89,19 @@ class TestLogin:
         access, refresh = await _init_and_login(client)
         assert len(access) > 20
         assert len(refresh) > 20
+
+    @pytest.mark.asyncio
+    async def test_valid_credentials_set_http_only_auth_cookies(self, client: AsyncClient):
+        resp = await _init_and_login_response(client)
+
+        assert client.cookies.get("access_token")
+        assert client.cookies.get("refresh_token")
+        assert client.cookies.get("csrf_token")
+
+        cookie_headers = _set_cookie_headers(resp)
+        assert any("access_token=" in header and "httponly" in header.lower() for header in cookie_headers)
+        assert any("refresh_token=" in header and "httponly" in header.lower() for header in cookie_headers)
+        assert any("csrf_token=" in header and "httponly" not in header.lower() for header in cookie_headers)
 
     @pytest.mark.asyncio
     async def test_force_change_password_allows_relogin(self, client: AsyncClient):
@@ -274,6 +304,19 @@ class TestTokenRefresh:
         assert "refresh_token" in data
 
     @pytest.mark.asyncio
+    async def test_refresh_accepts_refresh_cookie_without_body_token(self, client: AsyncClient):
+        await _init_and_login(client)
+        resp = await client.post(
+            "/api/v1/auth/token/refresh/",
+            json={},
+            headers=_csrf_headers(client),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["access_token"]
+        assert data["refresh_token"]
+
+    @pytest.mark.asyncio
     async def test_invalid_refresh_token_returns_401(self, client: AsyncClient):
         resp = await client.post("/api/v1/auth/token/refresh/", json={
             "refresh_token": "invalid.token.here",
@@ -312,6 +355,13 @@ class TestMe:
         assert "tenant_id" in data
 
     @pytest.mark.asyncio
+    async def test_me_accepts_http_only_access_cookie(self, client: AsyncClient):
+        await _init_and_login(client)
+        resp = await client.get("/api/v1/auth/me/")
+        assert resp.status_code == 200
+        assert resp.json()["username"] == "admin"
+
+    @pytest.mark.asyncio
     async def test_update_me_updates_profile_fields(self, client: AsyncClient):
         access, _ = await _init_and_login(client)
         resp = await client.patch(
@@ -323,6 +373,24 @@ class TestMe:
         data = resp.json()
         assert data["display_name"] == "平台管理员"
         assert data["email"] == "admin@sagitta-control.local"
+
+    @pytest.mark.asyncio
+    async def test_cookie_authenticated_write_requires_csrf_header(self, client: AsyncClient):
+        await _init_and_login(client)
+
+        missing_header_resp = await client.patch(
+            "/api/v1/auth/me/",
+            json={"display_name": "缺少 CSRF"},
+        )
+        assert missing_header_resp.status_code == 403
+
+        ok_resp = await client.patch(
+            "/api/v1/auth/me/",
+            json={"display_name": "平台管理员"},
+            headers=_csrf_headers(client),
+        )
+        assert ok_resp.status_code == 200
+        assert ok_resp.json()["display_name"] == "平台管理员"
 
     @pytest.mark.asyncio
     async def test_me_with_malformed_token_returns_401(self, client: AsyncClient):
@@ -353,6 +421,19 @@ class TestLogout:
         resp = await client.post("/api/v1/auth/logout/")
         # 401 或 200 均可接受，不应 500
         assert resp.status_code in (200, 401, 403)
+
+    @pytest.mark.asyncio
+    async def test_logout_clears_auth_cookies(self, client: AsyncClient):
+        await _init_and_login(client)
+        resp = await client.post(
+            "/api/v1/auth/logout/",
+            headers=_csrf_headers(client),
+        )
+        assert resp.status_code == 200
+        cookie_headers = _set_cookie_headers(resp)
+        assert any("access_token=" in header and "max-age=0" in header.lower() for header in cookie_headers)
+        assert any("refresh_token=" in header and "max-age=0" in header.lower() for header in cookie_headers)
+        assert any("csrf_token=" in header and "max-age=0" in header.lower() for header in cookie_headers)
 
 
 # ── 健康检查 ──────────────────────────────────────────────────
