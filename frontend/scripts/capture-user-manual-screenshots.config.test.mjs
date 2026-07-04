@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import test from 'node:test'
+import { test } from 'vitest'
 
 import { validateScreenshotCaptureConfig } from './capture-user-manual-screenshots.config.mjs'
 
@@ -23,7 +23,7 @@ test('allows screenshot overwrite when both credentials are supplied', () => {
 
 test('reports missing credentials before loading browser dependencies', () => {
   const result = spawnSync(process.execPath, ['scripts/capture-user-manual-screenshots.mjs'], {
-    cwd: new URL('..', import.meta.url),
+    cwd: process.cwd(),
     env: {
       ...process.env,
       E2E_USERNAME: '',
