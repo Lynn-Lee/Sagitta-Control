@@ -9,7 +9,7 @@
     "build:check": "npm run build && node scripts/check-build-budget.mjs",
     "preview": "vite preview",
     "e2e:smoke": "E2E_SMOKE_ONLY=true node scripts/capture-user-manual-screenshots.mjs",
-    "screenshots:user-manual": "node scripts/capture-user-manual-screenshots.mjs",
+    "screenshots:user-manual": "node scripts/check-user-manual-screenshot-manifest.mjs && node scripts/capture-user-manual-screenshots.mjs",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

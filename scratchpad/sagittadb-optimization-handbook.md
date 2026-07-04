@@ -576,6 +576,8 @@ git commit -m "移除已跟踪的商业构建产物目录，改为仅本地/CI �
 
 **验收标准**：截图里的品牌文案、版本号与当前 README/AGENT.md 定义的品牌规范一致。
 
+**增量落地状态（2026-07-04）**：Step A 已完成。`frontend/scripts/capture-user-manual-screenshots.mjs` 的截图清单已从旧版 20 张对齐到当前 `docs/screenshots/user-manual/` 的 26 张文件名，覆盖 4 个 Dashboard 分页、工单模板、查询历史、监控 SQL 分析/洞察、实例管理、用户组、交付与支持和审计日志等当前手册截图；旧的 `20-license.png` 不再作为公开用户手册截图捕获目标。新增 `frontend/scripts/check-user-manual-screenshot-manifest.mjs` 并接入 `npm run screenshots:user-manual`，防止捕获脚本和截图目录再次漂移。验证命令：`node frontend/scripts/check-user-manual-screenshot-manifest.mjs`。剩余工作：在可登录且有演示数据的最新环境中重新生成并人工复核 26 张截图的品牌文案与版本号。
+
 ---
 
 ### P3-3｜Docker Compose / Helm 默认弱密码的运行时门禁需要补全覆盖面，而非从零建立
