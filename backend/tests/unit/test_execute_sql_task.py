@@ -84,7 +84,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ):
             await execute_sql_task_module._execute_async(1, 2)
 
@@ -97,7 +97,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ), pytest.raises(RuntimeError, match="database unavailable"):
             await execute_sql_task_module._execute_async(1, 2)
 
@@ -127,7 +127,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ):
             await execute_sql_task_module._execute_async(3, 2)
 
@@ -163,7 +163,7 @@ class TestExecuteAsync:
         db_engine = SimpleNamespace(execute=AsyncMock(return_value=SimpleNamespace(error="")))
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ), patch("app.engines.registry.get_engine", return_value=db_engine), patch(
             "app.services.audit.AuditService._write_log", AsyncMock()
         ) as write_log_mock:
@@ -203,7 +203,7 @@ class TestExecuteAsync:
         db_engine = SimpleNamespace(execute=AsyncMock(side_effect=RuntimeError("sql failed")))
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ), patch("app.engines.registry.get_engine", return_value=db_engine):
             await execute_sql_task_module._execute_async(6, 7)
 
@@ -221,7 +221,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ):
             await execute_sql_task_module._execute_async(7, 2)
 
@@ -244,7 +244,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ), patch.object(execute_sql_task_module.execute_workflow_task, "delay", create=True) as delay_mock:
             dispatched = await execute_sql_task_module._dispatch_scheduled_async()
 
@@ -261,7 +261,7 @@ class TestExecuteAsync:
         engine = SimpleNamespace(dispose=AsyncMock())
 
         with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-            "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+            "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
         ), pytest.raises(RuntimeError, match="lock timeout"):
             await execute_sql_task_module._dispatch_scheduled_async()
 

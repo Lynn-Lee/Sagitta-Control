@@ -1,19 +1,29 @@
 """
 SQL 工单异步执行 Celery 任务（Sprint 3）。
 """
+from __future__ import annotations
+
 import asyncio
 import importlib
 import json
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any, TypeVar, cast
 
 from app.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
+_TaskFunc = TypeVar("_TaskFunc", bound=Callable[..., Any])
 
-@celery_app.task(bind=True, name="execute_workflow", max_retries=0, queue="execute")
-def execute_workflow_task(self, workflow_id: int, operator_id: int):
+
+def _typed_task(**kwargs: Any) -> Callable[[_TaskFunc], _TaskFunc]:
+    return cast(Callable[[_TaskFunc], _TaskFunc], celery_app.task(**kwargs))
+
+
+@_typed_task(bind=True, name="execute_workflow", max_retries=0, queue="execute")
+def execute_workflow_task(self: Any, workflow_id: int, operator_id: int) -> None:
     """
     异步执行 SQL 工单。
     在 Celery worker 进程中创建新的 asyncio event loop 执行。
@@ -27,8 +37,8 @@ def execute_workflow_task(self, workflow_id: int, operator_id: int):
         raise
 
 
-@celery_app.task(bind=True, name="dispatch_scheduled_workflows", max_retries=0, queue="execute")
-def dispatch_scheduled_workflows_task(self):
+@_typed_task(bind=True, name="dispatch_scheduled_workflows", max_retries=0, queue="execute")
+def dispatch_scheduled_workflows_task(self: Any) -> int:
     """扫描到期的预约工单并投递执行任务。"""
     logger.info("dispatch_scheduled_workflows start")
     try:
@@ -40,11 +50,11 @@ def dispatch_scheduled_workflows_task(self):
         raise
 
 
-async def _execute_async(workflow_id: int, operator_id: int):
+async def _execute_async(workflow_id: int, operator_id: int) -> None:
     """异步执行逻辑。"""
     from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import selectinload, sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.orm import selectinload
 
     from app.core.config import settings
     from app.engines.registry import get_engine
@@ -57,7 +67,7 @@ async def _execute_async(workflow_id: int, operator_id: int):
 
     engine = create_async_engine(settings.DATABASE_URL)
     try:
-        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session_local = async_sessionmaker(engine, expire_on_commit=False)
 
         async with async_session_local() as db:
             # 加载工单
@@ -183,8 +193,7 @@ async def _execute_async(workflow_id: int, operator_id: int):
 async def _dispatch_scheduled_async(limit: int = 50) -> int:
     """投递已到预约时间的 SQL 工单。"""
     from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.core.config import settings
     from app.models.workflow import SqlWorkflow, WorkflowStatus
@@ -193,7 +202,7 @@ async def _dispatch_scheduled_async(limit: int = 50) -> int:
 
     engine = create_async_engine(settings.DATABASE_URL)
     try:
-        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session_local = async_sessionmaker(engine, expire_on_commit=False)
         now = datetime.now(UTC)
         dispatched = 0
 
@@ -215,7 +224,7 @@ async def _dispatch_scheduled_async(limit: int = 50) -> int:
                 operator_id = wf.executed_by_id or wf.engineer_id
                 wf.status = WorkflowStatus.QUEUING
                 wf.execute_mode = "scheduled"
-                execute_workflow_task.delay(wf.id, operator_id)
+                cast(Any, execute_workflow_task).delay(wf.id, operator_id)
                 dispatched += 1
             await db.commit()
 

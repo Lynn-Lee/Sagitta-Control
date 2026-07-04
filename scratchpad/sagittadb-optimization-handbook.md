@@ -543,6 +543,8 @@ def _validate_cors(self) -> "Settings":
 
 **增量落地状态（2026-07-04）**：本轮完成 `app/tasks/archive.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐归档任务 wrapper 返回类型，并将本地 async engine 会话工厂从 `sessionmaker(..., class_=AsyncSession)` 调整为 SQLAlchemy 2 async 类型友好的 `async_sessionmaker`。`app/tasks/archive.py` 已纳入 `backend/mypy-baseline.txt`，相关 dispose 回归测试同步 patch 到新的会话工厂导入点。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/archive.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_archive_task.py -q`。下一轮可继续按同一策略消解 `app/tasks/execute_sql.py`。
 
+**增量落地状态（2026-07-04）**：本轮完成 `app/tasks/execute_sql.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐 SQL 执行任务 wrapper 返回类型，并将任务内本地 async engine 会话工厂从 `sessionmaker(..., class_=AsyncSession)` 调整为 SQLAlchemy 2 async 类型友好的 `async_sessionmaker`。`app/tasks/execute_sql.py` 已纳入 `backend/mypy-baseline.txt`，相关 dispose 回归测试同步 patch 到新的会话工厂导入点。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/execute_sql.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_execute_sql_task.py -q`、`cd backend && while IFS= read -r target; do uv run --with mypy mypy --follow-imports=silent "$target"; done < mypy-baseline.txt`。下一轮可进入 P3 或继续评估其他低风险 task/helper 模块是否适合纳入 baseline。
+
 ---
 
 ## 阶段 P3：仓库与交付卫生
