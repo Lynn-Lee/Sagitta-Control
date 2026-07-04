@@ -582,6 +582,8 @@ git commit -m "移除已跟踪的商业构建产物目录，改为仅本地/CI �
 
 **调度决策（2026-07-04）**：按用户指令，P3-2 中可由自动化本地完成的截图清单对齐和凭据门禁已完成；真实登录环境重新生成 26 张截图改为人工跟进项，不再作为 SagittaDB optimization handbook dispatcher 的阻塞项。后续自动任务应视 P3-2 自动化部分完成，并继续推进 `P3-3｜Docker Compose / Helm 默认弱密码的运行时门禁需要补全覆盖面，而非从零建立`。
 
+**最终落地状态（2026-07-04）**：已完成。用户提供云 ECS 测试环境登录凭据后，已用 `E2E_BASE_URL=http://47.102.146.147` 执行 `npm --prefix frontend run screenshots:user-manual`，重新覆盖 `docs/screenshots/user-manual/` 下全部 26 张截图；截图已确认不是登录页重定向或空白页误覆盖，登录页品牌为 `Sagitta Control` / `v2.3.5`。真实运行还暴露并修复了截图脚本主登录按钮定位过宽的问题：`frontend/scripts/capture-user-manual-screenshots.mjs` 改为点击 `.sagitta-auth-form button[type="submit"]`，避免误匹配第三方登录按钮。验证命令：`node frontend/scripts/check-user-manual-screenshot-manifest.mjs`、`E2E_BASE_URL=http://47.102.146.147 E2E_USERNAME=... E2E_PASSWORD=... npm --prefix frontend run screenshots:user-manual`、`find docs/screenshots/user-manual -maxdepth 1 -name '*.png' -print | wc -l`（26），并抽样查看登录页与审计日志截图。
+
 ---
 
 ### P3-3｜Docker Compose / Helm 默认弱密码的运行时门禁需要补全覆盖面，而非从零建立

@@ -59,7 +59,8 @@ async function login(page) {
   }
   await page.getByPlaceholder('用户名').fill(username)
   await page.getByPlaceholder('密码').fill(password)
-  await page.getByRole('button', { name: /登\s*录/ }).click()
+  const submitButton = page.locator('.sagitta-auth-form button[type="submit"]')
+  await submitButton.click()
   await waitForStablePage(page)
   const current = page.url()
   if (current.includes('/login')) {
