@@ -1,14 +1,16 @@
 """监控与会话采样任务。"""
 
+from __future__ import annotations
+
 import asyncio
 import importlib
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.celery_app import celery_app
 from app.core.config import settings
@@ -26,8 +28,18 @@ from app.services.slowlog import SlowLogService
 
 logger = logging.getLogger(__name__)
 
+_TaskFunc = TypeVar("_TaskFunc", bound=Callable[..., Any])
 
-async def _run_with_task_session(collector: Any, *args: Any, **kwargs: Any) -> dict:
+
+def _typed_task(**kwargs: Any) -> Callable[[_TaskFunc], _TaskFunc]:
+    return cast(Callable[[_TaskFunc], _TaskFunc], celery_app.task(**kwargs))
+
+
+async def _run_with_task_session(
+    collector: Callable[..., Awaitable[dict[str, Any]]],
+    *args: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """使用 Celery 进程内的本地 async engine 运行监控采集器。
 
     Celery 任务每次执行都会调用 ``asyncio.run``，如果复用 FastAPI 全局 async engine，
@@ -42,7 +54,7 @@ async def _run_with_task_session(collector: Any, *args: Any, **kwargs: Any) -> d
         pool_pre_ping=True,
         echo=settings.DEBUG,
     )
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_local = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with async_session_local() as db:
             return await collector(db, *args, **kwargs)
@@ -53,7 +65,7 @@ async def _run_with_task_session(collector: Any, *args: Any, **kwargs: Any) -> d
 async def _collect_session_snapshots_with_db(
     db: AsyncSession,
     retention_days: int = DEFAULT_SESSION_RETENTION_DAYS,
-) -> dict:
+) -> dict[str, Any]:
     instances = (
         await db.execute(select(Instance).where(Instance.is_active.is_(True)))
     ).scalars().all()
@@ -142,14 +154,16 @@ async def _collect_session_snapshots_with_db(
     }
 
 
-async def _collect_session_snapshots_async(retention_days: int = DEFAULT_SESSION_RETENTION_DAYS) -> dict:
+async def _collect_session_snapshots_async(
+    retention_days: int = DEFAULT_SESSION_RETENTION_DAYS,
+) -> dict[str, Any]:
     return await _run_with_task_session(
         _collect_session_snapshots_with_db,
         retention_days=retention_days,
     )
 
 
-@celery_app.task(
+@_typed_task(
     name="collect_session_snapshots",
     queue="monitor",
     autoretry_for=(ConnectionError, TimeoutError, OSError),
@@ -157,11 +171,15 @@ async def _collect_session_snapshots_async(retention_days: int = DEFAULT_SESSION
     retry_backoff_max=60,
     max_retries=2,
 )
-def collect_session_snapshots(retention_days: int = 30) -> dict:
+def collect_session_snapshots(retention_days: int = 30) -> dict[str, Any]:
     return asyncio.run(_collect_session_snapshots_async(retention_days=retention_days))
 
 
-async def _collect_slow_queries_with_db(db: AsyncSession, retention_days: int = 30, limit: int = 100) -> dict:
+async def _collect_slow_queries_with_db(
+    db: AsyncSession,
+    retention_days: int = 30,
+    limit: int = 100,
+) -> dict[str, Any]:
     instances = (
         await db.execute(select(Instance).where(Instance.is_active.is_(True)))
     ).scalars().all()
@@ -213,7 +231,10 @@ async def _collect_slow_queries_with_db(db: AsyncSession, retention_days: int = 
     }
 
 
-async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100) -> dict:
+async def _collect_slow_queries_async(
+    retention_days: int = 30,
+    limit: int = 100,
+) -> dict[str, Any]:
     return await _run_with_task_session(
         _collect_slow_queries_with_db,
         retention_days=retention_days,
@@ -221,7 +242,7 @@ async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100
     )
 
 
-@celery_app.task(
+@_typed_task(
     name="collect_slow_queries",
     queue="monitor",
     autoretry_for=(ConnectionError, TimeoutError, OSError),
@@ -229,19 +250,22 @@ async def _collect_slow_queries_async(retention_days: int = 30, limit: int = 100
     retry_backoff_max=60,
     max_retries=2,
 )
-def collect_slow_queries(retention_days: int = 30, limit: int = 100) -> dict:
+def collect_slow_queries(retention_days: int = 30, limit: int = 100) -> dict[str, Any]:
     return asyncio.run(_collect_slow_queries_async(retention_days=retention_days, limit=limit))
 
 
-async def _collect_native_monitoring_with_db(db: AsyncSession, limit: int | None = None) -> dict:
+async def _collect_native_monitoring_with_db(
+    db: AsyncSession,
+    limit: int | None = None,
+) -> dict[str, Any]:
     return await MonitorService.collect_due_native(db, limit=limit)
 
 
-async def _collect_native_monitoring_async(limit: int | None = None) -> dict:
+async def _collect_native_monitoring_async(limit: int | None = None) -> dict[str, Any]:
     return await _run_with_task_session(_collect_native_monitoring_with_db, limit=limit)
 
 
-@celery_app.task(
+@_typed_task(
     name="collect_native_monitoring",
     queue="monitor",
     autoretry_for=(ConnectionError, TimeoutError, OSError),
@@ -249,5 +273,5 @@ async def _collect_native_monitoring_async(limit: int | None = None) -> dict:
     retry_backoff_max=60,
     max_retries=2,
 )
-def collect_native_monitoring(limit: int | None = None) -> dict:
+def collect_native_monitoring(limit: int | None = None) -> dict[str, Any]:
     return asyncio.run(_collect_native_monitoring_async(limit=limit))

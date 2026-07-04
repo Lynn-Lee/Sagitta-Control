@@ -539,6 +539,8 @@ def _validate_cors(self) -> "Settings":
 
 **增量落地状态（2026-07-04）**：本轮完成 `app/tasks/license.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐 `_run_with_session()` handler 泛型、License 刷新结果类型与 task 返回类型，并改用 `async_sessionmaker` 适配 SQLAlchemy 2 async 类型签名。`app/tasks/license.py` 已纳入 `backend/mypy-baseline.txt`。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/license.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_license_task.py -q`。下一轮可继续按同一策略消解 `app/tasks/monitor.py` 或其他任务模块。
 
+**增量落地状态（2026-07-04）**：本轮完成 `app/tasks/monitor.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐监控采集任务返回值泛型、collector 协程类型与 `async_sessionmaker` 类型签名。`app/tasks/monitor.py` 已纳入 `backend/mypy-baseline.txt`。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/monitor.py`、`cd backend && while IFS= read -r target; do uv run --with mypy mypy --follow-imports=silent "$target"; done < mypy-baseline.txt`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_notify_task.py tests/unit/test_monitor_native.py -q`。下一轮可继续按同一策略消解其他低风险 task module，或在任务模块阶段足够收敛后进入 P3。
+
 ---
 
 ## 阶段 P3：仓库与交付卫生
