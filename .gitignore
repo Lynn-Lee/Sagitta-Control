@@ -51,6 +51,9 @@ CLAUDE.md
 # ─── Docker ───────────────────────────────────────────────────
 *.log
 
+# ─── 商业构建产物（由 release workflow / 本地构建生成）──────────
+dist-commercial/
+
 # ─── 本地上传/下载 ────────────────────────────────────────────
 backend/downloads/
 backend/app/uploads/

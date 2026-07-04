@@ -8,7 +8,7 @@ Sagitta Control 采用以下边界：
 
 - 公开交付仓库：`Lynn-Lee/Sagitta-Deploy` 是 Sagitta Control 的专用公开交付仓库；根 `README.md` 直接作为用户入口，发布流程会更新仓库根目录下的产品介绍、部署文件、Helm Chart、安装脚本、法律提示、用户手册、运维升级文档、截图和 Release 下载资产。
 - 公开镜像仓库：公开拉取固定版本商业镜像。
-- 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录。
+- 私有源码仓库：继续保留后端源码、前端源码、商业镜像构建脚本、License 签发工具、Manifest 签名工具和内部发布记录；`dist-commercial/` 仅作为本地或 CI 生成目录，不纳入源码仓库版本控制。
 - License-Server-Center：统一负责在线激活、联网刷新和商业授权状态管理。
 
 推荐公开仓库结构：
@@ -259,6 +259,8 @@ python scripts/render-customer-package.py \
   --output-dir dist-commercial \
   --package-name Sagitta-Control-v2.3.5
 ```
+
+`dist-commercial/` 是商业包渲染输出目录，已在源码仓库中忽略；发布资产以 workflow、Release 下载资产和公开交付仓库为准，不把本地生成包提交回源码仓库。
 
 ## 8. 验收清单
 

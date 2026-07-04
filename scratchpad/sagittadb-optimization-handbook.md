@@ -564,6 +564,8 @@ git commit -m "移除已跟踪的商业构建产物目录，改为仅本地/CI �
 
 **验收标准**：新的构建产物不再出现在 `git status` 里；`docs/public_commercial_delivery.md` 中"私有源码仓库 / 公开交付仓库分离"的原则和实际仓库内容保持一致。
 
+**落地状态（2026-07-04）**：已完成。`dist-commercial/` 下 249 个既有商业构建产物已通过 `git rm -r --cached dist-commercial` 停止版本控制跟踪，本地生成目录保留但新增 `.gitignore` 规则避免后续商业包、SBOM 和 zip/sha256 产物再次进入源码提交。`docs/public_commercial_delivery.md` 已同步说明 `dist-commercial/` 仅作为本地或 CI 输出目录，发布资产以 workflow、Release 下载资产和公开交付仓库为准。验证命令：`git ls-files dist-commercial | wc -l`（0）、`git status --ignored --short dist-commercial | head`（目录显示为 ignored）、`git diff --check`。
+
 ---
 
 ### P3-2｜用户手册截图与当前品牌规范不一致
