@@ -99,7 +99,7 @@ async def test_send_notification_async_disposes_engine_when_service_raises():
     engine = SimpleNamespace(dispose=AsyncMock())
 
     with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-        "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
     ), patch(
         "app.services.notify.NotifyService.send_event",
         AsyncMock(side_effect=RuntimeError("notify failed")),
