@@ -57,7 +57,7 @@ async def test_execute_archive_async_disposes_engine_when_service_raises():
     engine = SimpleNamespace(dispose=AsyncMock())
 
     with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-        "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
     ), patch(
         "app.services.archive.ArchiveService.execute_job",
         AsyncMock(side_effect=RuntimeError("archive failed")),
@@ -73,7 +73,7 @@ async def test_dispatch_scheduled_archive_async_disposes_engine_when_service_rai
     engine = SimpleNamespace(dispose=AsyncMock())
 
     with patch("sqlalchemy.ext.asyncio.create_async_engine", return_value=engine), patch(
-        "sqlalchemy.orm.sessionmaker", return_value=_session_factory(db)
+        "sqlalchemy.ext.asyncio.async_sessionmaker", return_value=_session_factory(db)
     ), patch(
         "app.services.archive.ArchiveService.dispatch_scheduled_jobs",
         AsyncMock(side_effect=RuntimeError("dispatch failed")),

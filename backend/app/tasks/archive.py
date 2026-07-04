@@ -4,14 +4,22 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from app.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
+_TaskFunc = TypeVar("_TaskFunc", bound=Callable[..., Any])
 
-@celery_app.task(bind=True, name="execute_archive_job", max_retries=0, queue="archive")
-def execute_archive_job_task(self, job_id: int, operator_id: int):
+
+def _typed_task(**kwargs: Any) -> Callable[[_TaskFunc], _TaskFunc]:
+    return cast(Callable[[_TaskFunc], _TaskFunc], celery_app.task(**kwargs))
+
+
+@_typed_task(bind=True, name="execute_archive_job", max_retries=0, queue="archive")
+def execute_archive_job_task(self: Any, job_id: int, operator_id: int) -> None:
     logger.info("execute_archive_job start: job_id=%s", job_id)
     try:
         asyncio.run(_execute_archive_async(job_id, operator_id))
@@ -21,8 +29,8 @@ def execute_archive_job_task(self, job_id: int, operator_id: int):
     logger.info("execute_archive_job done: job_id=%s", job_id)
 
 
-@celery_app.task(bind=True, name="dispatch_scheduled_archive_jobs", max_retries=0, queue="archive")
-def dispatch_scheduled_archive_jobs_task(self):
+@_typed_task(bind=True, name="dispatch_scheduled_archive_jobs", max_retries=0, queue="archive")
+def dispatch_scheduled_archive_jobs_task(self: Any) -> int:
     logger.info("dispatch_scheduled_archive_jobs start")
     try:
         dispatched = asyncio.run(_dispatch_scheduled_archive_async())
@@ -34,8 +42,7 @@ def dispatch_scheduled_archive_jobs_task(self):
 
 
 async def _execute_archive_async(job_id: int, operator_id: int) -> None:
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.core.config import settings
     from app.services.archive import ArchiveService
@@ -43,7 +50,7 @@ async def _execute_archive_async(job_id: int, operator_id: int) -> None:
     importlib.import_module("app.models")
     engine = create_async_engine(settings.DATABASE_URL)
     try:
-        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session_local = async_sessionmaker(engine, expire_on_commit=False)
         async with async_session_local() as db:
             await ArchiveService.execute_job(db, job_id, operator_id)
     finally:
@@ -51,8 +58,7 @@ async def _execute_archive_async(job_id: int, operator_id: int) -> None:
 
 
 async def _dispatch_scheduled_archive_async() -> int:
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.core.config import settings
     from app.services.archive import ArchiveService
@@ -60,7 +66,7 @@ async def _dispatch_scheduled_archive_async() -> int:
     importlib.import_module("app.models")
     engine = create_async_engine(settings.DATABASE_URL)
     try:
-        async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session_local = async_sessionmaker(engine, expire_on_commit=False)
         async with async_session_local() as db:
             return await ArchiveService.dispatch_scheduled_jobs(db)
     finally:
