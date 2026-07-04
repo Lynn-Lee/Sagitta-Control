@@ -54,4 +54,5 @@ app/services/risk_plan.py
 app/services/sql_audit.py
 app/services/text2sql.py
 app/tasks/__init__.py
+app/tasks/license.py
 app/tasks/notify.py

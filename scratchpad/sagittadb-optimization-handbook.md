@@ -537,6 +537,8 @@ def _validate_cors(self) -> "Settings":
 
 **增量落地状态（2026-07-04）**：本轮按当前 CI/README 的真实语义修正执行口径：`backend/mypy-baseline.txt` 是"已清洁文件硬门禁清单"，不是豁免清单；已清洁的 `app/services/*` 继续保留在门禁内，不做删除降级。本轮完成 `app/tasks/notify.py` 的类型基线消解，补齐 Celery task 装饰器静态类型边界、payload 泛型类型与 async sessionmaker 类型用法，并将 `app/tasks/notify.py` 纳入 `backend/mypy-baseline.txt`。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/notify.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_notify_task.py -q`。下一轮可继续按同一策略消解 `app/tasks/license.py` 或其他任务模块。
 
+**增量落地状态（2026-07-04）**：本轮完成 `app/tasks/license.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐 `_run_with_session()` handler 泛型、License 刷新结果类型与 task 返回类型，并改用 `async_sessionmaker` 适配 SQLAlchemy 2 async 类型签名。`app/tasks/license.py` 已纳入 `backend/mypy-baseline.txt`。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/license.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_license_task.py -q`。下一轮可继续按同一策略消解 `app/tasks/monitor.py` 或其他任务模块。
+
 ---
 
 ## 阶段 P3：仓库与交付卫生

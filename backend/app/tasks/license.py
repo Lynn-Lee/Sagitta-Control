@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar, cast
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.celery_app import celery_app
 from app.core.config import settings
@@ -16,8 +17,15 @@ from app.services.notify import NotifyService
 
 logger = logging.getLogger(__name__)
 
+_TaskFunc = TypeVar("_TaskFunc", bound=Callable[..., Any])
 
-async def _run_with_session(handler):
+def _typed_task(**kwargs: Any) -> Callable[[_TaskFunc], _TaskFunc]:
+    return cast(Callable[[_TaskFunc], _TaskFunc], celery_app.task(**kwargs))
+
+
+async def _run_with_session[SessionResult](
+    handler: Callable[[AsyncSession], Awaitable[SessionResult]],
+) -> SessionResult:
     importlib.import_module("app.models")
     engine = create_async_engine(
         settings.DATABASE_URL,
@@ -27,7 +35,7 @@ async def _run_with_session(handler):
         pool_pre_ping=True,
         echo=settings.DEBUG,
     )
-    async_session_local = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_local = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with async_session_local() as db:
             return await handler(db)
@@ -47,7 +55,7 @@ def _renewal_days() -> set[int]:
     return result
 
 
-async def _refresh_online_license_with_db(db: AsyncSession) -> dict:
+async def _refresh_online_license_with_db(db: AsyncSession) -> dict[str, Any]:
     state = await LicenseService.status(db)
     if not settings.LICENSE_AUTO_REFRESH_ENABLED:
         return {"status": state["status"], "skipped": "disabled"}
@@ -88,6 +96,6 @@ async def _refresh_online_license_with_db(db: AsyncSession) -> dict:
     }
 
 
-@celery_app.task(bind=True, name="refresh_online_license", max_retries=0, queue="default")
-def refresh_online_license_task(self):
+@_typed_task(bind=True, name="refresh_online_license", max_retries=0, queue="default")
+def refresh_online_license_task(self: Any) -> dict[str, Any]:
     return asyncio.run(_run_with_session(_refresh_online_license_with_db))
