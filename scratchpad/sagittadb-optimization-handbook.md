@@ -520,6 +520,8 @@ def _validate_cors(self) -> "Settings":
 
 **增量落地状态（2026-07-04）**：本轮完成 `test_archive_cancel.py` 归档执行暂停边界补强：新增 `execute_job()` 中执行子流程把作业置为 `paused` 后不应把 workflow 误同步为 `exception`、不应写失败执行结果、不应发送 `execution_failed` 通知的回归测试。`ArchiveService.execute_job()` 收尾逻辑已改为只对 `success`/`failed`/`canceled` 终态同步 workflow 终态和发送完成/失败通知，`paused` 等非终态只提交当前作业状态并保留 workflow `executing`。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_archive_cancel.py -q`（23 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（955 passed，Total coverage 52.45%）。由于距离 55% 仍有缺口，本轮暂不把覆盖率门槛从 51% 上调。`P2-1` 剩余工作：继续评估 archive dest/mongo 执行分支覆盖，或在覆盖率仍不足 55% 时进入 `P2-2` mypy baseline 消解。
 
+**增量落地状态（2026-07-04）**：本轮完成 `test_archive_cancel.py` MongoDB `dest` 归档执行分支补强：新增目标库已插入但源集合删除数量不足时必须拒绝继续、记录 `FAILED` 批次并提示人工核对的回归测试。`ArchiveService._execute_dest_mongo()` 已在 `insert_many()` 后校验 `delete_many()` 删除数量必须等于本批已插入文档数，避免目标已写入而源数据未完整删除时被误记为成功批次。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_archive_cancel.py tests/unit/test_archive_doris.py tests/unit/test_archive_starrocks.py tests/unit/test_archive_task.py -q`（36 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（956 passed，Total coverage 52.52%）。由于距离 55% 仍有缺口，本轮暂不把覆盖率门槛从 51% 上调。`P2-1` 剩余工作：归档核心执行风险边界已继续收敛，下一轮可进入 `P2-2` mypy baseline 消解。
+
 ---
 
 ### P2-2｜mypy baseline 消解计划

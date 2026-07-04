@@ -1171,6 +1171,10 @@ class ArchiveService:
             ids = [doc["_id"] for doc in docs]
             result = await src.delete_many({"_id": {"$in": ids}})
             deleted = int(result.deleted_count)
+            if deleted != len(docs):
+                msg = f"第 {batch_no} 批删除源数据不完整：目标已插入 {len(docs)} 行，但源表仅删除 {deleted} 行（需人工核对）"
+                await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.FAILED, len(docs), len(docs), deleted, msg, started)
+                raise AppException(msg, code=500)
             job.current_batch = batch_no
             job.processed_rows += deleted
             await ArchiveService._log_batch(db, job, batch_no, ArchiveBatchStatus.SUCCESS, len(docs), len(docs), deleted, "", started)

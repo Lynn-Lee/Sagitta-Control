@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.exceptions import AppException
-from app.models.archive import ArchiveJobStatus
+from app.models.archive import ArchiveBatchStatus, ArchiveJobStatus
 from app.models.workflow import AuditStatus, WorkflowStatus
 from app.services.archive import ArchiveService
 
@@ -416,6 +416,62 @@ async def test_archive_execute_job_pause_does_not_mark_workflow_exception():
     assert wf.finish_time is None
     assert content.execute_result == ""
     assert [call.args[0]["event_type"] for call in enqueue_event.call_args_list] == ["execution_started"]
+
+
+@pytest.mark.asyncio
+async def test_archive_dest_mongo_rejects_partial_source_delete_after_insert():
+    job = SimpleNamespace(
+        id=13,
+        status=ArchiveJobStatus.RUNNING,
+        current_batch=0,
+        processed_rows=0,
+        batch_size=2,
+        source_db="source",
+        source_table="orders",
+        dest_db="archive",
+        dest_table="orders_archive",
+        condition='{"status": "expired"}',
+        sleep_ms=0,
+    )
+    docs = [{"_id": "a", "status": "expired"}, {"_id": "b", "status": "expired"}]
+
+    class _FindResult:
+        def limit(self, count):
+            assert count == 2
+            return self
+
+        async def to_list(self, count):
+            assert count == 2
+            return docs
+
+    src_collection = SimpleNamespace(
+        find=MagicMock(return_value=_FindResult()),
+        delete_many=AsyncMock(return_value=SimpleNamespace(deleted_count=1)),
+    )
+    dest_collection = SimpleNamespace(insert_many=AsyncMock())
+    src_engine = SimpleNamespace(get_connection=AsyncMock(return_value={"source": {"orders": src_collection}}))
+    dest_engine = SimpleNamespace(get_connection=AsyncMock(return_value={"archive": {"orders_archive": dest_collection}}))
+    db = SimpleNamespace(commit=AsyncMock(), refresh=AsyncMock())
+
+    with patch("app.services.archive.ArchiveService._log_batch", AsyncMock()) as log_batch, pytest.raises(AppException) as exc_info:
+        await ArchiveService._execute_dest_mongo(db, job, src_engine, dest_engine)
+
+    assert "目标已插入 2 行，但源表仅删除 1 行" in str(exc_info.value)
+    assert job.status == ArchiveJobStatus.RUNNING
+    assert job.current_batch == 0
+    assert job.processed_rows == 0
+    dest_collection.insert_many.assert_awaited_once_with(docs)
+    src_collection.delete_many.assert_awaited_once_with({"_id": {"$in": ["a", "b"]}})
+    log_batch.assert_awaited_once()
+    _, logged_job, batch_no, status, selected_rows, inserted_rows, deleted_rows, message, _ = log_batch.await_args.args
+    assert logged_job is job
+    assert batch_no == 1
+    assert status == ArchiveBatchStatus.FAILED
+    assert selected_rows == 2
+    assert inserted_rows == 2
+    assert deleted_rows == 1
+    assert "需人工核对" in message
+    db.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
