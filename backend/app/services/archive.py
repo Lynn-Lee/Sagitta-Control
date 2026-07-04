@@ -935,25 +935,33 @@ class ArchiveService:
             job.error_message = str(exc)
             job.finished_at = datetime.now(UTC)
         finally:
-            await ArchiveService._sync_workflow_execution_result(db, job)
+            terminal_statuses = {
+                ArchiveJobStatus.SUCCESS,
+                ArchiveJobStatus.FAILED,
+                ArchiveJobStatus.CANCELED,
+            }
+            is_terminal = job.status in terminal_statuses
+            if is_terminal:
+                await ArchiveService._sync_workflow_execution_result(db, job)
             await db.commit()
-            NotifyService.enqueue_event(
-                {
-                    "event_type": "execution_succeeded" if job.status == ArchiveJobStatus.SUCCESS else "execution_failed",
-                    "subject_type": "workflow",
-                    "subject_id": job.workflow_id or job.id,
-                    "app_type": "数据归档",
-                    "title": f"数据归档-{job.source_table}",
-                    "applicant_id": job.created_by_id,
-                    "applicant_name": job.created_by,
-                    "user_ids": [job.created_by_id, operator_id],
-                    "instance_id": job.source_instance_id,
-                    "db_name": job.source_db,
-                    "table_name": job.source_table,
-                    "remark": job.error_message or f"处理行数：{job.processed_rows}",
-                    "detail_path": f"/workflow/{job.workflow_id}" if job.workflow_id else "/archive",
-                }
-            )
+            if is_terminal:
+                NotifyService.enqueue_event(
+                    {
+                        "event_type": "execution_succeeded" if job.status == ArchiveJobStatus.SUCCESS else "execution_failed",
+                        "subject_type": "workflow",
+                        "subject_id": job.workflow_id or job.id,
+                        "app_type": "数据归档",
+                        "title": f"数据归档-{job.source_table}",
+                        "applicant_id": job.created_by_id,
+                        "applicant_name": job.created_by,
+                        "user_ids": [job.created_by_id, operator_id],
+                        "instance_id": job.source_instance_id,
+                        "db_name": job.source_db,
+                        "table_name": job.source_table,
+                        "remark": job.error_message or f"处理行数：{job.processed_rows}",
+                        "detail_path": f"/workflow/{job.workflow_id}" if job.workflow_id else "/archive",
+                    }
+                )
 
     @staticmethod
     async def dispatch_scheduled_jobs(db: AsyncSession, limit: int = 50) -> int:

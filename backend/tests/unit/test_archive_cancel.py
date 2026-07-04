@@ -367,6 +367,58 @@ async def test_archive_execute_job_success_syncs_workflow_finish_and_content():
 
 
 @pytest.mark.asyncio
+async def test_archive_execute_job_pause_does_not_mark_workflow_exception():
+    job = SimpleNamespace(
+        id=13,
+        status=ArchiveJobStatus.QUEUED,
+        archive_mode="purge",
+        workflow_id=42,
+        source_instance_id=8,
+        source_db="testdb",
+        source_table="orders",
+        created_by_id=7,
+        created_by="liuyang",
+        started_at=None,
+        finished_at=None,
+        processed_rows=100,
+        current_batch=1,
+        error_message="",
+    )
+    content = SimpleNamespace(execute_result="")
+    wf = SimpleNamespace(
+        id=42,
+        status=WorkflowStatus.QUEUING,
+        execute_mode="immediate",
+        finish_time=None,
+        content=content,
+    )
+    workflow_result = MagicMock()
+    workflow_result.scalar_one_or_none.return_value = wf
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=wf),
+        execute=AsyncMock(return_value=workflow_result),
+        commit=AsyncMock(),
+    )
+
+    async def pause_job(_db, archive_job):
+        archive_job.status = ArchiveJobStatus.PAUSED
+        archive_job.finished_at = None
+        await _db.commit()
+
+    with patch("app.services.archive.ArchiveService.get_job_obj", AsyncMock(return_value=job)), patch(
+        "app.services.archive.ArchiveService._execute_purge_job",
+        side_effect=pause_job,
+    ), patch("app.services.notify.NotifyService.enqueue_event") as enqueue_event:
+        await ArchiveService.execute_job(db, 13, 2)
+
+    assert job.status == ArchiveJobStatus.PAUSED
+    assert wf.status == WorkflowStatus.EXECUTING
+    assert wf.finish_time is None
+    assert content.execute_result == ""
+    assert [call.args[0]["event_type"] for call in enqueue_event.call_args_list] == ["execution_started"]
+
+
+@pytest.mark.asyncio
 async def test_archive_job_visible_to_current_manager_approver():
     job = SimpleNamespace(
         id=13,
