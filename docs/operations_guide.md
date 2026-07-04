@@ -38,6 +38,7 @@ docker compose ps
 ```
 
 Kubernetes 部署时应先更新 Helm values 中的镜像、Secret、域名、证书、资源限制和持久化配置，再执行 `helm upgrade --install`。
+Helm Chart 已内置 `values.schema.json`，当 `app.env=production` 时会拒绝默认 `SECRET_KEY`、内置或外部 PostgreSQL/Redis 默认弱密码；生产发布必须通过 `values-prod.yaml`、`--set` 或客户侧 Secret 管理系统显式注入随机值。
 
 ### 2.2 Oracle Instant Client
 
@@ -430,7 +431,7 @@ Oracle 监控默认遵循“可用则增强、不可用则降级”的原则。�
 每月建议检查：
 
 - 生产环境未使用默认 `SECRET_KEY`。
-- PostgreSQL、Redis、Grafana 未使用默认密码。
+- PostgreSQL、Redis、Grafana 和 `GRAFANA_CLIENT_SECRET` 未使用默认弱值。
 - 外网未暴露数据库、Redis、Flower、Prometheus 和 Grafana 管理口。
 - 管理员账号数量合理，离职账号已禁用。
 - 用户角色和用户组资源范围符合最小权限原则。
@@ -455,7 +456,7 @@ scripts/ga-acceptance-check.py --base-url http://127.0.0.1:8000 \
 
 产品内 `商业交付` → `交付与支持` 页面已沉淀同类非破坏性验收能力，页面顶部会汇总推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、数据库类型分布和监控采集失败数；推广前待处理项可直接跳转到对应配置页，并区分阻塞项与建议补齐项。实施交付页提供页面化 checklist，覆盖品牌配置、License 授权、企业认证、通知渠道、首个实例、治理模板和验收报告；每项都会展示自动检测依据、上线必需/建议补齐级别、修复建议和快捷动作。页面提供 `初始化试用环境`，可幂等创建商业试用资源组、用户组、标准审批流和样例审计记录；如已接入活跃实例，会补充 SQL 工单、查询权限申请、在线查询、归档作业和监控快照演示数据并自动生成验收报告。该流程不会伪造活跃实例或保存真实数据库密码，未接入实例时仍需按客户现场信息完成首个实例配置。页面会自检备份脚本、恢复脚本、升级回滚脚本、商业构建门禁脚本、客户包 sha256、客户包签名和 SBOM 材料；容器运行态如果无法直接访问宿主机交付目录，会使用随后端打包的 `commercial_delivery_manifest.json` 作为已验证发布清单兜底。建议客户现场优先在页面生成 Markdown 和 JSON 验收报告，再按需要使用脚本做自动化或离线复核。验收报告会输出 `可推广`、`需补配置` 或 `阻塞` 结论；诊断包导出会自动脱敏密码、Token、Secret 和连接串，可用于支持排障流转。
 
-客户现场进入正式推广或客户验收前，先在客户包目录执行 `./prepare-go-live-env.sh --customer-id <customer_id>` 生成生产随机密钥和稳定部署 ID，再完成正式 License、实例、治理、通知和验收报告配置。最后执行 `./go-live-check.sh --api-base-url http://<server>:8000 --frontend-url http://<server>/ --username <admin> --password '<password>'` 作为硬门禁；管理员启用 2FA 时改用 `--token <access_token>`。该脚本会把默认密钥、试用 License、客户 ID 不一致、无活跃实例、实施向导未完成、推广就绪度非 `ready`、监控采集失败和待处理项全部判为失败。
+客户现场进入正式推广或客户验收前，先在客户包目录执行 `./prepare-go-live-env.sh --customer-id <customer_id>` 生成生产随机密钥和稳定部署 ID，再完成正式 License、实例、治理、通知和验收报告配置。最后执行 `./go-live-check.sh --api-base-url http://<server>:8000 --frontend-url http://<server>/ --username <admin> --password '<password>'` 作为硬门禁；管理员启用 2FA 时改用 `--token <access_token>`。该脚本会把默认密钥、试用 License、客户 ID 不一致、无活跃实例、实施向导未完成、推广就绪度非 `ready`、监控采集失败和待处理项全部判为失败；源码部署前的 `deploy/preflight-check.sh` 还会拦截 `POSTGRES_PASSWORD`、`REDIS_PASSWORD` 和 `GRAFANA_CLIENT_SECRET` 残留默认弱值。
 
 上线和升级前应保存以下内部记录：服务版本、镜像摘要、数据库备份文件、健康检查
 结果、关键链路验收结果、安全扫描结果和 License 激活/刷新结果。这些记录只进入

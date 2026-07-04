@@ -596,10 +596,12 @@ git commit -m "移除已跟踪的商业构建产物目录，改为仅本地/CI �
 
 ```bash
 # deploy/preflight-check.sh 现有 145-147 行之后追加
-check_env_secret GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET changeme
+check_env_secret GRAFANA_CLIENT_SECRET changeme
 ```
 
 **验收标准**：`APP_ENV=production` 时，`.env` 中残留任一已知默认弱密码（含新补充的 Grafana OAuth Secret）会导致 `preflight-check.sh` 非零退出；Helm 部署路径确认是否需要等价门禁并给出结论（即使结论是"当前 Helm 场景暂不需要，因为客户走 `go-live-check.sh`"，也要在运维文档里写清楚，不要留空白）。
+
+**落地状态（2026-07-04）**：已完成。`deploy/preflight-check.sh` 在既有 `SECRET_KEY`、`POSTGRES_PASSWORD`、`REDIS_PASSWORD` 检查基础上，新增实际 Compose 输入变量 `GRAFANA_CLIENT_SECRET=changeme` 拦截，避免 Grafana OAuth Secret 继续使用默认弱值。Helm 路径新增 `deploy/helm/sagitta-control/values.schema.json`，当 `app.env=production` 时拒绝默认 `SECRET_KEY`、内置 PostgreSQL/Redis 弱密码，以及外部 PostgreSQL/Redis 的 `CHANGE_ME` 占位密码；`docs/operations_guide.md` 与客户安装文档已写清 Helm schema 和 Compose preflight 的门禁边界。验证命令：`uv run --with pytest pytest tests/scripts/test_preflight_secret_gates.py -q`、`uv run --with pytest pytest tests/scripts/test_quality_gates.py::test_helm_chart_rejects_known_production_default_secrets -q`、`bash -n deploy/preflight-check.sh deploy/customer/go-live-check.sh`、`python3 -m json.tool deploy/helm/sagitta-control/values.schema.json >/dev/null`、`uv run --with jsonschema --with pyyaml python ...` 验证默认 Helm values 与 prod overlay 均会因生产弱默认值失败。
 
 ---
 

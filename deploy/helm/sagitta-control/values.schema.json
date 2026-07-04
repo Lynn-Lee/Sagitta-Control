@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "properties": {
+        "env": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "externalDatabase": {
+      "type": "object",
+      "properties": {
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "externalRedis": {
+      "type": "object",
+      "properties": {
+        "password": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "app": {
+            "properties": {
+              "env": {
+                "const": "production"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "app": {
+            "properties": {
+              "secretKey": {
+                "minLength": 32,
+                "not": {
+                  "enum": [
+                    "CHANGE_ME_USE_RANDOM_32_CHARS_IN_PRODUCTION",
+                    "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS"
+                  ]
+                },
+                "pattern": "^(?!(.)\\1+$)(?!(0123456789|abcdefgh|password|changeme)).+"
+              }
+            },
+            "required": [
+              "secretKey"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "app": {
+            "properties": {
+              "env": {
+                "const": "production"
+              }
+            }
+          },
+          "postgresql": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "postgresql": {
+            "properties": {
+              "auth": {
+                "properties": {
+                  "password": {
+                    "not": {
+                      "enum": [
+                        "sagitta123",
+                        "CHANGE_ME"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "password"
+                ]
+              }
+            },
+            "required": [
+              "auth"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "app": {
+            "properties": {
+              "env": {
+                "const": "production"
+              }
+            }
+          },
+          "postgresql": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "externalDatabase": {
+            "properties": {
+              "password": {
+                "not": {
+                  "enum": [
+                    "CHANGE_ME",
+                    "sagitta123"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "password"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "app": {
+            "properties": {
+              "env": {
+                "const": "production"
+              }
+            }
+          },
+          "redis": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "redis": {
+            "properties": {
+              "auth": {
+                "properties": {
+                  "password": {
+                    "not": {
+                      "enum": [
+                        "redis123",
+                        "CHANGE_ME"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "password"
+                ]
+              }
+            },
+            "required": [
+              "auth"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "app": {
+            "properties": {
+              "env": {
+                "const": "production"
+              }
+            }
+          },
+          "redis": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "externalRedis": {
+            "properties": {
+              "password": {
+                "not": {
+                  "enum": [
+                    "CHANGE_ME",
+                    "redis123"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "password"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

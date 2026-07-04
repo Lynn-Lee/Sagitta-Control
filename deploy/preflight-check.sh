@@ -170,6 +170,7 @@ fi
 check_secret_key CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS
 check_env_secret POSTGRES_PASSWORD sagitta123
 check_env_secret REDIS_PASSWORD redis123
+check_env_secret GRAFANA_CLIENT_SECRET changeme
 
 license_public_key="$(env_value LICENSE_PUBLIC_KEY || true)"
 license_server_url="$(env_value LICENSE_SERVER_URL || true)"

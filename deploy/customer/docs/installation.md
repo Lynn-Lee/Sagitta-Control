@@ -261,6 +261,7 @@ helm upgrade --install sagitta-control helm/sagitta-control \
 Helm 上线前请确认：
 
 - `values-prod.yaml` 中的域名、Ingress、证书、存储类、外部 PostgreSQL 和外部 Redis 已替换为客户现场值。
+- Chart 的 `values.schema.json` 会在 `app.env=production` 时拒绝默认 `SECRET_KEY`、PostgreSQL 和 Redis 弱密码；安装前必须通过 `--set`、独立 values 文件或客户侧 Secret 管理系统注入随机值。
 - 密钥、数据库密码、License 配置和证书通过客户侧 Secret 管理系统注入，不提交到 Git。
 - PostgreSQL、Redis 或外部托管服务的备份策略已经确认。
 - 后端、Worker、Beat、前端 Pod 的资源限制符合客户规范。
