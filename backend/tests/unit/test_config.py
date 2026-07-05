@@ -37,9 +37,32 @@ def test_production_accepts_random_length_secret_key():
         _env_file=None,
         APP_ENV="production",
         SECRET_KEY="r4ndom-secret-key-with-48-safe-chars-2026",
+        AUTH_COOKIE_SECURE=True,
     )
 
     assert settings.SECRET_KEY == "r4ndom-secret-key-with-48-safe-chars-2026"
+
+
+def test_production_rejects_insecure_auth_cookie_by_default():
+    with pytest.raises(ValidationError, match="生产环境必须设置 AUTH_COOKIE_SECURE=true"):
+        Settings(
+            _env_file=None,
+            APP_ENV="production",
+            SECRET_KEY="r4ndom-secret-key-with-48-safe-chars-2026",
+            AUTH_COOKIE_SECURE=False,
+        )
+
+
+def test_production_allows_insecure_auth_cookie_for_explicit_source_test():
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        SECRET_KEY="r4ndom-secret-key-with-48-safe-chars-2026",
+        AUTH_COOKIE_SECURE=False,
+        ALLOW_INSECURE_AUTH_COOKIE=True,
+    )
+
+    assert settings.AUTH_COOKIE_SECURE is False
 
 
 def test_production_rejects_wildcard_cors_origins():
@@ -48,5 +71,6 @@ def test_production_rejects_wildcard_cors_origins():
             _env_file=None,
             APP_ENV="production",
             SECRET_KEY="r4ndom-secret-key-with-48-safe-chars-2026",
+            AUTH_COOKIE_SECURE=True,
             CORS_ORIGINS=["*"],
         )

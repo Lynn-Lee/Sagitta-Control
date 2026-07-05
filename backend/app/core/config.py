@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     AUTH_COOKIE_SECURE: bool = False
+    ALLOW_INSECURE_AUTH_COOKIE: bool = False
     AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
     AUTH_COOKIE_DOMAIN: str = ""
 
@@ -126,6 +127,16 @@ class Settings(BaseSettings):
     def validate_cors_origins(self) -> "Settings":
         if self.APP_ENV == "production" and "*" in self.CORS_ORIGINS:
             raise ValueError("生产环境禁止 CORS_ORIGINS 使用通配符 '*'。")
+        return self
+
+    @model_validator(mode="after")
+    def validate_cookie_security(self) -> "Settings":
+        if (
+            self.APP_ENV == "production"
+            and not self.AUTH_COOKIE_SECURE
+            and not self.ALLOW_INSECURE_AUTH_COOKIE
+        ):
+            raise ValueError("生产环境必须设置 AUTH_COOKIE_SECURE=true；仅源码 HTTP 测试环境可显式开启豁免。")
         return self
 
     @property

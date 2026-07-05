@@ -258,6 +258,8 @@ for key in POSTGRES_PASSWORD REDIS_PASSWORD SECRET_KEY LICENSE_PUBLIC_KEY LICENS
 done
 check_exact_env APP_ENV production
 check_exact_env APP_INTEGRITY_REQUIRED true
+check_exact_env AUTH_COOKIE_SECURE true
+check_exact_env ALLOW_INSECURE_AUTH_COOKIE false
 check_exact_env LICENSE_ALLOW_LEGACY_LICENSE_IMPORT false
 
 secret_key="$(env_value SECRET_KEY || true)"

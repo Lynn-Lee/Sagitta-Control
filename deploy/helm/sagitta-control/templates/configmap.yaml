@@ -8,6 +8,8 @@ data:
   APP_ENV: {{ .Values.app.env | quote }}
   DEBUG: {{ .Values.app.debug | quote }}
   LOG_LEVEL: {{ .Values.app.logLevel | quote }}
+  AUTH_COOKIE_SECURE: {{ .Values.app.authCookieSecure | quote }}
+  ALLOW_INSECURE_AUTH_COOKIE: {{ .Values.app.allowInsecureAuthCookie | quote }}
   ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.app.accessTokenExpireMinutes | quote }}
   REFRESH_TOKEN_EXPIRE_DAYS: {{ .Values.app.refreshTokenExpireDays | quote }}
   TENANT_ID: {{ .Values.app.tenantId | quote }}

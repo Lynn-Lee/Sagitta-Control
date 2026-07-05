@@ -122,6 +122,8 @@ app:
   logLevel: INFO
   secretKey: "CHANGE_ME_USE_RANDOM_32_CHARS_IN_PRODUCTION"
   fernetKey: "CHANGE_ME_GENERATE_WITH_cryptography_fernet"
+  authCookieSecure: true
+  allowInsecureAuthCookie: false
   accessTokenExpireMinutes: 60
   refreshTokenExpireDays: 7
   tenantId: "1"

@@ -235,6 +235,7 @@ http://<server>/
 
 - `.env` 关键配置不是空值或占位符。
 - `APP_ENV=production`、`APP_INTEGRITY_REQUIRED=true`。
+- `AUTH_COOKIE_SECURE=true`、`ALLOW_INSECURE_AUTH_COOKIE=false`，确保公网生产环境只通过 HTTPS 发送浏览器登录 Cookie。
 - 前后端健康接口可访问。
 - 管理员认证通过。
 - License 为正式授权且非试用。
