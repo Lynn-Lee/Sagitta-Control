@@ -35,10 +35,10 @@ screenshots/
   23-commercial-support.png
   24-audit-log.png
 releases/
-  v2.3.5/
-    Sagitta-Control-v2.3.5.zip
-    Sagitta-Control-v2.3.5.zip.sha256
-    Sagitta-Control-v2.3.5.zip.sig.json
+  v3.0.0/
+    Sagitta-Control-v3.0.0.zip
+    Sagitta-Control-v3.0.0.zip.sha256
+    Sagitta-Control-v3.0.0.zip.sig.json
 ```
 
 公开仓库根 `README.md` 由 Sagitta Control 私有源码仓库的商业发布 workflow 渲染生成，是客户下载、安装、授权和运维文档的第一入口。
@@ -80,8 +80,8 @@ releases/
 Sagitta Control 镜像发布到公开 GHCR 仓库，并只在部署包中引用完整版本号：
 
 ```text
-ghcr.io/<org>/sagitta-control-backend:2.3.5
-ghcr.io/<org>/sagitta-control-frontend:2.3.5
+ghcr.io/<org>/sagitta-control-backend:3.0.0
+ghcr.io/<org>/sagitta-control-frontend:3.0.0
 ```
 
 发布规则：
@@ -101,11 +101,11 @@ Sagitta Control 在专用公开仓库中按版本发版：
 
 ```text
 Repository: Lynn-Lee/Sagitta-Deploy
-Tag: v2.3.5
-Title: Sagitta Control v2.3.5
+Tag: v3.0.0
+Title: Sagitta Control v3.0.0
 Assets:
-  Sagitta-Control-v2.3.5.zip
-  Sagitta-Control-v2.3.5.zip.sha256
+  Sagitta-Control-v3.0.0.zip
+  Sagitta-Control-v3.0.0.zip.sha256
 ```
 
 Release 发布说明使用 [Sagitta Control 公开发布模板](release_templates/sagitta_control_public_release.md)。
@@ -113,11 +113,11 @@ Release 发布说明使用 [Sagitta Control 公开发布模板](release_template
 用户安装命令示例：
 
 ```bash
-wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v2.3.5/Sagitta-Control-v2.3.5.zip
-wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v2.3.5/Sagitta-Control-v2.3.5.zip.sha256
-sha256sum -c Sagitta-Control-v2.3.5.zip.sha256
-unzip Sagitta-Control-v2.3.5.zip
-cd Sagitta-Control-v2.3.5
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v3.0.0/Sagitta-Control-v3.0.0.zip
+wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v3.0.0/Sagitta-Control-v3.0.0.zip.sha256
+sha256sum -c Sagitta-Control-v3.0.0.zip.sha256
+unzip Sagitta-Control-v3.0.0.zip
+cd Sagitta-Control-v3.0.0
 
 cp .env.example .env
 vim .env
@@ -209,9 +209,9 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 
 私有仓库负责生成公开交付资产：
 
-1. 确认版本号，例如 `2.3.5`。
-2. 构建并推送 `ghcr.io/<org>/sagitta-control-backend:2.3.5`。
-3. 构建并推送 `ghcr.io/<org>/sagitta-control-frontend:2.3.5`。
+1. 确认版本号，例如 `3.0.0`。
+2. 构建并推送 `ghcr.io/<org>/sagitta-control-backend:3.0.0`。
+3. 构建并推送 `ghcr.io/<org>/sagitta-control-frontend:3.0.0`。
 4. 生成并签名商业 Manifest。
 5. 渲染客户部署包。
 6. 生成 zip 和 sha256。
@@ -221,13 +221,13 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 10. 生成前后端镜像 CycloneDX SBOM，签名前后端镜像、SBOM 和客户部署包。
 11. 执行 `scripts/validate-commercial-release-materials.sh`，确认 zip、sha256、客户包签名、前后端 SBOM、SBOM sha256 和 cosign bundle 均已生成且可校验。
 12. 同步部署文件到公开仓库 `Lynn-Lee/Sagitta-Deploy` 根目录。
-13. 在公开仓库创建或更新 `v2.3.5` Release。
+13. 在公开仓库创建或更新 `v3.0.0` Release。
 14. 上传 zip、sha256、签名文件和 SBOM。
 
 源码 CI 和商业发布机制与 DataFusionX 保持一致：
 
 - 推送到 `main` 时，只触发 `.github/workflows/ci.yml` 和 `.github/workflows/release-version-record.yml`，用于源码构建校验和版本记录，不构建或发布商业包。
-- 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `2.3.5-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步公开交付仓库。
+- 推送到 `release/**` 时，由 `.github/workflows/commercial-release.yml` 生成 RC 候选版本，例如 `3.0.0-rc.123.abcdef0`，并推送固定版本商业镜像，但不默认同步公开交付仓库。
 - 推送正式 tag `vX.Y.Z` 时，生成正式版本 `X.Y.Z`，并同步到 `Lynn-Lee/Sagitta-Deploy`。
 - 手动触发商业 workflow 时，如果填写 `version`，生成指定正式版本；如果留空，生成快照版本；默认不发布到公开交付仓库，只有显式勾选发布时才同步公开发布仓库。
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagitta-control-backend:<version>` 和 `ghcr.io/lynn-lee/sagitta-control-frontend:<version>`。
@@ -248,16 +248,16 @@ PUBLIC_RELEASES_TOKEN
 现有脚本入口：
 
 ```bash
-VERSION=2.3.5 \
+VERSION=3.0.0 \
 IMAGE_REPOSITORY=ghcr.io/<org>/sagitta-control \
 MANIFEST_PRIVATE_KEY_FILE=/path/to/manifest_private_key \
 ./scripts/build-commercial-images.sh
 
 python scripts/render-customer-package.py \
-  --version 2.3.5 \
+  --version 3.0.0 \
   --image-repository ghcr.io/<org>/sagitta-control \
   --output-dir dist-commercial \
-  --package-name Sagitta-Control-v2.3.5
+  --package-name Sagitta-Control-v3.0.0
 ```
 
 `dist-commercial/` 是商业包渲染输出目录，已在源码仓库中忽略；发布资产以 workflow、Release 下载资产和公开交付仓库为准，不把本地生成包提交回源码仓库。
@@ -300,10 +300,10 @@ Product Code: sagitta-control
 Product Name: Sagitta Control
 Edition: enterprise
 Trial Days: 30
-Release Tag: v2.3.5
-Package Name: Sagitta-Control-v2.3.5.zip
-Backend Image: ghcr.io/<org>/sagitta-control-backend:2.3.5
-Frontend Image: ghcr.io/<org>/sagitta-control-frontend:2.3.5
+Release Tag: v3.0.0
+Package Name: Sagitta-Control-v3.0.0.zip
+Backend Image: ghcr.io/<org>/sagitta-control-backend:3.0.0
+Frontend Image: ghcr.io/<org>/sagitta-control-frontend:3.0.0
 License Server: License-Server-Center
 Expired Behavior: 保留登录和授权管理入口，业务 API 阻断
 ```

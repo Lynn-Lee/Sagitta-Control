@@ -3,7 +3,7 @@
 > 企业级多引擎数据库安全管控平台
 > 矢向数据，精准管控
 
-Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v2.3.5 商业部署版 + v2-lite 授权体系**。
+Sagitta Control 是面向企业数据库安全管控场景的统一平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。平台基于 Archery v1.14.0 深度重构，当前正式版定位为 **v3.0.0 商业部署版 + v2-lite 授权体系**。
 
 > 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
 
@@ -179,7 +179,7 @@ npm run build
 
 ## 商业交付
 
-当前源码版本对应商业部署版本 `2.3.5`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
+当前源码版本对应商业部署版本 `3.0.0`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
 
 商业交付包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与商业发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；商业部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
 
