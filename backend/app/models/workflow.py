@@ -22,7 +22,7 @@ from app.models.base import BaseModel
 class WorkflowStatus(IntEnum):
     """
     工单状态（整数枚举）。
-    对应 Archery 1.x 字符串值（已废弃）：
+    历史字符串状态已废弃，当前统一使用整数值：
       0 ← workflow_manreviewing
       1 ← workflow_autoreviewwrong
       2 ← workflow_review_pass

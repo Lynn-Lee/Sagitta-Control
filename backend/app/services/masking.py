@@ -1,11 +1,11 @@
 """
 数据脱敏服务。
 
-原始问题：Archery 1.x 使用 goInception 解析 SELECT 列，导致：
+早期实现使用外部进程解析 SELECT 列，导致：
   - 非 MySQL 数据库（PgSQL/ClickHouse/MongoDB等）脱敏实际无效
-  - goInception 进程挂掉时脱敏失败，直接返回明文数据
+  - 解析进程不可用时脱敏失败，存在返回明文数据的风险
 
-修复方案：用 sqlglot 替代 goInception 的解析功能。
+当前方案：使用 sqlglot 解析列引用。
   - sqlglot 支持 20+ 方言，全部 11 种数据库引擎均生效
   - 纯 Python，无外部进程依赖
 """
@@ -117,7 +117,7 @@ class DataMaskingService:
     """
     数据脱敏服务。
     
-    脱敏规则类型（对应 Archery 1.x 的 7 种规则）：
+    内置脱敏规则类型：
       1. REGEX   - 正则替换（通用）
       2. EMAIL   - 邮箱脱敏（保留前两位）
       3. PHONE   - 手机号脱敏（保留前3后2）

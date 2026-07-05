@@ -1,6 +1,5 @@
 """
-引擎层数据结构（对应 Archery 1.x 的 ResultSet / ReviewSet / SqlItem）。
-升级为 Pydantic v2 模型，增加类型验证。
+引擎层数据结构。
 """
 from dataclasses import dataclass, field
 from typing import Any
@@ -8,10 +7,7 @@ from typing import Any
 
 @dataclass
 class ResultSet:
-    """
-    查询结果集。
-    对应 Archery 1.x ResultSet，新增 cost_time 和 warning 字段。
-    """
+    """查询结果集。"""
     # 查询是否出错
     error: str = ""
     # 列名列表
@@ -42,10 +38,7 @@ class ResultSet:
 
 @dataclass
 class SqlItem:
-    """
-    单条 SQL 的审核/执行结果。
-    对应 Archery 1.x SqlItem。
-    """
+    """单条 SQL 的审核/执行结果。"""
     id: int = 0
     errlevel: int = 0           # 0=正常 1=警告 2=错误
     stagestatus: str = ""       # 执行阶段状态描述
@@ -82,10 +75,7 @@ class SqlItem:
 
 @dataclass
 class ReviewSet:
-    """
-    审核/执行结果集（包含多条 SQL 的结果）。
-    对应 Archery 1.x ReviewSet。
-    """
+    """审核/执行结果集（包含多条 SQL 的结果）。"""
     full_sql: str = ""
     rows: list[SqlItem] = field(default_factory=list)
     # 全局错误（连接失败等）

@@ -1,5 +1,5 @@
 """
-引擎协议定义（替代 Archery 1.x 的 EngineBase 隐式鸭子类型）。
+引擎协议定义。
 
 使用 Python typing.Protocol 实现结构化子类型：
 - 所有引擎只需实现 Protocol 中声明的方法，无需继承
