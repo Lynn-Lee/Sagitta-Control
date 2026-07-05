@@ -12,7 +12,7 @@ permissions:
 jobs:
   frontend:
     name: 前端质量门禁
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, sagitta-control]
     defaults:
       run:
         working-directory: frontend
@@ -69,7 +69,7 @@ jobs:
 
   backend:
     name: 后端质量门禁
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, sagitta-control]
     services:
       postgres:
         image: postgres:16-alpine

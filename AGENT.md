@@ -59,7 +59,7 @@
 
 - 开始改动前先检查 `git status --short --branch`。
 - 标准远端约定：`origin` 指向 GitHub 主仓库 `https://github.com/Lynn-Lee/Sagitta-Control.git`，用于主源码记录和 GitHub Actions；`gitee` 指向 Gitee 国内镜像仓库 `git@gitee.com:lynn-lee/sagitta-control.git`，用于国内网络环境下的源码拉取和部署更新。
-- GitHub Actions 默认使用 GitHub-hosted runner，workflow 统一配置 `runs-on: ubuntu-latest`；CI 中显式安装 Node.js 22、Python 3.12 和 uv。不要再把 workflow 调度到旧的 repository 级 self-hosted runner 标签。
+- GitHub Actions 当前因 hosted runner 计费限制使用 ECS self-hosted runner，workflow 统一配置 `runs-on: [self-hosted, Linux, X64, sagitta-control]`；ECS runner 需预装 Node.js 22、Python 3.12、uv、Docker 和 Buildx。若后续账户计费恢复并明确改回 hosted runner，再统一切回 `ubuntu-latest`。
 - 不要回滚用户已有改动；如果工作区已有无关变更，只处理当前任务相关文件。
 - 不要使用 `git reset --hard`、`git checkout -- <file>`、`docker compose down -v`、`docker volume rm` 等破坏性命令，除非用户明确要求。
 - 提交前查看 staged diff，确保没有误提交 `.env`、真实数据库连接串、Token、私钥、License、激活码或客户数据。

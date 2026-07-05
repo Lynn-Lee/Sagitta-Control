@@ -47,7 +47,7 @@ concurrency:
 jobs:
   package:
     name: 构建并发布商业部署包
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, sagitta-control]
     timeout-minutes: 90
 
     steps:

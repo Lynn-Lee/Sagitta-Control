@@ -11,7 +11,7 @@ permissions:
 jobs:
   record:
     name: 记录版本
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, sagitta-control]
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          VERSION="v2.3.5-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          VERSION="v3.0.0-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
           mkdir -p release-record
           cat > release-record/release-version.json <<JSON
           {

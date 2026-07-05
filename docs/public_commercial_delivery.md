@@ -233,7 +233,7 @@ LICENSE_ALLOW_LEGACY_LICENSE_IMPORT=false
 - 工作流会推送公开镜像到 `ghcr.io/lynn-lee/sagitta-control-backend:<version>` 和 `ghcr.io/lynn-lee/sagitta-control-frontend:<version>`。
 - 工作流会更新 `Lynn-Lee/Sagitta-Deploy` 根目录，并把 zip、sha256、签名文件和 SBOM 放入 `releases/v<version>/`；同时创建或更新公开仓库的 `v<version>` GitHub Release。
 - 为避免 GitHub Actions 制品存储配额被大包耗尽，商业部署包默认不上传为 Actions artifact；如确需临时留存，可配置仓库变量 `ENABLE_COMMERCIAL_RELEASE_ARTIFACT=true`。
-- GitHub Actions 默认使用 GitHub-hosted runner，workflow 统一配置 `runs-on: ubuntu-latest`；源码 CI 显式安装 Node.js 22、Python 3.12 和 uv，不再依赖旧 self-hosted runner 预装环境。
+- 当前 GitHub-hosted runner 受账户计费限制，GitHub Actions 使用 ECS self-hosted runner，workflow 统一配置 `runs-on: [self-hosted, Linux, X64, sagitta-control]`；ECS runner 需预装 Node.js 22、Python 3.12、uv、Docker 和 Buildx。
 - 商业后端镜像在 GitHub Actions 中使用官方 PyPI 源并延长 pip 超时时间，避免 runner 访问依赖源时出现下载超时。
 
 仓库需要配置 GitHub Secrets：
