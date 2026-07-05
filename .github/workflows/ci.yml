@@ -20,13 +20,6 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 设置 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
       - name: 校验 Node.js
         run: |
           node --version
@@ -78,7 +71,7 @@ jobs:
           POSTGRES_USER: sagitta
           POSTGRES_PASSWORD: sagitta123
         ports:
-          - 5432:5432
+          - 55432:5432
         options: >-
           --health-cmd "pg_isready -U sagitta -d sagitta_control_test"
           --health-interval 10s
@@ -87,7 +80,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          - 56379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -96,24 +89,22 @@ jobs:
     env:
       APP_ENV: development
       SECRET_KEY: ci_test_secret_key_please_do_not_use_in_production
-      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
-      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
-      REDIS_URL: redis://127.0.0.1:6379/0
+      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
+      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
+      REDIS_URL: redis://127.0.0.1:56379/0
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 设置 Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: 设置 uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
+      - name: 准备 Python 虚拟环境
+        shell: bash
+        run: |
+          rm -rf .venv-ci
+          python3 -m venv .venv-ci
+          echo "VIRTUAL_ENV=${PWD}/.venv-ci" >> "${GITHUB_ENV}"
+          echo "${PWD}/.venv-ci/bin" >> "${GITHUB_PATH}"
 
       - name: 校验 Python 与 uv
         run: |
@@ -137,8 +128,8 @@ jobs:
       - name: 安装后端依赖
         shell: bash
         run: |
-          uv pip install --system --break-system-packages -r backend/requirements.lock
-          uv pip install --system --break-system-packages --no-deps -e backend
+          uv pip install -r backend/requirements.lock
+          uv pip install --no-deps -e backend
 
       - name: 后端依赖安全审计
         run: uvx pip-audit --disable-pip --no-deps -r backend/requirements.lock
