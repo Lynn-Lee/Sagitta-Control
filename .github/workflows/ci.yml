@@ -63,35 +63,14 @@ jobs:
   backend:
     name: 后端质量门禁
     runs-on: [self-hosted, Linux, X64, sagitta-control]
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: sagitta_control_test
-          POSTGRES_USER: sagitta
-          POSTGRES_PASSWORD: sagitta123
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U sagitta -d sagitta_control_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 56379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     env:
       APP_ENV: development
       SECRET_KEY: ci_test_secret_key_please_do_not_use_in_production
       DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
       DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
       REDIS_URL: redis://127.0.0.1:56379/0
+      CI_POSTGRES_CONTAINER: sagitta-ci-postgres-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_REDIS_CONTAINER: sagitta-ci-redis-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -110,6 +89,37 @@ jobs:
         run: |
           python3 --version
           uv --version
+
+      - name: 启动后端测试依赖
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker image inspect postgres:16-alpine >/dev/null
+          docker image inspect redis:7-alpine >/dev/null
+          docker rm -f "${CI_POSTGRES_CONTAINER}" "${CI_REDIS_CONTAINER}" >/dev/null 2>&1 || true
+          docker run -d \
+            --name "${CI_POSTGRES_CONTAINER}" \
+            --pull=never \
+            -e POSTGRES_DB=sagitta_control_test \
+            -e POSTGRES_USER=sagitta \
+            -e POSTGRES_PASSWORD=sagitta123 \
+            -p 127.0.0.1:55432:5432 \
+            postgres:16-alpine
+          docker run -d \
+            --name "${CI_REDIS_CONTAINER}" \
+            --pull=never \
+            -p 127.0.0.1:56379:6379 \
+            redis:7-alpine
+          for i in {1..30}; do
+            if docker exec "${CI_POSTGRES_CONTAINER}" pg_isready -U sagitta -d sagitta_control_test \
+              && docker exec "${CI_REDIS_CONTAINER}" redis-cli ping >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs "${CI_POSTGRES_CONTAINER}" || true
+          docker logs "${CI_REDIS_CONTAINER}" || true
+          exit 1
 
       - name: 校验后端依赖锁
         shell: bash
@@ -174,20 +184,9 @@ jobs:
       - name: 校验 Docker Compose
         run: docker compose -f deploy/docker-compose.yml config --quiet
 
-      - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          driver-opts: |
-            network=host
-          buildkitd-config-inline: |
-            [dns]
-              nameservers = ["223.5.5.5", "114.114.114.114", "8.8.8.8"]
-
       - name: 构建后端镜像
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: false
-          provenance: false
+        run: docker build -f backend/Dockerfile -t sagitta-control-backend-ci:${GITHUB_SHA} backend
+
+      - name: 清理后端测试依赖
+        if: always()
+        run: docker rm -f "${CI_POSTGRES_CONTAINER}" "${CI_REDIS_CONTAINER}" >/dev/null 2>&1 || true
