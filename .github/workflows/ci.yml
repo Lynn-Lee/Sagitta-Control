@@ -12,13 +12,20 @@ permissions:
 jobs:
   frontend:
     name: 前端质量门禁
-    runs-on: [self-hosted, Linux, X64, sagitta-control]
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: 校验 Node.js
         run: |
@@ -62,114 +69,76 @@ jobs:
 
   backend:
     name: 后端质量门禁
-    runs-on: [self-hosted, Linux, X64, sagitta-control]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sagitta_control_test
+          POSTGRES_USER: sagitta
+          POSTGRES_PASSWORD: sagitta123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sagitta -d sagitta_control_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     env:
       APP_ENV: development
       SECRET_KEY: ci_test_secret_key_please_do_not_use_in_production
-      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
-      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:55432/sagitta_control_test
-      REDIS_URL: redis://127.0.0.1:56379/0
-      CI_POSTGRES_CONTAINER: sagitta-ci-postgres-${{ github.run_id }}-${{ github.run_attempt }}
-      CI_REDIS_CONTAINER: sagitta-ci-redis-${{ github.run_id }}-${{ github.run_attempt }}
+      DATABASE_URL: postgresql+asyncpg://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
+      DATABASE_URL_SYNC: postgresql+psycopg2://sagitta:sagitta123@127.0.0.1:5432/sagitta_control_test
+      REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 准备 Python 虚拟环境
-        shell: bash
-        run: |
-          rm -rf .venv-ci
-          uv venv --python python3 .venv-ci
-          echo "VIRTUAL_ENV=${PWD}/.venv-ci" >> "${GITHUB_ENV}"
-          echo "${PWD}/.venv-ci/bin" >> "${GITHUB_PATH}"
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 设置 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
       - name: 校验 Python 与 uv
         run: |
           python3 --version
           uv --version
 
-      - name: 启动后端测试依赖
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker image inspect postgres:16-alpine >/dev/null
-          docker image inspect redis:7-alpine >/dev/null
-          docker rm -f "${CI_POSTGRES_CONTAINER}" "${CI_REDIS_CONTAINER}" >/dev/null 2>&1 || true
-          docker run -d \
-            --name "${CI_POSTGRES_CONTAINER}" \
-            --pull=never \
-            -e POSTGRES_DB=sagitta_control_test \
-            -e POSTGRES_USER=sagitta \
-            -e POSTGRES_PASSWORD=sagitta123 \
-            -p 127.0.0.1:55432:5432 \
-            postgres:16-alpine
-          docker run -d \
-            --name "${CI_REDIS_CONTAINER}" \
-            --pull=never \
-            -p 127.0.0.1:56379:6379 \
-            redis:7-alpine
-          for i in {1..30}; do
-            if docker exec "${CI_POSTGRES_CONTAINER}" pg_isready -U sagitta -d sagitta_control_test \
-              && docker exec "${CI_REDIS_CONTAINER}" redis-cli ping >/dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs "${CI_POSTGRES_CONTAINER}" || true
-          docker logs "${CI_REDIS_CONTAINER}" || true
-          exit 1
-
       - name: 校验后端依赖锁
         shell: bash
         run: |
-          python3 - <<'PY'
-          from __future__ import annotations
-
-          import re
-          import sys
-          import tomllib
-          from pathlib import Path
-
-          def normalize_name(value: str) -> str:
-              return re.sub(r"[-_.]+", "-", value).lower()
-
-          def requirement_name(value: str) -> str:
-              match = re.match(r"\s*([A-Za-z0-9_.-]+)", value)
-              if not match:
-                  raise ValueError(f"无法解析依赖声明：{value!r}")
-              return normalize_name(match.group(1))
-
-          pyproject = tomllib.loads(Path("backend/pyproject.toml").read_text(encoding="utf-8"))
-          expected = {
-              requirement_name(item)
-              for item in pyproject["project"].get("dependencies", [])
-          }
-          expected.update(
-              requirement_name(item)
-              for item in pyproject["project"].get("optional-dependencies", {}).get("dev", [])
-          )
-
-          locked: set[str] = set()
-          for line in Path("backend/requirements.lock").read_text(encoding="utf-8").splitlines():
-              line = line.strip()
-              if not line or line.startswith("#") or line.startswith("-"):
-                  continue
-              locked.add(requirement_name(line))
-
-          missing = sorted(expected - locked)
-          if missing:
-              print("backend/requirements.lock 缺少直接依赖：", ", ".join(missing), file=sys.stderr)
-              sys.exit(1)
-          print(f"backend/requirements.lock 覆盖 {len(expected)} 个后端直接依赖")
-          PY
+          lock_cutoff="$(git log -1 --format=%cI -- backend/requirements.lock)"
+          uv pip compile \
+            --python-version 3.12 \
+            --universal \
+            --extra dev \
+            --exclude-newer "${lock_cutoff}" \
+            --custom-compile-command 'uv pip compile --python-version 3.12 --universal --extra dev --output-file backend/requirements.lock backend/pyproject.toml' \
+            --output-file /tmp/sagitta-control-backend-requirements.lock \
+            backend/pyproject.toml
+          diff -u backend/requirements.lock /tmp/sagitta-control-backend-requirements.lock
 
       - name: 安装后端依赖
         shell: bash
         run: |
-          uv pip install -r backend/requirements.lock
-          uv pip install --no-deps -e backend
+          uv pip install --system --break-system-packages -r backend/requirements.lock
+          uv pip install --system --break-system-packages --no-deps -e backend
 
       - name: 后端依赖安全审计
         run: uvx pip-audit --disable-pip --no-deps -r backend/requirements.lock
@@ -214,9 +183,20 @@ jobs:
       - name: 校验 Docker Compose
         run: docker compose -f deploy/docker-compose.yml config --quiet
 
-      - name: 构建后端镜像
-        run: docker build -f backend/Dockerfile -t sagitta-control-backend-ci:${GITHUB_SHA} backend
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          driver-opts: |
+            network=host
+          buildkitd-config-inline: |
+            [dns]
+              nameservers = ["223.5.5.5", "114.114.114.114", "8.8.8.8"]
 
-      - name: 清理后端测试依赖
-        if: always()
-        run: docker rm -f "${CI_POSTGRES_CONTAINER}" "${CI_REDIS_CONTAINER}" >/dev/null 2>&1 || true
+      - name: 构建后端镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          provenance: false
