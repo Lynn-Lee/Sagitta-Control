@@ -49,3 +49,5 @@ def test_public_release_validation_uses_current_customer_doc_paths():
         "docs/release_templates/sagitta_control_public_release.md",
     ):
         assert stale_path not in workflow
+    assert "../screenshots/23-commercial-support.png" in workflow
+    assert "../screenshots/02-dashboard-query.png" not in workflow

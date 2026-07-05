@@ -405,7 +405,7 @@ jobs:
           test -f "${public_dir}/docs/installation_deployment.md"
           test -f "${public_dir}/docs/operations_upgrade.md"
           test -f "${public_dir}/docs/user_manual.md"
-          grep -q "../screenshots/02-dashboard-query.png" "${public_dir}/docs/user_manual.md"
+          grep -q "../screenshots/23-commercial-support.png" "${public_dir}/docs/operations_upgrade.md"
           test -f "${public_dir}/screenshots/02-dashboard-query.png"
           test -f "${public_dir}/screenshots/09-query-workbench.png"
           test -f "${public_dir}/screenshots/23-commercial-support.png"
