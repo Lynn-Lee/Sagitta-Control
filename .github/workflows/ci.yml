@@ -81,7 +81,7 @@ jobs:
         shell: bash
         run: |
           rm -rf .venv-ci
-          python3 -m venv .venv-ci
+          uv venv --python python3 .venv-ci
           echo "VIRTUAL_ENV=${PWD}/.venv-ci" >> "${GITHUB_ENV}"
           echo "${PWD}/.venv-ci/bin" >> "${GITHUB_PATH}"
 
