@@ -1,11 +1,6 @@
 # Sagitta Control 矢准数据库安全管控平台
 
-> 企业级多引擎数据库安全管控平台
-> 矢向数据，精准管控
-
 Sagitta Control 是面向企业数据库安全管控场景的独立平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。当前正式版定位为 **v3.0.0 商业部署版 + v2-lite 授权体系**。
-
-> 品牌口径：对外产品名统一为 `Sagitta Control`，中文软著/推广名称建议使用 `矢准数据库安全管控平台软件`；技术 slug、授权项目码、镜像名、Helm chart 和客户包名称统一使用 `sagitta-control` / `Sagitta-Control`。
 
 ## 核心能力
 
@@ -84,14 +79,13 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 
 | 文档 | 用途 |
 |---|---|
+| [README](README.md) | 项目入口、快速启动、研发命令和发布说明。 |
 | [产品设计文档](docs/sagitta_control_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
-| [运维管理手册](docs/operations_guide.md) | 部署、初始化、升级、回滚、备份恢复、监控告警、故障处理和安全检查。 |
-| [公开商业交付说明](docs/public_commercial_delivery.md) | 商业部署包、公开部署仓库、镜像、Release、License 和验收规则。 |
-| [公开发布说明模板](docs/release_templates/sagitta_control_public_release.md) | 发布 `vX.Y.Z` 时使用的 Release 说明模板。 |
-| [客户部署文档模板](deploy/customer/README.md) | 生成用户部署仓库和商业部署包时使用的客户文档源模板。 |
+| [安装部署手册](docs/installation_deployment.md) | 首次部署、服务器准备、Docker Compose / Helm 部署、授权激活和上线检查。 |
+| [运维升级手册](docs/operations_upgrade.md) | 日常巡检、备份、升级、回滚、日志诊断和安全基线。 |
 
-源码仓库只保留长期维护文档和客户交付模板；历史计划、一次性验证报告、阶段性测试记录不再作为正式文档入口维护。用户部署仓库文档由 `deploy/customer/` 模板生成。
+源码仓库只保留以上长期维护文档；历史计划、一次性验证报告、阶段性测试记录、发布模板和已完成优化手册不再作为正式文档维护。用户部署仓库文档由这些标准文档和 `deploy/customer/` 下的部署脚本生成。
 
 ## 内部源码发布
 
@@ -102,7 +96,7 @@ cd /opt/sagitta-control/source
 COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --ref origin/main
 ```
 
-`deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本，并按变更范围自动选择备份、迁移、镜像构建和服务重建；后端、Worker、Beat、Flower 共用同一个后端镜像，普通文档或 CI 改动会跳过镜像构建。首次配置 deploy key、remote、回滚和发布后验证步骤见 [运维管理手册](docs/operations_guide.md#24-内部-ecs-源码直拉部署约定)。
+`deploy/update-prod.sh` 会校验 SSH Git remote、拉取目标版本，并按变更范围自动选择备份、迁移、镜像构建和服务重建；后端、Worker、Beat、Flower 共用同一个后端镜像，普通文档或 CI 改动会跳过镜像构建。首次部署、回滚和发布后验证步骤见 [安装部署手册](docs/installation_deployment.md) 与 [运维升级手册](docs/operations_upgrade.md)。
 
 ## 生产环境安全提示
 
@@ -130,7 +124,7 @@ Sagitta Control/
 │   └── app/tasks/            # Celery 任务
 ├── frontend/                # React 前端应用
 ├── deploy/                  # 生产 Compose、Nginx、Prometheus、Grafana、Helm、备份脚本
-├── docs/                    # 产品设计、用户使用和运维管理文档
+├── docs/                    # 产品设计、使用、安装部署和运维升级文档
 ├── docker-compose.yml       # 本地开发 / 功能测试 Compose
 └── .env.example             # 环境变量模板
 ```
@@ -183,5 +177,4 @@ npm run build
 
 商业交付包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与商业发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；商业部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
 
-- 公开商业交付规则见 [Sagitta Control 公开商业交付说明](docs/public_commercial_delivery.md)。
-- 客户安装、升级和使用入口见 [Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy)。
+客户安装、升级和使用入口见 [Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy)，源码仓库内以 [安装部署手册](docs/installation_deployment.md)、[产品使用手册](docs/user_manual.md) 和 [运维升级手册](docs/operations_upgrade.md) 为准。

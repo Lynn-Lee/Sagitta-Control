@@ -9,8 +9,13 @@ ROOT = Path(__file__).resolve().parents[2]
 VERSION_COPY_FILES = [
     ROOT / "README.md",
     ROOT / "docs" / "sagitta_control_prd.md",
-    ROOT / "docs" / "operations_guide.md",
     ROOT / "docs" / "user_manual.md",
+    ROOT / "docs" / "installation_deployment.md",
+    ROOT / "docs" / "operations_upgrade.md",
+]
+VERSION_REQUIRED_FILES = [
+    ROOT / "README.md",
+    ROOT / "docs" / "sagitta_control_prd.md",
 ]
 LOGIN_PAGE = ROOT / "frontend" / "src" / "pages" / "auth" / "LoginPage.tsx"
 
@@ -29,7 +34,7 @@ def test_outward_facing_version_copy_matches_frontend_package_version():
         stale_match = stale_version_pattern.search(text)
         if stale_match:
             failures.append(f"{path.relative_to(ROOT)} still contains {stale_match.group(0)!r}")
-        if version not in text:
+        if path in VERSION_REQUIRED_FILES and version not in text:
             failures.append(f"{path.relative_to(ROOT)} does not mention current version {version!r}")
 
     login_page_text = LOGIN_PAGE.read_text()

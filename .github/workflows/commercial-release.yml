@@ -23,7 +23,7 @@ on:
         default: false
         type: boolean
       preserve_public_docs:
-        description: "发布到公开部署仓库时保留现有 README、docs、LEGAL-NOTICE 和 screenshots。"
+        description: "发布到公开部署仓库时保留现有 README、docs 和 screenshots。"
         required: false
         default: false
         type: boolean
@@ -342,7 +342,6 @@ jobs:
           if [[ "${preserve_public_docs}" == "true" ]]; then
             rsync_excludes+=(
               --exclude README.md
-              --exclude LEGAL-NOTICE.md
               --exclude docs
               --exclude screenshots
             )
@@ -397,18 +396,16 @@ jobs:
           test -f "${public_dir}/README.md"
           grep -q "Sagitta Control" "${public_dir}/README.md"
           grep -q "docker compose" "${public_dir}/README.md"
-          grep -q "License" "${public_dir}/README.md"
           grep -q "screenshots/02-dashboard-query.png" "${public_dir}/README.md"
 
           test -f "${public_dir}/docker-compose.yml"
           test -f "${public_dir}/.env.example"
-          test -f "${public_dir}/LEGAL-NOTICE.md"
           test -f "${public_dir}/nginx.conf"
           test -d "${public_dir}/helm/sagitta-control"
-          test -f "${public_dir}/docs/installation.md"
-          test -f "${public_dir}/docs/operations-upgrade.md"
-          test -f "${public_dir}/docs/product-manual.md"
-          grep -q "../screenshots/02-dashboard-query.png" "${public_dir}/docs/product-manual.md"
+          test -f "${public_dir}/docs/installation_deployment.md"
+          test -f "${public_dir}/docs/operations_upgrade.md"
+          test -f "${public_dir}/docs/user_manual.md"
+          grep -q "../screenshots/02-dashboard-query.png" "${public_dir}/docs/user_manual.md"
           test -f "${public_dir}/screenshots/02-dashboard-query.png"
           test -f "${public_dir}/screenshots/09-query-workbench.png"
           test -f "${public_dir}/screenshots/23-commercial-support.png"
@@ -493,10 +490,50 @@ jobs:
           title="Sagitta Control v${version}"
           notes_file="$(mktemp)"
 
-          sed \
-            -e "s/X.Y.Z/${version}/g" \
-            -e "s#ghcr.io/<org>/sagitta-control#${PUBLIC_IMAGE_REPOSITORY}#g" \
-            docs/release_templates/sagitta_control_public_release.md > "${notes_file}"
+          cat > "${notes_file}" <<EOF
+          # Sagitta Control v${version}
+
+          ## 镜像
+
+          - \`${PUBLIC_IMAGE_REPOSITORY}-backend:${version}\`
+          - \`${PUBLIC_IMAGE_REPOSITORY}-frontend:${version}\`
+
+          ## 安装
+
+          下载 \`Sagitta-Control-v${version}.zip\` 和 sha256 文件，校验后解压，并按包内 \`README.md\` 和 \`docs/installation_deployment.md\` 部署。
+
+          \`\`\`bash
+          wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v${version}/Sagitta-Control-v${version}.zip
+          wget https://github.com/Lynn-Lee/Sagitta-Deploy/releases/download/v${version}/Sagitta-Control-v${version}.zip.sha256
+          sha256sum -c Sagitta-Control-v${version}.zip.sha256
+          unzip Sagitta-Control-v${version}.zip
+          cd Sagitta-Control-v${version}
+          cp .env.example .env
+          ./prepare-go-live-env.sh --customer-id <customer_id>
+          docker compose pull
+          docker compose up -d postgres redis
+          docker compose run --rm backend alembic upgrade head
+          docker compose up -d
+          docker compose ps
+          \`\`\`
+
+          启动后先检查：
+
+          \`\`\`bash
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS http://127.0.0.1/health
+          \`\`\`
+
+          ## 试用与授权
+
+          首次部署自动进入 60 天全功能试用期。试用到期后，业务 API 会被阻断，授权管理页仍可访问。
+
+          在线授权默认需要至少每 7 天成功联网刷新一次；长期离线部署请使用 challenge-response 离线授权。
+
+          ## 安全说明
+
+          本部署包只包含部署文件，不包含 Sagitta Control 源码、私钥、客户 License、激活码或镜像仓库凭据。Release 同时提供客户包签名文件、前后端镜像 CycloneDX SBOM 及其校验/签名材料。
+          EOF
 
           assets=(
             "${public_dir}/releases/${release_dir}/${package_name}.zip"

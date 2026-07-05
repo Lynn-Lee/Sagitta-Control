@@ -14,18 +14,20 @@ from pathlib import Path
 
 
 PACKAGE_FILES = {
-    "deploy/customer/README.md": "README.md",
     "deploy/customer/docker-compose.yml": "docker-compose.yml",
     "deploy/customer/.env.example": ".env.example",
     "deploy/customer/prepare-go-live-env.sh": "prepare-go-live-env.sh",
     "deploy/customer/go-live-check.sh": "go-live-check.sh",
     "deploy/customer/upgrade.sh": "upgrade.sh",
     "deploy/customer/verify-license.sh": "verify-license.sh",
-    "deploy/customer/LEGAL-NOTICE.md": "LEGAL-NOTICE.md",
     "deploy/nginx.conf": "nginx.conf",
 }
+PACKAGE_DOC_FILES = {
+    "docs/installation_deployment.md": "docs/installation_deployment.md",
+    "docs/user_manual.md": "docs/user_manual.md",
+    "docs/operations_upgrade.md": "docs/operations_upgrade.md",
+}
 PACKAGE_DIRS = {
-    "deploy/customer/docs": "docs",
     "docs/screenshots/user-manual": "screenshots",
     "deploy/helm/sagitta-control": "helm/sagitta-control",
 }
@@ -78,10 +80,55 @@ def copy_package_files(repo_root: Path, package_dir: Path) -> None:
         shutil.copy2(repo_root / src, package_dir / dest)
     for src, dest in PACKAGE_DIRS.items():
         shutil.copytree(repo_root / src, package_dir / dest)
+    for src, dest in PACKAGE_DOC_FILES.items():
+        target = package_dir / dest
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repo_root / src, target)
+
+    write_customer_readme(package_dir)
 
     for script in ("prepare-go-live-env.sh", "go-live-check.sh", "upgrade.sh", "verify-license.sh"):
         path = package_dir / script
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def write_customer_readme(package_dir: Path) -> None:
+    (package_dir / "README.md").write_text(
+        """# Sagitta Control 客户部署包
+
+Sagitta Control 是面向企业数据库安全管控场景的统一平台。此部署包包含固定版本 Docker Compose、Helm Chart、上线检查脚本、升级脚本、产品截图和标准文档，不包含后端或前端源码。
+
+![交付与支持](screenshots/23-commercial-support.png)
+
+## 文档入口
+
+- [安装部署手册](docs/installation_deployment.md)：服务器准备、Docker Compose / Helm 部署、授权激活和上线检查。
+- [产品使用手册](docs/user_manual.md)：平台初始化、权限模型、SQL 工单、在线查询、观测诊断、归档和审计操作。
+- [运维升级手册](docs/operations_upgrade.md)：日常巡检、备份、升级、回滚、日志诊断和安全基线。
+
+## 快速部署
+
+```bash
+cp .env.example .env
+bash prepare-go-live-env.sh
+docker compose pull
+docker compose up -d postgres redis
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+bash go-live-check.sh
+```
+
+## 运维脚本
+
+- `prepare-go-live-env.sh`：检查 `.env` 中的 `SECRET_KEY`、`LICENSE_DEPLOYMENT_ID`、数据库密码和授权配置。
+- `go-live-check.sh`：检查容器、健康接口、授权状态和上线前关键配置。
+- `upgrade.sh`：执行固定版本升级、备份、迁移、重启和健康检查。
+- `verify-license.sh`：检查授权配置和许可证状态。
+
+共享部署截图、日志和诊断包前，请先确认没有暴露服务器 IP、`.env`、License 文件、激活码、数据库密码、Token 或未脱敏客户数据。
+""",
+        encoding="utf-8",
+    )
 
 
 def render_placeholders(package_dir: Path, version: str, image_repository: str) -> None:
@@ -94,6 +141,8 @@ def render_placeholders(package_dir: Path, version: str, image_repository: str) 
         text = path.read_text(encoding="utf-8")
         text = text.replace("__SAGITTA_CONTROL_VERSION__", version)
         text = text.replace("__IMAGE_REPOSITORY__", image_repository)
+        if path.parent.name == "docs":
+            text = text.replace("screenshots/user-manual/", "../screenshots/")
         if path.name == "Chart.yaml":
             text = re.sub(r"^version: .*$", f"version: {version}", text, flags=re.MULTILINE)
             text = re.sub(r"^appVersion: .*$", f'appVersion: "{version}"', text, flags=re.MULTILINE)
@@ -114,7 +163,7 @@ def split_image_repository(image_repository: str) -> tuple[str, str]:
 
 def validate_package(package_dir: Path, version: str) -> list[str]:
     errors: list[str] = []
-    expected = sorted(Path(dest) for dest in PACKAGE_FILES.values())
+    expected = sorted([Path("README.md"), *(Path(dest) for dest in PACKAGE_FILES.values())])
     actual = sorted(path.relative_to(package_dir) for path in package_dir.iterdir() if path.is_file())
     if actual != expected:
         errors.append(f"客户包文件不匹配：应为 {expected}，实际为 {actual}")
@@ -134,13 +183,10 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
         errors.append("客户包截图数量不足，README 和产品手册需要可展示的产品截图")
 
     readme_path = package_dir / "README.md"
-    product_manual_path = package_dir / "docs" / "product-manual.md"
-    installation_path = package_dir / "docs" / "installation.md"
-    operations_path = package_dir / "docs" / "operations-upgrade.md"
+    installation_path = package_dir / "docs" / "installation_deployment.md"
+    operations_path = package_dir / "docs" / "operations_upgrade.md"
     if readme_path.exists() and "screenshots/" not in readme_path.read_text(encoding="utf-8"):
         errors.append("README.md 未引用产品截图")
-    if product_manual_path.exists() and "../screenshots/" not in product_manual_path.read_text(encoding="utf-8"):
-        errors.append("产品使用手册未引用产品截图")
     required_doc_snippets = {
         readme_path: [
             "prepare-go-live-env.sh",

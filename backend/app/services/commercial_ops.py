@@ -1268,8 +1268,8 @@ class CommercialOpsService:
             "readiness": readiness,
             "docs": [
                 {"label": "用户使用手册", "path": "/docs/user_manual.md"},
-                {"label": "运维管理手册", "path": "/docs/operations_guide.md"},
-                {"label": "商业交付说明", "path": "/docs/public_commercial_delivery.md"},
+                {"label": "安装部署手册", "path": "/docs/installation_deployment.md"},
+                {"label": "运维升级手册", "path": "/docs/operations_upgrade.md"},
             ],
             "support": {
                 "email": "support@loveai.asia",

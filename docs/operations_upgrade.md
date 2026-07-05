@@ -32,7 +32,7 @@ curl -fsS http://127.0.0.1:8080/health
 
 产品内巡检建议使用 `商业交付` -> `交付与支持` 汇总推广就绪度、授权状态、客户环境用量、实例接入和监控采集摘要。
 
-![交付与支持巡检入口](../screenshots/23-commercial-support.png)
+![交付与支持巡检入口](screenshots/user-manual/23-commercial-support.png)
 
 建议每周至少登录一次 `商业交付` -> `License 授权`，确认在线授权刷新、客户 ID、部署指纹和授权项目状态。
 
