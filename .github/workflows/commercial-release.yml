@@ -396,7 +396,7 @@ jobs:
           test -f "${public_dir}/README.md"
           grep -q "Sagitta Control" "${public_dir}/README.md"
           grep -q "docker compose" "${public_dir}/README.md"
-          grep -q "screenshots/02-dashboard-query.png" "${public_dir}/README.md"
+          grep -q "screenshots/23-commercial-support.png" "${public_dir}/README.md"
 
           test -f "${public_dir}/docker-compose.yml"
           test -f "${public_dir}/.env.example"

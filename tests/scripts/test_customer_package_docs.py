@@ -29,6 +29,7 @@ def test_customer_readme_does_not_render_explanatory_blockquotes(tmp_path):
     assert "\n> " not in readme
     assert "版本：" not in readme
     assert "镜像仓库：" not in readme
+    assert "screenshots/23-commercial-support.png" in readme
 
 
 def test_public_release_validation_uses_current_customer_doc_paths():
