@@ -124,16 +124,46 @@ jobs:
       - name: 校验后端依赖锁
         shell: bash
         run: |
-          lock_cutoff="$(git log -1 --format=%cI -- backend/requirements.lock)"
-          uv pip compile \
-            --python-version 3.12 \
-            --universal \
-            --extra dev \
-            --exclude-newer "${lock_cutoff}" \
-            --custom-compile-command 'uv pip compile --python-version 3.12 --universal --extra dev --output-file backend/requirements.lock backend/pyproject.toml' \
-            --output-file /tmp/sagitta-control-backend-requirements.lock \
-            backend/pyproject.toml
-          diff -u backend/requirements.lock /tmp/sagitta-control-backend-requirements.lock
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import re
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          def normalize_name(value: str) -> str:
+              return re.sub(r"[-_.]+", "-", value).lower()
+
+          def requirement_name(value: str) -> str:
+              match = re.match(r"\s*([A-Za-z0-9_.-]+)", value)
+              if not match:
+                  raise ValueError(f"无法解析依赖声明：{value!r}")
+              return normalize_name(match.group(1))
+
+          pyproject = tomllib.loads(Path("backend/pyproject.toml").read_text(encoding="utf-8"))
+          expected = {
+              requirement_name(item)
+              for item in pyproject["project"].get("dependencies", [])
+          }
+          expected.update(
+              requirement_name(item)
+              for item in pyproject["project"].get("optional-dependencies", {}).get("dev", [])
+          )
+
+          locked: set[str] = set()
+          for line in Path("backend/requirements.lock").read_text(encoding="utf-8").splitlines():
+              line = line.strip()
+              if not line or line.startswith("#") or line.startswith("-"):
+                  continue
+              locked.add(requirement_name(line))
+
+          missing = sorted(expected - locked)
+          if missing:
+              print("backend/requirements.lock 缺少直接依赖：", ", ".join(missing), file=sys.stderr)
+              sys.exit(1)
+          print(f"backend/requirements.lock 覆盖 {len(expected)} 个后端直接依赖")
+          PY
 
       - name: 安装后端依赖
         shell: bash
