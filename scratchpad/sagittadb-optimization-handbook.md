@@ -497,7 +497,7 @@ def _validate_cors(self) -> "Settings":
 
 ### P2-1｜补强高风险模块的测试边界，逐步提升覆盖率门槛
 
-> **修正说明**：初版手册把这三个模块写成"缺专项测试"是不准确的——`backend/tests/unit/` 下已经存在 `test_query_guard.py`、`test_masking.py`、`test_archive_cancel.py`（以及 `test_archive_doris.py`、`test_archive_starrocks.py`），不是从零开始。真正的任务是**核对现有用例是否覆盖了高风险边界，补齐薄弱点**，而不是新建测试文件。另外覆盖率门槛 `--cov-fail-under=51` 实际配置在 [README.md:147](../README.md) 和 [.github/workflows/ci.yml:172](../.github/workflows/ci.yml)（`pytest` 命令行参数），**不在** `backend/pyproject.toml` 里，调整时两处都要改，保持一致。
+> **修正说明**：初版手册把这三个模块写成"缺专项测试"是不准确的——`backend/tests/unit/` 下已经存在 `test_query_guard.py`、`test_masking.py`、`test_archive_cancel.py`（以及 `test_archive_doris.py`、`test_archive_starrocks.py`），不是从零开始。真正的任务是**核对现有用例是否覆盖了高风险边界，补齐薄弱点**，而不是新建测试文件。另外覆盖率门槛实际配置在 [README.md:147](../README.md) 和 [.github/workflows/ci.yml:172](../.github/workflows/ci.yml)（`pytest` 命令行参数），**不在** `backend/pyproject.toml` 里，调整时两处都要改，保持一致；当前已从 `--cov-fail-under=51` 提升到 `--cov-fail-under=55`。
 
 **建议节奏**：
 1. 先读一遍现有 `test_query_guard.py`，列出已覆盖 vs 未覆盖的规则分支，重点确认这几类是否有用例：
@@ -508,7 +508,7 @@ def _validate_cors(self) -> "Settings":
    把清单里缺失的分支补上，而不是重写整个测试文件。
 2. 同样方式核对 `test_masking.py`：内置脱敏类型和自定义正则的匹配/替换结果是否都有正例+反例（防止规则误伤或漏伤）。
 3. 核对 `test_archive_cancel.py` 等：是否覆盖了"暂停/继续/取消"状态机的所有合法状态迁移路径，以及非法迁移（如已完成批次再次取消）是否被正确拒绝。
-4. 每补齐一批边界用例后，评估实际覆盖率数字，再把 `--cov-fail-under=51` 逐步上调（例如先提到 55%，模块补齐后再提到 60%+），而不是一次性大幅调高导致 CI 长期红。
+4. 每补齐一批边界用例后，评估实际覆盖率数字，再把 `--cov-fail-under=55` 继续小步上调（例如模块补齐后再提到 60%+），而不是一次性大幅调高导致 CI 长期红。
 
 **文件**：`README.md:147`、`.github/workflows/ci.yml:172`（覆盖率门槛，两处需同步改）；`backend/tests/unit/test_query_guard.py`、`test_masking.py`、`test_archive_cancel.py` 等（补充用例，非新建）。
 
@@ -525,6 +525,8 @@ def _validate_cors(self) -> "Settings":
 **增量落地状态（2026-07-04）**：本轮完成 `test_archive_cancel.py` MongoDB `dest` 归档执行分支补强：新增目标库已插入但源集合删除数量不足时必须拒绝继续、记录 `FAILED` 批次并提示人工核对的回归测试。`ArchiveService._execute_dest_mongo()` 已在 `insert_many()` 后校验 `delete_many()` 删除数量必须等于本批已插入文档数，避免目标已写入而源数据未完整删除时被误记为成功批次。验证命令：`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_archive_cancel.py tests/unit/test_archive_doris.py tests/unit/test_archive_starrocks.py tests/unit/test_archive_task.py -q`（36 passed，保留默认 SECRET_KEY warning）；`cd backend && uv run --with pytest --with pytest-asyncio --with pytest-cov pytest tests/unit/ -v --cov=app --cov-fail-under=51`（956 passed，Total coverage 52.52%）。由于距离 55% 仍有缺口，本轮暂不把覆盖率门槛从 51% 上调。`P2-1` 剩余工作：归档核心执行风险边界已继续收敛，下一轮可进入 `P2-2` mypy baseline 消解。
 
 **增量落地状态（2026-07-04）**：本轮随 P1-4 Step B 完成认证传输安全边界补强：新增 `backend/tests/unit/test_auth_cookies.py` 覆盖 HttpOnly auth Cookie、可读 CSRF Cookie、Cookie 清理、CSRF 豁免/拒绝/通过路径；更新 `backend/tests/unit/test_auth.py` 覆盖 OAuth 登录码交换落 Cookie；更新 `backend/tests/unit/test_cors_middleware.py` 覆盖 `X-CSRF-Token` CORS 允许头；新增 `frontend/src/api/client.test.ts` 覆盖 `withCredentials`、写操作 CSRF Header 注入、以及不再把持久化 token 镜像进 Authorization Header。验证命令：`cd backend && .venv/bin/pytest tests/unit/ -q --cov=app --cov-report=term-missing --cov-fail-under=51`（961 passed，Total coverage 52.64%）、`npm --prefix frontend test`（37 passed）。由于距离 55% 仍有缺口，本轮继续不把 `README.md` 和 `.github/workflows/ci.yml` 的覆盖率门槛从 51% 上调；P2-1 仍属于持续迭代项，下一步应继续补 `archive` / `dashboard` / DB 引擎中更高收益的真实业务分支，而不是为了数字调整覆盖统计口径。
+
+**落地状态（2026-07-05）**：已完成本轮手册目标。新增 `backend/tests/unit/test_sms_auth.py` 覆盖短信验证码开关、限流、每日上限、验证码一次性验证、阿里云/腾讯云/自定义 provider 分支；新增 `backend/tests/unit/test_dashboard_scope.py` 覆盖 dashboard 实例、查询、归档概览的作用域和聚合组装；新增 `backend/tests/unit/test_engine_protocol.py`、`test_common_schemas.py` 覆盖引擎协议默认能力与公共分页响应模型；新增 `backend/tests/unit/test_deps.py` 并扩展 `test_auth.py` 覆盖认证依赖、refresh、logout、2FA 与 SMS 登录链路。`README.md` 与 `.github/workflows/ci.yml` 覆盖率门槛已同步提升为 `--cov-fail-under=55`。验证命令：`cd backend && .venv/bin/pytest tests/unit/ -q --cov=app --cov-report=term-missing --cov-fail-under=55`（1013 passed，Total coverage 55.03%）。
 
 ---
 
@@ -550,6 +552,8 @@ def _validate_cors(self) -> "Settings":
 **增量落地状态（2026-07-04）**：本轮完成 `app/tasks/execute_sql.py` 的类型基线消解，复用 Celery task 装饰器静态类型边界，补齐 SQL 执行任务 wrapper 返回类型，并将任务内本地 async engine 会话工厂从 `sessionmaker(..., class_=AsyncSession)` 调整为 SQLAlchemy 2 async 类型友好的 `async_sessionmaker`。`app/tasks/execute_sql.py` 已纳入 `backend/mypy-baseline.txt`，相关 dispose 回归测试同步 patch 到新的会话工厂导入点。验证命令：`cd backend && uv run --with mypy mypy --follow-imports=silent app/tasks/execute_sql.py`、`cd backend && uv run --with pytest --with pytest-asyncio pytest tests/unit/test_execute_sql_task.py -q`、`cd backend && while IFS= read -r target; do uv run --with mypy mypy --follow-imports=silent "$target"; done < mypy-baseline.txt`。下一轮可进入 P3 或继续评估其他低风险 task/helper 模块是否适合纳入 baseline。
 
 **增量落地状态（2026-07-04）**：本轮随 P1-4 Step B 新增 `app/core/auth_cookies.py`，该 helper 模块已通过严格 mypy 检查并纳入 `backend/mypy-baseline.txt`；`app/core/deps.py` 与 `app/routers/auth.py` 仍存在存量 `no-untyped-def` / 泛型注解问题，本轮未将其硬塞进 baseline。验证命令：`cd backend && .venv/bin/mypy --follow-imports=silent app/core/auth_cookies.py`、`cd backend && while read -r target; do [ -z "$target" ] && continue; .venv/bin/mypy --follow-imports=silent "$target"; done < mypy-baseline.txt`（全部通过）。下一轮可继续拆分认证路由 helper 或治理 `deps.py` 的类型注解，再扩大 baseline 门禁面。
+
+**落地状态（2026-07-05）**：已完成本轮手册点名的认证类型基线收口。`app/core/deps.py` 补齐 `CurrentUser` 类型别名、`current_user`/`current_superuser`/`require_perm` 返回类型与依赖工厂签名；`app/routers/auth.py` 补齐认证 helper、登录/刷新/logout、2FA、短信、OAuth 端点的参数与返回类型，并对 `disable_2fa()` 的 `totp_secret` 空值边界做显式保护。两个模块已通过严格 mypy 并纳入 `backend/mypy-baseline.txt`。验证命令：`cd backend && .venv/bin/mypy --follow-imports=silent app/core/deps.py app/routers/auth.py`、`cd backend && while read -r target; do [ -z "$target" ] && continue; .venv/bin/mypy --follow-imports=silent "$target"; done < mypy-baseline.txt`。
 
 ---
 
@@ -629,6 +633,6 @@ check_env_secret GRAFANA_CLIENT_SECRET changeme
 
 修完每一项 P0/P1 后，按仓库既有约定收尾：
 1. 更新受影响的文档（如涉及安全策略变化，同步 `docs/operations_guide.md` 第 10 节"安全运维检查表"）。
-2. 跑对应验证命令：后端 `pytest tests/unit/ -v --cov=app --cov-fail-under=51`、`ruff check .`、`mypy` baseline 校验；前端如涉及改动跑 `npm run build`。
+2. 跑对应验证命令：后端 `pytest tests/unit/ -v --cov=app --cov-fail-under=55`、`ruff check .`、`mypy` baseline 校验；前端如涉及改动跑 `npm run build`。
 3. `git status --short` 确认改动范围与本项任务一致。
 4. 按 AGENT.md 约定推送 `origin` 和 `gitee`，检查 GitHub Actions 状态。

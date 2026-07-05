@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import Response
+from fastapi import Response
 from pydantic import ValidationError
 
 from app.core.security import (
@@ -26,20 +26,66 @@ from app.core.security import (
     validate_password_strength,
     verify_password,
 )
+from app.routers import auth as auth_router
 from app.routers.auth import _oauth_login_code_key, exchange_oauth_login_code
-from app.schemas.auth import OAuthExchangeRequest
+from app.schemas.auth import (
+    OAuthExchangeRequest,
+    RefreshRequest,
+    SmsCodeRequest,
+    SmsLoginRequest,
+    TwoFAVerifyRequest,
+)
 from app.schemas.user import UserCreate
 
 
 class FakeRedis:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.setex_calls: list[tuple[str, int, str]] = []
 
     async def get(self, key: str) -> str | None:
         return self.store.get(key)
 
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
+
+    async def setex(self, key: str, ttl: int, value: str) -> None:
+        self.setex_calls.append((key, ttl, value))
+        self.store[key] = value
+
+
+class FakeAuthRole:
+    name = "engineer"
+
+
+class FakeAuthUser:
+    id = 7
+    username = "alice"
+    display_name = "Alice"
+    email = "alice@example.test"
+    is_superuser = False
+    is_active = True
+    auth_type = "local"
+    password_changed_at = datetime.now(UTC)
+    created_at = datetime.now(UTC)
+    password = hash_password("OldPass@123")
+    role = FakeAuthRole()
+    role_id = 3
+    manager_id = None
+    employee_id = "E001"
+    department = "研发"
+    title = "工程师"
+    tenant_id = 1
+    totp_enabled = False
+    totp_secret: str | None = None
+
+
+class FakeDB:
+    def __init__(self) -> None:
+        self.commits = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
 
 
 class TestPasswordHashing:
@@ -118,6 +164,150 @@ class TestJWT:
                 redis=redis,
             )
         assert exc.value.status_code == 401
+
+
+class TestAuthRouterFlows:
+    def test_issue_login_response_sets_tokens_and_auth_cookies(self):
+        user = FakeAuthUser()
+        response = Response()
+
+        tokens = auth_router._issue_login_response(response, user)
+
+        assert tokens.access_token
+        assert tokens.refresh_token
+        assert decode_token(tokens.access_token)["sub"] == str(user.id)
+        assert "access_token=" in response.headers["set-cookie"]
+
+    @pytest.mark.asyncio
+    async def test_logout_blacklists_access_token_and_clears_cookies(self):
+        token = create_access_token({"sub": "7", "username": "alice", "tenant_id": 1})
+        redis = FakeRedis()
+        response = Response()
+
+        result = await auth_router.logout(
+            request=object(),  # type: ignore[arg-type]
+            response=response,
+            token=token,
+            redis=redis,
+        )
+
+        assert result == {"status": 0, "msg": "已退出登录"}
+        assert redis.setex_calls
+        assert redis.setex_calls[0][0] == f"blacklist:{token}"
+        cookie_headers = [
+            value.decode()
+            for key, value in response.raw_headers
+            if key.decode().lower() == "set-cookie"
+        ]
+        assert len(cookie_headers) >= 2
+        assert all("Max-Age=0" in header for header in cookie_headers)
+
+    @pytest.mark.asyncio
+    async def test_totp_setup_verify_and_disable_flow(self, monkeypatch):
+        import pyotp
+
+        secret = "JBSWY3DPEHPK3PXP"
+        db_user = FakeAuthUser()
+        db = FakeDB()
+
+        async def get_by_id(db_arg, user_id):
+            assert db_arg is db
+            assert user_id == db_user.id
+            return db_user
+
+        monkeypatch.setattr(auth_router.UserService, "get_by_id", get_by_id)
+        monkeypatch.setattr("pyotp.random_base32", lambda: secret)
+
+        setup = await auth_router.setup_2fa({"id": db_user.id}, db)  # type: ignore[arg-type]
+        assert setup["secret"] == secret
+        assert decrypt_field(db_user.totp_secret) == secret
+
+        code = pyotp.TOTP(secret).now()
+        verify_result = await auth_router.verify_2fa(
+            TwoFAVerifyRequest(totp_code=code),
+            {"id": db_user.id},
+            db,  # type: ignore[arg-type]
+        )
+        assert verify_result == {"status": 0, "msg": "2FA 已启用"}
+        assert db_user.totp_enabled is True
+
+        disable_result = await auth_router.disable_2fa(
+            TwoFAVerifyRequest(totp_code=code),
+            {"id": db_user.id},
+            db,  # type: ignore[arg-type]
+        )
+        assert disable_result == {"status": 0, "msg": "2FA 已禁用"}
+        assert db_user.totp_enabled is False
+        assert db_user.totp_secret is None
+        assert db.commits == 3
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_issues_new_cookie_tokens(self, monkeypatch):
+        db_user = FakeAuthUser()
+
+        async def get_by_id(db_arg, user_id):
+            assert user_id == db_user.id
+            return db_user
+
+        monkeypatch.setattr(auth_router.UserService, "get_by_id", get_by_id)
+        refresh = create_refresh_token({"sub": str(db_user.id), "tenant_id": db_user.tenant_id})
+        response = Response()
+
+        result = await auth_router.refresh_token(
+            RefreshRequest(refresh_token=refresh),
+            request=object(),  # type: ignore[arg-type]
+            response=response,
+            db=object(),  # type: ignore[arg-type]
+        )
+
+        assert result.access_token
+        assert result.refresh_token
+        assert "access_token=" in response.headers["set-cookie"]
+
+    @pytest.mark.asyncio
+    async def test_sms_send_code_delegates_to_service(self, monkeypatch):
+        import app.services.sms_auth as sms_auth_module
+
+        async def send_sms_code(db_arg, phone):
+            assert phone == "13800000000"
+            return {"success": True, "message": "ok"}
+
+        monkeypatch.setattr(sms_auth_module, "send_sms_code", send_sms_code)
+
+        result = await auth_router.sms_send_code(
+            SmsCodeRequest(phone="13800000000"),
+            db=object(),  # type: ignore[arg-type]
+        )
+
+        assert result == {"success": True, "message": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_sms_login_issues_tokens_after_code_verification(self, monkeypatch):
+        import app.services.sms_auth as sms_auth_module
+
+        db_user = FakeAuthUser()
+
+        async def verify_sms_code(phone, code):
+            assert (phone, code) == ("13800000000", "123456")
+            return True
+
+        async def get_by_phone(db_arg, phone):
+            assert phone == "13800000000"
+            return db_user
+
+        monkeypatch.setattr(sms_auth_module, "verify_sms_code", verify_sms_code)
+        monkeypatch.setattr(auth_router.UserService, "get_by_phone", get_by_phone)
+        response = Response()
+
+        result = await auth_router.sms_login(
+            SmsLoginRequest(phone="13800000000", code="123456"),
+            response=response,
+            db=object(),  # type: ignore[arg-type]
+        )
+
+        assert result.access_token
+        assert result.refresh_token
+        assert "access_token=" in response.headers["set-cookie"]
 
 
 class TestFieldEncryption:

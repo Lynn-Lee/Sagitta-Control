@@ -1,5 +1,8 @@
 """FastAPI 公共 Depends 依赖（v2 授权体系：角色权限 + 用户组资源组链路）。"""
 
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError as JWTError
@@ -12,6 +15,7 @@ from app.core.database import get_db
 from app.core.security import decode_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login/form/", auto_error=False)
+type CurrentUser = dict[str, Any]
 
 _401 = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,7 +28,7 @@ async def current_user(
     request: Request,
     token: str | None = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> CurrentUser:
     """获取当前登录用户，返回含 permissions + role + user_groups 的完整字典。"""
     token = token or get_access_token(request)
     if not token:
@@ -109,16 +113,16 @@ async def current_user(
     }
 
 
-async def current_superuser(user: dict = Depends(current_user)) -> dict:
+async def current_superuser(user: CurrentUser = Depends(current_user)) -> CurrentUser:
     if not user.get("is_superuser"):
         raise HTTPException(status_code=403, detail="需要超级管理员权限")
     return user
 
 
-def require_perm(perm: str):
+def require_perm(perm: str) -> Callable[[CurrentUser], Awaitable[CurrentUser]]:
     """权限校验依赖工厂，用法：Depends(require_perm('sql_review'))"""
 
-    async def _checker(user: dict = Depends(current_user)) -> dict:
+    async def _checker(user: CurrentUser = Depends(current_user)) -> CurrentUser:
         if user.get("is_superuser"):
             return user
         if perm not in user.get("permissions", []):

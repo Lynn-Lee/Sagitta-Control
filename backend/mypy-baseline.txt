@@ -4,6 +4,7 @@ app/core/__init__.py
 app/core/auth_cookies.py
 app/core/config.py
 app/core/database.py
+app/core/deps.py
 app/core/integrity.py
 app/core/logging.py
 app/core/security.py
@@ -28,6 +29,7 @@ app/models/session.py
 app/models/slowlog.py
 app/models/workflow.py
 app/routers/__init__.py
+app/routers/auth.py
 app/routers/system.py
 app/routers/system_routes/__init__.py
 app/routers/system_routes/access_control.py
