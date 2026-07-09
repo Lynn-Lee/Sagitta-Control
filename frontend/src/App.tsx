@@ -68,11 +68,12 @@ export default function App() {
           <Route path="query/privileges"     element={<PermissionGuard permission="menu_query"><QueryPrivPage /></PermissionGuard>} />
           <Route path="query/history"        element={<PermissionGuard permission="menu_query"><QueryHistoryPage /></PermissionGuard>} />
           <Route path="monitor"              element={<PermissionGuard permission="menu_observability"><MonitorPage /></PermissionGuard>} />
-          <Route path="sql-analysis"         element={<Navigate to="/monitor?view=sql" replace />} />
-          <Route path="slowlog"              element={<Navigate to="/monitor?view=sql" replace />} />
-          <Route path="diagnostic"           element={<Navigate to="/monitor?view=sessions" replace />} />
+          <Route path="monitor/diagnostics"  element={<PermissionGuard permission="menu_observability"><MonitorPage /></PermissionGuard>} />
+          <Route path="sql-analysis"         element={<Navigate to="/monitor/diagnostics?view=sql" replace />} />
+          <Route path="slowlog"              element={<Navigate to="/monitor/diagnostics?view=sql" replace />} />
+          <Route path="diagnostic"           element={<Navigate to="/monitor/diagnostics?view=sessions" replace />} />
           <Route path="archive"              element={<PermissionGuard anyPermissions={['archive_apply', 'archive_review', 'archive_execute']}><ArchivePage /></PermissionGuard>} />
-          <Route path="optimize"             element={<Navigate to="/monitor?view=sql" replace />} />
+          <Route path="optimize"             element={<Navigate to="/monitor/diagnostics?view=sql" replace />} />
           <Route path="schema"               element={<PermissionGuard permission="menu_schema"><DataDictPage /></PermissionGuard>} />
           <Route path="instance"             element={<PermissionGuard permission="instance_manage"><InstanceList /></PermissionGuard>} />
           <Route path="system/users"         element={<PermissionGuard permission="menu_system"><UserManagement /></PermissionGuard>} />

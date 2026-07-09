@@ -10,6 +10,7 @@ import {
   BugOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
   KeyOutlined, EyeInvisibleOutlined, ApartmentOutlined, HistoryOutlined,
   CheckOutlined, CustomerServiceOutlined, ConsoleSqlOutlined,
+  DatabaseOutlined, BarChartOutlined,
 } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { notificationApi, type SystemNotification } from '@/api/system'
@@ -210,14 +211,20 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/query/history', icon: <HistoryOutlined />, label: '查询历史' },
     ],
   },
-  { key: '/monitor', icon: <MenuIcon component={MonitorMenuSvg} label="观测中心" />, label: '观测中心', permission: 'menu_observability' },
   {
-    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="运维工具" />, label: '运维工具', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'],
+    key: 'monitor-group', icon: <MenuIcon component={MonitorMenuSvg} label="观测中心" />, label: '观测中心', permission: 'menu_observability',
     children: [
-      { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'] },
+      { key: '/monitor', icon: <DatabaseOutlined />, label: '实例总览' },
+      { key: '/monitor/diagnostics', icon: <BarChartOutlined />, label: '实例诊断' },
     ],
   },
-  { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典', permission: 'menu_schema' },
+  {
+    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="研发工具" />, label: '研发工具', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute', 'menu_schema'],
+    children: [
+      { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'] },
+      { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典', permission: 'menu_schema' },
+    ],
+  },
   { key: '/instance', icon: <MenuIcon component={InstanceMenuSvg} label="实例管理" />, label: '实例管理', permission: 'instance_manage' },
   {
     key: 'system-group', icon: <SettingOutlined />, label: '系统管理', permission: 'menu_system',
@@ -229,6 +236,7 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/system/approval-flows', icon: <ApartmentOutlined />, label: '审批流管理' },
       { key: '/system/config', icon: <MenuIcon component={SystemConfigMenuSvg} label="系统配置" />, label: '系统配置' },
       { key: '/masking', icon: <EyeInvisibleOutlined />, label: '数据脱敏规则' },
+      { key: '/audit', icon: <AuditOutlined />, label: '审计日志', permission: 'menu_audit' },
     ],
   },
   {
@@ -238,7 +246,6 @@ const NAV_ITEMS: NavItem[] = [
       { key: '/commercial', icon: <CustomerServiceOutlined />, label: '交付与支持' },
     ],
   },
-  { key: '/audit', icon: <AuditOutlined />, label: '审计日志', permission: 'menu_audit' },
 ]
 
 export default function MainLayout() {

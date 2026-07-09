@@ -3,7 +3,7 @@ import type { MenuProps } from 'antd'
 import { Alert, Button, Card, DatePicker, Descriptions, Dropdown, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip as AntTooltip, Typography, message } from 'antd'
 import { AlertOutlined, ApiOutlined, BarChartOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, DatabaseOutlined, DownOutlined, FieldTimeOutlined, PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, SettingOutlined, StopOutlined, TableOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '@/components/common/PageHeader'
@@ -32,6 +32,10 @@ export default function MonitorPage() {
   const isMobile = !screens.md
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isDiagnostics = location.pathname.startsWith('/monitor/diagnostics')
+  const mainTab = isDiagnostics ? 'monitor' : 'instance-overview'
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const canManageConfig = hasPermission('observability_collect_manage')
   const canManageAlerts = hasPermission('observability_alert_manage')
@@ -40,7 +44,6 @@ export default function MonitorPage() {
   const [msgApi, msgCtx] = message.useMessage()
   const requestedView = searchParams.get('view')
   const requestedInstanceId = Number(searchParams.get('instance_id') || 0) || null
-  const [mainTab, setMainTab] = useState(requestedView ? 'monitor' : 'instance-overview')
   const [workbenchTab, setWorkbenchTab] = useState(requestedView || 'overview')
   const [selectedId, setSelectedId] = useState<number | null>(requestedInstanceId)
   const [dbTypeFilter, setDbTypeFilter] = useState<string | undefined>()
@@ -107,8 +110,8 @@ export default function MonitorPage() {
   useEffect(() => {
     if (requestedInstanceId) setSelectedId(requestedInstanceId)
     if (requestedView) {
-      setMainTab('monitor')
       setWorkbenchTab(requestedView)
+      if (!isDiagnostics) navigate(`/monitor/diagnostics?${searchParams.toString()}`, { replace: true })
     }
   }, [requestedInstanceId, requestedView])
 
@@ -166,16 +169,15 @@ export default function MonitorPage() {
 
   const showInstanceMonitor = (instanceId: number) => {
     selectInstance(instanceId)
-    setMainTab('monitor')
     setWorkbenchTab('overview')
-    setSearchParams({ instance_id: String(instanceId), view: 'overview' })
+    navigate(`/monitor/diagnostics?instance_id=${instanceId}&view=overview`)
   }
 
   const openWorkbench = (instanceId: number, tab: string) => {
     selectInstance(instanceId)
-    setMainTab('monitor')
     setWorkbenchTab(tab)
-    setSearchParams({ instance_id: String(instanceId), view: tab === 'sql' ? 'sql' : tab === 'sessions' ? 'sessions' : tab })
+    const view = tab === 'sql' ? 'sql' : tab === 'sessions' ? 'sessions' : tab
+    navigate(`/monitor/diagnostics?instance_id=${instanceId}&view=${view}`)
   }
 
   const refreshMonitorData = async () => {
@@ -620,21 +622,7 @@ export default function MonitorPage() {
         )}
       />
 
-      <Tabs
-        activeKey={mainTab}
-        onChange={(key) => {
-          setMainTab(key)
-          if (key === 'instance-overview') {
-            setSearchParams({})
-          } else if (activeId) {
-            setSearchParams({ instance_id: String(activeId), view: workbenchTab })
-          }
-        }}
-        items={[
-          {
-            key: 'instance-overview',
-            label: <span><DatabaseOutlined />舰队总览</span>,
-            children: (
+      {mainTab === 'instance-overview' ? (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(8, minmax(0, 1fr))', gap: 12 }}>
                   <MetricCard title="实例总数" value={overview?.cards?.instance_total ?? allInstances.length} />
@@ -690,12 +678,7 @@ export default function MonitorPage() {
                   locale={{ emptyText: <TableEmptyState title="暂无可监控实例" /> }}
                 />
               </Space>
-            ),
-          },
-          {
-            key: 'monitor',
-            label: <span><BarChartOutlined />实例诊断工作台</span>,
-            children: activeId ? (
+      ) : activeId ? (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Space wrap align="center">
@@ -1008,10 +991,7 @@ export default function MonitorPage() {
                   ]}
                 />
               </Space>
-            ) : <TableEmptyState title="暂无可监控实例" />,
-          },
-        ]}
-      />
+      ) : <TableEmptyState title="暂无可监控实例" />}
 
       <Modal
         title={configScope === 'all' ? '统一采集配置 - 全部实例' : `统一采集配置 - ${configTarget?.instance_name || active?.instance_name || ''}`}
