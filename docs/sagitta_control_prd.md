@@ -232,7 +232,7 @@ SQL 工单审核默认使用基于 sqlglot 的统一规则层，覆盖多引擎�
 
 观测中心的实例概览展示当前运行态风险。MySQL 的慢查询卡片统计当前正在执行且超过 `long_query_time` 的会话数，锁等待卡片统计当前处于锁等待或阻塞状态的会话数，不使用 MySQL 全局累计计数作为当前风险值。性能趋势中的慢查询曲线按采集快照间的累计计数差值展示“本次采集新增慢查询次数”，避免长时间运行实例因累计值持续升高而误判。
 
-实例诊断工作台采用通用诊断框架加引擎专属面板的组合：概览、性能、容量、会话、SQL、复制、等待事件、告警和采集诊断保持统一；告警事件支持确认、静默、恢复、关闭闭环，采集恢复时自动进入 `resolved` 并触发恢复通知。Redis、ClickHouse、Oracle、TiDB 等实例按 `db_type` 追加专属页签。Redis 观测通过 `INFO all`、`CLIENT LIST` 和 `SLOWLOG` 采集内存、连接、Ops/sec、命中率、Key 淘汰、复制角色、客户端会话和慢命令，并在 Redis 专属页签展示缓存命中、内存使用率和复制摘要。ClickHouse 观测通过 `system.metrics`、`system.events`、`system.asynchronous_metrics`、`system.disks`、`system.processes` 和 `system.tables` 采集连接、当前查询、查询计数增量、失败查询、内存、磁盘、表容量和活动 SQL，并在 ClickHouse 专属页签展示磁盘、内存、写入和查询风险。TiDB 专属页签展示 Token 使用率。
+观测中心拆分为 `实例总览` 和 `实例诊断` 两个二级菜单：`实例总览` 展示舰队级实例健康与风险，`实例诊断` 针对单实例展开。实例诊断采用通用诊断框架加引擎专属面板的组合：概览、性能、容量、会话、SQL、复制、等待事件、告警和采集诊断保持统一；告警事件支持确认、静默、恢复、关闭闭环，采集恢复时自动进入 `resolved` 并触发恢复通知。Redis、ClickHouse、Oracle、TiDB 等实例按 `db_type` 追加专属页签。Redis 观测通过 `INFO all`、`CLIENT LIST` 和 `SLOWLOG` 采集内存、连接、Ops/sec、命中率、Key 淘汰、复制角色、客户端会话和慢命令，并在 Redis 专属页签展示缓存命中、内存使用率和复制摘要。ClickHouse 观测通过 `system.metrics`、`system.events`、`system.asynchronous_metrics`、`system.disks`、`system.processes` 和 `system.tables` 采集连接、当前查询、查询计数增量、失败查询、内存、磁盘、表容量和活动 SQL，并在 ClickHouse 专属页签展示磁盘、内存、写入和查询风险。TiDB 专属页签展示 Token 使用率。
 
 SQL 洞察按引擎能力选择采集来源。MySQL 使用 `performance_schema` 慢 SQL 摘要；StarRocks、Doris、TiDB 等活动型引擎优先使用当前 SQL 活动或会话视图作为 Top SQL 来源，避免复用 MySQL 专属 `performance_schema` 查询。
 

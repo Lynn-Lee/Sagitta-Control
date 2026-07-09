@@ -43,10 +43,10 @@
 
 每次完成项目新的功能代码或 UI 调整后，必须完成以下收尾动作，除非用户明确要求暂停、只做局部分析或不提交：
 
-- 每次功能完成后都要同步更新本地代码和相关文档，提交到 git 并推送 GitHub 主远端和 Gitee 国内镜像远端，然后更新云 ECS 测试环境到最新源码。
+- 每次完成任务功能代码或 UI 调整后，必须同时更新对应文档，代码与文档放在同一次提交里，不允许留到后续补文档；随后提交到 git 并同时推送 GitHub 主远端和 Gitee 国内镜像远端，再更新云 ECS 测试环境到最新源码。
 - 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 `Lynn-Lee/Sagitta-Deploy` 后续仅按用户明确指令更新。
 
-1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagitta_control_prd.md`、`docs/user_manual.md`、`docs/installation_deployment.md`、`docs/operations_upgrade.md` 和本文件。
+1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagitta_control_prd.md`、`docs/user_manual.md`、`docs/installation_deployment.md`、`docs/operations_upgrade.md` 和本文件；凡涉及菜单、导航结构、页面入口路径或功能命名的调整，必须同步更新用户手册的入口路径与 PRD 的对应描述。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。
 3. 查看 `git status --short` 和 diff，确认只包含本次任务需要的代码与文档。
 4. 提交代码并推送到 GitHub 主远端 `origin` 和 Gitee 国内镜像远端 `gitee`。
