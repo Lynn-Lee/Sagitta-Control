@@ -113,7 +113,7 @@ export default function MonitorPage() {
       setWorkbenchTab(requestedView)
       if (!isDiagnostics) navigate(`/monitor/diagnostics?${searchParams.toString()}`, { replace: true })
     }
-  }, [requestedInstanceId, requestedView])
+  }, [requestedInstanceId, requestedView, isDiagnostics, navigate, searchParams])
 
   useEffect(() => {
     setAlertRulesText(JSON.stringify(alertRules?.rules || {}, null, 2))
