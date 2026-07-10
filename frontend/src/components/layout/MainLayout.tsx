@@ -219,7 +219,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="研发工具" />, label: '研发工具', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute', 'menu_schema'],
+    key: 'ops-group', icon: <MenuIcon component={OpsMenuSvg} label="实用工具" />, label: '实用工具', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute', 'menu_schema'],
     children: [
       { key: '/archive', icon: <MenuIcon component={ArchiveMenuSvg} label="数据归档" />, label: '数据归档', anyPermissions: ['archive_apply', 'archive_review', 'archive_execute'] },
       { key: '/schema', icon: <MenuIcon component={SchemaMenuSvg} label="数据字典" />, label: '数据字典', permission: 'menu_schema' },
