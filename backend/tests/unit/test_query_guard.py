@@ -265,6 +265,41 @@ def test_limit_is_only_applied_to_select_like_sql():
     assert guard.apply_limit("DESC users", 100, "desc") == "DESC users"
 
 
+def test_apply_limit_ignores_limit_keyword_in_string_or_comment():
+    """字符串字面量或注释中的 limit 不得被误判为已有上限，否则查询将不加 cap。"""
+    guard = get_query_guard("mysql")
+
+    literal = guard.apply_limit("SELECT * FROM t WHERE name = 'limit'", 100, "select")
+    assert literal.rstrip().endswith("LIMIT 100")
+
+    commented = guard.apply_limit("SELECT id FROM t /* limit here */", 100, "select")
+    assert commented.rstrip().endswith("LIMIT 100")
+
+
+def test_apply_limit_respects_existing_top_level_limit():
+    guard = get_query_guard("mysql")
+
+    assert guard.apply_limit("SELECT * FROM t LIMIT 5", 100, "select") == "SELECT * FROM t LIMIT 5"
+
+
+def test_apply_limit_places_cap_after_order_by():
+    guard = get_query_guard("mysql")
+
+    capped = guard.apply_limit("SELECT a FROM t ORDER BY a", 100, "select")
+    assert "ORDER BY" in capped.upper()
+    assert capped.rstrip().endswith("LIMIT 100")
+
+
+def test_apply_limit_caps_cte_and_union_at_top_level():
+    guard = get_query_guard("mysql")
+
+    cte = guard.apply_limit("WITH x AS (SELECT * FROM big) SELECT * FROM x", 100, "with")
+    assert cte.rstrip().endswith("LIMIT 100")
+
+    union = guard.apply_limit("SELECT 1 UNION SELECT 2", 100, "select")
+    assert union.rstrip().endswith("LIMIT 100")
+
+
 def test_cassandra_guard_applies_limit_and_extracts_keyspace_table_ref():
     guard = get_query_guard("cassandra")
 

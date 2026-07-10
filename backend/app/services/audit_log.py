@@ -10,6 +10,7 @@ from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.net import resolve_client_ip
 from app.models.system import OperationLog
 
 logger = logging.getLogger(__name__)
@@ -29,12 +30,7 @@ class AuditLogService:
         remark: str = "",
     ) -> None:
         """写入一条操作日志。"""
-        ip = ""
-        if request:
-            forwarded = request.headers.get("X-Forwarded-For")
-            ip = forwarded.split(",")[0].strip() if forwarded else (
-                request.client.host if request.client else ""
-            )
+        ip = resolve_client_ip(request) if request else ""
 
         log = OperationLog(
             user_id=user.get("id", 0),

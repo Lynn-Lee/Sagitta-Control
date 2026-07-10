@@ -236,6 +236,7 @@ http://<server>/
 - `.env` 关键配置不是空值或占位符。
 - `APP_ENV=production`、`APP_INTEGRITY_REQUIRED=true`。
 - `AUTH_COOKIE_SECURE=true`、`ALLOW_INSECURE_AUTH_COOKIE=false`，确保公网生产环境只通过 HTTPS 发送浏览器登录 Cookie。
+- `TRUSTED_PROXY_COUNT` 与实际反向代理层数一致（标准单层 nginx 保持 `1`，无代理直连设 `0`），并确保 backend 仅经可信代理内网可达；否则审计与查询日志中的客户端 IP 可被 `X-Forwarded-For` 伪造。
 - 前后端健康接口可访问。
 - 管理员认证通过。
 - License 为正式授权且非试用。

@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     ALLOW_INSECURE_AUTH_COOKIE: bool = False
     AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
     AUTH_COOKIE_DOMAIN: str = ""
+    # 应用前置的可信反向代理层数，用于从 X-Forwarded-For 还原真实客户端 IP。
+    # 标准部署为单层 nginx，故默认 1；直连无代理时设为 0（此时忽略 XFF，只信任 socket 对端）。
+    # 该机制假定 backend 仅经可信代理可达（内网隔离），否则需配合网络隔离防止 XFF 伪造。
+    TRUSTED_PROXY_COUNT: int = 1
 
     # ─── 商业授权 ─────────────────────────────────────────────
     LICENSE_PUBLIC_KEY: str = "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"

@@ -371,6 +371,42 @@ def _syntax_validation_reason(prefix: str, sql: str, tree: exp.Expression) -> st
     return ""
 
 
+def _ast_inject_limit(normalized: str, limit_num: int, dialect: str) -> str | None:
+    """用 AST 精确注入行数上限。
+
+    仅识别顶层查询的 LIMIT，避免字符串字面量或注释中的 ``limit`` 被正则误判为
+    已存在上限；已有顶层 LIMIT 时原样返回，否则按目标方言生成带 LIMIT 的 SQL。
+    解析或生成失败返回 None，由调用方回退到保守字符串追加。
+    """
+    try:
+        tree = sqlglot.parse_one(normalized, dialect=dialect)
+    except sqlglot.errors.SqlglotError:
+        return None
+    if tree is None:
+        return None
+    if tree.args.get("limit") is not None:
+        return normalized
+    try:
+        return tree.limit(limit_num).sql(dialect=dialect)
+    except Exception:
+        return None
+
+
+def _ast_has_limit(normalized: str, dialect: str) -> bool | None:
+    """仅判断顶层查询是否已有 LIMIT；解析失败返回 None。
+
+    用于不便整体重写 SQL 的方言（如 Elasticsearch，索引名转义与原文差异敏感），
+    在保持原始 SQL 文本的前提下修正 ``\\blimit\\b`` 正则的误判。
+    """
+    try:
+        tree = sqlglot.parse_one(normalized, dialect=dialect)
+    except sqlglot.errors.SqlglotError:
+        return None
+    if tree is None:
+        return None
+    return tree.args.get("limit") is not None
+
+
 class SqlQueryGuard:
     db_type: str
 
@@ -583,6 +619,10 @@ class SqlQueryGuard:
         normalized = _clean_sql(sql)
         if limit_num <= 0 or kind not in {"select", "with"}:
             return normalized
+        injected = _ast_inject_limit(normalized, limit_num, self.dialect)
+        if injected is not None:
+            return injected
+        # AST 不可用时回退保守字符串追加（validate 已确保可解析，正常不会走到这里）
         if re.search(r"\blimit\b", normalized, re.I):
             return normalized
         return f"{normalized} LIMIT {limit_num}"
@@ -640,7 +680,11 @@ class ElasticsearchQueryGuard(SqlQueryGuard):
         normalized = _clean_sql(sql)
         if limit_num <= 0 or kind not in {"select", "with"}:
             return normalized
-        if re.search(r"\blimit\b", normalized, re.I):
+        has_limit = _ast_has_limit(normalized, self.dialect)
+        if has_limit is None:
+            # 解析失败回退正则判断，保持 ES 原始 SQL 文本不被重写
+            has_limit = bool(re.search(r"\blimit\b", normalized, re.I))
+        if has_limit:
             return normalized
         return f"{normalized} LIMIT {limit_num}"
 

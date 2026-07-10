@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.deps import current_user
+from app.core.net import resolve_client_ip
 from app.engines.registry import get_engine
 from app.models.instance import Instance, InstanceDatabase
 from app.schemas.query import QueryExecuteRequest
@@ -181,10 +182,7 @@ async def _run_query_with_permissions(
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else ""
+    return resolve_client_ip(request)
 
 
 async def _write_failed_query_log(
