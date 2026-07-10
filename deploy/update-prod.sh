@@ -82,7 +82,7 @@ usage() {
   COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh
   bash deploy/update-prod.sh
   bash deploy/update-prod.sh --ref origin/main
-  bash deploy/update-prod.sh --ref v2.0.0
+  bash deploy/update-prod.sh --ref v3.0.0
   bash deploy/update-prod.sh --force-backup
   bash deploy/update-prod.sh --full
   bash deploy/update-prod.sh --skip-backup --no-cache
