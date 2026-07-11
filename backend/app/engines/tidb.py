@@ -106,7 +106,7 @@ class TidbEngine(MysqlEngine):
     async def processlist(
         self, command_type: str = "Query", **kwargs: Any
     ) -> ResultSet:
-        cluster_sql, cluster_params = self._processlist_sql(
+        cluster_sql, cluster_params = self._tidb_processlist_sql(
             table_name="information_schema.CLUSTER_PROCESSLIST",
             include_instance=True,
             command_type=command_type,
@@ -115,7 +115,7 @@ class TidbEngine(MysqlEngine):
         if rs.is_success:
             return rs
 
-        fallback_sql, fallback_params = self._processlist_sql(
+        fallback_sql, fallback_params = self._tidb_processlist_sql(
             table_name="information_schema.PROCESSLIST",
             include_instance=False,
             command_type=command_type,
@@ -125,7 +125,7 @@ class TidbEngine(MysqlEngine):
             fallback.warning = f"CLUSTER_PROCESSLIST 不可用，已降级为本节点 PROCESSLIST：{rs.error}"
             return fallback
 
-        minimal_sql, minimal_params = self._processlist_sql(
+        minimal_sql, minimal_params = self._tidb_processlist_sql(
             table_name="information_schema.PROCESSLIST",
             include_instance=False,
             include_tidb_columns=False,
@@ -140,7 +140,7 @@ class TidbEngine(MysqlEngine):
             return minimal
         return fallback
 
-    def _processlist_sql(
+    def _tidb_processlist_sql(
         self,
         *,
         table_name: str,

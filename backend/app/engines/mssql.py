@@ -43,7 +43,7 @@ class MssqlEngine:
         self._password = decrypt_field(instance.password)
         self._db_name = instance.db_name or "master"
 
-    def _connect_sync(self, db_name: str | None = None):
+    def _connect_sync(self, db_name: str | None = None) -> Any:
         try:
             import pytds
         except ImportError:
@@ -111,7 +111,7 @@ class MssqlEngine:
                 conn.close()
         return rs
 
-    async def get_connection(self, db_name: str | None = None):
+    async def get_connection(self, db_name: str | None = None) -> Any:
         return await asyncio.to_thread(self._connect_sync, db_name)
 
     async def test_connection(self) -> ResultSet:
@@ -280,7 +280,7 @@ class MssqlEngine:
             return []
         return [dict(zip(rs.column_list, row, strict=False)) for row in rs.rows]
 
-    def query_check(self, db_name: str, sql: str) -> dict:
+    def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         result: dict[str, Any] = {"msg": "", "has_star": False, "syntax_error": False}
         try:
             tree = sqlglot.parse_one(sql.strip().rstrip(";"), dialect="tsql")
@@ -315,7 +315,7 @@ class MssqlEngine:
         db_name: str,
         sql: str,
         limit_num: int = 0,
-        parameters: dict | None = None,
+        parameters: dict[str, Any] | None = None,
         **kw: Any,
     ) -> ResultSet:
         filtered_sql = self.filter_sql(sql, limit_num)

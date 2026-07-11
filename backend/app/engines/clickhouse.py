@@ -22,7 +22,7 @@ class ClickHouseEngine:
     def __init__(self, instance: Instance) -> None:
         self.instance = instance
 
-    def _client(self, db_name: str | None = None):
+    def _client(self, db_name: str | None = None) -> Any:
         try:
             import clickhouse_connect
         except ImportError:
@@ -106,7 +106,7 @@ class ClickHouseEngine:
             rs.error = str(e)
         return rs
 
-    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list:
+    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list[dict[str, Any]]:
         try:
             r = self._client(db_name).query(
                 "SELECT name,engine,total_rows,total_bytes,comment FROM system.tables WHERE database={db:String}",
@@ -227,7 +227,7 @@ class ClickHouseEngine:
             rs.error = str(e)
         return rs
 
-    def query_check(self, db_name: str, sql: str) -> dict:
+    def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         for kw in ["insert", "update", "delete", "drop", "truncate", "alter"]:
             if sql.strip().lower().startswith(kw):
                 return {"msg": f"在线查询不允许 {kw.upper()}", "syntax_error": True}
@@ -240,7 +240,7 @@ class ClickHouseEngine:
         return sql
 
     async def query(
-        self, db_name: str, sql: str, limit_num: int = 0, parameters: dict | None = None, **kw: Any
+        self, db_name: str, sql: str, limit_num: int = 0, parameters: dict[str, Any] | None = None, **kw: Any
     ) -> ResultSet:
         rs = ResultSet()
         try:
@@ -341,7 +341,7 @@ class ClickHouseEngine:
             affected_rows=len(rows),
         )
 
-    async def collect_metrics(self) -> dict:
+    async def collect_metrics(self) -> dict[str, Any]:
         missing_groups: dict[str, str] = {}
         try:
             client = self._client()
@@ -500,7 +500,7 @@ class ClickHouseEngine:
         except Exception as e:
             return {"health": {"up": 0}, "error": str(e)}
 
-    def get_supported_metric_groups(self) -> list:
+    def get_supported_metric_groups(self) -> list[str]:
         return [
             "health",
             "connections",

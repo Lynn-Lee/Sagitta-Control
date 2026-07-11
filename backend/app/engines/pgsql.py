@@ -61,7 +61,7 @@ class PgSQLEngine:
             )
         return self._pool
 
-    async def get_connection(self, db_name: str | None = None):
+    async def get_connection(self, db_name: str | None = None) -> asyncpg.Pool:
         pool = await self._get_pool(db_name)
         return pool
 
@@ -81,7 +81,7 @@ class PgSQLEngine:
             ORDER BY table_name, table_schema
         """
         rs = await self._raw_query(db_name=db_name, sql=sql, args=[normalized_names])
-        mapping = {name: [] for name in normalized_names}
+        mapping: dict[str, list[str]] = {name: [] for name in normalized_names}
         if rs.error:
             return mapping
 
@@ -338,7 +338,7 @@ class PgSQLEngine:
 
         keys = []
 
-        def replacer(m: re.Match) -> str:
+        def replacer(m: re.Match[str]) -> str:
             key = m.group(1)
             if key not in keys:
                 keys.append(key)

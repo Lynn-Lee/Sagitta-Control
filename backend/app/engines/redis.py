@@ -38,7 +38,7 @@ class RedisEngine:
     def __init__(self, instance: Instance) -> None:
         self.instance = instance
 
-    async def _get_client(self, db_name: str | None = None):
+    async def _get_client(self, db_name: str | None = None) -> Any:
         try:
             import redis.asyncio as aioredis
         except ImportError:
@@ -104,10 +104,10 @@ class RedisEngine:
     async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
         return await self.get_all_columns_by_tb(db_name, tb_name)
 
-    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list:
+    async def get_tables_metas_data(self, db_name: str, **kw: Any) -> list[dict[str, Any]]:
         return []
 
-    def query_check(self, db_name: str, sql: str) -> dict:
+    def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         from app.services.query_guard import RedisCommandGuard
 
         guard_result = RedisCommandGuard().validate(sql, db_name)
@@ -121,7 +121,7 @@ class RedisEngine:
     def filter_sql(self, sql: str, limit_num: int) -> str:
         return sql.strip()
 
-    async def query(self, db_name: str, sql: str, limit_num: int = 0, parameters: dict | None = None, **kw: Any) -> ResultSet:
+    async def query(self, db_name: str, sql: str, limit_num: int = 0, parameters: dict[str, Any] | None = None, **kw: Any) -> ResultSet:
         rs = ResultSet()
         check = self.query_check(db_name, sql)
         if check["syntax_error"]:
@@ -290,7 +290,7 @@ class RedisEngine:
             rs.error = str(e)
         return rs
 
-    async def collect_metrics(self) -> dict:
+    async def collect_metrics(self) -> dict[str, Any]:
         try:
             r = await self._get_client()
             info = await r.info("all")
@@ -352,5 +352,5 @@ class RedisEngine:
         except Exception as e:
             return {"health": {"up": 0}, "error": str(e)}
 
-    def get_supported_metric_groups(self) -> list:
+    def get_supported_metric_groups(self) -> list[str]:
         return ["health", "memory", "stats", "replication"]

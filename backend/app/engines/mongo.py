@@ -39,9 +39,9 @@ class MongoEngine:
         self._port = instance.port
         self._user = decrypt_field(instance.user)
         self._password = decrypt_field(instance.password)
-        self._client: AsyncIOMotorClient | None = None
+        self._client: AsyncIOMotorClient[Any] | None = None
 
-    async def get_connection(self, db_name: str | None = None) -> AsyncIOMotorClient:
+    async def get_connection(self, db_name: str | None = None) -> AsyncIOMotorClient[Any]:
         if self._client is None:
             uri = (
                 f"mongodb://{self._user}:{self._password}@{self._host}:{self._port}"
@@ -325,6 +325,7 @@ class MongoEngine:
             db = client[db_name]
             coll_name = parsed["collection"]
 
+            cursor: Any
             if parsed["type"] == "find":
                 cursor = db[coll_name].find(
                     parsed.get("filter", {}),
@@ -390,6 +391,7 @@ class MongoEngine:
             operation = parsed["operation"]
             args = parsed["args"]
 
+            result: Any
             if operation == "insertOne":
                 result = await coll.insert_one(args[0])
                 affected_rows = 1 if getattr(result, "inserted_id", None) is not None else 0

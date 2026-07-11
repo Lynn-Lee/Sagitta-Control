@@ -3,9 +3,10 @@
 通过 get_engine(instance) 根据 db_type 分发到对应引擎实现。
 """
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from app.engines.protocol import EngineProtocol
     from app.models.instance import Instance
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ _REGISTRY: dict[str, str] = {
 }
 
 
-def get_engine(instance: "Instance"):
+def get_engine(instance: "Instance") -> "EngineProtocol":
     """
     根据实例的 db_type 返回对应引擎实例。
     移除了 isinstance(EngineProtocol) 运行时检查——
@@ -55,7 +56,7 @@ def get_engine(instance: "Instance"):
 
     engine = engine_class(instance=instance)
     logger.debug("engine_created: %s for %s", class_name, db_type)
-    return engine
+    return cast("EngineProtocol", engine)
 
 
 def register_engine(db_type: str, engine_path: str) -> None:

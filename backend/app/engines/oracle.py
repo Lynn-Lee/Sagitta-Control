@@ -133,7 +133,7 @@ class OracleEngine:
     def _dsn(self) -> str:
         return f"{self._host}:{self._port}/{self._service_name}"
 
-    def _connect_sync(self):
+    def _connect_sync(self) -> Any:
         _init_oracle_client_if_needed()
         return oracledb.connect(
             user=self._user,
@@ -183,7 +183,7 @@ class OracleEngine:
             rs.cost_time = int((time.monotonic() - start) * 1000)
         return rs
 
-    async def get_connection(self, db_name: str | None = None):
+    async def get_connection(self, db_name: str | None = None) -> Any:
         return await asyncio.to_thread(self._connect_sync)
 
     async def test_connection(self) -> ResultSet:
@@ -527,7 +527,7 @@ class OracleEngine:
             )
         return rs
 
-    def query_check(self, db_name: str, sql: str) -> dict:
+    def query_check(self, db_name: str, sql: str) -> dict[str, Any]:
         result = {"msg": "", "has_star": False, "syntax_error": False}
         try:
             tree = sqlglot.parse_one(sql.strip().rstrip(";"), dialect="oracle")
@@ -555,7 +555,7 @@ class OracleEngine:
         db_name: str,
         sql: str,
         limit_num: int = 0,
-        parameters: dict | None = None,
+        parameters: dict[str, Any] | None = None,
         **kw: Any,
     ) -> ResultSet:
         filtered_sql = self.filter_sql(sql, limit_num)
@@ -1012,7 +1012,7 @@ class OracleEngine:
         return fallback
 
     async def kill_connection(self, thread_id: int, serial: str | int | None = None) -> ResultSet:
-        if serial in (None, ""):
+        if serial is None or serial == "":
             return ResultSet(error="Oracle Kill 会话必须提供 serial")
         sql = f"ALTER SYSTEM KILL SESSION '{int(thread_id)},{int(serial)}' IMMEDIATE"
         return await asyncio.to_thread(self._run_statement_sync, sql, None)
@@ -1202,7 +1202,7 @@ class OracleEngine:
             metrics["missing_groups"]["health"] = error
             return metrics
 
-        def fetch_one(group: str, sql: str, params: dict[str, Any] | None = None):
+        def fetch_one(group: str, sql: str, params: dict[str, Any] | None = None) -> Any:
             try:
                 with conn.cursor() as cur:
                     cur.execute(sql, params or {})
@@ -1212,7 +1212,7 @@ class OracleEngine:
                 logger.info("oracle_metric_group_failed group=%s error=%s", group, exc)
                 return None
 
-        def fetch_all(group: str, sql: str, params: dict[str, Any] | None = None):
+        def fetch_all(group: str, sql: str, params: dict[str, Any] | None = None) -> Any:
             try:
                 with conn.cursor() as cur:
                     cur.execute(sql, params or {})
@@ -1709,7 +1709,7 @@ class OracleEngine:
             conn.close()
         return metrics
 
-    async def collect_metrics(self) -> dict:
+    async def collect_metrics(self) -> dict[str, Any]:
         return await asyncio.to_thread(self._collect_metrics_sync)
 
     def get_supported_metric_groups(self) -> list[str]:

@@ -64,7 +64,7 @@ class CassandraEngine:
         self._password = decrypt_field(instance.password)
         self._db_name = instance.db_name or None
 
-    def _connect_sync(self, db_name: str | None = None):
+    def _connect_sync(self, db_name: str | None = None) -> Any:
         try:
             from cassandra.auth import PlainTextAuthProvider
             from cassandra.cluster import Cluster
@@ -113,7 +113,7 @@ class CassandraEngine:
                 cluster.shutdown()
         return rs
 
-    async def get_connection(self, db_name: str | None = None):
+    async def get_connection(self, db_name: str | None = None) -> Any:
         return await asyncio.to_thread(self._connect_sync, db_name)
 
     async def test_connection(self) -> ResultSet:
@@ -131,7 +131,7 @@ class CassandraEngine:
         def load_keyspaces() -> ResultSet:
             rs = ResultSet(column_list=["keyspace_name"])
             session = None
-            cluster = None
+            cluster: Any = None
             try:
                 session = self._connect_sync(None)
                 cluster = getattr(session, "cluster", None)
@@ -154,7 +154,7 @@ class CassandraEngine:
         def load_tables() -> ResultSet:
             rs = ResultSet(column_list=["table_name"])
             session = None
-            cluster = None
+            cluster: Any = None
             try:
                 session = self._connect_sync(db_name)
                 cluster = getattr(session, "cluster", None)
@@ -180,7 +180,7 @@ class CassandraEngine:
         def load_columns() -> ResultSet:
             rs = ResultSet(column_list=["column_name", "column_type", "kind", "position"])
             session = None
-            cluster = None
+            cluster: Any = None
             try:
                 session = self._connect_sync(db_name)
                 cluster = getattr(session, "cluster", None)
@@ -215,7 +215,7 @@ class CassandraEngine:
     async def describe_table(self, db_name: str, tb_name: str, **kw: Any) -> ResultSet:
         def load_ddl() -> ResultSet:
             session = None
-            cluster = None
+            cluster: Any = None
             try:
                 session = self._connect_sync(db_name)
                 cluster = getattr(session, "cluster", None)
@@ -585,7 +585,7 @@ class CassandraEngine:
     async def _load_table_metadata(self, db_name: str, tb_name: str) -> ResultSet:
         def load_table() -> ResultSet:
             session = None
-            cluster = None
+            cluster: Any = None
             try:
                 session = self._connect_sync(db_name)
                 cluster = getattr(session, "cluster", None)
@@ -619,6 +619,7 @@ class CassandraEngine:
     def _secondary_index_rows(table: Any) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         indexes = getattr(table, "indexes", {}) or {}
+        iterable: Any
         if isinstance(indexes, dict):
             iterable = indexes.items()
         else:
