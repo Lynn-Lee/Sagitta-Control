@@ -11,65 +11,18 @@ import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
+import {
+  IMPORT_DEFAULT_PASSWORD,
+  downloadImportErrors,
+  extractFileName,
+  triggerDownload,
+  type ImportErrorRow,
+  type ImportResult,
+} from './userImportExport'
 
 const { Text } = Typography
 const { Dragger } = Upload
 const { useBreakpoint } = Grid
-
-type ImportErrorRow = {
-  row: number
-  username: string
-  error: string
-  row_data?: Record<string, string>
-}
-
-type ImportResult = {
-  total: number
-  created: number
-  updated: number
-  failed: number
-  auto_created_user_groups?: number
-  import_headers?: string[]
-  errors: ImportErrorRow[]
-}
-
-const IMPORT_DEFAULT_PASSWORD = 'Sagitta@2026A'
-
-function extractFileName(contentDisposition?: string, fallback = 'users_export.xlsx') {
-  if (!contentDisposition) return fallback
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
-  const normalMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
-  return normalMatch?.[1] || fallback
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  window.URL.revokeObjectURL(url)
-}
-
-function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: string[]) {
-  const headers = (importHeaders && importHeaders.length ? importHeaders : ['username']).filter(Boolean)
-  const lines = [
-    ['source_row', ...headers, 'import_error'],
-    ...errors.map((item) => [
-      String(item.row),
-      ...headers.map((header) => item.row_data?.[header] || ''),
-      item.error || '',
-    ]),
-  ]
-  const csv = lines
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  triggerDownload(
-    new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
-    'users_import_errors.csv',
-  )
-}
 
 export default function UserManagement() {
   const passwordRules = [
