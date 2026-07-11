@@ -16,11 +16,9 @@ from app.models.instance import Instance
 from app.models.monitor import (
     MonitorAlertEvent,
     MonitorCollectConfig,
-    MonitorDatabaseCapacitySnapshot,
     MonitorMetricSnapshot,
     MonitorPrivilege,
     MonitorPrivilegeApply,
-    MonitorTableCapacitySnapshot,
 )
 from app.models.user import ResourceGroup, Users
 from app.schemas.monitor import (
@@ -31,6 +29,7 @@ from app.schemas.monitor import (
 from app.services.dashboard import DashboardService
 from app.services.monitor_alerts import MonitorAlertService
 from app.services.monitor_capacity import MonitorCapacityService
+from app.services.monitor_collect import MonitorCollectService
 
 logger = logging.getLogger(__name__)
 
@@ -419,8 +418,8 @@ class MonitorService:
             await db.execute(select(Instance).where(Instance.id == instance_id))
         ).scalar_one()
         try:
-            snapshot = await MonitorService.collect_instance_metrics(db, inst, cfg)
-            await MonitorService.collect_instance_capacity(db, inst, cfg)
+            snapshot = await MonitorCollectService.collect_instance_metrics(db, inst, cfg)
+            await MonitorCapacityService.collect_instance_capacity(db, inst, cfg)
             cfg.last_collect_status = "success"
             cfg.last_collect_error = ""
             await db.commit()
@@ -1359,209 +1358,7 @@ class MonitorService:
 
     @staticmethod
     async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
-        now = datetime.now(UTC)
-        cfg_rows = (
-            await db.execute(
-                select(MonitorCollectConfig, Instance)
-                .join(Instance, MonitorCollectConfig.instance_id == Instance.id)
-                .where(MonitorCollectConfig.is_enabled.is_(True), Instance.is_active.is_(True))
-                .order_by(MonitorCollectConfig.id)
-                .limit(limit or 1000)
-            )
-        ).all()
-        collected = 0
-        failed = 0
-        skipped = 0
-        capacity_collected = 0
-        for cfg, inst in cfg_rows:
-            metric_due = (
-                not cfg.last_metric_collect_at
-                or now - cfg.last_metric_collect_at >= timedelta(seconds=cfg.collect_interval)
-            )
-            capacity_due = (
-                not cfg.last_capacity_collect_at
-                or now - cfg.last_capacity_collect_at
-                >= timedelta(seconds=cfg.capacity_collect_interval)
-            )
-            if not metric_due and not capacity_due:
-                skipped += 1
-                continue
-            try:
-                if metric_due:
-                    await MonitorService.collect_instance_metrics(db, inst, cfg, collected_at=now)
-                    collected += 1
-                if capacity_due:
-                    await MonitorService.collect_instance_capacity(db, inst, cfg, collected_at=now)
-                    capacity_collected += 1
-                cfg.last_collect_status = "success"
-                cfg.last_collect_error = ""
-            except Exception as exc:
-                failed += 1
-                cfg.last_collect_status = "failed"
-                cfg.last_collect_error = str(exc)[:4000]
-                db.add(
-                    MonitorMetricSnapshot(
-                        instance_id=inst.id,
-                        collected_at=now,
-                        status="failed",
-                        error=str(exc)[:4000],
-                        is_up=False,
-                    )
-                )
-            await MonitorService.cleanup_old_snapshots(db, inst.id, cfg.retention_days, now)
-        await db.commit()
-        return {
-            "instances": len(cfg_rows),
-            "metric_collected": collected,
-            "capacity_collected": capacity_collected,
-            "failed": failed,
-            "skipped": skipped,
-        }
-
-    @staticmethod
-    async def collect_instance_metrics(
-        db: AsyncSession,
-        inst: Instance,
-        cfg: MonitorCollectConfig,
-        collected_at: datetime | None = None,
-    ) -> MonitorMetricSnapshot:
-        from app.engines.registry import get_engine
-
-        now = collected_at or datetime.now(UTC)
-        engine = get_engine(inst)
-        previous = (
-            await db.execute(
-                select(MonitorMetricSnapshot)
-                .where(MonitorMetricSnapshot.instance_id == inst.id)
-                .order_by(MonitorMetricSnapshot.collected_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        raw = await engine.collect_metrics()
-        normalized = MonitorService._normalize_metric_payload(raw)
-        MonitorService._apply_delta_rates(normalized, raw, previous, now)
-        snapshot = MonitorMetricSnapshot(instance_id=inst.id, collected_at=now, **normalized)
-        db.add(snapshot)
-        await db.flush()
-        await MonitorService.sync_alert_events_for_snapshot(db, inst, cfg, snapshot)
-        cfg.last_metric_collect_at = now
-        return snapshot
-
-    @staticmethod
-    def _normalize_metric_payload(raw: dict[str, Any]) -> dict[str, Any]:
-        health = raw.get("health") or {}
-        connections = raw.get("connections") or raw.get("stats") or {}
-        stats = raw.get("stats") or raw.get("opcounters") or raw.get("metrics") or {}
-        version = raw.get("version")
-        if isinstance(version, dict):
-            version = version.get("value") or version.get("version") or ""
-        missing: dict[str, str] = {}
-        if isinstance(raw.get("missing_groups"), dict):
-            missing.update({str(k): str(v) for k, v in raw["missing_groups"].items()})
-        if raw.get("error"):
-            missing["health"] = "collect_failed"
-        current_connections = MonitorService._first_number(
-            connections,
-            "current",
-            "connected_clients",
-            "Threads_connected",
-            "threads_connected",
-            "current_connections",
-        )
-        max_connections = MonitorService._first_number(
-            raw.get("variables") or raw,
-            "max_connections",
-            "Max_used_connections",
-        ) or MonitorService._first_number(connections, "max_connections")
-        usage = None
-        if current_connections is not None and max_connections:
-            usage = round(float(current_connections) / float(max_connections), 4)
-        qps = MonitorService._first_number(
-            stats, "qps", "instantaneous_ops_per_sec", "queries_per_second"
-        )
-        tps = MonitorService._first_number(stats, "tps", "transactions_per_second")
-        return {
-            "status": "failed" if raw.get("error") else "success",
-            "error": str(raw.get("error") or ""),
-            "missing_groups": missing,
-            "is_up": bool(health.get("up")),
-            "version": str(version or raw.get("server_version") or ""),
-            "uptime_seconds": MonitorService._first_number(raw, "uptime_seconds", "uptime")
-            or MonitorService._first_number(stats, "uptime_in_seconds"),
-            "current_connections": current_connections,
-            "active_sessions": MonitorService._first_number(
-                raw.get("queries") or connections, "active_sessions", "active", "current"
-            ),
-            "max_connections": max_connections,
-            "connection_usage": usage,
-            "qps": float(qps) if qps is not None else None,
-            "tps": float(tps) if tps is not None else None,
-            "slow_queries": MonitorService._first_number(stats, "slow_queries", "Slow_queries"),
-            "error_count": MonitorService._first_number(stats, "errors", "error_count"),
-            "lock_waits": MonitorService._first_number(
-                stats, "lock_waits", "Innodb_row_lock_waits"
-            ),
-            "long_transactions": MonitorService._first_number(stats, "long_transactions"),
-            "replication_lag_seconds": MonitorService._first_number(
-                raw.get("replication") or {}, "lag_seconds", "seconds_behind_master"
-            ),
-            "extra_metrics": MonitorService._json_safe(raw),
-        }
-
-    @staticmethod
-    def _apply_delta_rates(
-        normalized: dict[str, Any],
-        raw: dict[str, Any],
-        previous: MonitorMetricSnapshot | None,
-        now: datetime,
-    ) -> None:
-        """当引擎提供单调递增计数器时，优先使用区间速率。"""
-        if not previous or not previous.collected_at:
-            return
-        previous_at = previous.collected_at
-        if previous_at.tzinfo is None and now.tzinfo is not None:
-            previous_at = previous_at.replace(tzinfo=UTC)
-        seconds = max((now - previous_at).total_seconds(), 1)
-        previous_extra = previous.extra_metrics or {}
-        counters = raw.get("counters") or {}
-        previous_counters = previous_extra.get("counters") or {}
-        qps = MonitorService._counter_rate(counters, previous_counters, seconds, "queries", "query_work")
-        tps = MonitorService._counter_rate(
-            counters, previous_counters, seconds, "transactions", "xact_total"
-        )
-        if qps is not None:
-            normalized["qps"] = qps
-        if tps is not None:
-            normalized["tps"] = tps
-
-    @staticmethod
-    def _counter_rate(
-        counters: dict[str, Any], previous_counters: dict[str, Any], seconds: float, *keys: str
-    ) -> float | None:
-        if not isinstance(counters, dict) or not isinstance(previous_counters, dict):
-            return None
-        for key in keys:
-            current = MonitorService._coerce_float(counters.get(key))
-            previous = MonitorService._coerce_float(previous_counters.get(key))
-            if current is None or previous is None or current < previous:
-                continue
-            return round((current - previous) / seconds, 2)
-        return None
-
-    @staticmethod
-    def _first_number(mapping: Any, *keys: str) -> int | float | None:
-        if not isinstance(mapping, dict):
-            return None
-        lowered = {str(k).lower(): v for k, v in mapping.items()}
-        for key in keys:
-            value = lowered.get(key.lower())
-            if value is None:
-                continue
-            try:
-                return float(value) if "." in str(value) else int(value)
-            except (TypeError, ValueError):
-                continue
-        return None
+        return await MonitorCollectService.collect_due_native(db, limit=limit)
 
     @staticmethod
     def _coerce_float(value: Any) -> float | None:
@@ -1571,17 +1368,6 @@ class MonitorService:
             return float(value)
         except (TypeError, ValueError):
             return None
-
-    @staticmethod
-    async def collect_instance_capacity(
-        db: AsyncSession,
-        inst: Instance,
-        cfg: MonitorCollectConfig,
-        collected_at: datetime | None = None,
-    ) -> None:
-        await MonitorCapacityService.collect_instance_capacity(
-            db, inst, cfg, collected_at=collected_at
-        )
 
     @staticmethod
     def _json_safe(value: Any) -> Any:
@@ -1594,19 +1380,3 @@ class MonitorService:
         if isinstance(value, Decimal):
             return int(value) if value == value.to_integral_value() else float(value)
         return value
-
-    @staticmethod
-    async def cleanup_old_snapshots(
-        db: AsyncSession, instance_id: int, retention_days: int, now: datetime | None = None
-    ) -> None:
-        cutoff = (now or datetime.now(UTC)) - timedelta(days=max(1, retention_days))
-        for model in (
-            MonitorMetricSnapshot,
-            MonitorDatabaseCapacitySnapshot,
-            MonitorTableCapacitySnapshot,
-        ):
-            rows = await db.execute(
-                select(model).where(model.instance_id == instance_id, model.collected_at < cutoff)
-            )
-            for row in rows.scalars().all():
-                await db.delete(row)

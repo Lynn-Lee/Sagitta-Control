@@ -11,6 +11,7 @@ from app.schemas.monitor import UnifiedCollectConfigUpsert
 from app.services.monitor import MonitorService
 from app.services.monitor_alerts import MonitorAlertService
 from app.services.monitor_capacity import MonitorCapacityService
+from app.services.monitor_collect import MonitorCollectService
 
 
 def test_normalize_metric_payload_keeps_missing_values_none():
@@ -21,7 +22,7 @@ def test_normalize_metric_payload_keeps_missing_values_none():
         "version": {"value": "8.0.36"},
     }
 
-    normalized = MonitorService._normalize_metric_payload(payload)
+    normalized = MonitorCollectService._normalize_metric_payload(payload)
 
     assert normalized["is_up"] is True
     assert normalized["version"] == "8.0.36"
@@ -35,7 +36,7 @@ def test_normalize_metric_payload_keeps_missing_values_none():
 
 
 def test_normalize_metric_payload_records_collect_failure():
-    normalized = MonitorService._normalize_metric_payload(
+    normalized = MonitorCollectService._normalize_metric_payload(
         {"health": {"up": 0}, "error": "permission denied"}
     )
 
@@ -46,7 +47,7 @@ def test_normalize_metric_payload_records_collect_failure():
 
 
 def test_normalize_metric_payload_preserves_partial_missing_groups():
-    normalized = MonitorService._normalize_metric_payload(
+    normalized = MonitorCollectService._normalize_metric_payload(
         {
             "health": {"up": 1},
             "connections": {"current": Decimal("8"), "max_connections": Decimal("100")},
@@ -275,7 +276,7 @@ def test_apply_delta_rates_prefers_interval_counters():
     )
     normalized = {"qps": 1, "tps": 1}
 
-    MonitorService._apply_delta_rates(
+    MonitorCollectService._apply_delta_rates(
         normalized,
         {"counters": {"queries": 1600, "transactions": 260}},
         previous,
