@@ -3,6 +3,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 from datetime import UTC
 
@@ -21,7 +23,7 @@ class AuditLogService:
     @staticmethod
     async def write(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         action: str,
         module: str,
         detail: str = "",
@@ -65,7 +67,7 @@ class AuditLogService:
 
         from sqlalchemy import and_
 
-        conditions = []
+        conditions: list[Any] = []
 
         if username:
             conditions.append(OperationLog.username.ilike(f"%{username}%"))

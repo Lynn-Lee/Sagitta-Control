@@ -17,7 +17,7 @@ import urllib.parse
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.mime.text import MIMEText
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -102,7 +102,7 @@ class NotifyService:
         try:
             from app.tasks.notify import send_notification_event_task
 
-            send_notification_event_task.delay(payload)
+            cast(Any, send_notification_event_task).delay(payload)
         except Exception as exc:  # noqa: BLE001
             logger.warning("notification_enqueue_failed: event=%s error=%s", payload.get("event_type"), exc)
 
@@ -355,7 +355,7 @@ class NotifyService:
     async def resolve_targets(
         db: AsyncSession,
         *,
-        node: dict | None = None,
+        node: dict[str, Any] | None = None,
         user_ids: list[int] | None = None,
         permission: str | None = None,
         permissions: list[str] | None = None,
@@ -381,7 +381,7 @@ class NotifyService:
         return [NotifyService._target_from_user(user) for user in result.scalars().all()]
 
     @staticmethod
-    async def _user_ids_by_node(db: AsyncSession, node: dict, applicant_id: int | None) -> set[int]:
+    async def _user_ids_by_node(db: AsyncSession, node: dict[str, Any], applicant_id: int | None) -> set[int]:
         approver_type = node.get("approver_type", "any_reviewer")
         if approver_type == "users":
             return {int(uid) for uid in (node.get("approver_ids") or [])}
@@ -472,7 +472,7 @@ class NotifyService:
                 ids.update(role_result.scalars().all())
 
         manager_result = await db.execute(select(Users.manager_id).where(Users.manager_id.is_not(None)))
-        ids.update(manager_result.scalars().all())
+        ids.update(i for i in manager_result.scalars().all() if i is not None)
         return ids
 
     @staticmethod
@@ -523,7 +523,7 @@ class NotifyService:
         channel: str,
         target: NotificationTarget,
         recipient: str,
-        coro,
+        coro: Any,
     ) -> bool:
         try:
             await coro
@@ -536,7 +536,7 @@ class NotifyService:
 
     # ── 应用消息实现 ─────────────────────────────────────────
 
-    async def _send_feishu_user(self, title: str, content: str, open_id: str) -> dict:
+    async def _send_feishu_user(self, title: str, content: str, open_id: str) -> dict[str, Any]:
         app_id = self.config.get("feishu_app_id", "")
         app_secret = self.config.get("feishu_app_secret", "")
         if not app_id or not app_secret:
@@ -564,9 +564,9 @@ class NotifyService:
             data = resp.json()
         if data.get("code") not in (0, None):
             raise RuntimeError(f"飞书应用消息失败：{data}")
-        return data
+        return cast("dict[str, Any]", data)
 
-    async def _send_wecom_user(self, title: str, content: str, userid: str) -> dict:
+    async def _send_wecom_user(self, title: str, content: str, userid: str) -> dict[str, Any]:
         corp_id = self.config.get("wecom_login_corp_id", "")
         secret = self.config.get("wecom_login_app_secret", "")
         agent_id = self.config.get("wecom_login_agent_id", "")
@@ -601,9 +601,9 @@ class NotifyService:
             data = resp.json()
         if data.get("errcode") != 0:
             raise RuntimeError(f"企微应用消息失败：{data}")
-        return data
+        return cast("dict[str, Any]", data)
 
-    async def _send_dingtalk_user(self, title: str, content: str, userid: str) -> dict:
+    async def _send_dingtalk_user(self, title: str, content: str, userid: str) -> dict[str, Any]:
         app_key = self.config.get("ding_login_app_id", "")
         app_secret = self.config.get("ding_login_app_secret", "")
         agent_id = self.config.get("ding_agent_id") or self.config.get("ding_login_agent_id", "")
@@ -632,13 +632,13 @@ class NotifyService:
             data = resp.json()
         if data.get("errcode") != 0:
             raise RuntimeError(f"钉钉工作通知失败：{data}")
-        return data
+        return cast("dict[str, Any]", data)
 
     # ── 旧 Webhook 通知与邮件 ───────────────────────────────
 
     @staticmethod
     async def notify_workflow(
-        db,
+        db: AsyncSession,
         workflow_id: int,
         workflow_name: str,
         status: int,
@@ -675,7 +675,7 @@ class NotifyService:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _send_dingtalk(self, title: str, content: str) -> dict:
+    async def _send_dingtalk(self, title: str, content: str) -> dict[str, Any]:
         import httpx
 
         webhook = self.config.get("ding_webhook", "")
@@ -693,9 +693,9 @@ class NotifyService:
             data = resp.json()
         if data.get("errcode") != 0:
             raise Exception(f"钉钉通知失败：{data.get('errmsg', '未知错误')}")
-        return data
+        return cast("dict[str, Any]", data)
 
-    async def _send_wecom(self, title: str, content: str) -> dict:
+    async def _send_wecom(self, title: str, content: str) -> dict[str, Any]:
         import httpx
 
         async with httpx.AsyncClient(timeout=10) as client:
@@ -703,9 +703,9 @@ class NotifyService:
             data = resp.json()
         if data.get("errcode") != 0:
             raise Exception(f"企微通知失败：{data.get('errmsg', '未知错误')}")
-        return data
+        return cast("dict[str, Any]", data)
 
-    async def _send_feishu(self, title: str, content: str) -> dict:
+    async def _send_feishu(self, title: str, content: str) -> dict[str, Any]:
         import httpx
 
         payload = {
@@ -721,7 +721,7 @@ class NotifyService:
         code = data.get("code") or data.get("StatusCode")
         if code and code != 0:
             raise Exception(f"飞书通知失败：{data}")
-        return data
+        return cast("dict[str, Any]", data)
 
     async def _send_mail(self, subject: str, content: str, to_emails: list[str]) -> None:
         host = self.config.get("mail_host", "")
@@ -738,6 +738,7 @@ class NotifyService:
             msg["Subject"] = subject
             msg["From"] = f"{sender} <{user}>" if sender and sender != user else user
             msg["To"] = ", ".join(to_emails)
+            smtp: smtplib.SMTP
             if use_ssl:
                 smtp = smtplib.SMTP_SSL(host, port, timeout=10)
             else:

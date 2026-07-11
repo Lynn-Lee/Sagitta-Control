@@ -3,6 +3,8 @@ SQL 工单业务逻辑服务（Sprint 3）。
 """
 from __future__ import annotations
 
+from typing import Any, cast
+
 import json
 import logging
 from datetime import UTC, datetime
@@ -66,7 +68,7 @@ EXECUTION_RECORD_STATUSES = (
 
 class WorkflowService:
     @staticmethod
-    def _can_cancel_workflow(wf: SqlWorkflow, user: dict, nodes: list[dict] | None = None) -> bool:
+    def _can_cancel_workflow(wf: SqlWorkflow, user: dict[str, Any], nodes: list[dict[str, Any]] | None = None) -> bool:
         return ApplicationCancelPolicy.can_cancel_before_approval(
             applicant_username=wf.engineer,
             operator=user,
@@ -76,7 +78,7 @@ class WorkflowService:
         )
 
     @staticmethod
-    def _can_submit_high_risk_sql(operator: dict) -> bool:
+    def _can_submit_high_risk_sql(operator: dict[str, Any]) -> bool:
         return bool(
             operator.get("is_superuser")
             or operator.get("role") in HIGH_RISK_SQL_SUBMIT_ROLES
@@ -85,7 +87,7 @@ class WorkflowService:
 
     @staticmethod
     def _build_audit_chain_text(
-        nodes: list[dict],
+        nodes: list[dict[str, Any]],
         workflow_status: int,
         operator_display_map: dict[str, str] | None = None,
     ) -> str:
@@ -106,15 +108,15 @@ class WorkflowService:
         return " -> ".join(actor_chain) if actor_chain else "—"
 
     @staticmethod
-    def _get_current_node_name(nodes: list[dict], workflow_status: int) -> str:
+    def _get_current_node_name(nodes: list[dict[str, Any]], workflow_status: int) -> str:
         if workflow_status != WorkflowStatus.PENDING_REVIEW:
             return "—"
         current_node = next((node for node in nodes if node.get("status") == 0), None)
         return current_node.get("node_name", "—") if current_node else "—"
 
     @staticmethod
-    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict], applicant: dict) -> list[dict]:
-        result: list[dict] = []
+    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict[str, Any]], applicant: dict[str, Any]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
         for node in nodes_snapshot:
             node_copy = dict(node)
             if node_copy.get("approver_type") == "manager":
@@ -124,7 +126,7 @@ class WorkflowService:
         return result
 
     @staticmethod
-    def _fmt_workflow(wf: SqlWorkflow, instance_name: str = "") -> dict:
+    def _fmt_workflow(wf: SqlWorkflow, instance_name: str = "") -> dict[str, Any]:
         """序列化工单为 dict（不含 SQL 内容）。"""
         risk_level = ""
         risk_summary = ""
@@ -137,6 +139,10 @@ class WorkflowService:
             except (TypeError, ValueError):
                 risk_level = ""
                 risk_summary = ""
+        run_date_start = wf.run_date_start
+        run_date_end = wf.run_date_end
+        scheduled_execute_at = getattr(wf, "scheduled_execute_at", None)
+        external_executed_at = getattr(wf, "external_executed_at", None)
         return {
             "id": wf.id,
             "workflow_name": wf.workflow_name,
@@ -154,16 +160,16 @@ class WorkflowService:
             "workflow_type": int(WorkflowType.SQL),
             "workflow_type_label": WORKFLOW_TYPE_LABEL[int(WorkflowType.SQL)],
             "audit_auth_groups": wf.audit_auth_groups,
-            "run_date_start": wf.run_date_start.isoformat() if wf.run_date_start else None,
-            "run_date_end": wf.run_date_end.isoformat() if wf.run_date_end else None,
+            "run_date_start": run_date_start.isoformat() if run_date_start else None,
+            "run_date_end": run_date_end.isoformat() if run_date_end else None,
             "execute_mode": getattr(wf, "execute_mode", None),
             "scheduled_execute_at": (
-                wf.scheduled_execute_at.isoformat() if getattr(wf, "scheduled_execute_at", None) else None
+                scheduled_execute_at.isoformat() if scheduled_execute_at else None
             ),
             "executed_by_id": getattr(wf, "executed_by_id", None),
             "executed_by_name": getattr(wf, "executed_by_name", None),
             "external_executed_at": (
-                wf.external_executed_at.isoformat() if getattr(wf, "external_executed_at", None) else None
+                external_executed_at.isoformat() if external_executed_at else None
             ),
             "external_result_status": getattr(wf, "external_result_status", None),
             "external_result_remark": getattr(wf, "external_result_remark", None),
@@ -182,7 +188,7 @@ class WorkflowService:
     async def create(
         db: AsyncSession,
         data: WorkflowCreateRequest,
-        operator: dict,
+        operator: dict[str, Any],
     ) -> SqlWorkflow:
         if data.flow_id is None:
             raise AppException("请选择审批流", code=400)
@@ -216,7 +222,7 @@ class WorkflowService:
         audit_auth_groups = str(rg.id)
 
         # 如果指定了审批流模板，生成节点快照
-        nodes_snapshot: list[dict] | None = None
+        nodes_snapshot: list[dict[str, Any]] | None = None
         if data.flow_id:
             from app.services.approval_flow import ApprovalFlowService
             nodes_snapshot = await ApprovalFlowService.snapshot_for_workflow(db, data.flow_id)
@@ -329,7 +335,7 @@ class WorkflowService:
     @staticmethod
     async def list_workflows(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         view: str = "mine",
         status: int | None = None,
         instance_id: int | None = None,
@@ -340,7 +346,7 @@ class WorkflowService:
         date_end: str | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict], dict | None]:
+    ) -> tuple[int, list[dict[str, Any]], dict[str, Any] | None]:
         """
         查询工单列表。
         所有过滤条件均通过同一套 WHERE 子句构建，避免条件不一致问题。
@@ -352,7 +358,7 @@ class WorkflowService:
 
         from app.services.audit import AuditService
 
-        scope: dict | None = None
+        scope: dict[str, Any] | None = None
         if view == "mine":
             conditions.append(SqlWorkflow.engineer_id == user["id"])
         elif view == "audit":
@@ -467,7 +473,7 @@ class WorkflowService:
                 for username, display_name in user_rows.all()
             }
 
-        items: list[dict] = []
+        items: list[dict[str, Any]] = []
         for wf, inst_name in rows:
             item = WorkflowService._fmt_workflow(wf, inst_name or "")
             audit = audit_map.get(wf.id)
@@ -493,7 +499,7 @@ class WorkflowService:
         # ── 工单详情 ──────────────────────────────────────────────
 
     @staticmethod
-    async def get_detail(db: AsyncSession, workflow_id: int, user: dict) -> dict:
+    async def get_detail(db: AsyncSession, workflow_id: int, user: dict[str, Any]) -> dict[str, Any]:
         result = await db.execute(
             select(SqlWorkflow, Instance.instance_name)
             .outerjoin(Instance, SqlWorkflow.instance_id == Instance.id)
@@ -565,10 +571,10 @@ class WorkflowService:
     async def execute(
         db: AsyncSession,
         workflow_id: int,
-        operator: dict,
+        operator: dict[str, Any],
         data: WorkflowExecuteRequest | None = None,
         mode: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if data is None:
             data = WorkflowExecuteRequest(mode=mode or "immediate")
 
@@ -594,7 +600,7 @@ class WorkflowService:
         return await WorkflowService._execute_immediately(db, wf, operator)
 
     @staticmethod
-    def _operator_display(operator: dict) -> str:
+    def _operator_display(operator: dict[str, Any]) -> str:
         return operator.get("display_name") or operator.get("username") or str(operator.get("id", ""))
 
     @staticmethod
@@ -614,7 +620,7 @@ class WorkflowService:
     async def _write_execution_log(
         db: AsyncSession,
         workflow_id: int,
-        operator: dict,
+        operator: dict[str, Any],
         operation_type: str,
         remark: str,
     ) -> None:
@@ -626,8 +632,8 @@ class WorkflowService:
     async def _execute_immediately(
         db: AsyncSession,
         wf: SqlWorkflow,
-        operator: dict,
-    ) -> dict:
+        operator: dict[str, Any],
+    ) -> dict[str, Any]:
         # 更新为队列中
         wf.execute_mode = "immediate"
         wf.executed_by_id = operator.get("id")
@@ -646,7 +652,7 @@ class WorkflowService:
         # 提交 Celery 任务
         try:
             from app.tasks.execute_sql import execute_workflow_task
-            task = execute_workflow_task.delay(wf.id, operator.get("id"))
+            task = cast(Any, execute_workflow_task).delay(wf.id, operator.get("id"))
             return {
                 "msg": "已加入执行队列",
                 "task_id": task.id,
@@ -662,9 +668,9 @@ class WorkflowService:
     async def _schedule_execution(
         db: AsyncSession,
         wf: SqlWorkflow,
-        operator: dict,
+        operator: dict[str, Any],
         data: WorkflowExecuteRequest,
-    ) -> dict:
+    ) -> dict[str, Any]:
         scheduled_at = data.scheduled_at or data.timing_time
         if scheduled_at is None:
             raise AppException("请选择预约执行时间", code=400)
@@ -695,9 +701,9 @@ class WorkflowService:
     async def _record_external_execution(
         db: AsyncSession,
         wf: SqlWorkflow,
-        operator: dict,
+        operator: dict[str, Any],
         data: WorkflowExecuteRequest,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if data.external_executed_at is None:
             raise AppException("请填写外部实际执行时间", code=400)
         if not data.external_status:
@@ -741,7 +747,7 @@ class WorkflowService:
     async def _execute_sync(
         db: AsyncSession,
         wf: SqlWorkflow,
-        operator: dict,
+        operator: dict[str, Any],
     ) -> None:
         """同步执行工单（Celery 不可用时的降级方案）。"""
         from app.models.instance import Instance
@@ -796,7 +802,7 @@ class WorkflowService:
         instance_id: int,
         db_name: str,
         sql_content: str,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         inst_result = await db.execute(
             select(Instance).where(Instance.id == instance_id)
         )
@@ -822,8 +828,8 @@ class WorkflowService:
 
     @staticmethod
     async def pending_for_me(
-        db: AsyncSession, user: dict, page: int = 1, page_size: int = 20
-    ) -> tuple[int, list[dict]]:
+        db: AsyncSession, user: dict[str, Any], page: int = 1, page_size: int = 20
+    ) -> tuple[int, list[dict[str, Any]]]:
         """
         获取当前用户有权限审批的工单列表。
         委托给 AuditService.get_pending_for_user 按节点权限过滤。

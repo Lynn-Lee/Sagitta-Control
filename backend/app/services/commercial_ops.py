@@ -802,7 +802,7 @@ class CommercialOpsService:
     @staticmethod
     async def create_acceptance_run(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         options: dict[str, Any],
     ) -> DeliveryAcceptanceRun:
         checks: list[dict[str, Any]] = []
@@ -981,7 +981,7 @@ class CommercialOpsService:
         }
 
     @staticmethod
-    async def create_diagnostic_bundle(db: AsyncSession, user: dict) -> DiagnosticBundle:
+    async def create_diagnostic_bundle(db: AsyncSession, user: dict[str, Any]) -> DiagnosticBundle:
         latest_license = await LicenseService.status(db)
         alembic_version = ""
         try:
@@ -1081,7 +1081,7 @@ class CommercialOpsService:
         now = _now()
         start = now - timedelta(days=30)
         if report_type == "query_export":
-            rows = (
+            rows: Any = (
                 await db.execute(
                     select(QueryLog)
                     .where(QueryLog.operation_type == "export", QueryLog.created_at >= start)
@@ -1343,5 +1343,5 @@ class CommercialOpsService:
             "category": category,
             "label": RETENTION_LABELS[category],
             "cutoff": cutoff.isoformat(),
-            "deleted": int(result.rowcount or 0),
+            "deleted": int(getattr(result, "rowcount", 0) or 0),
         }

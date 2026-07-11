@@ -7,6 +7,11 @@ Phase 4：移除 user_permission / user_resource_group 旧表引用。
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.models.role import Role
+
 import csv
 import logging
 from datetime import UTC, datetime
@@ -429,9 +434,10 @@ class UserService:
 
         if auto_commit:
             await db.commit()
-        user = await UserService.get_by_id(db, user.id)
+        refreshed = await UserService.get_by_id(db, user.id)
+        assert refreshed is not None  # 刚创建并提交，必然存在
         logger.info("user_created: %s", data.username)
-        return user
+        return refreshed
 
     @staticmethod
     async def update_user(
@@ -449,6 +455,7 @@ class UserService:
         if auto_commit:
             await db.commit()
         user = await UserService.get_by_id(db, user.id)
+        assert user is not None  # 刚更新并提交，必然存在
         return user
 
     @staticmethod
@@ -849,10 +856,10 @@ class UserService:
         if not raw_headers:
             raise AppException("Excel 文件缺少表头", code=400)
         headers = [USER_IMPORT_HEADER_ALIASES.get(header, header) for header in raw_headers]
-        rows: list[dict[str, dict[str, str]]] = []
+        rows = []
         for values in sheet.iter_rows(min_row=2, values_only=True):
             normalized_row: dict[str, str] = {}
-            raw_display_row: dict[str, str] = {}
+            raw_display_row = {}
             for raw_header, normalized_header, value in zip(raw_headers, headers, values, strict=False):
                 if not normalized_header:
                     continue
@@ -1004,7 +1011,7 @@ class UserService:
                 (UserGroup.name.in_(group_names)) | (UserGroup.name_cn.in_(group_names))
             )
         )
-        resolved = list(result.all())
+        resolved: list[Any] = list(result.all())
         found_names = {
             value
             for row in resolved
@@ -1029,7 +1036,7 @@ class UserService:
         return [row.id for row in resolved], missing
 
     @staticmethod
-    def _role_model():
+    def _role_model() -> type[Role]:
         from app.models.role import Role
 
         return Role

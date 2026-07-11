@@ -238,7 +238,7 @@ def has_side_effect_function(tree: exp.Expression) -> bool:
         if isinstance(current, exp.Anonymous):
             name = str(current.this or "")
         elif isinstance(current, exp.Func):
-            name = current.sql_name()
+            name = current.sql_name()  # type: ignore[no-untyped-call]
         if name and name.lower() in SIDE_EFFECT_FUNCTIONS:
             return True
     return False

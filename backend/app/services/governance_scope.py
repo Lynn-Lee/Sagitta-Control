@@ -19,14 +19,14 @@ ScopeDomain = Literal["query", "workflow"]
 
 class GovernanceScopeService:
     @staticmethod
-    def is_global_user(user: dict, domain: ScopeDomain) -> bool:
+    def is_global_user(user: dict[str, Any], domain: ScopeDomain) -> bool:
         if user.get("is_superuser") or user.get("role") in {"superadmin", "dba"}:
             return True
         permissions = set(user.get("permissions", []))
         return domain == "query" and "query_all_instances" in permissions
 
     @staticmethod
-    def _has_instance_scope_permission(user: dict, domain: ScopeDomain) -> bool:
+    def _has_instance_scope_permission(user: dict[str, Any], domain: ScopeDomain) -> bool:
         if user.get("role") == "dba_group":
             return True
         permissions = set(user.get("permissions", []))
@@ -35,7 +35,7 @@ class GovernanceScopeService:
         return "sql_execute_for_resource_group" in permissions
 
     @staticmethod
-    async def _resolve_instance_ids(db: AsyncSession, user: dict) -> list[int]:
+    async def _resolve_instance_ids(db: AsyncSession, user: dict[str, Any]) -> list[int]:
         user_rg_ids = user.get("resource_groups", [])
         if not user_rg_ids:
             return []
@@ -48,7 +48,7 @@ class GovernanceScopeService:
         return list(result.scalars().all())
 
     @staticmethod
-    async def _resolve_group_user_ids(db: AsyncSession, user: dict) -> list[int]:
+    async def _resolve_group_user_ids(db: AsyncSession, user: dict[str, Any]) -> list[int]:
         leader_groups = await db.execute(
             select(UserGroup)
             .options(selectinload(UserGroup.members))
@@ -64,7 +64,7 @@ class GovernanceScopeService:
         return sorted(user_ids)
 
     @staticmethod
-    async def resolve(db: AsyncSession, user: dict, domain: ScopeDomain) -> dict[str, Any]:
+    async def resolve(db: AsyncSession, user: dict[str, Any], domain: ScopeDomain) -> dict[str, Any]:
         if GovernanceScopeService.is_global_user(user, domain):
             return {"mode": "global", "label": "全量数据", "user_ids": None, "instance_ids": None}
 
@@ -88,7 +88,7 @@ class GovernanceScopeService:
         return {"mode": "self", "label": "我的数据", "user_ids": [user["id"]], "instance_ids": None}
 
     @staticmethod
-    def apply_scope(stmt, scope: dict, *, user_col, instance_col):
+    def apply_scope(stmt: Any, scope: dict[str, Any], *, user_col: Any, instance_col: Any) -> Any:
         if scope["mode"] in {"self", "group"}:
             user_ids = scope.get("user_ids") or []
             if not user_ids:

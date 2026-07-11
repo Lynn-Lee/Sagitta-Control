@@ -27,7 +27,7 @@ class ApplicationCancelPolicy:
         *,
         applicant_id: int | None = None,
         applicant_username: str | None = None,
-        operator: dict,
+        operator: dict[str, Any],
         status: int | str,
         pending_status: int | str,
         nodes: list[dict[str, Any]],
@@ -45,7 +45,7 @@ class ApplicationCancelPolicy:
         return not ApplicationCancelPolicy.has_operated_node(nodes)
 
     @staticmethod
-    def cancel_pending_nodes(nodes: list[dict[str, Any]], operator: dict) -> list[dict[str, Any]]:
+    def cancel_pending_nodes(nodes: list[dict[str, Any]], operator: dict[str, Any]) -> list[dict[str, Any]]:
         operated_at = operator.get("operated_at")
         for node in nodes:
             if node.get("status") != AuditStatus.PENDING:

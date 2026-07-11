@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 from datetime import UTC, datetime
 
@@ -36,7 +38,7 @@ class InstanceDatabaseService:
         db: AsyncSession,
         instance_id: int,
         include_inactive: bool = False,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """获取实例下已注册的数据库列表。"""
         stmt = select(InstanceDatabase).where(InstanceDatabase.instance_id == instance_id)
         if not include_inactive:
@@ -130,7 +132,7 @@ class InstanceDatabaseService:
     async def sync_from_engine(
         db: AsyncSession,
         instance_id: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         连接引擎拉取数据库列表，自动同步到 instance_database 表。
         与当前连接用户的真实可见范围保持一致：
@@ -199,13 +201,13 @@ class InstanceDatabaseService:
         for db_name in db_list:
             if not db_name:
                 continue
-            existing = existing_by_name.get(db_name)
-            if existing:
-                existing.sync_at = now
+            matched = existing_by_name.get(db_name)
+            if matched:
+                matched.sync_at = now
                 # 兼容旧版本曾将部分库/Schema 自动置为“系统库（默认禁用）”
-                if existing.remark == "系统库（默认禁用）":
-                    existing.remark = ""
-                    existing.is_active = True
+                if matched.remark == "系统库（默认禁用）":
+                    matched.remark = ""
+                    matched.is_active = True
                 updated += 1
             else:
                 db.add(

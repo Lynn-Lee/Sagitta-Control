@@ -8,7 +8,7 @@ import csv
 import logging
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import delete, func, select
@@ -183,7 +183,7 @@ def _split_multi_value(raw: str) -> list[str]:
             parts.append(value)
     return parts
 
-BUILTIN_ROLES: list[dict] = [
+BUILTIN_ROLES: list[dict[str, Any]] = [
     {
         "name": "superadmin",
         "name_cn": "超级管理员",
@@ -388,7 +388,9 @@ class RoleService:
         if permission_codes is not None:
             await RoleService._set_permissions(db, role, permission_codes)
         await db.commit()
-        return await RoleService.get_by_id(db, role.id)
+        refreshed = await RoleService.get_by_id(db, role.id)
+        assert refreshed is not None  # 刚更新并提交，必然存在
+        return refreshed
 
     @staticmethod
     async def delete_role(db: AsyncSession, role_id: int) -> None:
@@ -926,10 +928,10 @@ class UserGroupService:
         if not raw_headers:
             raise AppException("Excel 文件缺少表头", code=400)
         headers = [USER_GROUP_IMPORT_HEADER_ALIASES.get(header, header) for header in raw_headers]
-        rows: list[dict[str, dict[str, str]]] = []
+        rows = []
         for values in sheet.iter_rows(min_row=2, values_only=True):
             normalized_row: dict[str, str] = {}
-            raw_display_row: dict[str, str] = {}
+            raw_display_row = {}
             for raw_header, normalized_header, value in zip(raw_headers, headers, values, strict=False):
                 if not normalized_header:
                     continue
@@ -1054,7 +1056,7 @@ class UserGroupService:
         parent_id, parent_name = matched_rows[0]
         if parent_name == current_name:
             raise AppException("父组不能设置为自己", code=400)
-        return parent_id
+        return cast("int | None", parent_id)
 
     @staticmethod
     async def _resolve_member_ids(db: AsyncSession, raw_members: str) -> list[int]:

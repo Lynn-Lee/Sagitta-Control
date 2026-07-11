@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import random
 import string
@@ -29,7 +31,7 @@ CODE_COOLDOWN_SECONDS = 60  # 重发冷却 60 秒
 DAILY_LIMIT = 10  # 每天每手机号上限
 
 
-async def _get_redis():
+async def _get_redis() -> Any:
     from redis.asyncio import Redis
 
     from app.core.config import settings
@@ -37,7 +39,7 @@ async def _get_redis():
     return Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
-async def send_sms_code(db: AsyncSession, phone: str) -> dict:
+async def send_sms_code(db: AsyncSession, phone: str) -> dict[str, Any]:
     """发送短信验证码。返回 {"success": bool, "message": str}。"""
     enabled = (await SystemConfigService.get_value(db, "sms_enabled")).lower()
     if enabled != "true":
@@ -105,7 +107,7 @@ async def verify_sms_code(phone: str, code: str) -> bool:
         await r.aclose()
 
 
-async def _send_aliyun(db: AsyncSession, phone: str, code: str) -> dict:
+async def _send_aliyun(db: AsyncSession, phone: str, code: str) -> dict[str, Any]:
     """阿里云短信发送。"""
     try:
         import base64
@@ -171,13 +173,13 @@ async def _send_aliyun(db: AsyncSession, phone: str, code: str) -> dict:
         return {"success": False, "message": str(e)}
 
 
-async def _send_tencent(db: AsyncSession, phone: str, code: str) -> dict:
+async def _send_tencent(db: AsyncSession, phone: str, code: str) -> dict[str, Any]:
     """腾讯云短信发送（简化版，生产环境建议用 SDK）。"""
     logger.info("sms_tencent_send: phone=%s code=sent", phone[:3] + "****")
     return {"success": True, "message": "验证码已发送（请配置腾讯云短信 SDK）"}
 
 
-async def _send_custom(db: AsyncSession, phone: str, code: str) -> dict:
+async def _send_custom(db: AsyncSession, phone: str, code: str) -> dict[str, Any]:
     """自定义 HTTP API 短信发送。"""
     try:
         import httpx

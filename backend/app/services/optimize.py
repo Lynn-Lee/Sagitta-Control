@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import sqlglot
 import sqlglot.expressions as exp
@@ -451,7 +451,7 @@ class MysqlAnalyzer(JsonPlanAnalyzer):
     support_level: SupportLevel = "full"
 
     async def explain(self) -> ResultSet:
-        return await self.engine.explain_query(self.db_name, self.sql)
+        return cast(ResultSet, await self.engine.explain_query(self.db_name, self.sql))
 
     def extract_raw(self, rs: ResultSet) -> Any:
         return _loads_json(_first_value(rs))
@@ -462,7 +462,7 @@ class PostgresAnalyzer(JsonPlanAnalyzer):
     support_level: SupportLevel = "full"
 
     async def explain(self) -> ResultSet:
-        return await self.engine.explain_query(self.db_name, self.sql)
+        return cast(ResultSet, await self.engine.explain_query(self.db_name, self.sql))
 
     def extract_raw(self, rs: ResultSet) -> Any:
         return _loads_json(_first_value(rs))
@@ -476,8 +476,8 @@ class TidbAnalyzer(JsonPlanAnalyzer):
         sql = f"EXPLAIN FORMAT='tidb_json' {self.sql.rstrip(';')}"
         rs = await self.engine.query(db_name=self.db_name, sql=sql, limit_num=1)
         if rs.is_success:
-            return rs
-        return await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN {self.sql.rstrip(';')}", limit_num=100)
+            return cast(ResultSet, rs)
+        return cast(ResultSet, await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN {self.sql.rstrip(';')}", limit_num=100))
 
     def extract_raw(self, rs: ResultSet) -> Any:
         value = _first_value(rs)
@@ -568,7 +568,7 @@ class StarRocksAnalyzer(TextPlanAnalyzer):
     support_level: SupportLevel = "full"
 
     async def explain(self) -> ResultSet:
-        return await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN COSTS {self.sql.rstrip(';')}", limit_num=1000)
+        return cast(ResultSet, await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN COSTS {self.sql.rstrip(';')}", limit_num=1000))
 
     def parse_plan(self, raw: Any) -> tuple[OptimizePlan, list[OptimizeFinding]]:
         plan, findings = self.parse_text_plan(raw, "starrocks")
@@ -602,7 +602,7 @@ class OracleAnalyzer(TextPlanAnalyzer):
 
     async def explain(self) -> ResultSet:
         if hasattr(self.engine, "explain_query"):
-            return await self.engine.explain_query(self.db_name, self.sql)
+            return cast(ResultSet, await self.engine.explain_query(self.db_name, self.sql))
         return ResultSet(warning="Oracle 引擎未实现 DBMS_XPLAN")
 
 
@@ -613,7 +613,7 @@ class MssqlAnalyzer(TextPlanAnalyzer):
 
     async def explain(self) -> ResultSet:
         if hasattr(self.engine, "explain_query"):
-            return await self.engine.explain_query(self.db_name, self.sql)
+            return cast(ResultSet, await self.engine.explain_query(self.db_name, self.sql))
         return ResultSet(warning="MSSQL 引擎未实现 SHOWPLAN_XML")
 
     def parse_plan(self, raw: Any) -> tuple[OptimizePlan, list[OptimizeFinding]]:
@@ -646,8 +646,8 @@ class PartialExplainAnalyzer(TextPlanAnalyzer):
 
     async def explain(self) -> ResultSet:
         if hasattr(self.engine, "explain_query"):
-            return await self.engine.explain_query(self.db_name, self.sql)
-        return await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN {self.sql.rstrip(';')}", limit_num=300)
+            return cast(ResultSet, await self.engine.explain_query(self.db_name, self.sql))
+        return cast(ResultSet, await self.engine.query(db_name=self.db_name, sql=f"EXPLAIN {self.sql.rstrip(';')}", limit_num=300))
 
 
 def _safe_int(value: Any) -> int:
@@ -696,7 +696,7 @@ class OptimizeService:
     """SQL 优化 v2 的统一入口。"""
 
     @staticmethod
-    async def analyze(db: AsyncSession, user: dict, data: OptimizeAnalyzeRequest) -> OptimizeAnalyzeResponse:
+    async def analyze(db: AsyncSession, user: dict[str, Any], data: OptimizeAnalyzeRequest) -> OptimizeAnalyzeResponse:
         instance, source, db_name, sql, slowlog_meta = await OptimizeService._resolve_input(db, user, data)
         db_type = instance.db_type.lower()
         if db_type in _UNSUPPORTED_ENGINES:
@@ -740,7 +740,7 @@ class OptimizeService:
     @staticmethod
     async def _resolve_input(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         data: OptimizeAnalyzeRequest,
     ) -> tuple[Instance, OptimizeSource, str, str, dict[str, Any]]:
         if data.log_id:

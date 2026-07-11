@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import logging
 from datetime import UTC, datetime
@@ -61,8 +63,8 @@ class AuditService:
     async def create_audit(
         self,
         db: AsyncSession,
-        operator: dict,
-        nodes_snapshot: list[dict] | None = None,
+        operator: dict[str, Any],
+        nodes_snapshot: list[dict[str, Any]] | None = None,
     ) -> WorkflowAudit:
         """
         工单提交时创建审批记录。
@@ -134,10 +136,10 @@ class AuditService:
         audit: WorkflowAudit,
         event_type: str,
         *,
-        node: dict | None = None,
+        node: dict[str, Any] | None = None,
         user_ids: list[int] | None = None,
         permission: str | None = None,
-        operator: dict | None = None,
+        operator: dict[str, Any] | None = None,
         remark: str = "",
     ) -> None:
         from app.services.notify import NotifyService
@@ -174,9 +176,9 @@ class AuditService:
         db: AsyncSession,
         workflow_id: int,
         action: str,
-        operator: dict,
+        operator: dict[str, Any],
         remark: str = "",
-    ) -> dict:
+    ) -> dict[str, Any]:
         wf_result = await db.execute(select(SqlWorkflow).where(SqlWorkflow.id == workflow_id))
         workflow = wf_result.scalar_one_or_none()
         if not workflow:
@@ -203,9 +205,9 @@ class AuditService:
         db: AsyncSession,
         workflow: SqlWorkflow,
         audit: WorkflowAudit,
-        operator: dict,
+        operator: dict[str, Any],
         remark: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if workflow.status not in (WorkflowStatus.PENDING_REVIEW, WorkflowStatus.REVIEW_PASS):
             raise AppException("当前状态不允许审批通过", code=400)
 
@@ -284,9 +286,9 @@ class AuditService:
         db: AsyncSession,
         workflow: SqlWorkflow,
         audit: WorkflowAudit,
-        operator: dict,
+        operator: dict[str, Any],
         remark: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if workflow.status not in (WorkflowStatus.PENDING_REVIEW, WorkflowStatus.REVIEW_PASS):
             raise AppException("当前状态不允许驳回", code=400)
 
@@ -323,9 +325,9 @@ class AuditService:
         db: AsyncSession,
         workflow: SqlWorkflow,
         audit: WorkflowAudit,
-        operator: dict,
+        operator: dict[str, Any],
         remark: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         cancelable = (
             WorkflowStatus.PENDING_REVIEW,
         )
@@ -371,8 +373,8 @@ class AuditService:
     @staticmethod
     async def _check_approver_permission(
         db: AsyncSession,
-        operator: dict,
-        node: dict,
+        operator: dict[str, Any],
+        node: dict[str, Any],
     ) -> None:
         """
         校验 operator 是否有权限审批 node。
@@ -483,7 +485,7 @@ class AuditService:
     @staticmethod
     async def get_pending_workflow_ids_for_user(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
     ) -> set[int]:
         """
         返回当前用户有权限审批的待审批工单 ID 集合。
@@ -522,7 +524,7 @@ class AuditService:
     @staticmethod
     async def get_audited_workflow_ids_for_user(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
     ) -> set[int]:
         """
         返回当前用户已经审批过的工单 ID 集合。
@@ -539,10 +541,10 @@ class AuditService:
     @staticmethod
     async def get_pending_for_user(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         """
         返回当前用户有权限审批的待审批工单列表。
         超管可看全部，普通用户按节点权限过滤。
@@ -593,7 +595,7 @@ class AuditService:
     # ── 审批日志 ──────────────────────────────────────────────
 
     @staticmethod
-    async def get_audit_logs(db: AsyncSession, workflow_id: int) -> list[dict]:
+    async def get_audit_logs(db: AsyncSession, workflow_id: int) -> list[dict[str, Any]]:
         from app.models.user import Users
 
         result = await db.execute(
@@ -630,7 +632,7 @@ class AuditService:
         ]
 
     @staticmethod
-    async def get_audit_info(db: AsyncSession, workflow_id: int) -> dict | None:
+    async def get_audit_info(db: AsyncSession, workflow_id: int) -> dict[str, Any] | None:
         result = await db.execute(
             select(WorkflowAudit).where(WorkflowAudit.workflow_id == workflow_id)
         )
@@ -666,7 +668,7 @@ class AuditService:
     async def _write_log(
         db: AsyncSession,
         audit_id: int,
-        operator: dict,
+        operator: dict[str, Any],
         operation_type: str,
         remark: str = "",
     ) -> None:

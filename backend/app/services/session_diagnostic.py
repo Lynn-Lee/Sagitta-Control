@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -231,12 +231,12 @@ def is_collect_due(cfg: Any, now: datetime) -> bool:
     last_collect_at = getattr(cfg, "last_collect_at", None)
     if not last_collect_at:
         return True
-    return now - last_collect_at >= timedelta(seconds=int(getattr(cfg, "collect_interval", DEFAULT_SESSION_COLLECT_INTERVAL)))
+    return bool(now - last_collect_at >= timedelta(seconds=int(getattr(cfg, "collect_interval", DEFAULT_SESSION_COLLECT_INTERVAL))))
 
 
 class SessionDiagnosticService:
     @staticmethod
-    def can_access_instance(user: dict, instance: Instance) -> bool:
+    def can_access_instance(user: dict[str, Any], instance: Instance) -> bool:
         if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
             return True
         user_rg_ids = set(user.get("resource_groups") or [])
@@ -244,7 +244,7 @@ class SessionDiagnosticService:
         return bool(user_rg_ids & instance_rg_ids)
 
     @staticmethod
-    async def get_instance_or_404(db: AsyncSession, instance_id: int, user: dict | None = None) -> Instance:
+    async def get_instance_or_404(db: AsyncSession, instance_id: int, user: dict[str, Any] | None = None) -> Instance:
         from fastapi import HTTPException
 
         result = await db.execute(
@@ -263,7 +263,7 @@ class SessionDiagnosticService:
     async def ensure_default_config(
         db: AsyncSession,
         instance: Instance,
-        user: dict | None = None,
+        user: dict[str, Any] | None = None,
     ) -> SessionCollectConfig:
         result = await db.execute(
             select(SessionCollectConfig).where(SessionCollectConfig.instance_id == instance.id)
@@ -284,7 +284,7 @@ class SessionDiagnosticService:
         return cfg
 
     @staticmethod
-    async def list_configs(db: AsyncSession, user: dict) -> tuple[int, list[SessionCollectConfigItem]]:
+    async def list_configs(db: AsyncSession, user: dict[str, Any]) -> tuple[int, list[SessionCollectConfigItem]]:
         instance_stmt = (
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -320,7 +320,7 @@ class SessionDiagnosticService:
     async def upsert_config(
         db: AsyncSession,
         data: SessionCollectConfigUpsert,
-        user: dict,
+        user: dict[str, Any],
     ) -> SessionCollectConfig:
         instance = await SessionDiagnosticService.get_instance_or_404(db, data.instance_id, user)
         cfg = await SessionDiagnosticService.ensure_default_config(db, instance, user)
@@ -338,7 +338,7 @@ class SessionDiagnosticService:
         db: AsyncSession,
         config_id: int,
         data: SessionCollectConfigUpdate,
-        user: dict,
+        user: dict[str, Any],
     ) -> SessionCollectConfig:
         from fastapi import HTTPException
 
@@ -358,7 +358,7 @@ class SessionDiagnosticService:
             setattr(cfg, field, value)
         await db.commit()
         await db.refresh(cfg)
-        return cfg
+        return cast(SessionCollectConfig, cfg)
 
     @staticmethod
     def normalize_result(instance: Instance, rs: ResultSet, source: str = "online") -> list[SessionItem]:
@@ -558,4 +558,4 @@ class SessionDiagnosticService:
         if instance_id is not None:
             stmt = stmt.where(SessionSnapshot.instance_id == instance_id)
         result = await db.execute(stmt)
-        return int(result.rowcount or 0)
+        return int(getattr(result, "rowcount", 0) or 0)

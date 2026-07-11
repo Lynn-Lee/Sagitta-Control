@@ -177,7 +177,7 @@ class DataMaskingService:
                 try:
                     if hide_group:
                         # 三段式脱敏：隐藏指定分组
-                        def _mask_group(m: re.Match) -> str:
+                        def _mask_group(m: re.Match[str]) -> str:
                             groups = list(m.groups())
                             if hide_group <= len(groups) and groups[hide_group - 1] is not None:
                                 groups[hide_group - 1] = "*" * len(groups[hide_group - 1])

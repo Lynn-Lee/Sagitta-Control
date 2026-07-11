@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import sqlglot
 from sqlalchemy import and_, func, or_, select
@@ -179,7 +179,7 @@ class ArchiveService:
         return inst
 
     @staticmethod
-    def _assert_instance_scope(inst: Instance, user: dict) -> tuple[int, str]:
+    def _assert_instance_scope(inst: Instance, user: dict[str, Any]) -> tuple[int, str]:
         if user.get("is_superuser"):
             rgs = [rg for rg in inst.resource_groups if rg.is_active]
             return (rgs[0].id, rgs[0].group_name) if rgs else (0, "默认资源组")
@@ -191,11 +191,11 @@ class ArchiveService:
         return rg.id, rg.group_name
 
     @staticmethod
-    def _has_archive_execute(user: dict) -> bool:
+    def _has_archive_execute(user: dict[str, Any]) -> bool:
         return bool(user.get("is_superuser") or "archive_execute" in user.get("permissions", []))
 
     @staticmethod
-    def _assert_archive_execute_scope(job: ArchiveJob, src_inst: Instance, user: dict) -> None:
+    def _assert_archive_execute_scope(job: ArchiveJob, src_inst: Instance, user: dict[str, Any]) -> None:
         if user.get("is_superuser"):
             return
         if "archive_execute" not in user.get("permissions", []):
@@ -218,7 +218,7 @@ class ArchiveService:
         batch_size: int = 1000,
         dest_db: str | None = None,
         dest_table: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         inst = await ArchiveService._load_instance(db, instance_id)
         supported, reason = check_support(inst.db_type, "purge")
         if not supported:
@@ -241,7 +241,7 @@ class ArchiveService:
         return {"count": count, "supported": True, "msg": f"符合条件的数据：{count} 行", "db_type": inst.db_type, "risk_plan": plan.model_dump()}
 
     @staticmethod
-    async def submit_job(db: AsyncSession, data: Any, operator: dict) -> ArchiveJob:
+    async def submit_job(db: AsyncSession, data: Any, operator: dict[str, Any]) -> ArchiveJob:
         src_inst = await ArchiveService._load_instance(db, data.source_instance_id)
         rg_id, rg_name = ArchiveService._assert_instance_scope(src_inst, operator)
         supported, reason = check_support(src_inst.db_type, data.archive_mode)
@@ -309,11 +309,11 @@ class ArchiveService:
     async def _create_archive_workflow(
         db: AsyncSession,
         data: Any,
-        operator: dict,
+        operator: dict[str, Any],
         rg_id: int,
         rg_name: str,
         estimated_rows: int,
-        risk_plan: dict | None = None,
+        risk_plan: dict[str, Any] | None = None,
     ) -> SqlWorkflow:
         nodes_snapshot = None
         if data.flow_id:
@@ -421,7 +421,7 @@ class ArchiveService:
         return workflow
 
     @staticmethod
-    async def start_job(db: AsyncSession, job_id: int, operator: dict, data: Any | None = None) -> dict:
+    async def start_job(db: AsyncSession, job_id: int, operator: dict[str, Any], data: Any | None = None) -> dict[str, Any]:
         job = await ArchiveService.get_job_obj(db, job_id)
         src_inst = await ArchiveService._load_instance(db, job.source_instance_id)
         ArchiveService._assert_archive_execute_scope(job, src_inst, operator)
@@ -435,7 +435,7 @@ class ArchiveService:
         return await ArchiveService._start_job_immediately(db, job, operator)
 
     @staticmethod
-    def _operator_display(operator: dict) -> str:
+    def _operator_display(operator: dict[str, Any]) -> str:
         return operator.get("display_name") or operator.get("username") or str(operator.get("id", ""))
 
     @staticmethod
@@ -445,7 +445,7 @@ class ArchiveService:
         return value.astimezone(UTC)
 
     @staticmethod
-    async def _write_execution_log(db: AsyncSession, job: ArchiveJob, operator: dict, operation_type: str, remark: str) -> None:
+    async def _write_execution_log(db: AsyncSession, job: ArchiveJob, operator: dict[str, Any], operation_type: str, remark: str) -> None:
         if not job.workflow_id:
             return
         audit_result = await db.execute(select(WorkflowAudit).where(WorkflowAudit.workflow_id == job.workflow_id))
@@ -457,7 +457,7 @@ class ArchiveService:
     async def _sync_workflow_execution_decision(
         db: AsyncSession,
         job: ArchiveJob,
-        operator: dict,
+        operator: dict[str, Any],
         *,
         mode: str,
         status: WorkflowStatus,
@@ -495,7 +495,7 @@ class ArchiveService:
             )
 
     @staticmethod
-    async def _start_job_immediately(db: AsyncSession, job: ArchiveJob, operator: dict) -> dict:
+    async def _start_job_immediately(db: AsyncSession, job: ArchiveJob, operator: dict[str, Any]) -> dict[str, Any]:
         job.status = ArchiveJobStatus.QUEUED
         job.finished_at = None
         await ArchiveService._sync_workflow_execution_decision(
@@ -508,7 +508,7 @@ class ArchiveService:
         try:
             from app.tasks.archive import execute_archive_job_task
 
-            task = execute_archive_job_task.delay(job.id, operator.get("id", 0))
+            task = cast(Any, execute_archive_job_task).delay(job.id, operator.get("id", 0))
             job.celery_task_id = task.id
             await db.commit()
         except Exception as exc:
@@ -518,7 +518,7 @@ class ArchiveService:
         return {"msg": "归档作业已加入后台队列", "job_id": job.id, "status": job.status}
 
     @staticmethod
-    async def _schedule_job(db: AsyncSession, job: ArchiveJob, operator: dict, data: Any) -> dict:
+    async def _schedule_job(db: AsyncSession, job: ArchiveJob, operator: dict[str, Any], data: Any) -> dict[str, Any]:
         scheduled_at = getattr(data, "scheduled_at", None) or getattr(data, "timing_time", None)
         if scheduled_at is None:
             raise AppException("请选择预约执行时间", code=400)
@@ -544,7 +544,7 @@ class ArchiveService:
         }
 
     @staticmethod
-    async def _record_external_job(db: AsyncSession, job: ArchiveJob, operator: dict, data: Any) -> dict:
+    async def _record_external_job(db: AsyncSession, job: ArchiveJob, operator: dict[str, Any], data: Any) -> dict[str, Any]:
         executed_at = getattr(data, "external_executed_at", None)
         external_status = getattr(data, "external_status", None)
         remark = (getattr(data, "external_remark", "") or "").strip()
@@ -576,7 +576,7 @@ class ArchiveService:
         return {"msg": "外部执行结果已登记", "job_id": job.id, "workflow_id": job.workflow_id, "status": job.status}
 
     @staticmethod
-    async def set_job_control_state(db: AsyncSession, job_id: int, action: str, operator: dict) -> ArchiveJob:
+    async def set_job_control_state(db: AsyncSession, job_id: int, action: str, operator: dict[str, Any]) -> ArchiveJob:
         job = await ArchiveService.get_job_obj(db, job_id)
 
         if action == "pause":
@@ -635,7 +635,7 @@ class ArchiveService:
         return job
 
     @staticmethod
-    async def list_jobs(db: AsyncSession, user: dict, page: int = 1, page_size: int = 20) -> tuple[int, list[dict]]:
+    async def list_jobs(db: AsyncSession, user: dict[str, Any], page: int = 1, page_size: int = 20) -> tuple[int, list[dict[str, Any]]]:
         conditions = []
         if not user.get("is_superuser") and not (
             "archive_review" in user.get("permissions", []) or "archive_execute" in user.get("permissions", [])
@@ -672,7 +672,7 @@ class ArchiveService:
         return total, items
 
     @staticmethod
-    async def can_audit_job(db: AsyncSession, job: ArchiveJob, user: dict) -> bool:
+    async def can_audit_job(db: AsyncSession, job: ArchiveJob, user: dict[str, Any]) -> bool:
         if not job.workflow_id:
             return False
         wf = await db.get(SqlWorkflow, job.workflow_id)
@@ -692,7 +692,7 @@ class ArchiveService:
             return False
 
     @staticmethod
-    async def can_execute_job(db: AsyncSession, job: ArchiveJob, user: dict) -> bool:
+    async def can_execute_job(db: AsyncSession, job: ArchiveJob, user: dict[str, Any]) -> bool:
         if job.status not in (ArchiveJobStatus.APPROVED, ArchiveJobStatus.PAUSED, ArchiveJobStatus.SCHEDULED):
             return False
         try:
@@ -703,7 +703,7 @@ class ArchiveService:
             return False
 
     @staticmethod
-    async def can_control_job(db: AsyncSession, job: ArchiveJob, user: dict) -> bool:
+    async def can_control_job(db: AsyncSession, job: ArchiveJob, user: dict[str, Any]) -> bool:
         if job.status not in (
             ArchiveJobStatus.APPROVED,
             ArchiveJobStatus.SCHEDULED,
@@ -729,7 +729,7 @@ class ArchiveService:
         return job
 
     @staticmethod
-    async def get_job(db: AsyncSession, job_id: int, user: dict) -> dict:
+    async def get_job(db: AsyncSession, job_id: int, user: dict[str, Any]) -> dict[str, Any]:
         job = await ArchiveService.get_job_obj(db, job_id)
         if not await ArchiveService.can_view_job(db, job, user):
             raise AppException("没有查看该归档作业的权限", code=403)
@@ -760,13 +760,13 @@ class ArchiveService:
         return data
 
     @staticmethod
-    async def _visible_workflow_ids_for_user(db: AsyncSession, user: dict) -> set[int]:
+    async def _visible_workflow_ids_for_user(db: AsyncSession, user: dict[str, Any]) -> set[int]:
         pending_ids = await AuditService.get_pending_workflow_ids_for_user(db, user)
         audited_ids = await AuditService.get_audited_workflow_ids_for_user(db, user)
         return pending_ids | audited_ids
 
     @staticmethod
-    async def can_view_job(db: AsyncSession, job: ArchiveJob, user: dict) -> bool:
+    async def can_view_job(db: AsyncSession, job: ArchiveJob, user: dict[str, Any]) -> bool:
         if (
             user.get("is_superuser")
             or "archive_review" in user.get("permissions", [])
@@ -780,7 +780,7 @@ class ArchiveService:
         return job.workflow_id in visible_workflow_ids
 
     @staticmethod
-    def fmt_job(job: ArchiveJob, created_by_display: str | None = None) -> dict:
+    def fmt_job(job: ArchiveJob, created_by_display: str | None = None) -> dict[str, Any]:
         return {
             "id": job.id,
             "workflow_id": job.workflow_id,
@@ -818,7 +818,7 @@ class ArchiveService:
         }
 
     @staticmethod
-    async def can_cancel_application(db: AsyncSession, job: ArchiveJob, user: dict) -> bool:
+    async def can_cancel_application(db: AsyncSession, job: ArchiveJob, user: dict[str, Any]) -> bool:
         if job.status != ArchiveJobStatus.PENDING_REVIEW:
             return False
         if not job.workflow_id:
@@ -996,7 +996,7 @@ class ArchiveService:
         for job in due_jobs:
             wf = await db.get(SqlWorkflow, job.workflow_id) if job.workflow_id else None
             operator_id = wf.executed_by_id if wf and wf.executed_by_id else job.created_by_id
-            task = execute_archive_job_task.delay(job.id, operator_id)
+            task = cast(Any, execute_archive_job_task).delay(job.id, operator_id)
             job.celery_task_id = task.id
             dispatched += 1
         await db.commit()

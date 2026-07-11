@@ -628,7 +628,7 @@ class LicenseService:
         if limit in (None, "", 0):
             return
         try:
-            max_allowed = int(limit)
+            max_allowed = int(limit)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             return
         result = await db.execute(query)

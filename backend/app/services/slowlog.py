@@ -124,7 +124,7 @@ def _datetime_value(value: Any) -> datetime | None:
         lambda raw: datetime.strptime(raw, "%Y/%m/%d %H:%M:%S"),
     ):
         try:
-            return parser(text)
+            return parser(text)  # type: ignore[no-untyped-call]
         except ValueError:
             continue
     return None
@@ -252,7 +252,7 @@ def build_recommendations(
 
 class SlowLogService:
     @staticmethod
-    async def list_configs(db: AsyncSession, user: dict) -> tuple[int, list[SlowQueryConfigItem]]:
+    async def list_configs(db: AsyncSession, user: dict[str, Any]) -> tuple[int, list[SlowQueryConfigItem]]:
         result = await db.execute(
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -291,7 +291,7 @@ class SlowLogService:
     async def upsert_config(
         db: AsyncSession,
         data: SlowQueryConfigUpsert,
-        user: dict,
+        user: dict[str, Any],
     ) -> SlowQueryConfig:
         instance = await SlowLogService.get_instance_or_404(db, data.instance_id, user)
         result = await db.execute(select(SlowQueryConfig).where(SlowQueryConfig.instance_id == instance.id))
@@ -310,7 +310,7 @@ class SlowLogService:
         db: AsyncSession,
         config_id: int,
         data: SlowQueryConfigUpdate,
-        user: dict,
+        user: dict[str, Any],
     ) -> SlowQueryConfig:
         result = await db.execute(
             select(SlowQueryConfig, Instance)
@@ -328,13 +328,13 @@ class SlowLogService:
             setattr(cfg, field, value)
         await db.commit()
         await db.refresh(cfg)
-        return cfg
+        return cfg  # type: ignore[no-any-return]
 
     @staticmethod
     async def ensure_default_config(
         db: AsyncSession,
         instance: Instance,
-        user: dict | None = None,
+        user: dict[str, Any] | None = None,
     ) -> SlowQueryConfig:
         result = await db.execute(select(SlowQueryConfig).where(SlowQueryConfig.instance_id == instance.id))
         cfg = result.scalar_one_or_none()
@@ -355,11 +355,11 @@ class SlowLogService:
         return cfg
 
     @staticmethod
-    def can_access_instance(user: dict, instance: Instance) -> bool:
+    def can_access_instance(user: dict[str, Any], instance: Instance) -> bool:
         return MonitorService._can_access_instance(user, instance)
 
     @staticmethod
-    async def get_instance_or_404(db: AsyncSession, instance_id: int, user: dict) -> Instance:
+    async def get_instance_or_404(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> Instance:
         result = await db.execute(
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -373,7 +373,7 @@ class SlowLogService:
         return instance
 
     @staticmethod
-    async def scoped_instance_ids(db: AsyncSession, user: dict) -> list[int] | None:
+    async def scoped_instance_ids(db: AsyncSession, user: dict[str, Any]) -> list[int] | None:
         if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return None
         rg_ids = user.get("resource_groups", [])
@@ -499,7 +499,7 @@ class SlowLogService:
     @staticmethod
     async def list_logs(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         *,
         instance_id: int | None = None,
         db_name: str | None = None,
@@ -541,7 +541,7 @@ class SlowLogService:
     @staticmethod
     async def overview(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         **filters: Any,
     ) -> SlowQueryOverviewResponse:
         await SlowLogService.sync_platform_logs(
@@ -604,7 +604,7 @@ class SlowLogService:
     @staticmethod
     async def fingerprints(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         *,
         limit: int = 20,
         **filters: Any,
@@ -802,7 +802,7 @@ class SlowLogService:
     @staticmethod
     async def fingerprint_detail(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         fingerprint: str,
         *,
         date_start: datetime | None = None,
@@ -849,7 +849,7 @@ class SlowLogService:
     @staticmethod
     async def samples(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         fingerprint: str,
         limit: int = 20,
     ) -> list[SlowQueryLog]:
@@ -958,7 +958,7 @@ class SlowLogService:
     @staticmethod
     async def explain(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         *,
         log_id: int | None = None,
         instance_id: int | None = None,
@@ -1330,4 +1330,4 @@ class SlowLogService:
     async def cleanup_old_logs(db: AsyncSession, retention_days: int = 30) -> int:
         cutoff = datetime.now(UTC) - timedelta(days=retention_days)
         result = await db.execute(delete(SlowQueryLog).where(SlowQueryLog.occurred_at < cutoff))
-        return result.rowcount or 0
+        return getattr(result, "rowcount", 0) or 0

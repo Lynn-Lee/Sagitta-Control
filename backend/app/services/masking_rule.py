@@ -3,6 +3,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 
 from sqlalchemy import and_, func, or_, select
@@ -39,7 +41,7 @@ WORKFLOW_TEMPLATE_CATEGORIES = [
 class MaskingRuleService:
 
     @staticmethod
-    def fmt(rule: MaskingRule) -> dict:
+    def fmt(rule: MaskingRule) -> dict[str, Any]:
         return {
             "id": rule.id,
             "rule_name": rule.rule_name,
@@ -65,7 +67,7 @@ class MaskingRuleService:
         search: str | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         conditions = []
         if instance_id is not None:
             conditions.append(MaskingRule.instance_id == instance_id)
@@ -90,7 +92,7 @@ class MaskingRuleService:
         return total, [MaskingRuleService.fmt(r) for r in rows]
 
     @staticmethod
-    async def create_rule(db: AsyncSession, data: dict, operator: dict) -> MaskingRule:
+    async def create_rule(db: AsyncSession, data: dict[str, Any], operator: dict[str, Any]) -> MaskingRule:
         rule = MaskingRule(
             rule_name=data["rule_name"],
             description=data.get("description", ""),
@@ -111,7 +113,7 @@ class MaskingRuleService:
         return rule
 
     @staticmethod
-    async def update_rule(db: AsyncSession, rule_id: int, data: dict) -> MaskingRule:
+    async def update_rule(db: AsyncSession, rule_id: int, data: dict[str, Any]) -> MaskingRule:
         result = await db.execute(select(MaskingRule).where(MaskingRule.id == rule_id))
         rule = result.scalar_one_or_none()
         if not rule:
@@ -137,7 +139,7 @@ class MaskingRuleService:
     @staticmethod
     async def get_rules_for_instance(
         db: AsyncSession, instance_id: int, db_name: str
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """
         获取适用于指定实例和数据库的活跃规则（供查询时脱敏使用）。
         匹配逻辑：instance_id 匹配 OR instance_id IS NULL（全局规则）
@@ -183,7 +185,7 @@ class MaskingRuleService:
 
 class WorkflowTemplateService:
     @staticmethod
-    def _can_manage_public_template(operator: dict) -> bool:
+    def _can_manage_public_template(operator: dict[str, Any]) -> bool:
         if operator.get("is_superuser"):
             return True
         permissions = set(operator.get("permissions") or [])
@@ -201,7 +203,7 @@ class WorkflowTemplateService:
         return {row[0]: row[1] for row in rows}
 
     @staticmethod
-    def fmt(t: WorkflowTemplate, flow_name: str = "") -> dict:
+    def fmt(t: WorkflowTemplate, flow_name: str = "") -> dict[str, Any]:
         return {
             "id": t.id,
             "template_name": t.template_name,
@@ -228,14 +230,14 @@ class WorkflowTemplateService:
     @staticmethod
     async def list_templates(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         search: str | None = None,
         category: str | None = None,
         visibility: str | None = None,
         is_active: bool | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         # 可见：公开模板 + 自己创建的私有模板
         user_id = user.get("id", 0)
         visibility_cond = (
@@ -272,7 +274,7 @@ class WorkflowTemplateService:
         return total, [WorkflowTemplateService.fmt(t, flow_map.get(t.flow_id or 0, "")) for t in rows]
 
     @staticmethod
-    async def get_template(db: AsyncSession, tmpl_id: int, user: dict) -> dict:
+    async def get_template(db: AsyncSession, tmpl_id: int, user: dict[str, Any]) -> dict[str, Any]:
         user_id = user.get("id", 0)
         result = await db.execute(
             select(WorkflowTemplate).where(
@@ -290,7 +292,7 @@ class WorkflowTemplateService:
         return WorkflowTemplateService.fmt(t, flow_map.get(t.flow_id or 0, ""))
 
     @staticmethod
-    async def create_template(db: AsyncSession, data: dict, operator: dict) -> WorkflowTemplate:
+    async def create_template(db: AsyncSession, data: dict[str, Any], operator: dict[str, Any]) -> WorkflowTemplate:
         visibility = data.get("visibility", "public")
         if visibility == "public" and not WorkflowTemplateService._can_manage_public_template(operator):
             raise AppException("仅 DBA 或超级管理员可创建全局模板", code=403)
@@ -317,7 +319,7 @@ class WorkflowTemplateService:
         return t
 
     @staticmethod
-    async def update_template(db: AsyncSession, tmpl_id: int, data: dict, operator: dict) -> WorkflowTemplate:
+    async def update_template(db: AsyncSession, tmpl_id: int, data: dict[str, Any], operator: dict[str, Any]) -> WorkflowTemplate:
         result = await db.execute(select(WorkflowTemplate).where(WorkflowTemplate.id == tmpl_id))
         t = result.scalar_one_or_none()
         if not t:
@@ -342,7 +344,7 @@ class WorkflowTemplateService:
         return t
 
     @staticmethod
-    async def delete_template(db: AsyncSession, tmpl_id: int, operator: dict) -> None:
+    async def delete_template(db: AsyncSession, tmpl_id: int, operator: dict[str, Any]) -> None:
         result = await db.execute(select(WorkflowTemplate).where(WorkflowTemplate.id == tmpl_id))
         t = result.scalar_one_or_none()
         if not t:
@@ -367,7 +369,7 @@ class WorkflowTemplateService:
         return t
 
     @staticmethod
-    async def clone_template(db: AsyncSession, tmpl_id: int, operator: dict) -> WorkflowTemplate:
+    async def clone_template(db: AsyncSession, tmpl_id: int, operator: dict[str, Any]) -> WorkflowTemplate:
         data = await WorkflowTemplateService.get_template(db, tmpl_id, operator)
         cloned = WorkflowTemplate(
             template_name=f"{data['template_name']}-副本",

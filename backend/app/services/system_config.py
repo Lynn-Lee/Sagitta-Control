@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 
 from sqlalchemy import select
@@ -249,13 +251,13 @@ class SystemConfigService:
         await db.commit()
 
     @staticmethod
-    async def get_all(db: AsyncSession) -> dict[str, list[dict]]:
+    async def get_all(db: AsyncSession) -> dict[str, Any]:
         """返回按分组组织的所有配置项（敏感值掩码）。"""
         await SystemConfigService._ensure_defaults(db)
         result = await db.execute(select(SystemConfig))
         configs = result.scalars().all()
 
-        groups: dict[str, list[dict]] = {k: [] for k in CONFIG_GROUPS}
+        groups: dict[str, list[dict[str, Any]]] = {k: [] for k in CONFIG_GROUPS}
         for cfg in sorted(configs, key=lambda item: CONFIG_ORDER.get(item.config_key, len(CONFIG_ORDER))):
             group = cfg.group if cfg.group in groups else "basic"
             defn = CONFIG_DEFINITIONS.get(cfg.config_key)
@@ -381,7 +383,7 @@ class SystemConfigService:
         return count, change_summary
 
     @staticmethod
-    async def test_ai(db: AsyncSession) -> dict:
+    async def test_ai(db: AsyncSession) -> dict[str, Any]:
         """调用当前 AI 配置生成一条最小 SQL，用于验证模型服务是否可用。"""
         try:
             from app.services.text2sql import generate_sql
@@ -402,7 +404,7 @@ class SystemConfigService:
     # ── 连通性测试 ────────────────────────────────────────────
 
     @staticmethod
-    async def test_mail(db: AsyncSession, to_email: str) -> dict:
+    async def test_mail(db: AsyncSession, to_email: str) -> dict[str, Any]:
         """发送测试邮件。"""
         try:
             import smtplib
@@ -423,6 +425,7 @@ class SystemConfigService:
             msg["From"] = f"{sender} <{user}>"
             msg["To"] = to_email
 
+            smtp: smtplib.SMTP
             if use_ssl:
                 smtp = smtplib.SMTP_SSL(host, port, timeout=10)
             else:
@@ -437,7 +440,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_dingtalk(db: AsyncSession) -> dict:
+    async def test_dingtalk(db: AsyncSession) -> dict[str, Any]:
         """发送钉钉测试消息。"""
         try:
             import base64
@@ -475,7 +478,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_wecom(db: AsyncSession) -> dict:
+    async def test_wecom(db: AsyncSession) -> dict[str, Any]:
         """发送企业微信测试消息。"""
         try:
             import httpx
@@ -499,7 +502,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_feishu(db: AsyncSession) -> dict:
+    async def test_feishu(db: AsyncSession) -> dict[str, Any]:
         """发送飞书测试消息。"""
         try:
             import httpx
@@ -523,7 +526,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_ldap(db: AsyncSession, test_username: str, test_password: str) -> dict:
+    async def test_ldap(db: AsyncSession, test_username: str, test_password: str) -> dict[str, Any]:
         """测试 LDAP 连接。"""
         try:
             import ldap3
@@ -548,7 +551,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_cas(db: AsyncSession) -> dict:
+    async def test_cas(db: AsyncSession) -> dict[str, Any]:
         """测试 CAS 服务端可达性。"""
         try:
             import httpx
@@ -570,7 +573,7 @@ class SystemConfigService:
             return {"success": False, "message": str(e)}
 
     @staticmethod
-    async def test_oidc(db: AsyncSession) -> dict:
+    async def test_oidc(db: AsyncSession) -> dict[str, Any]:
         """测试 OIDC Discovery 或授权端点可达性。"""
         try:
             import httpx

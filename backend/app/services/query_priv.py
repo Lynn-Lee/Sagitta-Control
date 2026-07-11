@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,15 +32,15 @@ class QueryPrivService:
     """查询权限校验与管理。"""
 
     @staticmethod
-    def _safe_load_nodes(raw: str) -> list[dict]:
+    def _safe_load_nodes(raw: str) -> list[dict[str, Any]]:
         try:
-            return json.loads(raw or "[]")
+            return cast("list[dict[str, Any]]", json.loads(raw or "[]"))
         except Exception:
             return []
 
     @staticmethod
-    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict], applicant: dict) -> list[dict]:
-        result: list[dict] = []
+    def _decorate_snapshot_for_applicant(nodes_snapshot: list[dict[str, Any]], applicant: dict[str, Any]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
         for node in nodes_snapshot:
             node_copy = dict(node)
             if node_copy.get("approver_type") == "manager":
@@ -50,12 +50,12 @@ class QueryPrivService:
         return result
 
     @staticmethod
-    def _get_current_pending_node(apply: QueryPrivilegeApply) -> dict | None:
+    def _get_current_pending_node(apply: QueryPrivilegeApply) -> dict[str, Any] | None:
         nodes = json.loads(apply.audit_auth_groups_info or "[]")
         return next((node for node in nodes if node.get("status") == AuditStatus.PENDING), None)
 
     @staticmethod
-    def can_cancel_apply(apply: QueryPrivilegeApply, user: dict) -> bool:
+    def can_cancel_apply(apply: QueryPrivilegeApply, user: dict[str, Any]) -> bool:
         nodes = QueryPrivService._safe_load_nodes(apply.audit_auth_groups_info)
         return ApplicationCancelPolicy.can_cancel_before_approval(
             applicant_id=apply.user_id,
@@ -68,9 +68,9 @@ class QueryPrivService:
     @staticmethod
     async def _check_apply_approver_permission(
         db: AsyncSession,
-        operator: dict,
-        node: dict,
-    ) -> QueryLog:
+        operator: dict[str, Any],
+        node: dict[str, Any],
+    ) -> None:
         if operator.get("is_superuser"):
             return
 
@@ -109,7 +109,7 @@ class QueryPrivService:
             )
 
     @staticmethod
-    def user_has_instance_access(user: dict, instance: Instance) -> bool:
+    def user_has_instance_access(user: dict[str, Any], instance: Instance) -> bool:
         if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
             return True
         user_rg_ids = set(user.get("resource_groups", []))
@@ -117,7 +117,7 @@ class QueryPrivService:
         return bool(user_rg_ids & instance_rg_ids)
 
     @staticmethod
-    def user_has_query_bypass(user: dict, instance: Instance) -> bool:
+    def user_has_query_bypass(user: dict[str, Any], instance: Instance) -> bool:
         """判断用户是否可绕过数据范围授权直接查询该实例。"""
         permissions = set(user.get("permissions", []))
         if user.get("is_superuser") or "query_all_instances" in permissions:
@@ -129,7 +129,7 @@ class QueryPrivService:
         return bool(user_rg_ids & instance_rg_ids)
 
     @staticmethod
-    def query_bypass_reason(user: dict, instance: Instance) -> str:
+    def query_bypass_reason(user: dict[str, Any], instance: Instance) -> str:
         permissions = set(user.get("permissions", []))
         if user.get("is_superuser") or "query_all_instances" in permissions:
             return "admin"
@@ -141,7 +141,7 @@ class QueryPrivService:
     async def _can_revoke_privilege(
         db: AsyncSession,
         priv: QueryPrivilege,
-        operator: dict,
+        operator: dict[str, Any],
     ) -> bool:
         """撤销已生效查询权限：本人、资源组 DBA、全局 DBA、超管。"""
         if GovernanceScopeService.is_global_user(operator, "query"):
@@ -271,7 +271,7 @@ class QueryPrivService:
         resolver = getattr(engine, "resolve_table_schemas", None)
         if not callable(resolver):
             return {}
-        return await resolver(db_name, unresolved_tables)
+        return cast("dict[str, list[str]]", await resolver(db_name, unresolved_tables))
 
     @staticmethod
     async def _has_db_priv(
@@ -353,7 +353,7 @@ class QueryPrivService:
     @staticmethod
     async def list_data_dict_databases(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         database_names: list[str],
     ) -> list[str]:
@@ -386,7 +386,7 @@ class QueryPrivService:
     @staticmethod
     async def list_data_dict_tables(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         db_name: str,
         table_names: list[str],
@@ -427,7 +427,7 @@ class QueryPrivService:
     @staticmethod
     async def check_data_dict_access(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         db_name: str = "",
         table_name: str = "",
@@ -467,7 +467,7 @@ class QueryPrivService:
     @staticmethod
     async def _resolve_apply_group_id(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance_id: int,
         group_id: int | None,
     ) -> int:
@@ -488,13 +488,13 @@ class QueryPrivService:
                 raise AppException("所选资源组与目标实例不匹配", code=400)
             return group_id
         if allowed_group_ids:
-            return sorted(allowed_group_ids)[0]
+            return cast(int, sorted(allowed_group_ids)[0])
         raise AppException("目标实例未关联到你的资源组，无法创建申请", code=400)
 
     @staticmethod
     async def check_query_priv(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         db_name: str,
         sql: str,
@@ -575,12 +575,12 @@ class QueryPrivService:
     @staticmethod
     async def explain_query_access(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         db_name: str,
         sql: str,
         table_refs: list[dict[str, Any]] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         allowed, reason = await QueryPrivService.check_query_priv(
             db, user, instance, db_name, sql, table_refs=table_refs
         )
@@ -596,7 +596,7 @@ class QueryPrivService:
     @staticmethod
     async def get_effective_query_limit(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance: Instance,
         db_name: str,
         sql: str,
@@ -742,14 +742,14 @@ class QueryPrivService:
     @staticmethod
     async def list_manage_privileges(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         page: int = 1,
         page_size: int = 20,
         instance_id: int | None = None,
         user_id: int | None = None,
         db_name: str | None = None,
         status: str = "active",
-    ) -> tuple[dict, int, list[dict]]:
+    ) -> tuple[dict[str, Any], int, list[dict[str, Any]]]:
         scope = await GovernanceScopeService.resolve(db, user, "query")
         stmt = (
             select(QueryPrivilege, Users.username, Users.display_name, Instance.instance_name)
@@ -791,7 +791,7 @@ class QueryPrivService:
             .limit(page_size)
         )
 
-        items: list[dict] = []
+        items: list[dict[str, Any]] = []
         for priv, username, display_name, instance_name in result.all():
             items.append(
                 {
@@ -833,7 +833,7 @@ class QueryPrivService:
         audit_auth_groups: str,
         title: str,
         scope_type: str = "database",
-        user: dict | None = None,
+        user: dict[str, Any] | None = None,
         risk_remark: str = "",
     ) -> QueryPrivilegeApply:
         if user is None:
@@ -932,7 +932,7 @@ class QueryPrivService:
     async def list_applies(
         db: AsyncSession,
         user_id: int | None = None,
-        auditor: dict | None = None,
+        auditor: dict[str, Any] | None = None,
         status: int | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -974,7 +974,7 @@ class QueryPrivService:
     @staticmethod
     async def list_audit_records(
         db: AsyncSession,
-        auditor: dict,
+        auditor: dict[str, Any],
         status: int | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -1023,7 +1023,7 @@ class QueryPrivService:
     async def audit_apply(
         db: AsyncSession,
         apply_id: int,
-        auditor: dict,
+        auditor: dict[str, Any],
         action: str,
         remark: str = "",
         valid_date_override: date | None = None,
@@ -1162,7 +1162,7 @@ class QueryPrivService:
         return apply
 
     @staticmethod
-    async def cancel_apply(db: AsyncSession, apply_id: int, user: dict) -> QueryPrivilegeApply:
+    async def cancel_apply(db: AsyncSession, apply_id: int, user: dict[str, Any]) -> QueryPrivilegeApply:
         result = await db.execute(
             select(QueryPrivilegeApply).where(QueryPrivilegeApply.id == apply_id)
         )
@@ -1209,7 +1209,7 @@ class QueryPrivService:
     async def revoke_privilege(
         db: AsyncSession,
         priv_id: int,
-        operator: dict,
+        operator: dict[str, Any],
         reason: str = "",
     ) -> QueryPrivilege:
         result = await db.execute(select(QueryPrivilege).where(QueryPrivilege.id == priv_id))
@@ -1264,7 +1264,7 @@ class QueryPrivService:
         db_type: str = "",
         client_ip: str = "",
         error: str = "",
-    ) -> None:
+    ) -> QueryLog:
         log = QueryLog(
             user_id=user_id,
             instance_id=instance_id,
@@ -1291,7 +1291,7 @@ class QueryPrivService:
     @staticmethod
     async def list_logs(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         instance_id: int | None = None,
         username: str | None = None,
         db_name: str | None = None,

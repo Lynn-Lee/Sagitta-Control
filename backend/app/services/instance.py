@@ -430,7 +430,7 @@ class InstanceService:
         search: str | None = None,
         resource_group_id: int | None = None,
         include_inactive: bool = False,
-        user: dict | None = None,
+        user: dict[str, Any] | None = None,
     ) -> tuple[int, list[Instance]]:
         query = (
             select(Instance)
@@ -574,7 +574,7 @@ class InstanceService:
         await db.commit()
 
     @staticmethod
-    async def test_connection(db: AsyncSession, instance_id: int) -> dict:
+    async def test_connection(db: AsyncSession, instance_id: int) -> dict[str, Any]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
         rs = await engine.test_connection()
@@ -621,7 +621,7 @@ class InstanceService:
     @staticmethod
     async def get_columns(
         db: AsyncSession, instance_id: int, db_name: str, tb_name: str
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
         resolved_table_name, extra_kwargs = InstanceService._resolve_table_lookup(
@@ -640,7 +640,7 @@ class InstanceService:
     @staticmethod
     async def get_constraints(
         db: AsyncSession, instance_id: int, db_name: str, tb_name: str
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
         getter = getattr(engine, "get_table_constraints", None)
@@ -666,7 +666,7 @@ class InstanceService:
     @staticmethod
     async def get_indexes(
         db: AsyncSession, instance_id: int, db_name: str, tb_name: str
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
         getter = getattr(engine, "get_table_indexes", None)
@@ -784,7 +784,7 @@ class InstanceService:
         }
 
     @staticmethod
-    async def get_variables(db: AsyncSession, instance_id: int) -> list[dict]:
+    async def get_variables(db: AsyncSession, instance_id: int) -> list[dict[str, Any]]:
         inst = await InstanceService._load_instance(db, instance_id)
         engine = get_engine(inst)
         rs = await engine.get_variables()
@@ -798,7 +798,7 @@ class InstanceService:
 
     # ─── 实例信息序列化（不暴露密码）────────────────────────
     @staticmethod
-    def to_response(inst: Instance) -> dict:
+    def to_response(inst: Instance) -> dict[str, Any]:
         return {
             "id": inst.id,
             "instance_name": inst.instance_name,

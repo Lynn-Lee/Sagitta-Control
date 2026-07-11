@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import logging
 
@@ -19,7 +21,7 @@ from app.schemas.approval_flow import ApprovalFlowCreate, ApprovalFlowUpdate
 logger = logging.getLogger(__name__)
 
 
-def _fmt_node(node: ApprovalFlowNode) -> dict:
+def _fmt_node(node: ApprovalFlowNode) -> dict[str, Any]:
     result = {
         "id": node.id,
         "order": node.order,
@@ -34,7 +36,7 @@ def _fmt_node(node: ApprovalFlowNode) -> dict:
     return result
 
 
-def _fmt_flow(flow: ApprovalFlow) -> dict:
+def _fmt_flow(flow: ApprovalFlow) -> dict[str, Any]:
     return {
         "id": flow.id,
         "name": flow.name,
@@ -49,7 +51,7 @@ def _fmt_flow(flow: ApprovalFlow) -> dict:
 
 class ApprovalFlowService:
     @staticmethod
-    async def list_flows(db: AsyncSession, include_inactive: bool = False) -> list[dict]:
+    async def list_flows(db: AsyncSession, include_inactive: bool = False) -> list[dict[str, Any]]:
         """列出所有审批流模板（默认只返回启用的）。"""
         stmt = select(ApprovalFlow).options(selectinload(ApprovalFlow.nodes))
         if not include_inactive:
@@ -59,7 +61,7 @@ class ApprovalFlowService:
         return [_fmt_flow(f) for f in result.scalars().all()]
 
     @staticmethod
-    async def get_flow(db: AsyncSession, flow_id: int) -> dict:
+    async def get_flow(db: AsyncSession, flow_id: int) -> dict[str, Any]:
         """获取单个流程模板详情。"""
         result = await db.execute(
             select(ApprovalFlow)
@@ -75,8 +77,8 @@ class ApprovalFlowService:
     async def create_flow(
         db: AsyncSession,
         data: ApprovalFlowCreate,
-        operator: dict,
-    ) -> dict:
+        operator: dict[str, Any],
+    ) -> dict[str, Any]:
         """创建审批流模板（含节点）。"""
         flow = ApprovalFlow(
             name=data.name,
@@ -111,7 +113,7 @@ class ApprovalFlowService:
         db: AsyncSession,
         flow_id: int,
         data: ApprovalFlowUpdate,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         更新审批流模板。
         如果传入 nodes，则全量替换节点（删除旧节点，重建新节点）。
@@ -165,7 +167,7 @@ class ApprovalFlowService:
         await db.commit()
 
     @staticmethod
-    async def snapshot_for_workflow(db: AsyncSession, flow_id: int) -> list[dict]:
+    async def snapshot_for_workflow(db: AsyncSession, flow_id: int) -> list[dict[str, Any]]:
         """
         为工单创建时生成节点快照列表。
         快照结构与 audit_auth_groups_info 的节点格式一致：

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import sqlglot
 import sqlglot.expressions as exp
@@ -387,7 +387,7 @@ def _ast_inject_limit(normalized: str, limit_num: int, dialect: str) -> str | No
     if tree.args.get("limit") is not None:
         return normalized
     try:
-        return tree.limit(limit_num).sql(dialect=dialect)
+        return str(cast(Any, tree).limit(limit_num).sql(dialect=dialect))
     except Exception:
         return None
 
@@ -770,7 +770,7 @@ class MongoQueryGuard:
 
         parser = MongoEngine._parse_mongo_query
         try:
-            parsed = parser(None, sql)  # type: ignore[misc]
+            parsed = parser(None, sql)  # type: ignore[arg-type]
         except ValueError as exc:
             return QueryGuardResult(False, str(exc), normalized_sql=sql.strip())
 
