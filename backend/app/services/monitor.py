@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,22 +65,22 @@ class MonitorService:
     }
 
     @staticmethod
-    def _can_access_instance(user: dict, instance: Instance) -> bool:
+    def _can_access_instance(user: dict[str, Any], instance: Instance) -> bool:
         # 观测域实例访问判定统一收敛到 MonitorAlertService，避免两处重复实现漂移
         return MonitorAlertService._can_access_instance(user, instance)
 
     @staticmethod
     async def list_configs(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         return await MonitorConfigService.list_configs(db, user, page=page, page_size=page_size)
 
     @staticmethod
     async def create_config(
-        db: AsyncSession, data: MonitorConfigCreate, operator: dict
+        db: AsyncSession, data: MonitorConfigCreate, operator: dict[str, Any]
     ) -> MonitorCollectConfig:
         return await MonitorConfigService.create_config(db, data, operator)
 
@@ -89,36 +89,36 @@ class MonitorService:
         db: AsyncSession,
         config_id: int,
         data: MonitorConfigUpdate,
-        user: dict,
+        user: dict[str, Any],
     ) -> MonitorCollectConfig:
         return await MonitorConfigService.update_config_with_access(db, config_id, data, user)
 
     @staticmethod
-    async def delete_config(db: AsyncSession, config_id: int, user: dict) -> None:
+    async def delete_config(db: AsyncSession, config_id: int, user: dict[str, Any]) -> None:
         await MonitorConfigService.delete_config(db, config_id, user)
 
     @staticmethod
-    async def get_sd_targets(db: AsyncSession) -> list[dict]:
+    async def get_sd_targets(db: AsyncSession) -> list[dict[str, Any]]:
         return await MonitorConfigService.get_sd_targets(db)
 
     @staticmethod
-    async def apply_privilege(db: AsyncSession, data, user: dict) -> MonitorPrivilegeApply:
+    async def apply_privilege(db: AsyncSession, data: Any, user: dict[str, Any]) -> MonitorPrivilegeApply:
         return await MonitorConfigService.apply_privilege(db, data, user)
 
     @staticmethod
     async def audit_privilege(
-        db: AsyncSession, apply_id: int, action: str, operator: dict, remark: str = ""
+        db: AsyncSession, apply_id: int, action: str, operator: dict[str, Any], remark: str = ""
     ) -> MonitorPrivilegeApply:
         return await MonitorConfigService.audit_privilege(db, apply_id, action, operator, remark)
 
     @staticmethod
-    async def check_privilege(db: AsyncSession, user: dict, instance_id: int) -> bool:
+    async def check_privilege(db: AsyncSession, user: dict[str, Any], instance_id: int) -> bool:
         return await MonitorConfigService.check_privilege(db, user, instance_id)
 
     @staticmethod
     async def list_applies(
-        db: AsyncSession, user: dict, status: int | None = None, page: int = 1, page_size: int = 20
-    ) -> tuple[int, list]:
+        db: AsyncSession, user: dict[str, Any], status: int | None = None, page: int = 1, page_size: int = 20
+    ) -> tuple[int, list[MonitorPrivilegeApply]]:
         return await MonitorConfigService.list_applies(
             db, user, status=status, page=page, page_size=page_size
         )
@@ -128,12 +128,12 @@ class MonitorService:
         db: AsyncSession,
         instance_id: int,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> MonitorCollectConfig:
         return await MonitorConfigService.upsert_native_config(db, instance_id, data, user)
 
     @staticmethod
-    async def collect_native_now(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def collect_native_now(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         """手动触发原生监控采集：确保采集配置存在，执行指标与容量采集并回写状态。
 
         get_native_detail 内部已做实例访问校验；采集失败时记录失败快照并抛出 400。
@@ -182,7 +182,7 @@ class MonitorService:
         return MonitorService._snapshot_to_dict(snapshot)
 
     @staticmethod
-    async def list_unified_collect_configs(db: AsyncSession, user: dict) -> dict[str, Any]:
+    async def list_unified_collect_configs(db: AsyncSession, user: dict[str, Any]) -> dict[str, Any]:
         return await MonitorConfigService.list_unified_collect_configs(db, user)
 
     @staticmethod
@@ -190,7 +190,7 @@ class MonitorService:
         db: AsyncSession,
         instance_id: int,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
         return await MonitorConfigService.upsert_unified_collect_config(db, instance_id, data, user)
 
@@ -198,12 +198,12 @@ class MonitorService:
     async def bulk_upsert_unified_collect_configs(
         db: AsyncSession,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
         return await MonitorConfigService.bulk_upsert_unified_collect_configs(db, data, user)
 
     @staticmethod
-    async def list_native_instances(db: AsyncSession, user: dict) -> list[dict]:
+    async def list_native_instances(db: AsyncSession, user: dict[str, Any]) -> list[dict[str, Any]]:
         stmt = (
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -241,7 +241,7 @@ class MonitorService:
                 return []
         instances = list((await db.execute(stmt.order_by(Instance.instance_name))).scalars().all())
 
-        items: list[dict] = []
+        items: list[dict[str, Any]] = []
         for inst in instances:
             cfg = (
                 await db.execute(
@@ -276,7 +276,7 @@ class MonitorService:
         return sorted(items, key=lambda item: (item["health_score"], item["instance_name"]))
 
     @staticmethod
-    async def get_latest_snapshot(db: AsyncSession, instance_id: int) -> dict | None:
+    async def get_latest_snapshot(db: AsyncSession, instance_id: int) -> dict[str, Any] | None:
         snap = (
             await db.execute(
                 select(MonitorMetricSnapshot)
@@ -290,7 +290,7 @@ class MonitorService:
         return MonitorService._snapshot_to_dict(snap)
 
     @staticmethod
-    def _snapshot_to_dict(snap: MonitorMetricSnapshot) -> dict:
+    def _snapshot_to_dict(snap: MonitorMetricSnapshot) -> dict[str, Any]:
         extra_metrics = snap.extra_metrics or {}
         data = {
             "instance_id": snap.instance_id,
@@ -338,10 +338,10 @@ class MonitorService:
             if key in MonitorService.METRIC_GROUP_META_KEYS:
                 continue
             groups[key] = value
-        return MonitorService._json_safe(groups)
+        return cast(dict[str, Any], MonitorService._json_safe(groups))
 
     @staticmethod
-    def evaluate_health(snapshot: dict | None, collect_status: str = "not_configured") -> dict:
+    def evaluate_health(snapshot: dict[str, Any] | None, collect_status: str = "not_configured") -> dict[str, Any]:
         """根据最新原生快照推导面向运维人员的健康评分。"""
         score = 100
         reasons: list[str] = []
@@ -478,7 +478,7 @@ class MonitorService:
         }
 
     @staticmethod
-    async def get_native_detail(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def get_native_detail(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         instance = (
             await db.execute(
                 select(Instance)
@@ -528,8 +528,8 @@ class MonitorService:
 
     @staticmethod
     async def get_native_trend(
-        db: AsyncSession, instance_id: int, user: dict, hours: int = 24
-    ) -> list[dict]:
+        db: AsyncSession, instance_id: int, user: dict[str, Any], hours: int = 24
+    ) -> list[dict[str, Any]]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
         instance = (
@@ -570,7 +570,7 @@ class MonitorService:
             .scalars()
             .all()
         )
-        items: list[dict] = []
+        items: list[dict[str, Any]] = []
         for row in rows:
             slow_queries = row.slow_queries
             if instance.db_type == "mysql":
@@ -622,7 +622,7 @@ class MonitorService:
         return current_total - previous_total, current_total
 
     @staticmethod
-    async def get_database_capacity(db: AsyncSession, instance_id: int, user: dict) -> list[dict]:
+    async def get_database_capacity(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> list[dict[str, Any]]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
         return await MonitorCapacityService.database_capacity(db, instance_id)
@@ -631,12 +631,12 @@ class MonitorService:
     async def get_table_capacity(
         db: AsyncSession,
         instance_id: int,
-        user: dict,
+        user: dict[str, Any],
         db_name: str | None = None,
         search: str | None = None,
         page: int = 1,
         page_size: int = 50,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
         return await MonitorCapacityService.table_capacity(
@@ -644,7 +644,7 @@ class MonitorService:
         )
 
     @staticmethod
-    async def get_native_overview(db: AsyncSession, user: dict) -> dict:
+    async def get_native_overview(db: AsyncSession, user: dict[str, Any]) -> dict[str, Any]:
         items = await MonitorService.list_native_instances(db, user)
         total = len(items)
         online = sum(1 for item in items if (item.get("latest") or {}).get("is_up"))
@@ -687,11 +687,11 @@ class MonitorService:
         }
 
     @staticmethod
-    def _has_capacity_risk(snapshot: dict) -> bool:
+    def _has_capacity_risk(snapshot: dict[str, Any]) -> bool:
         return MonitorCapacityService.has_capacity_risk(snapshot)
 
     @staticmethod
-    async def get_native_health(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def get_native_health(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         detail = await MonitorService.get_native_detail(db, instance_id, user)
         latest = detail.get("latest")
         return {
@@ -703,7 +703,7 @@ class MonitorService:
         }
 
     @staticmethod
-    async def get_engine_detail(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def get_engine_detail(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         detail = await MonitorService.get_native_detail(db, instance_id, user)
         latest = detail.get("latest") or {}
         extra = latest.get("extra_metrics") or {}
@@ -717,7 +717,7 @@ class MonitorService:
         }
 
     @staticmethod
-    async def get_alert_rules(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def get_alert_rules(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         detail = await MonitorService.get_native_detail(db, instance_id, user)
         cfg = (
             await db.execute(
@@ -741,8 +741,8 @@ class MonitorService:
 
     @staticmethod
     async def update_alert_rules(
-        db: AsyncSession, instance_id: int, rules: dict[str, Any], user: dict
-    ) -> dict:
+        db: AsyncSession, instance_id: int, rules: dict[str, Any], user: dict[str, Any]
+    ) -> dict[str, Any]:
         inst_result = await db.execute(
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -799,7 +799,7 @@ class MonitorService:
     @staticmethod
     async def list_alert_events(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         status: str | None = None,
         instance_id: int | None = None,
         page: int = 1,
@@ -810,7 +810,7 @@ class MonitorService:
         )
 
     @staticmethod
-    async def get_alert_event(db: AsyncSession, event_id: int, user: dict) -> dict[str, Any]:
+    async def get_alert_event(db: AsyncSession, event_id: int, user: dict[str, Any]) -> dict[str, Any]:
         return await MonitorAlertService.get_alert_event(db, event_id, user)
 
     @staticmethod
@@ -818,7 +818,7 @@ class MonitorService:
         db: AsyncSession,
         event_id: int,
         action: str,
-        user: dict,
+        user: dict[str, Any],
         *,
         minutes: int = 60,
         reason: str = "",
@@ -828,7 +828,7 @@ class MonitorService:
         )
 
     @staticmethod
-    async def get_waits(db: AsyncSession, instance_id: int, user: dict) -> dict:
+    async def get_waits(db: AsyncSession, instance_id: int, user: dict[str, Any]) -> dict[str, Any]:
         detail = await MonitorService.get_native_detail(db, instance_id, user)
         extra = (detail.get("latest") or {}).get("extra_metrics") or {}
         return {
@@ -842,12 +842,12 @@ class MonitorService:
     async def get_top_sql(
         db: AsyncSession,
         instance_id: int,
-        user: dict,
+        user: dict[str, Any],
         limit: int = 20,
         window_minutes: int = 30,
         date_start: datetime | None = None,
         date_end: datetime | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         from app.engines.registry import get_engine
 
         if not await MonitorService.check_privilege(db, user, instance_id):
@@ -858,6 +858,7 @@ class MonitorService:
         window_minutes = max(1, min(int(window_minutes or 30), 1440))
         custom_range = date_start is not None and date_end is not None and date_start < date_end
         if custom_range:
+            assert date_start is not None and date_end is not None
             window_minutes = max(1, int((date_end - date_start).total_seconds() // 60) or 1)
         latest = await MonitorService.get_latest_snapshot(db, instance_id)
         extra = (latest or {}).get("extra_metrics") or {}
@@ -916,14 +917,14 @@ class MonitorService:
             "items": items[:limit],
             "error": error,
             "window_minutes": window_minutes,
-            "date_start": date_start.isoformat() if custom_range else None,
-            "date_end": date_end.isoformat() if custom_range else None,
+            "date_start": date_start.isoformat() if custom_range and date_start is not None else None,
+            "date_end": date_end.isoformat() if custom_range and date_end is not None else None,
             "missing_groups": (latest or {}).get("missing_groups") or {},
         }
 
     @staticmethod
-    def _result_rows_to_dicts(columns: list[str], rows: list[Any]) -> list[dict]:
-        result: list[dict] = []
+    def _result_rows_to_dicts(columns: list[str], rows: list[Any]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
         for row in rows:
             if isinstance(row, dict):
                 result.append(MonitorService._json_safe(row))
@@ -935,14 +936,14 @@ class MonitorService:
 
     @staticmethod
     async def get_capacity_growth(
-        db: AsyncSession, instance_id: int, user: dict, days: int = 7
-    ) -> dict:
+        db: AsyncSession, instance_id: int, user: dict[str, Any], days: int = 7
+    ) -> dict[str, Any]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
         return await MonitorCapacityService.capacity_growth(db, instance_id, days=days)
 
     @staticmethod
-    async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
+    async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict[str, Any]:
         return await MonitorCollectService.collect_due_native(db, limit=limit)
 
     @staticmethod

@@ -53,6 +53,7 @@ app/services/commercial_readiness.py
 app/services/dashboard.py
 app/services/dashboard_metrics.py
 app/services/ldap_auth.py
+app/services/monitor.py
 app/services/monitor_alerts.py
 app/services/monitor_capacity.py
 app/services/monitor_collect.py
