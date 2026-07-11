@@ -1,6 +1,7 @@
 """
 会话/锁/事务诊断路由（Sprint 4）。
 """
+from typing import Any, cast
 import logging
 from datetime import datetime
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _get_instance(db: AsyncSession, user: dict, instance_id: int) -> Instance:
+async def _get_instance(db: AsyncSession, user: dict[str, Any], instance_id: int) -> Instance:
     result = await db.execute(
         select(Instance)
         .options(selectinload(Instance.resource_groups))
@@ -75,9 +76,9 @@ def _parse_oracle_dt(value: str | None) -> datetime | None:
 async def get_processlist(
     instance_id: int = QParam(..., description="实例ID"),
     command_type: str = "ALL",
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await _get_instance(db, user, instance_id)
     engine = get_engine(inst)
     processlist = getattr(engine, "processlist", None)
@@ -124,9 +125,9 @@ async def list_session_history(
     min_active_duration_ms: int | None = QParam(default=None, ge=0),
     page: int = QParam(default=1, ge=1),
     page_size: int = QParam(default=50, ge=1, le=200),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await SessionDiagnosticService.list_history(
         db,
         instance_id=instance_id,
@@ -156,9 +157,9 @@ async def list_session_history(
     dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def list_session_collect_configs(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await SessionDiagnosticService.list_configs(db, user)
     return {"total": total, "items": items}
 
@@ -171,9 +172,9 @@ async def list_session_collect_configs(
 )
 async def upsert_session_collect_config(
     data: SessionCollectConfigUpsert,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> SessionCollectConfigItem:
     cfg = await SessionDiagnosticService.upsert_config(db, data, user)
     inst = await _get_instance(db, user, cfg.instance_id)
     return SessionCollectConfigItem(
@@ -201,9 +202,9 @@ async def upsert_session_collect_config(
 async def update_session_collect_config(
     config_id: int,
     data: SessionCollectConfigUpdate,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> SessionCollectConfigItem:
     cfg = await SessionDiagnosticService.update_config(db, config_id, data, user)
     inst = await _get_instance(db, user, cfg.instance_id)
     return SessionCollectConfigItem(
@@ -237,9 +238,9 @@ async def list_oracle_ash_history(
     min_duration_ms: int | None = QParam(default=None, ge=0),
     page: int = QParam(default=1, ge=1),
     page_size: int = QParam(default=50, ge=1, le=200),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await _get_instance(db, user, instance_id)
     if inst.db_type != "oracle":
         raise HTTPException(400, "ASH/AWR 历史仅支持 Oracle 实例")
@@ -269,9 +270,9 @@ async def kill_session(
     thread_id: int | None = None,
     session_id: str | None = None,
     serial: str = "",
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     if payload is not None:
         instance_id = payload.instance_id
         session_id = payload.session_id
@@ -289,7 +290,7 @@ async def kill_session(
         if inst.db_type == "oracle":
             if not serial:
                 raise HTTPException(400, "Oracle Kill 会话必须提供 serial")
-            rs = await engine.kill_connection(int(session_id), serial=serial)
+            rs = await cast(Any, engine).kill_connection(int(session_id), serial=serial)
         else:
             rs = await engine.kill_connection(int(session_id))
         if rs.error:
@@ -321,9 +322,9 @@ async def kill_session(
 @router.get("/variables/", summary="实例参数列表")
 async def get_variables(
     instance_id: int = QParam(...),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await _get_instance(db, user, instance_id)
     engine = get_engine(inst)
     rs = await engine.get_variables()

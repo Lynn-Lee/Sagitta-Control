@@ -1,5 +1,6 @@
 """系统访问控制子路由。"""
 
+from typing import Any
 import logging
 
 from fastapi import APIRouter, Depends, Query
@@ -30,8 +31,8 @@ async def list_resource_groups(
     page_size: int = Query(20, ge=1, le=200),
     search: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     total, items = await ResourceGroupService.list_groups(db, page, page_size, search)
     result = []
     for rg in items:
@@ -78,8 +79,8 @@ async def list_resource_groups(
 async def create_resource_group(
     data: ResourceGroupCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("resource_group_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("resource_group_manage")),
+) -> dict[str, Any]:
     rg = await ResourceGroupService.create(db, data)
     return {
         "status": 0,
@@ -93,8 +94,8 @@ async def update_resource_group(
     rg_id: int,
     data: ResourceGroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("resource_group_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("resource_group_manage")),
+) -> dict[str, Any]:
     rg = await ResourceGroupService.update(db, rg_id, data)
     return {"status": 0, "msg": "资源组已更新", "data": {"id": rg.id}}
 
@@ -103,8 +104,8 @@ async def update_resource_group(
 async def delete_resource_group(
     rg_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("resource_group_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("resource_group_manage")),
+) -> dict[str, Any]:
     await ResourceGroupService.delete(db, rg_id)
     return {"status": 0, "msg": "资源组已删除"}
 
@@ -113,8 +114,8 @@ async def delete_resource_group(
 async def list_rg_members(
     rg_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     """v2: 资源组成员通过用户组关联获取，不再直接查 user_resource_group。"""
     members = await UserGroupService.list_members_for_resource_group(db, rg_id)
     return {
@@ -136,8 +137,8 @@ async def update_rg_members(
     rg_id: int,
     data: MemberUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("resource_group_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("resource_group_manage")),
+) -> dict[str, Any]:
     """v2: 资源组成员管理已迁移到用户组体系，此端点仅为前端兼容保留空操作。"""
     return {
         "status": 0,
@@ -149,8 +150,8 @@ async def update_rg_members(
 async def list_rg_user_groups(
     rg_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     groups = await UserGroupService.get_user_groups_for_resource_group(db, rg_id)
     return {
         "items": [
@@ -173,7 +174,7 @@ async def update_rg_user_groups(
     rg_id: int,
     data: RgUserGroupsUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("resource_group_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("resource_group_manage")),
+) -> dict[str, Any]:
     await UserGroupService.update_resource_group_user_groups(db, rg_id, data.user_group_ids)
     return {"status": 0, "msg": f"资源组用户组关联已更新，共 {len(data.user_group_ids)} 个组"}

@@ -1,6 +1,8 @@
 """数据归档路由。"""
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -57,7 +59,7 @@ class ArchiveExecuteRequest(BaseModel):
 
 
 @router.get("/support/", summary="查询数据库归档支持情况")
-async def get_archive_support(_user=Depends(current_user)):
+async def get_archive_support(_user: dict[str, Any]=Depends(current_user)) -> dict[str, Any]:
     return {
         "support": {
             db_type: {
@@ -74,9 +76,9 @@ async def get_archive_support(_user=Depends(current_user)):
 @router.post("/estimate/", summary="估算归档影响行数（不执行）")
 async def estimate_archive(
     data: ArchiveRequest,
-    _user=Depends(require_perm("archive_apply")),
+    _user: dict[str, Any]=Depends(require_perm("archive_apply")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await ArchiveService.estimate_rows(
         db, data.source_instance_id, data.source_db, data.source_table, data.condition,
         data.archive_mode, data.batch_size, data.dest_db, data.dest_table
@@ -86,9 +88,9 @@ async def estimate_archive(
 @router.post("/run/", summary="提交归档作业并进入审批")
 async def submit_archive_job(
     data: ArchiveRequest,
-    user=Depends(require_perm("archive_apply")),
+    user: dict[str, Any]=Depends(require_perm("archive_apply")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     job = await ArchiveService.submit_job(db, data, user)
     return {
         "success": True,
@@ -104,9 +106,9 @@ async def submit_archive_job(
 async def list_archive_jobs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await ArchiveService.list_jobs(db, user, page, page_size)
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
@@ -114,18 +116,18 @@ async def list_archive_jobs(
 @router.get("/jobs/{job_id}/", summary="归档作业详情")
 async def get_archive_job(
     job_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await ArchiveService.get_job(db, job_id, user)
 
 
 @router.get("/jobs/{job_id}/status/", summary="归档作业状态")
 async def get_archive_job_status(
     job_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     job = await ArchiveService.get_job(db, job_id, user)
     return {
         "job_id": job["id"],
@@ -142,9 +144,9 @@ async def get_archive_job_status(
 async def start_archive_job(
     job_id: int,
     data: ArchiveExecuteRequest = ArchiveExecuteRequest(),
-    user=Depends(require_perm("archive_execute")),
+    user: dict[str, Any]=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await ArchiveService.start_job(db, job_id, user, data)
     return {"success": True, **result}
 
@@ -152,9 +154,9 @@ async def start_archive_job(
 @router.post("/jobs/{job_id}/pause/", summary="暂停归档作业")
 async def pause_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_execute")),
+    user: dict[str, Any]=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     job = await ArchiveService.set_job_control_state(db, job_id, "pause", user)
     return {"success": True, "msg": "暂停请求已提交，将在当前批次完成后生效", "job_id": job.id, "status": job.status}
 
@@ -162,9 +164,9 @@ async def pause_archive_job(
 @router.post("/jobs/{job_id}/resume/", summary="继续归档作业")
 async def resume_archive_job(
     job_id: int,
-    user=Depends(require_perm("archive_execute")),
+    user: dict[str, Any]=Depends(require_perm("archive_execute")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     job = await ArchiveService.set_job_control_state(db, job_id, "resume", user)
     result = await ArchiveService.start_job(db, job.id, user)
     return {"success": True, **result}
@@ -173,8 +175,8 @@ async def resume_archive_job(
 @router.post("/jobs/{job_id}/cancel/", summary="取消归档作业")
 async def cancel_archive_job(
     job_id: int,
-    user=Depends(current_user),
+    user: dict[str, Any]=Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     job = await ArchiveService.set_job_control_state(db, job_id, "cancel", user)
     return {"success": True, "msg": "取消请求已提交；执行中作业将在当前批次完成后停止", "job_id": job.id, "status": job.status}

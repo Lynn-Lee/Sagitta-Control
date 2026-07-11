@@ -1,6 +1,7 @@
 """
 SQL 工单路由（Sprint 3）。
 """
+from typing import Any
 import contextlib
 import logging
 
@@ -38,9 +39,9 @@ async def list_workflows(
     date_end: str | None = QParam(None, description="提交时间结束 yyyy-mm-dd"),
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items, scope = await WorkflowService.list_workflows(
         db, user=user, view=view, status=status, instance_id=instance_id,
         search=search, engineer=engineer, db_name=db_name,
@@ -57,9 +58,9 @@ async def list_workflows(
 async def create_workflow(
     data: WorkflowCreateRequest,
     request: Request,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     wf = await WorkflowService.create(db, data, operator=user)
     await AuditLogService.write(
         db, user, action="submit_workflow", module="workflow",
@@ -73,9 +74,9 @@ async def create_workflow(
 async def pending_workflows(
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await WorkflowService.pending_for_me(db, user, page, page_size)
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
@@ -83,9 +84,9 @@ async def pending_workflows(
 @router.post("/check/", summary="SQL 预检查（不提交工单）")
 async def check_sql(
     data: WorkflowCheckRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     results = await WorkflowService.check_sql(db, data.instance_id, data.db_name, data.sql_content)
     return {"status": 0, "data": results}
 
@@ -93,9 +94,9 @@ async def check_sql(
 @router.post("/risk-plan/", summary="SQL 工单风险预案")
 async def workflow_risk_plan(
     data: WorkflowCheckRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     from sqlalchemy import select
 
     result = await db.execute(select(Instance).where(Instance.id == data.instance_id))
@@ -117,9 +118,9 @@ async def workflow_risk_plan(
 @router.get("/{workflow_id}/", summary="工单详情")
 async def get_workflow(
     workflow_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await WorkflowService.get_detail(db, workflow_id, user)
 
 
@@ -128,9 +129,9 @@ async def audit_workflow(
     workflow_id: int,
     data: WorkflowAuditRequest,
     request: Request,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await AuditService.operate(
         db, workflow_id=workflow_id, action=data.action,
         operator=user, remark=data.remark,
@@ -148,9 +149,9 @@ async def audit_workflow(
 async def execute_workflow(
     workflow_id: int,
     data: WorkflowExecuteRequest = WorkflowExecuteRequest(),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await WorkflowService.execute(db, workflow_id, operator=user, data=data)
     return {"status": 0, **result}
 
@@ -158,9 +159,9 @@ async def execute_workflow(
 @router.post("/{workflow_id}/cancel/", summary="取消工单")
 async def cancel_workflow(
     workflow_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await AuditService.operate(
         db, workflow_id=workflow_id, action="cancel", operator=user
     )
@@ -170,9 +171,9 @@ async def cancel_workflow(
 @router.get("/{workflow_id}/status/", summary="查询工单当前状态")
 async def get_workflow_status(
     workflow_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     from sqlalchemy import select
 
     from app.models.workflow import SqlWorkflow
@@ -197,7 +198,7 @@ async def workflow_progress_ws(
     workflow_id: int,
     websocket: WebSocket,
     db: AsyncSession = Depends(get_db),
-):
+) -> None:
     """
     WebSocket：实时推送工单执行进度。
     每秒查询一次状态，直到终态（finish/exception/abort）或客户端断开。

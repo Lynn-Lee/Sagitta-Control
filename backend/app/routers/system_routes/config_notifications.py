@@ -1,5 +1,6 @@
 """系统管理子路由。"""
 
+from typing import Any
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -33,8 +34,8 @@ async def list_my_notifications(
     page_size: int = Query(20, ge=1, le=100),
     unread_only: bool = False,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_user),
-):
+    user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     total, items = await NotifyService.list_system_notifications(
@@ -50,8 +51,8 @@ async def list_my_notifications(
 @router.get("/notifications/unread-count/", summary="我的未读通知数")
 async def get_my_notification_unread_count(
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_user),
-):
+    user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     return {"count": await NotifyService.unread_count(db, user["id"])}
@@ -68,8 +69,8 @@ async def list_notification_delivery_logs(
     status: str | None = Query(None, pattern="^(sent|failed|skipped|pending)$"),
     recipient_user_id: int | None = Query(None, ge=1),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     total, items = await NotifyService.list_delivery_logs(
@@ -93,8 +94,8 @@ async def list_notification_missing_external_ids(
     approval_only: bool = True,
     missing_only: bool = True,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     total, items = await NotifyService.list_missing_external_ids(
@@ -110,8 +111,8 @@ async def list_notification_missing_external_ids(
 @router.post("/notifications/read-all/", summary="全部通知标记已读")
 async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_user),
-):
+    user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     count = await NotifyService.mark_all_read(db, user["id"])
@@ -122,8 +123,8 @@ async def mark_all_notifications_read(
 async def mark_notification_read(
     notification_id: int,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_user),
-):
+    user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     ok = await NotifyService.mark_read(db, user["id"], notification_id)
@@ -135,18 +136,18 @@ async def mark_notification_read(
 @router.get("/config/", summary="获取系统配置（按分组）")
 async def get_system_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.get_all(db)
 
 
 @router.get("/branding/", summary="获取公开品牌配置")
-async def get_public_branding(db: AsyncSession = Depends(get_db)):
+async def get_public_branding(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     return await SystemConfigService.get_branding(db)
 
 
 @router.get("/auth-methods/", summary="获取公开登录方式配置")
-async def get_public_auth_methods(db: AsyncSession = Depends(get_db)):
+async def get_public_auth_methods(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     return await SystemConfigService.get_public_auth_methods(db)
 
 
@@ -155,8 +156,8 @@ async def update_system_config(
     data: ConfigUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     try:
         count, change_summary = await SystemConfigService.update_batch(db, data.updates)
     except ValueError as exc:
@@ -182,8 +183,8 @@ async def update_system_config(
 async def test_mail_config(
     data: MailTestRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     result = await SystemConfigService.test_mail(db, data.to_email)
     return result
 
@@ -191,32 +192,32 @@ async def test_mail_config(
 @router.post("/config/test/dingtalk/", summary="测试钉钉配置")
 async def test_dingtalk_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_dingtalk(db)
 
 
 @router.post("/config/test/wecom/", summary="测试企业微信配置")
 async def test_wecom_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_wecom(db)
 
 
 @router.post("/config/test/feishu/", summary="测试飞书配置")
 async def test_feishu_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_feishu(db)
 
 
 @router.post("/config/test/ai/", summary="测试 AI 配置")
 async def test_ai_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     license_check = await LicenseService.check_access(db, "/api/v1/ai/text2sql/", "POST")
     if not license_check.allowed:
         return {
@@ -230,8 +231,8 @@ async def test_ai_config(
 async def test_notify_user_config(
     data: NotifyUserTestRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     from app.services.notify import NotifyService
 
     await NotifyService.send_event(
@@ -256,22 +257,22 @@ async def test_notify_user_config(
 async def test_ldap_config(
     data: LdapTestRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_ldap(db, data.test_username, data.test_password)
 
 
 @router.post("/config/test/cas/", summary="测试 CAS 配置")
 async def test_cas_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_cas(db)
 
 
 @router.post("/config/test/oidc/", summary="测试 OIDC 配置")
 async def test_oidc_config(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await SystemConfigService.test_oidc(db)

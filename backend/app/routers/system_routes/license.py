@@ -1,5 +1,6 @@
 """系统管理子路由。"""
 
+from typing import Any
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -24,8 +25,8 @@ router = APIRouter()
 @router.get("/license/status", summary="License 授权状态")
 async def get_license_status(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     return await LicenseService.status(db)
 
 
@@ -33,8 +34,8 @@ async def get_license_status(
 async def get_license_deployment_fingerprint(
     customer_id: str = Query("", max_length=128),
     customer_id_legacy: str = Query("", max_length=128, alias="customerId"),
-    _user=Depends(current_superuser),
-):
+    _user: dict[str, Any]=Depends(current_superuser),
+) -> dict[str, Any]:
     return LicenseService.activation_fingerprint(customer_id or customer_id_legacy)
 
 
@@ -43,8 +44,8 @@ async def import_license(
     data: LicenseImportRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_superuser),
-):
+    user: dict[str, Any]=Depends(current_superuser),
+) -> dict[str, Any]:
     status_data = await LicenseService.import_license(db, data.license)
     await AuditLogService.write(
         db,
@@ -62,8 +63,8 @@ async def create_license_challenge(
     data: LicenseChallengeRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_superuser),
-):
+    user: dict[str, Any]=Depends(current_superuser),
+) -> dict[str, Any]:
     challenge = LicenseService.create_offline_challenge(data.customer_id)
     await AuditLogService.write(
         db,
@@ -81,8 +82,8 @@ async def activate_license(
     data: LicenseActivateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_superuser),
-):
+    user: dict[str, Any]=Depends(current_superuser),
+) -> dict[str, Any]:
     status_data = await LicenseService.activate(db, data.model_dump())
     await AuditLogService.write(
         db,
@@ -99,8 +100,8 @@ async def activate_license(
 async def refresh_license(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(current_superuser),
-):
+    user: dict[str, Any]=Depends(current_superuser),
+) -> dict[str, Any]:
     status_data = await LicenseService.refresh(db)
     await AuditLogService.write(
         db,

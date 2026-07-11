@@ -2,6 +2,7 @@
 SQL 优化路由（Sprint 4）。
 提供 EXPLAIN 分析和 sqlglot 语法建议。
 """
+from typing import Any
 import logging
 
 import sqlglot
@@ -52,18 +53,18 @@ class OptimizeRequest(BaseModel):
 @router.post("/analyze/", response_model=OptimizeAnalyzeResponse, summary="SQL 优化 v2 统一诊断")
 async def analyze_sql(
     data: OptimizeAnalyzeRequest,
-    user: dict = Depends(require_perm("observability_sql_analyze")),
+    user: dict[str, Any] = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
-):
+) -> OptimizeAnalyzeResponse:
     return await OptimizeService.analyze(db, user, data)
 
 
 @router.post("/explain/", summary="EXPLAIN 执行计划")
 async def explain_sql(
     data: OptimizeRequest,
-    user: dict = Depends(require_perm("observability_sql_analyze")),
+    user: dict[str, Any] = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await db.execute(
         select(Instance).where(Instance.id == data.instance_id, Instance.is_active)
     )
@@ -98,9 +99,9 @@ async def explain_sql(
 @router.post("/advice/", summary="SQL 优化建议（sqlglot 规则引擎）")
 async def sql_advice(
     data: OptimizeRequest,
-    user: dict = Depends(require_perm("observability_sql_analyze")),
+    user: dict[str, Any] = Depends(require_perm("observability_sql_analyze")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     使用 sqlglot 对 SQL 进行静态分析，给出优化建议。
     """

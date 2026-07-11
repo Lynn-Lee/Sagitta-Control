@@ -2,6 +2,7 @@
 AI 路由：Text2SQL 端点。
 业务逻辑全部委托给 services/text2sql.py，此处只处理请求解析和响应映射。
 """
+from typing import Any
 import logging
 
 import httpx
@@ -27,9 +28,9 @@ class Text2SQLRequest(BaseModel):
 @router.post("/text2sql/", summary="自然语言转 SQL（AI Text2SQL）")
 async def text2sql(
     data: Text2SQLRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     if not data.question.strip():
         raise HTTPException(400, "问题描述不能为空")
 

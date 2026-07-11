@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -42,7 +44,7 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise HTTPException(422, "时间格式错误，请使用 ISO8601") from None
 
 
-def _row_duration_seconds(row) -> int:
+def _row_duration_seconds(row: Any) -> int:
     if not isinstance(row, dict):
         return 0
     for key in ("Time", "TIME", "time_seconds", "duration_seconds"):
@@ -66,15 +68,15 @@ def _row_duration_seconds(row) -> int:
     dependencies=[Depends(require_perm("observability_collect_manage"))],
 )
 async def list_slowlog_configs(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await SlowLogService.list_configs(db, user)
     return {"total": total, "items": items}
 
 
 @router.get("/tag-options/", summary="SQL 洞察标签选项")
-async def slowlog_tag_options():
+async def slowlog_tag_options() -> dict[str, Any]:
     return {"items": tag_options_by_engine()}
 
 
@@ -85,9 +87,9 @@ async def slowlog_tag_options():
 )
 async def upsert_slowlog_config(
     data: SlowQueryConfigUpsert,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     cfg = await SlowLogService.upsert_config(db, data, user)
     return {"status": 0, "msg": "SQL 采集配置已保存", "data": {"id": cfg.id}}
 
@@ -100,9 +102,9 @@ async def upsert_slowlog_config(
 async def update_slowlog_config(
     config_id: int,
     data: SlowQueryConfigUpdate,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     cfg = await SlowLogService.update_config(db, config_id, data, user)
     return {"status": 0, "msg": "SQL 采集配置已更新", "data": {"id": cfg.id}}
 
@@ -125,9 +127,9 @@ async def list_slow_logs(
     date_end: str | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(50, ge=1, le=200),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await SlowLogService.list_logs(
         db,
         user,
@@ -162,9 +164,9 @@ async def slowlog_overview(
     min_duration_ms: int = QParam(DEFAULT_SLOW_THRESHOLD_MS, ge=0),
     date_start: str | None = None,
     date_end: str | None = None,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> SlowQueryOverviewResponse:
     return await SlowLogService.overview(
         db,
         user,
@@ -197,9 +199,9 @@ async def slowlog_fingerprints(
     date_start: str | None = None,
     date_end: str | None = None,
     limit: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     items = await SlowLogService.fingerprints(
         db,
         user,
@@ -225,9 +227,9 @@ async def slowlog_fingerprints(
 async def slowlog_fingerprint_samples(
     fingerprint: str,
     limit: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return {"items": await SlowLogService.samples(db, user, fingerprint, limit=limit)}
 
 
@@ -241,9 +243,9 @@ async def slowlog_fingerprint_detail(
     fingerprint: str,
     date_start: str | None = None,
     date_end: str | None = None,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> SlowQueryFingerprintDetailResponse:
     return await SlowLogService.fingerprint_detail(
         db,
         user,
@@ -261,9 +263,9 @@ async def slowlog_fingerprint_detail(
 )
 async def explain_slow_query(
     data: SlowQueryExplainRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> SlowQueryExplainResponse:
     return await SlowLogService.explain(
         db,
         user,
@@ -278,9 +280,9 @@ async def explain_slow_query(
 async def collect_slow_logs(
     instance_id: int | None = None,
     limit: int = QParam(100, ge=1, le=500),
-    user: dict = Depends(require_perm("observability_collect_manage")),
+    user: dict[str, Any] = Depends(require_perm("observability_collect_manage")),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     since = datetime.now(UTC) - timedelta(days=1)
     saved = 0
     failed = 0
@@ -332,9 +334,9 @@ async def list_slow_queries(
     db_name: str | None = None,
     limit: int = QParam(50, ge=1, le=500),
     min_seconds: int = QParam(1, ge=1),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await SlowLogService.get_instance_or_404(db, instance_id, user)
     engine = get_engine(inst)
 
@@ -350,7 +352,7 @@ async def list_slow_queries(
             ORDER BY duration_seconds DESC
             LIMIT $1
         """
-        rs = await engine._raw_query(db_name=db_name or inst.db_name, sql=sql, args=[limit, min_seconds])
+        rs = await cast(Any, engine)._raw_query(db_name=db_name or inst.db_name, sql=sql, args=[limit, min_seconds])
     elif inst.db_type == "mysql":
         sql = (
             "SELECT Id, User, Host, db, Command, Time, State, LEFT(Info,200) AS Info "
@@ -393,9 +395,9 @@ async def list_slow_queries(
 async def slow_query_stats(
     instance_id: int = QParam(...),
     limit: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await SlowLogService.get_instance_or_404(db, instance_id, user)
     items = await SlowLogService.fingerprints(db, user, instance_id=instance_id, limit=limit)
     return {"items": [item.model_dump() for item in items]}

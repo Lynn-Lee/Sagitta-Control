@@ -143,13 +143,11 @@ uvicorn app.main:app --reload --port 8000
 alembic upgrade head
 pytest tests/unit/ -v --cov=app --cov-fail-under=55
 ruff format . && ruff check .
-while IFS= read -r target; do
-  mypy --follow-imports=silent "$target"
-done < mypy-baseline.txt
+mypy app
 uvx pip-audit --disable-pip --no-deps -r requirements.lock
 ```
 
-后端 CI 以 `mypy-baseline.txt` 中的清洁文件作为硬门禁，并保持全量 `mypy app` 作为 notice 审计；新增或拆分出的低风险 helper 模块应优先纳入 baseline。单测覆盖率门槛当前为 55%，后续按模块补测后继续提升关键服务覆盖率。仓库转为 public 后，GitHub Actions 统一使用 GitHub-hosted 默认 runner（`runs-on: ubuntu-latest`），CI 中显式安装 Node.js 22、Python 3.12 和 uv，不再依赖旧 self-hosted runner 预装环境。
+后端 CI 以全量 `mypy app`（`strict = true`）作为硬门禁——`app/` 下 134 个源文件全部零类型错误，新增代码必须保持 strict 清洁。单测覆盖率门槛当前为 55%，后续按模块补测后继续提升关键服务覆盖率。仓库转为 public 后，GitHub Actions 统一使用 GitHub-hosted 默认 runner（`runs-on: ubuntu-latest`），CI 中显式安装 Node.js 22、Python 3.12 和 uv，不再依赖旧 self-hosted runner 预装环境。
 
 修改 `backend/pyproject.toml` 的依赖后，必须刷新并提交后端锁文件：
 

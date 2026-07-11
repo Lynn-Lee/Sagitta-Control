@@ -1,5 +1,6 @@
 """系统访问控制子路由。"""
 
+from typing import Any
 import logging
 
 from fastapi import APIRouter, Depends, Query
@@ -28,8 +29,8 @@ async def list_roles(
     page_size: int = Query(50, ge=1, le=200),
     is_active: bool | None = None,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     total, items = await RoleService.list_roles(db, page, page_size, is_active)
     return {
         "total": total,
@@ -55,8 +56,8 @@ async def list_roles(
 async def create_role(
     data: RoleCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     role = await RoleService.create_role(
         db,
         name=data.name,
@@ -71,8 +72,8 @@ async def create_role(
 async def get_role(
     role_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     role = await RoleService.get_by_id(db, role_id)
     if not role:
         from fastapi import HTTPException
@@ -95,8 +96,8 @@ async def update_role(
     role_id: int,
     data: RoleUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     role = await RoleService.update_role(
         db,
         role_id,
@@ -112,7 +113,7 @@ async def update_role(
 async def delete_role(
     role_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await RoleService.delete_role(db, role_id)
     return {"status": 0, "msg": "角色已删除"}

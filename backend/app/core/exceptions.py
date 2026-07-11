@@ -2,6 +2,7 @@
 统一异常处理：所有未捕获的异常都在这里统一格式化返回。
 """
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -41,7 +42,7 @@ class EngineException(AppException):
 
 
 def _err(code: int, message: str, detail: str | None = None) -> JSONResponse:
-    body: dict = {"status": code, "msg": message}
+    body: dict[str, Any] = {"status": code, "msg": message}
     if detail:
         body["detail"] = detail
     return JSONResponse(status_code=code, content=body)
@@ -49,11 +50,11 @@ def _err(code: int, message: str, detail: str | None = None) -> JSONResponse:
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
-    async def app_exception_handler(request: Request, exc: AppException):
+    async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
         return _err(exc.code, exc.message, exc.detail)
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         errors = "; ".join(
             f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}"
             for e in exc.errors()
@@ -61,7 +62,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _err(422, "请求参数校验失败", errors)
 
     @app.exception_handler(Exception)
-    async def generic_exception_handler(request: Request, exc: Exception):
+    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         # 标准 logging 用位置参数，不用关键字参数
         logger.error("unhandled_exception: %s path=%s", str(exc), request.url.path)
         return _err(500, "服务器内部错误", str(exc))

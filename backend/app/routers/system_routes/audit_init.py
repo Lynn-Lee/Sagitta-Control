@@ -1,5 +1,6 @@
 """系统管理子路由。"""
 
+from typing import Any
 import logging
 from urllib.parse import quote
 
@@ -34,8 +35,8 @@ async def list_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("audit_user")),
-):
+    _user: dict[str, Any]=Depends(require_perm("audit_user")),
+) -> dict[str, Any]:
     total, logs = await AuditLogService.list_logs(
         db,
         username=username,
@@ -79,8 +80,8 @@ async def export_audit_logs(
     date_end: str | None = None,
     export_format: str = Query("xlsx", pattern="^(xlsx|csv|json)$"),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("audit_user")),
-):
+    _user: dict[str, Any]=Depends(require_perm("audit_user")),
+) -> StreamingResponse:
     _total, logs = await AuditLogService.list_logs(
         db,
         username=username,
@@ -119,7 +120,7 @@ async def export_audit_logs(
 
 
 @router.post("/init/", summary="初始化系统", include_in_schema=False)
-async def init_system(db: AsyncSession = Depends(get_db)):
+async def init_system(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     await RoleService.init_builtin_roles(db)
     existing = await UserService.get_by_username(db, "admin")
     if not existing:

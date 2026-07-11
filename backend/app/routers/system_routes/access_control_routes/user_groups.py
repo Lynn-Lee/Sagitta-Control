@@ -1,5 +1,6 @@
 """系统访问控制子路由。"""
 
+from typing import Any
 import logging
 from urllib.parse import quote
 
@@ -36,8 +37,8 @@ async def list_user_groups(
     resource_group_ids: list[int] | None = Query(None),
     statuses: list[bool] | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     total, items = await UserGroupService.list_groups(
         db,
         page,
@@ -82,8 +83,8 @@ async def export_user_groups(
     resource_group_ids: list[int] | None = Query(None),
     statuses: list[bool] | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> StreamingResponse:
     rows = await UserGroupService.export_groups(
         db,
         search=search,
@@ -103,8 +104,8 @@ async def export_user_groups(
 @router.get("/user-groups/import-template/", summary="下载用户组导入模板")
 async def download_user_group_import_template(
     export_format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> StreamingResponse:
     content, media_type, filename = UserGroupService.build_group_import_template(export_format)
     headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
     return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
@@ -114,8 +115,8 @@ async def download_user_group_import_template(
 async def import_user_groups(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     result = await UserGroupService.import_groups(
         db=db,
         filename=file.filename or "",
@@ -128,8 +129,8 @@ async def import_user_groups(
 async def create_user_group(
     data: UserGroupCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     group = await UserGroupService.create_group(
         db,
         name=data.name,
@@ -147,8 +148,8 @@ async def create_user_group(
 async def get_user_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     group = await UserGroupService.get_by_id(db, group_id)
     if not group:
         from fastapi import HTTPException
@@ -175,8 +176,8 @@ async def update_user_group(
     group_id: int,
     data: UserGroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     group = await UserGroupService.update_group(
         db,
         group_id,
@@ -195,8 +196,8 @@ async def update_user_group(
 async def delete_user_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await UserGroupService.delete_group(db, group_id)
     return {"status": 0, "msg": "用户组已删除"}
 
@@ -205,8 +206,8 @@ async def delete_user_group(
 async def list_group_members(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     members = await UserGroupService.get_members(db, group_id)
     return {
         "items": [
@@ -220,8 +221,8 @@ async def list_group_members(
 async def list_group_resource_groups(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     rgs = await UserGroupService.get_resource_groups(db, group_id)
     return {
         "items": [

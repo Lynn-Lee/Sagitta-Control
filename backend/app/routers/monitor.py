@@ -1,5 +1,6 @@
 """观测中心路由（Sprint 5）。"""
 
+from typing import Any
 import logging
 from datetime import datetime
 
@@ -41,61 +42,61 @@ def _parse_dt(value: str | None) -> datetime | None:
 @router.get("/dashboard/stats/", summary="Dashboard 首页统计")
 async def dashboard_stats(
     days: int = QParam(30, ge=1, le=365, description="统计周期（天），默认30天，用户可自定义"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await DashboardService.get_stats(db, days=days)
 
 
 @router.get("/dashboard/workflow-trend/", summary="工单趋势（支持自定义天数）")
 async def workflow_trend(
     days: int = QParam(7, ge=1, le=90, description="展示最近 N 天，默认7天，最多90天"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return {"items": await DashboardService.get_workflow_trend(db, days)}
 
 
 @router.get("/dashboard/instance-dist/", summary="实例类型分布")
 async def instance_dist(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return {"items": await DashboardService.get_instance_dist(db)}
 
 
 @router.get("/dashboard/query-overview/", summary="在线查询概览")
 async def query_overview(
     days: int = QParam(7, ge=1, le=365, description="展示最近 N 天，默认7天"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await DashboardService.get_query_overview(db, user=user, days=days)
 
 
 @router.get("/dashboard/workflow-overview/", summary="SQL 工单概览")
 async def workflow_overview(
     days: int = QParam(7, ge=1, le=365, description="展示最近 N 天，默认7天"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await DashboardService.get_workflow_overview(db, user=user, days=days)
 
 
 @router.get("/dashboard/archive-overview/", summary="数据归档概览")
 async def archive_overview(
     days: int = QParam(7, ge=1, le=365, description="展示最近 N 天，默认7天"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await DashboardService.get_archive_overview(db, user=user, days=days)
 
 
 @router.get("/dashboard/instance-overview/", summary="实例与库概览")
 async def instance_overview(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await DashboardService.get_instance_overview(db, user=user)
 
 
@@ -108,9 +109,9 @@ async def list_alert_events(
     instance_id: int | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(50, ge=1, le=200),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await MonitorService.list_alert_events(
         db, user, status=status, instance_id=instance_id, page=page, page_size=page_size
     )
@@ -120,28 +121,28 @@ async def list_alert_events(
 @router.get("/alerts/events/{event_id}", summary="告警事件详情")
 async def get_alert_event(
     event_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_alert_event(db, event_id, user)
 
 
 @router.post("/alerts/events/{event_id}/ack", summary="确认告警事件")
 async def ack_alert_event(
     event_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.change_alert_event(db, event_id, "ack", user)
 
 
 @router.post("/alerts/events/{event_id}/silence", summary="静默告警事件")
 async def silence_alert_event(
     event_id: int,
-    payload: dict = Body(default_factory=dict),
-    user: dict = Depends(current_user),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.change_alert_event(
         db, event_id, "silence", user, minutes=int(payload.get("minutes") or 60)
     )
@@ -150,19 +151,19 @@ async def silence_alert_event(
 @router.post("/alerts/events/{event_id}/resolve", summary="恢复告警事件")
 async def resolve_alert_event(
     event_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.change_alert_event(db, event_id, "resolve", user)
 
 
 @router.post("/alerts/events/{event_id}/close", summary="关闭告警事件")
 async def close_alert_event(
     event_id: int,
-    payload: dict = Body(default_factory=dict),
-    user: dict = Depends(current_user),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.change_alert_event(
         db, event_id, "close", user, reason=str(payload.get("reason") or "")
     )
@@ -173,18 +174,18 @@ async def close_alert_event(
 
 @router.get("/native/instances/", summary="原生数据库监控实例列表")
 async def native_instances(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     items = await MonitorService.list_native_instances(db, user)
     return {"items": items}
 
 
 @router.get("/native/overview/", summary="原生数据库监控舰队总览")
 async def native_overview(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_native_overview(db, user)
 
 
@@ -196,9 +197,9 @@ async def native_overview(
 async def upsert_native_config(
     instance_id: int,
     data: NativeMonitorConfigUpsert,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     cfg = await MonitorService.upsert_native_config(db, instance_id, data, user)
     return {"status": 0, "msg": "监控采集配置已保存", "data": {"id": cfg.id}}
 
@@ -208,9 +209,9 @@ async def upsert_native_config(
     summary="统一采集配置列表",
 )
 async def unified_collect_configs(
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.list_unified_collect_configs(db, user)
 
 
@@ -222,9 +223,9 @@ async def unified_collect_configs(
 async def upsert_unified_collect_config(
     instance_id: int,
     data: UnifiedCollectConfigUpsert,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     item = await MonitorService.upsert_unified_collect_config(db, instance_id, data, user)
     return {"status": 0, "msg": "采集配置已保存", "data": item}
 
@@ -236,9 +237,9 @@ async def upsert_unified_collect_config(
 )
 async def bulk_upsert_unified_collect_configs(
     data: UnifiedCollectConfigUpsert,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.bulk_upsert_unified_collect_configs(db, data, user)
 
 
@@ -249,9 +250,9 @@ async def bulk_upsert_unified_collect_configs(
 )
 async def collect_native_instance(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     data = await MonitorService.collect_native_now(db, instance_id, user)
     return {"status": 0, "msg": "采集完成", "data": data}
 
@@ -259,9 +260,9 @@ async def collect_native_instance(
 @router.get("/native/instances/{instance_id}/", summary="原生数据库监控详情")
 async def native_detail(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_native_detail(db, instance_id, user)
 
 
@@ -269,18 +270,18 @@ async def native_detail(
 async def native_trend(
     instance_id: int,
     hours: int = QParam(24, ge=1, le=720),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return {"items": await MonitorService.get_native_trend(db, instance_id, user, hours)}
 
 
 @router.get("/native/instances/{instance_id}/health/", summary="实例健康评分")
 async def native_health(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_native_health(db, instance_id, user)
 
 
@@ -295,9 +296,9 @@ async def native_top_sql(
     window_minutes: int = QParam(30, ge=1, le=1440),
     date_start: str | None = QParam(None, description="自定义开始时间 ISO8601"),
     date_end: str | None = QParam(None, description="自定义结束时间 ISO8601"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     start = _parse_dt(date_start)
     end = _parse_dt(date_end)
     if (start and not end) or (end and not start):
@@ -318,9 +319,9 @@ async def native_top_sql(
 @router.get("/native/instances/{instance_id}/waits/", summary="等待事件与阻塞摘要")
 async def native_waits(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_waits(db, instance_id, user)
 
 
@@ -328,27 +329,27 @@ async def native_waits(
 async def native_capacity_growth(
     instance_id: int,
     days: int = QParam(7, ge=1, le=90),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_capacity_growth(db, instance_id, user, days)
 
 
 @router.get("/native/instances/{instance_id}/engine-detail/", summary="引擎专属指标包")
 async def native_engine_detail(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_engine_detail(db, instance_id, user)
 
 
 @router.get("/native/instances/{instance_id}/alerts/", summary="实例阈值告警规则")
 async def native_alert_rules(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.get_alert_rules(db, instance_id, user)
 
 
@@ -359,19 +360,19 @@ async def native_alert_rules(
 )
 async def update_native_alert_rules(
     instance_id: int,
-    rules: dict = Body(default_factory=dict),
-    user: dict = Depends(current_user),
+    rules: dict[str, Any] = Body(default_factory=dict),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await MonitorService.update_alert_rules(db, instance_id, rules, user)
 
 
 @router.get("/native/instances/{instance_id}/databases/", summary="库/Schema 容量")
 async def native_database_capacity(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return {"items": await MonitorService.get_database_capacity(db, instance_id, user)}
 
 
@@ -382,9 +383,9 @@ async def native_table_capacity(
     search: str | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(50, ge=1, le=200),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await MonitorService.get_table_capacity(
         db, instance_id, user, db_name, search, page, page_size
     )
@@ -402,9 +403,9 @@ async def native_table_capacity(
 async def list_configs(
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, items = await MonitorService.list_configs(db, user, page, page_size)
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
@@ -416,9 +417,9 @@ async def list_configs(
 )
 async def create_config(
     data: MonitorConfigCreate,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     cfg = await MonitorService.create_config(db, data, user)
     return {"status": 0, "msg": "采集配置创建成功", "data": {"id": cfg.id}}
 
@@ -431,9 +432,9 @@ async def create_config(
 async def update_config(
     config_id: int,
     data: MonitorConfigUpdate,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     cfg = await MonitorService.update_config_with_access(db, config_id, data, user)
     return {"status": 0, "msg": "采集配置已更新", "data": {"id": cfg.id}}
 
@@ -445,9 +446,9 @@ async def update_config(
 )
 async def delete_config(
     config_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await MonitorService.delete_config(db, config_id, user)
     return {"status": 0, "msg": "采集配置已删除"}
 
@@ -458,9 +459,9 @@ async def delete_config(
 @router.post("/privileges/apply/", summary="申请监控权限")
 async def apply_privilege(
     data: MonitorPrivApplyRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     apply = await MonitorService.apply_privilege(db, data, user)
     return {"status": 0, "msg": "申请已提交", "data": {"apply_id": apply.id}}
 
@@ -470,9 +471,9 @@ async def list_applies(
     status: int | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, applies = await MonitorService.list_applies(db, user, status, page, page_size)
     return {
         "total": total,
@@ -501,9 +502,9 @@ async def list_applies(
 async def audit_privilege(
     apply_id: int,
     data: AuditMonitorPrivRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     apply = await MonitorService.audit_privilege(db, apply_id, data.action, user, data.remark)
     return {"status": 0, "msg": "审批完成", "data": {"apply_id": apply.id, "status": apply.status}}
 
@@ -514,9 +515,9 @@ async def audit_privilege(
 @router.get("/instances/{instance_id}/metrics/", summary="实例指标概览")
 async def instance_metrics(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     has_priv = await MonitorService.check_privilege(db, user, instance_id)
     if not has_priv:
         raise HTTPException(403, "没有该实例的监控查看权限")
@@ -543,7 +544,7 @@ async def instance_metrics(
 @sd_router.get(
     "/prometheus/sd-targets", summary="Prometheus HTTP SD 发现目标", include_in_schema=False
 )
-async def prometheus_sd_targets(db: AsyncSession = Depends(get_db)):
+async def prometheus_sd_targets(db: AsyncSession = Depends(get_db)) -> JSONResponse:
     """
     Prometheus HTTP SD 端点。
     在 prometheus.yml 中配置：

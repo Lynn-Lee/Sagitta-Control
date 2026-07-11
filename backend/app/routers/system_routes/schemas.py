@@ -1,5 +1,6 @@
 """系统管理路由请求模型。"""
 
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -21,7 +22,7 @@ class LdapTestRequest(BaseModel):
 
 
 class LicenseImportRequest(BaseModel):
-    license: dict | str
+    license: dict[str, Any] | str
 
 
 class LicenseActivateRequest(BaseModel):

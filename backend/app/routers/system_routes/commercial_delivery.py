@@ -1,5 +1,6 @@
 """系统管理子路由。"""
 
+from typing import Any
 import logging
 from urllib.parse import quote
 
@@ -28,8 +29,8 @@ router = APIRouter()
 @router.get("/onboarding/status", summary="实施交付向导状态")
 async def onboarding_status(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await CommercialOpsService.onboarding_status(db)
 
 
@@ -38,8 +39,8 @@ async def complete_onboarding_step(
     step: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     try:
         data = await CommercialOpsService.complete_onboarding_step(db, step)
     except ValueError as exc:
@@ -59,8 +60,8 @@ async def complete_onboarding_step(
 async def bootstrap_trial_environment(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     result = await CommercialOpsService.bootstrap_trial_environment(db, user)
     created_count = len(result.get("created") or [])
     updated_count = len(result.get("updated") or [])
@@ -80,8 +81,8 @@ async def create_acceptance_run(
     data: AcceptanceRunRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     run = await CommercialOpsService.create_acceptance_run(
         db,
         user,
@@ -102,8 +103,8 @@ async def create_acceptance_run(
 async def get_acceptance_run(
     run_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     run = (
         await db.execute(select(DeliveryAcceptanceRun).where(DeliveryAcceptanceRun.id == run_id))
     ).scalar_one_or_none()
@@ -116,8 +117,8 @@ async def get_acceptance_run(
 async def download_acceptance_markdown(
     run_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> StreamingResponse:
     run = (
         await db.execute(select(DeliveryAcceptanceRun).where(DeliveryAcceptanceRun.id == run_id))
     ).scalar_one_or_none()
@@ -134,8 +135,8 @@ async def download_acceptance_markdown(
 async def download_acceptance_json(
     run_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> StreamingResponse:
     import json
 
     run = (
@@ -154,8 +155,8 @@ async def download_acceptance_json(
 async def create_diagnostic_bundle(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     bundle = await CommercialOpsService.create_diagnostic_bundle(db, user)
     await AuditLogService.write(
         db,
@@ -177,8 +178,8 @@ async def create_diagnostic_bundle(
 async def download_diagnostic_bundle(
     bundle_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> StreamingResponse:
     import json
 
     bundle = (
@@ -194,15 +195,15 @@ async def download_diagnostic_bundle(
 
 
 @router.get("/support/engine-matrix", summary="数据库引擎支持矩阵")
-async def engine_support_matrix(_user=Depends(current_user)):
+async def engine_support_matrix(_user: dict[str, Any]=Depends(current_user)) -> dict[str, Any]:
     return CommercialOpsService.engine_matrix()
 
 
 @router.get("/support/about", summary="商业支持与关于信息")
 async def support_about(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await CommercialOpsService.support_about(db)
 
 
@@ -210,8 +211,8 @@ async def support_about(
 async def compliance_report(
     report_type: str,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("audit_user")),
-):
+    _user: dict[str, Any]=Depends(require_perm("audit_user")),
+) -> dict[str, Any]:
     try:
         return await CommercialOpsService.compliance_report(db, report_type)
     except ValueError as exc:
@@ -221,8 +222,8 @@ async def compliance_report(
 @router.get("/compliance/retention-policy", summary="审计合规保留策略")
 async def retention_policy(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("system_config_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     return await CommercialOpsService.retention_policy(db)
 
 
@@ -231,8 +232,8 @@ async def update_retention_policy(
     data: RetentionPolicyUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     result = await CommercialOpsService.update_retention_policy(db, data.values)
     await AuditLogService.write(
         db,
@@ -250,8 +251,8 @@ async def cleanup_retention_policy(
     data: RetentionCleanupRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_perm("system_config_manage")),
-):
+    user: dict[str, Any]=Depends(require_perm("system_config_manage")),
+) -> dict[str, Any]:
     try:
         result = await CommercialOpsService.cleanup_retention_category(db, data.category)
     except ValueError as exc:

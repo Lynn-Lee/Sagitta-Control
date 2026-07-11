@@ -1,5 +1,6 @@
 """系统管理子路由。"""
 
+from typing import Any
 import logging
 from urllib.parse import quote
 
@@ -38,8 +39,8 @@ async def list_users(
     titles: list[str] | None = Query(None),
     statuses: list[bool] | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     total, items = await UserService.list_users(
         db,
         page,
@@ -104,8 +105,8 @@ async def export_users(
     statuses: list[bool] | None = Query(None),
     user_ids: list[int] | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> StreamingResponse:
     rows = await UserService.export_users(
         db,
         search=search,
@@ -125,8 +126,8 @@ async def export_users(
 @router.get("/users/import-template/", summary="下载用户导入模板")
 async def download_user_import_template(
     export_format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> StreamingResponse:
     content, media_type, filename = UserService.build_user_import_template(export_format)
     headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
     return StreamingResponse(iter([content]), media_type=media_type, headers=headers)
@@ -137,8 +138,8 @@ async def import_users(
     file: UploadFile = File(...),
     default_password: str = Form(...),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     result = await UserService.import_users(
         db=db,
         filename=file.filename or "",
@@ -152,8 +153,8 @@ async def import_users(
 async def create_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await LicenseService.enforce_max_users(db)
     user = await UserService.create_user(db, data)
     return {"status": 0, "msg": "用户创建成功", "data": {"id": user.id, "username": user.username}}
@@ -163,8 +164,8 @@ async def create_user(
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
 
     user = await UserService.get_by_id(db, user_id)
     if not user:
@@ -201,8 +202,8 @@ async def update_user(
     user_id: int,
     data: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     user = await UserService.update_user(db, user_id, data)
     return {"status": 0, "msg": "用户已更新", "data": {"id": user.id}}
 
@@ -211,8 +212,8 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await UserService.delete_user(db, user_id)
     return {"status": 0, "msg": "用户已删除"}
 
@@ -222,8 +223,8 @@ async def grant_permissions(
     user_id: int,
     data: GrantPermissionRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await UserService.grant_permissions(db, user_id, data.permission_codes)
     return {"status": 0, "msg": f"已授予 {len(data.permission_codes)} 个权限"}
 
@@ -233,7 +234,7 @@ async def revoke_permissions(
     user_id: int,
     data: GrantPermissionRequest,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_perm("user_manage")),
-):
+    _user: dict[str, Any]=Depends(require_perm("user_manage")),
+) -> dict[str, Any]:
     await UserService.revoke_permissions(db, user_id, data.permission_codes)
     return {"status": 0, "msg": f"已撤销 {len(data.permission_codes)} 个权限"}

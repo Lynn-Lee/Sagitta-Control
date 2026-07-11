@@ -1,5 +1,6 @@
 """实例管理路由。"""
 
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from app.schemas.instance import (
     InstanceUpdate,
     TunnelCreate,
 )
+from app.models.instance import Instance
 from app.services.instance import InstanceService, TunnelService
 from app.services.instance_database import InstanceDatabaseService
 from app.services.license import LicenseService
@@ -20,11 +22,11 @@ router = APIRouter()
 
 async def _ensure_data_dict_access(
     db: AsyncSession,
-    user: dict,
+    user: dict[str, Any],
     instance_id: int,
     db_name: str = "",
     tb_name: str = "",
-):
+) -> Instance:
     inst = await _ensure_instance_access(db, user, instance_id)
     allowed, reason = await QueryPrivService.check_data_dict_access(
         db=db,
@@ -38,7 +40,7 @@ async def _ensure_data_dict_access(
     return inst
 
 
-def _validate_resource_group_scope(user: dict, resource_group_ids: list[int] | None) -> None:
+def _validate_resource_group_scope(user: dict[str, Any], resource_group_ids: list[int] | None) -> None:
     if not resource_group_ids:
         return
     if user.get("is_superuser") or "query_all_instances" in user.get("permissions", []):
@@ -61,8 +63,8 @@ async def list_instances(
     resource_group_id: int | None = None,
     include_inactive: bool = False,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     total, items = await InstanceService.list_instances(
         db,
         page=page,
@@ -81,7 +83,7 @@ async def list_instances(
     }
 
 
-async def _ensure_instance_access(db: AsyncSession, user: dict, instance_id: int):
+async def _ensure_instance_access(db: AsyncSession, user: dict[str, Any], instance_id: int) -> Instance:
     from fastapi import HTTPException
 
     inst = await InstanceService.get_by_id(db, instance_id)
@@ -99,8 +101,8 @@ async def _ensure_instance_access(db: AsyncSession, user: dict, instance_id: int
 async def create_instance(
     data: InstanceCreate,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await LicenseService.enforce_max_instances(db)
     _validate_resource_group_scope(user, data.resource_group_ids)
     inst = await InstanceService.create(db, data)
@@ -111,8 +113,8 @@ async def create_instance(
 async def get_instance(
     instance_id: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     inst = await _ensure_instance_access(db, user, instance_id)
     return InstanceService.to_response(inst)
 
@@ -124,8 +126,8 @@ async def update_instance(
     instance_id: int,
     data: InstanceUpdate,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     _validate_resource_group_scope(user, data.resource_group_ids)
     inst = await InstanceService.update(db, instance_id, data)
@@ -140,8 +142,8 @@ async def update_instance(
 async def delete_instance(
     instance_id: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     await InstanceService.delete(db, instance_id)
     return {"status": 0, "msg": "实例已删除"}
@@ -151,8 +153,8 @@ async def delete_instance(
 async def test_connection(
     instance_id: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     result = await InstanceService.test_connection(db, instance_id)
     return result
@@ -161,9 +163,9 @@ async def test_connection(
 @router.get("/{instance_id}/databases/", summary="获取数据库列表")
 async def get_databases(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await _ensure_data_dict_access(db, user, instance_id)
     registered = await InstanceDatabaseService.list_databases(
         db, instance_id, include_inactive=True
@@ -188,8 +190,8 @@ async def get_tables(
     instance_id: int,
     db_name: str = Query(..., description="数据库名"),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     inst = await _ensure_data_dict_access(db, user, instance_id, db_name=db_name)
     tables = await InstanceService.get_tables(db, instance_id, db_name)
     tables = await QueryPrivService.list_data_dict_tables(
@@ -208,8 +210,8 @@ async def get_columns(
     db_name: str = Query(...),
     tb_name: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     columns = await InstanceService.get_columns(db, instance_id, db_name, tb_name)
     return {"columns": columns}
@@ -221,8 +223,8 @@ async def get_table_ddl(
     db_name: str = Query(...),
     tb_name: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     ddl = await InstanceService.get_table_ddl(db, instance_id, db_name, tb_name)
     return ddl
@@ -234,8 +236,8 @@ async def get_constraints(
     db_name: str = Query(...),
     tb_name: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     constraints = await InstanceService.get_constraints(db, instance_id, db_name, tb_name)
     return {"constraints": constraints}
@@ -247,8 +249,8 @@ async def get_indexes(
     db_name: str = Query(...),
     tb_name: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_data_dict_access(db, user, instance_id, db_name=db_name, tb_name=tb_name)
     indexes = await InstanceService.get_indexes(db, instance_id, db_name, tb_name)
     return {"indexes": indexes}
@@ -258,8 +260,8 @@ async def get_indexes(
 async def get_params(
     instance_id: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(current_user),
-):
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     params = await InstanceService.get_variables(db, instance_id)
     return {"params": params}
@@ -274,9 +276,9 @@ async def get_params(
 async def list_registered_databases(
     instance_id: int,
     include_inactive: bool = False,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     show_inactive = user.get("is_superuser", False) or include_inactive
     items = await InstanceDatabaseService.list_databases(db, instance_id, show_inactive)
@@ -290,10 +292,10 @@ async def list_registered_databases(
 )
 async def add_database(
     instance_id: int,
-    data: dict,
-    user: dict = Depends(current_user),
+    data: dict[str, Any],
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     db_name = data.get("db_name", "").strip()
     remark = data.get("remark", "")
@@ -311,10 +313,10 @@ async def add_database(
 async def update_database(
     instance_id: int,
     idb_id: int,
-    data: dict,
-    user: dict = Depends(current_user),
+    data: dict[str, Any],
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     idb = await InstanceDatabaseService.update_database(
         db,
@@ -333,9 +335,9 @@ async def update_database(
 async def delete_database(
     instance_id: int,
     idb_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     await InstanceDatabaseService.delete_database(db, idb_id)
     return {"status": 0, "msg": "已删除"}
@@ -344,9 +346,9 @@ async def delete_database(
 @router.post("/{instance_id}/db-list/sync/", summary="从引擎自动同步数据库列表")
 async def sync_databases(
     instance_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
     result = await InstanceDatabaseService.sync_from_engine(db, instance_id)
     return result
@@ -355,8 +357,8 @@ async def sync_databases(
 @router.get("/tunnels/", summary="SSH 隧道列表")
 async def list_tunnels(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     tunnels = await TunnelService.list_tunnels(db)
     return {
         "tunnels": [
@@ -378,8 +380,8 @@ async def list_tunnels(
 async def create_tunnel(
     data: TunnelCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     tunnel = await TunnelService.create(db, data)
     return {
         "status": 0,
@@ -396,7 +398,7 @@ async def create_tunnel(
 async def delete_tunnel(
     tunnel_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(current_user),
-):
+    _user: dict[str, Any]=Depends(current_user),
+) -> dict[str, Any]:
     await TunnelService.delete(db, tunnel_id)
     return {"status": 0, "msg": "SSH 隧道已删除"}

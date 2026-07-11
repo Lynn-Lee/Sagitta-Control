@@ -3,6 +3,7 @@
 完整实现：执行查询、权限校验、数据脱敏、查询日志。
 """
 
+from typing import Any
 import csv
 import logging
 from datetime import datetime
@@ -47,12 +48,12 @@ async def _load_instance(db: AsyncSession, instance_id: int) -> Instance:
 
 async def _run_query_with_permissions(
     db: AsyncSession,
-    user: dict,
+    user: dict[str, Any],
     data: QueryExecuteRequest,
     operation_type: str = "execute",
     export_format: str = "",
     client_ip: str = "",
-) -> tuple[Instance, dict]:
+) -> tuple[Instance, dict[str, Any]]:
     inst = await _load_instance(db, data.instance_id)
     engine = get_engine(inst)
 
@@ -97,7 +98,7 @@ async def _run_query_with_permissions(
         effective_limit,
         guard_result.statement_kind,
     )
-    query_kwargs: dict[str, str] = {}
+    query_kwargs: dict[str, Any] = {}
     pg_search_path = await QueryPrivService.resolve_pg_search_path(
         inst,
         data.db_name,
@@ -187,7 +188,7 @@ def _client_ip(request: Request) -> str:
 
 async def _write_failed_query_log(
     db: AsyncSession,
-    user: dict,
+    user: dict[str, Any],
     data: QueryExecuteRequest,
     operation_type: str,
     export_format: str,
@@ -224,7 +225,7 @@ async def _write_failed_query_log(
 
 
 def _build_query_export_file(
-    result: dict,
+    result: dict[str, Any],
     export_format: str,
     metadata: dict[str, str] | None = None,
 ) -> tuple[bytes, str, str]:
@@ -275,9 +276,9 @@ def _build_query_export_file(
 async def execute_query(
     data: QueryExecuteRequest,
     request: Request,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     执行在线查询，完整流程：
     1. 加载实例
@@ -314,9 +315,9 @@ async def export_query_result(
     data: QueryExecuteRequest,
     request: Request,
     export_format: str = QParam("xlsx", pattern="^(xlsx|csv)$"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> StreamingResponse:
     client_ip = _client_ip(request)
     try:
         _, result = await _run_query_with_permissions(
@@ -355,9 +356,9 @@ async def export_query_result(
 @router.post("/access-check/", summary="查询权限排查")
 async def explain_query_access(
     data: QueryExecuteRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     inst = await _load_instance(db, data.instance_id)
     guard = get_query_guard(inst.db_type)
     guard_result = guard.validate(data.sql, data.db_name)
@@ -396,9 +397,9 @@ async def list_query_logs(
     date_end: str | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, logs = await QueryPrivService.list_logs(
         db,
         user=user,
@@ -455,9 +456,9 @@ async def export_query_history(
     date_start: str | None = None,
     date_end: str | None = None,
     export_format: str = QParam("xlsx", pattern="^(xlsx|csv|json)$"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> StreamingResponse:
     _total, logs = await QueryPrivService.list_logs(
         db,
         user=user,
@@ -502,8 +503,8 @@ async def export_query_history(
 @router.post("/logs/{log_id}/favorite/", summary="收藏/取消收藏查询")
 async def toggle_favorite(
     log_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     is_favorite = await QueryPrivService.toggle_favorite(db, log_id, user["id"])
     return {"status": 0, "is_favorite": is_favorite}

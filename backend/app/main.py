@@ -1,10 +1,13 @@
 """
 Sagitta Control — FastAPI 应用入口
 """
+from typing import Any
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from collections.abc import AsyncIterator, Awaitable, Callable
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -37,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     verify_startup_integrity()
     logger.info("Sagitta Control starting env=%s version=3.0.0", settings.APP_ENV)
@@ -67,7 +70,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def csrf_protection_middleware(request, call_next):
+async def csrf_protection_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     csrf_error = validate_csrf_request(request)
     if csrf_error is not None:
         return csrf_error
@@ -75,7 +78,7 @@ async def csrf_protection_middleware(request, call_next):
 
 
 @app.middleware("http")
-async def license_enforcement_middleware(request, call_next):
+async def license_enforcement_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     try:
         async with AsyncSessionLocal() as db:
             check = await LicenseService.check_access(db, request.url.path, request.method)
@@ -133,10 +136,10 @@ app.include_router(sd_router, prefix="/internal", tags=["内部接口"])
 
 
 @app.get("/health", tags=["健康检查"])
-async def health_check():
+async def health_check() -> dict[str, Any]:
     return {"status": "ok", "version": "3.0.0"}
 
 
 @app.get("/", tags=["健康检查"])
-async def root():
+async def root() -> dict[str, Any]:
     return {"message": "Sagitta Control 矢准数据库安全管控平台", "docs": "/docs"}

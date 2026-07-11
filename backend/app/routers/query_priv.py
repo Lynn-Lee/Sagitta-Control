@@ -1,6 +1,9 @@
 """
 查询权限管理路由（Sprint 2）。
 """
+from typing import Any
+
+from app.models.query import QueryPrivilegeApply
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -21,12 +24,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _load_name_maps(db: AsyncSession, applies: list) -> tuple[dict[int, str], dict[int, dict]]:
+async def _load_name_maps(db: AsyncSession, applies: list[Any]) -> tuple[dict[int, str], dict[int, dict[str, Any]]]:
     instance_ids = sorted({a.instance_id for a in applies if a.instance_id})
     user_ids = sorted({a.user_id for a in applies if a.user_id})
 
     instance_name_map: dict[int, str] = {}
-    user_map: dict[int, dict] = {}
+    user_map: dict[int, dict[str, Any]] = {}
 
     if instance_ids:
         result = await db.execute(
@@ -49,7 +52,7 @@ async def _load_name_maps(db: AsyncSession, applies: list) -> tuple[dict[int, st
     return instance_name_map, user_map
 
 
-def _build_approval_progress(apply, user_map: dict[int, dict]) -> str | None:
+def _build_approval_progress(apply: QueryPrivilegeApply, user_map: dict[int, dict[str, Any]]) -> str | None:
     applicant = user_map.get(apply.user_id or 0, {})
     applicant_name = applicant.get("display_name") or applicant.get("username")
     if not apply.audit_auth_groups_info:
@@ -68,7 +71,7 @@ def _build_approval_progress(apply, user_map: dict[int, dict]) -> str | None:
     return " -> ".join(parts) if parts else None
 
 
-def _extract_latest_action(apply, username: str) -> tuple[str | None, str | None, str | None]:
+def _extract_latest_action(apply: QueryPrivilegeApply, username: str) -> tuple[str | None, str | None, str | None]:
     if not apply.audit_auth_groups_info:
         return None, None, None
     nodes = QueryPrivService._safe_load_nodes(apply.audit_auth_groups_info)
@@ -81,14 +84,14 @@ def _extract_latest_action(apply, username: str) -> tuple[str | None, str | None
 
 
 def _serialize_apply_items(
-    applies: list,
+    applies: list[Any],
     *,
     can_audit_ids: set[int],
     instance_name_map: dict[int, str],
-    user_map: dict[int, dict],
-    operator: dict,
-) -> list[dict]:
-    items: list[dict] = []
+    user_map: dict[int, dict[str, Any]],
+    operator: dict[str, Any],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
     operator_username = operator.get("username", "")
     for apply in applies:
         applicant = user_map.get(apply.user_id or 0, {})
@@ -131,9 +134,9 @@ def _serialize_apply_items(
 @router.get("/privileges/", summary="我的查询权限列表")
 async def list_my_privileges(
     instance_id: int | None = None,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     privs = await QueryPrivService.list_my_privileges(
         db, user_id=user["id"], instance_id=instance_id
     )
@@ -159,9 +162,9 @@ async def list_my_privileges(
 @router.post("/privileges/apply/", summary="申请查询权限")
 async def apply_privilege(
     data: PrivApplyRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     apply = await QueryPrivService.apply_privilege(
         db=db,
         user_id=user["id"],
@@ -186,9 +189,9 @@ async def apply_privilege(
 @router.post("/privileges/risk-plan/", summary="查询权限申请风险预案")
 async def query_privilege_risk_plan(
     data: PrivApplyRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     result = await db.execute(select(Instance).where(Instance.id == data.instance_id))
     inst = result.scalar_one_or_none()
     db_type = inst.db_type if inst else ""
@@ -208,9 +211,9 @@ async def list_applies(
     status: int | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, applies = await QueryPrivService.list_applies(
         db, user_id=user["id"], auditor=None, status=status, page=page, page_size=page_size
     )
@@ -235,9 +238,9 @@ async def list_audit_records(
     status: int | None = None,
     page: int = QParam(1, ge=1),
     page_size: int = QParam(20, ge=1, le=100),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     total, applies, can_audit_ids = await QueryPrivService.list_audit_records(
         db=db,
         auditor=user,
@@ -267,9 +270,9 @@ async def list_audit_records(
 async def audit_apply(
     apply_id: int,
     data: AuditPrivRequest,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     apply = await QueryPrivService.audit_apply(
         db=db,
         apply_id=apply_id,
@@ -292,9 +295,9 @@ async def audit_apply(
 @router.post("/privileges/applies/{apply_id}/cancel/", summary="取消查询权限申请")
 async def cancel_apply(
     apply_id: int,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     apply = await QueryPrivService.cancel_apply(db=db, apply_id=apply_id, user=user)
     return {"status": 0, "msg": "申请已取消", "data": {"apply_id": apply.id, "status": apply.status}}
 
@@ -307,9 +310,9 @@ async def list_manage_privileges(
     user_id: int | None = None,
     db_name: str | None = None,
     status: str = QParam("active", pattern="^(active|revoked)$"),
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     scope, total, items = await QueryPrivService.list_manage_privileges(
         db=db,
         user=user,
@@ -337,9 +340,9 @@ async def revoke_privilege(
     priv_id: int,
     request: Request,
     data: RevokePrivilegeRequest | None = None,
-    user: dict = Depends(current_user),
+    user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     priv = await QueryPrivService.revoke_privilege(
         db,
         priv_id=priv_id,
