@@ -30,7 +30,7 @@ class MonitorCollectService:
     """采集引擎域：到期实例批量采集、单实例指标采集、原始载荷归一与快照保留清理。"""
 
     @staticmethod
-    async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
+    async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict[str, Any]:
         now = datetime.now(UTC)
         cfg_rows = (
             await db.execute(

@@ -43,7 +43,7 @@ class MonitorCapacityService:
     # --- 读查询（鉴权由 MonitorService 门面完成后调用）---
 
     @staticmethod
-    async def database_capacity(db: AsyncSession, instance_id: int) -> list[dict]:
+    async def database_capacity(db: AsyncSession, instance_id: int) -> list[dict[str, Any]]:
         latest_at = (
             await db.execute(
                 select(func.max(MonitorDatabaseCapacitySnapshot.collected_at)).where(
@@ -90,7 +90,7 @@ class MonitorCapacityService:
         search: str | None = None,
         page: int = 1,
         page_size: int = 50,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         latest_at = (
             await db.execute(
                 select(func.max(MonitorTableCapacitySnapshot.collected_at)).where(
@@ -137,7 +137,7 @@ class MonitorCapacityService:
         ]
 
     @staticmethod
-    async def capacity_growth(db: AsyncSession, instance_id: int, days: int = 7) -> dict:
+    async def capacity_growth(db: AsyncSession, instance_id: int, days: int = 7) -> dict[str, Any]:
         since = datetime.now(UTC) - timedelta(days=days)
         db_rows = (
             (
@@ -161,7 +161,7 @@ class MonitorCapacityService:
         for row in db_rows:
             first_by_db.setdefault(row.db_name, row)
             last_by_db[row.db_name] = row
-        db_growth = [
+        db_growth: list[dict[str, Any]] = [
             {
                 "db_name": name,
                 "first_size_bytes": first_by_db[name].total_size_bytes,
@@ -183,7 +183,7 @@ class MonitorCapacityService:
         }
 
     @staticmethod
-    def has_capacity_risk(snapshot: dict) -> bool:
+    def has_capacity_risk(snapshot: dict[str, Any]) -> bool:
         extra = snapshot.get("extra_metrics") or {}
         tablespaces = extra.get("tablespaces") or []
         if any(

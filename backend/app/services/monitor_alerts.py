@@ -19,7 +19,7 @@ class MonitorAlertService:
     """负责阈值告警规则评估、事件查询与处置闭环。"""
 
     @staticmethod
-    def _can_access_instance(user: dict, instance: Instance) -> bool:
+    def _can_access_instance(user: dict[str, Any], instance: Instance) -> bool:
         """观测域实例访问判定的统一入口：超管或持全局观测权限放行，否则要求用户与实例资源组有交集。"""
         if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return True
@@ -65,8 +65,8 @@ class MonitorAlertService:
                 for item in (extra.get("tablespaces") or [])
                 if isinstance(item, dict)
             ]
-            values = [value for value in values if value is not None]
-            return max(values) if values else None
+            present = [value for value in values if value is not None]
+            return max(present) if present else None
         if rule_key == "fra_used_pct":
             return MonitorAlertService._coerce_float((extra.get("fra") or {}).get("used_pct"))
         return None
@@ -227,7 +227,7 @@ class MonitorAlertService:
     @staticmethod
     async def list_alert_events(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         status: str | None = None,
         instance_id: int | None = None,
         page: int = 1,
@@ -264,7 +264,7 @@ class MonitorAlertService:
         )
 
     @staticmethod
-    async def get_alert_event(db: AsyncSession, event_id: int, user: dict) -> dict[str, Any]:
+    async def get_alert_event(db: AsyncSession, event_id: int, user: dict[str, Any]) -> dict[str, Any]:
         row = (
             await db.execute(
                 select(MonitorAlertEvent, Instance)
@@ -284,7 +284,7 @@ class MonitorAlertService:
         db: AsyncSession,
         event_id: int,
         action: str,
-        user: dict,
+        user: dict[str, Any],
         *,
         minutes: int = 60,
         reason: str = "",

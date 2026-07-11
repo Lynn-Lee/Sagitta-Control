@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,10 +34,10 @@ class MonitorConfigService:
     @staticmethod
     async def list_configs(
         db: AsyncSession,
-        user: dict,
+        user: dict[str, Any],
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         query = select(MonitorCollectConfig, Instance.instance_name).join(
             Instance, MonitorCollectConfig.instance_id == Instance.id
         )
@@ -83,7 +83,7 @@ class MonitorConfigService:
 
     @staticmethod
     async def create_config(
-        db: AsyncSession, data: MonitorConfigCreate, operator: dict
+        db: AsyncSession, data: MonitorConfigCreate, operator: dict[str, Any]
     ) -> MonitorCollectConfig:
         inst = await db.execute(
             select(Instance)
@@ -120,7 +120,7 @@ class MonitorConfigService:
         db: AsyncSession,
         config_id: int,
         data: MonitorConfigUpdate,
-        user: dict,
+        user: dict[str, Any],
     ) -> MonitorCollectConfig:
         result = await db.execute(
             select(MonitorCollectConfig, Instance)
@@ -138,10 +138,10 @@ class MonitorConfigService:
             setattr(cfg, field, value)
         await db.commit()
         await db.refresh(cfg)
-        return cfg
+        return cast(MonitorCollectConfig, cfg)
 
     @staticmethod
-    async def delete_config(db: AsyncSession, config_id: int, user: dict) -> None:
+    async def delete_config(db: AsyncSession, config_id: int, user: dict[str, Any]) -> None:
         result = await db.execute(
             select(MonitorCollectConfig, Instance)
             .join(Instance, MonitorCollectConfig.instance_id == Instance.id)
@@ -158,7 +158,7 @@ class MonitorConfigService:
         await db.commit()
 
     @staticmethod
-    async def get_sd_targets(db: AsyncSession) -> list[dict]:
+    async def get_sd_targets(db: AsyncSession) -> list[dict[str, Any]]:
         """Prometheus HTTP SD 格式 targets。"""
         result = await db.execute(
             select(MonitorCollectConfig, Instance)
@@ -192,7 +192,7 @@ class MonitorConfigService:
     # --- 监控权限申请 / 审批 / 判定 ---
 
     @staticmethod
-    async def apply_privilege(db: AsyncSession, data, user: dict) -> MonitorPrivilegeApply:
+    async def apply_privilege(db: AsyncSession, data: Any, user: dict[str, Any]) -> MonitorPrivilegeApply:
         apply = MonitorPrivilegeApply(
             title=data.title,
             user_id=user["id"],
@@ -230,7 +230,7 @@ class MonitorConfigService:
 
     @staticmethod
     async def audit_privilege(
-        db: AsyncSession, apply_id: int, action: str, operator: dict, remark: str = ""
+        db: AsyncSession, apply_id: int, action: str, operator: dict[str, Any], remark: str = ""
     ) -> MonitorPrivilegeApply:
         result = await db.execute(
             select(MonitorPrivilegeApply).where(MonitorPrivilegeApply.id == apply_id)
@@ -279,7 +279,7 @@ class MonitorConfigService:
         return apply
 
     @staticmethod
-    async def check_privilege(db: AsyncSession, user: dict, instance_id: int) -> bool:
+    async def check_privilege(db: AsyncSession, user: dict[str, Any], instance_id: int) -> bool:
         if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return True
         instance_result = await db.execute(
@@ -307,8 +307,8 @@ class MonitorConfigService:
 
     @staticmethod
     async def list_applies(
-        db: AsyncSession, user: dict, status: int | None = None, page: int = 1, page_size: int = 20
-    ) -> tuple[int, list]:
+        db: AsyncSession, user: dict[str, Any], status: int | None = None, page: int = 1, page_size: int = 20
+    ) -> tuple[int, list[MonitorPrivilegeApply]]:
         query = select(MonitorPrivilegeApply)
         if not user.get("is_superuser") and "observability_collect_manage" not in user.get("permissions", []):
             query = query.where(MonitorPrivilegeApply.user_id == user["id"])
@@ -330,7 +330,7 @@ class MonitorConfigService:
         db: AsyncSession,
         instance_id: int,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> MonitorCollectConfig:
         inst_result = await db.execute(
             select(Instance)
@@ -362,7 +362,7 @@ class MonitorConfigService:
         return cfg
 
     @staticmethod
-    async def _accessible_instances(db: AsyncSession, user: dict) -> list[Instance]:
+    async def _accessible_instances(db: AsyncSession, user: dict[str, Any]) -> list[Instance]:
         stmt = (
             select(Instance)
             .options(selectinload(Instance.resource_groups))
@@ -400,7 +400,7 @@ class MonitorConfigService:
     async def _unified_collect_config_item(
         db: AsyncSession,
         instance: Instance,
-        user: dict,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
         from app.models.session import SessionCollectConfig
         from app.models.slowlog import SlowQueryConfig
@@ -466,7 +466,7 @@ class MonitorConfigService:
         }
 
     @staticmethod
-    async def list_unified_collect_configs(db: AsyncSession, user: dict) -> dict[str, Any]:
+    async def list_unified_collect_configs(db: AsyncSession, user: dict[str, Any]) -> dict[str, Any]:
         instances = await MonitorConfigService._accessible_instances(db, user)
         items = [
             await MonitorConfigService._unified_collect_config_item(db, instance, user)
@@ -479,7 +479,7 @@ class MonitorConfigService:
         db: AsyncSession,
         instance_id: int,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
         from app.schemas.diagnostic import SessionCollectConfigUpsert
         from app.schemas.slowlog import SlowQueryConfigUpsert
@@ -514,7 +514,7 @@ class MonitorConfigService:
     async def bulk_upsert_unified_collect_configs(
         db: AsyncSession,
         data: Any,
-        user: dict,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
         instances = await MonitorConfigService._accessible_instances(db, user)
         success = 0
