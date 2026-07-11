@@ -20,6 +20,7 @@ class MonitorAlertService:
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
+        """观测域实例访问判定的统一入口：超管或持全局观测权限放行，否则要求用户与实例资源组有交集。"""
         if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
             return True
         user_rg_ids = set(user.get("resource_groups", []))

@@ -73,11 +73,8 @@ class MonitorService:
 
     @staticmethod
     def _can_access_instance(user: dict, instance: Instance) -> bool:
-        if user.get("is_superuser") or "observability_instance_all" in user.get("permissions", []):
-            return True
-        user_rg_ids = set(user.get("resource_groups", []))
-        instance_rg_ids = {rg.id for rg in instance.resource_groups}
-        return bool(user_rg_ids & instance_rg_ids)
+        # 观测域实例访问判定统一收敛到 MonitorAlertService，避免两处重复实现漂移
+        return MonitorAlertService._can_access_instance(user, instance)
 
     @staticmethod
     async def list_configs(
