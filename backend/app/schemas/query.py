@@ -30,7 +30,7 @@ class QueryResultResponse(BaseModel):
     cost_time_ms: int
     is_masked: bool = False
     error: str = ""
-    risk_plan: dict | None = None
+    risk_plan: dict[str, Any] | None = None
 
 
 class QueryLogItem(BaseModel):

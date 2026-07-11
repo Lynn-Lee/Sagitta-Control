@@ -2,6 +2,7 @@
 观测中心 Pydantic Schema（Sprint 5）。
 """
 from datetime import date
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -13,7 +14,7 @@ class MonitorConfigCreate(BaseModel):
     collect_interval: int = Field(default=60, ge=10, le=3600)
     capacity_collect_interval: int = Field(default=3600, ge=300, le=86400)
     retention_days: int = Field(default=30, ge=1, le=365)
-    alert_rules_override: dict = {}
+    alert_rules_override: dict[str, Any] = {}
 
     @field_validator("exporter_url")
     @classmethod
@@ -32,7 +33,7 @@ class MonitorConfigUpdate(BaseModel):
     capacity_collect_interval: int | None = None
     retention_days: int | None = None
     is_enabled: bool | None = None
-    alert_rules_override: dict | None = None
+    alert_rules_override: dict[str, Any] | None = None
 
 
 class MonitorConfigResponse(BaseModel):
@@ -43,7 +44,7 @@ class MonitorConfigResponse(BaseModel):
     collect_interval: int
     exporter_url: str
     exporter_type: str
-    alert_rules_override: dict
+    alert_rules_override: dict[str, Any]
     created_by: str
     capacity_collect_interval: int = 3600
     retention_days: int = 30
@@ -136,7 +137,7 @@ class MonitorSnapshotResponse(BaseModel):
     collected_at: str | None = None
     status: str = "not_configured"
     error: str = ""
-    missing_groups: dict = {}
+    missing_groups: dict[str, Any] = {}
     is_up: bool = False
     version: str = ""
     uptime_seconds: int | None = None
@@ -152,8 +153,8 @@ class MonitorSnapshotResponse(BaseModel):
     long_transactions: int | None = None
     replication_lag_seconds: int | None = None
     total_size_bytes: int | None = None
-    extra_metrics: dict = {}
-    metric_groups: dict = {}
+    extra_metrics: dict[str, Any] = {}
+    metric_groups: dict[str, Any] = {}
     health_score: int = 0
     risk_level: str = "attention"
     risk_label: str = "关注"
@@ -210,4 +211,4 @@ class MonitorTableCapacityItem(BaseModel):
     index_size_bytes: int
     total_size_bytes: int
     row_count: int
-    extra: dict = {}
+    extra: dict[str, Any] = {}

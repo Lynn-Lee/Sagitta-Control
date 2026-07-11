@@ -5,10 +5,15 @@
 用户组（UserGroup）：组织架构单元，关联资源组获得实例访问权。
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, BaseModel
+
+if TYPE_CHECKING:
+    from app.models.user import Permission, ResourceGroup, Users
 
 # ─── 关联表 ──────────────────────────────────────────────────
 

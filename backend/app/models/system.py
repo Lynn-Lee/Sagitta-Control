@@ -2,6 +2,7 @@
 系统配置 & 操作审计日志模型。
 """
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -118,14 +119,14 @@ class LicenseRecord(BaseModel):
     status: Mapped[str] = mapped_column(String(20), default="trial", comment="trial/licensed/invalid/expired")
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否当前授权")
     raw_license: Mapped[str] = mapped_column(Text, default="", comment="原始 license JSON")
-    payload: Mapped[dict] = mapped_column(JSON, default=dict, comment="License payload")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="License payload")
     signature: Mapped[str] = mapped_column(Text, default="", comment="License 签名")
     license_id: Mapped[str] = mapped_column(String(100), default="", comment="License ID")
     customer_id: Mapped[str] = mapped_column(String(100), default="", comment="客户 ID")
     company_name: Mapped[str] = mapped_column(String(200), default="", comment="客户名称")
     edition: Mapped[str] = mapped_column(String(50), default="trial", comment="版本")
-    features: Mapped[list] = mapped_column(JSON, default=list, comment="授权功能")
-    limits: Mapped[dict] = mapped_column(JSON, default=dict, comment="授权额度")
+    features: Mapped[list[Any]] = mapped_column(JSON, default=list, comment="授权功能")
+    limits: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="授权额度")
     activation_code: Mapped[str] = mapped_column(String(100), default="", comment="激活码")
     activation_id: Mapped[str] = mapped_column(String(100), default="", comment="在线激活 ID")
     server_url: Mapped[str] = mapped_column(String(500), default="", comment="授权服务器地址")
@@ -163,8 +164,8 @@ class DeliveryAcceptanceRun(BaseModel):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     status: Mapped[str] = mapped_column(String(20), default="success", comment="success/failed")
-    options: Mapped[dict] = mapped_column(JSON, default=dict, comment="验收选项")
-    report_json: Mapped[dict] = mapped_column(JSON, default=dict, comment="结构化验收报告")
+    options: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="验收选项")
+    report_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="结构化验收报告")
     report_markdown: Mapped[str] = mapped_column(Text, default="", comment="Markdown 验收报告")
     created_by: Mapped[str] = mapped_column(String(100), default="", comment="创建人")
     completed_at: Mapped[datetime | None] = mapped_column(
@@ -184,7 +185,7 @@ class DiagnosticBundle(BaseModel):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     status: Mapped[str] = mapped_column(String(20), default="success", comment="success/failed")
-    bundle_json: Mapped[dict] = mapped_column(JSON, default=dict, comment="脱敏后的诊断内容")
+    bundle_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="脱敏后的诊断内容")
     created_by: Mapped[str] = mapped_column(String(100), default="", comment="创建人")
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="完成时间"

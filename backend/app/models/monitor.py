@@ -2,6 +2,7 @@
 观测中心模型（3 张新增表）。
 """
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -50,7 +51,7 @@ class MonitorCollectConfig(BaseModel):
         String(50), default="", comment="Exporter 类型(历史字段，可选)"
     )
     # 实例级告警阈值覆盖（JSON），不填则使用全局默认规则
-    alert_rules_override: Mapped[dict] = mapped_column(
+    alert_rules_override: Mapped[dict[str, Any]] = mapped_column(
         JSON, default=dict, comment="告警阈值覆盖(JSON)"
     )
     created_by: Mapped[str] = mapped_column(String(30), default="", comment="创建人")
@@ -154,7 +155,7 @@ class MonitorMetricSnapshot(BaseModel):
     collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="success", comment="success/partial/failed")
     error: Mapped[str] = mapped_column(Text, default="", comment="采集错误")
-    missing_groups: Mapped[dict] = mapped_column(JSON, default=dict, comment="缺失指标组原因")
+    missing_groups: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, comment="缺失指标组原因")
 
     is_up: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[str] = mapped_column(String(100), default="")
@@ -171,7 +172,7 @@ class MonitorMetricSnapshot(BaseModel):
     long_transactions: Mapped[int | None] = mapped_column(Integer)
     replication_lag_seconds: Mapped[int | None] = mapped_column(Integer)
     total_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
-    extra_metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    extra_metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     __table_args__ = (
         Index("ix_mms_instance_time", "instance_id", "collected_at"),
@@ -221,7 +222,7 @@ class MonitorTableCapacitySnapshot(BaseModel):
     index_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     total_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     row_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+    extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     __table_args__ = (
         Index("ix_mtcs_instance_time", "instance_id", "collected_at"),
@@ -263,7 +264,7 @@ class MonitorAlertEvent(BaseModel):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_by: Mapped[str] = mapped_column(String(100), default="")
     close_reason: Mapped[str] = mapped_column(String(500), default="")
-    extra: Mapped[dict] = mapped_column(JSON, default=dict)
+    extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     __table_args__ = (
         Index("ix_alert_event_instance_status", "instance_id", "status"),

@@ -6,11 +6,15 @@ Phase 4 已完成：移除 user_permission 和 user_resource_group 旧关联表�
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, BaseModel
+
+if TYPE_CHECKING:
+    from app.models.role import Role, UserGroup
 
 # ─── 关联表（多对多）─────────────────────────────────────────
 instance_resource_group = Table(

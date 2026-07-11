@@ -2,6 +2,7 @@
 SQL 工单 Pydantic Schema（Sprint 3）。
 """
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -121,9 +122,9 @@ class WorkflowDetailResponse(BaseModel):
     sql_content: str = ""
     review_content: str = ""
     execute_result: str = ""
-    risk_plan: dict | None = None
+    risk_plan: dict[str, Any] | None = None
     risk_remark: str = ""
-    audit_logs: list[dict] = []
+    audit_logs: list[dict[str, Any]] = []
 
 
 class WorkflowListResponse(BaseModel):
