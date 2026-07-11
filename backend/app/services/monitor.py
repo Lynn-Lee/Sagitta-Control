@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
-from app.models.instance import Instance, InstanceDatabase
+from app.models.instance import Instance
 from app.models.monitor import (
     MonitorAlertEvent,
     MonitorCollectConfig,
@@ -30,6 +30,7 @@ from app.schemas.monitor import (
 )
 from app.services.dashboard import DashboardService
 from app.services.monitor_alerts import MonitorAlertService
+from app.services.monitor_capacity import MonitorCapacityService
 
 logger = logging.getLogger(__name__)
 
@@ -47,18 +48,6 @@ class MonitorService:
         "clickhouse",
         "elasticsearch",
         "opensearch",
-    }
-    SYSTEM_DATABASES = {
-        "information_schema",
-        "performance_schema",
-        "mysql",
-        "sys",
-        "pg_catalog",
-        "template0",
-        "template1",
-        "admin",
-        "local",
-        "config",
     }
     RISK_LABELS = {
         "healthy": "健康",
@@ -1052,43 +1041,7 @@ class MonitorService:
     async def get_database_capacity(db: AsyncSession, instance_id: int, user: dict) -> list[dict]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
-        latest_at = (
-            await db.execute(
-                select(func.max(MonitorDatabaseCapacitySnapshot.collected_at)).where(
-                    MonitorDatabaseCapacitySnapshot.instance_id == instance_id
-                )
-            )
-        ).scalar_one_or_none()
-        if not latest_at:
-            return []
-        rows = (
-            (
-                await db.execute(
-                    select(MonitorDatabaseCapacitySnapshot)
-                    .where(
-                        MonitorDatabaseCapacitySnapshot.instance_id == instance_id,
-                        MonitorDatabaseCapacitySnapshot.collected_at == latest_at,
-                    )
-                    .order_by(MonitorDatabaseCapacitySnapshot.total_size_bytes.desc())
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return [
-            {
-                "db_name": row.db_name,
-                "collected_at": row.collected_at.isoformat(),
-                "table_count": row.table_count,
-                "data_size_bytes": row.data_size_bytes,
-                "index_size_bytes": row.index_size_bytes,
-                "total_size_bytes": row.total_size_bytes,
-                "row_count": row.row_count,
-                "status": row.status,
-                "error": row.error,
-            }
-            for row in rows
-        ]
+        return await MonitorCapacityService.database_capacity(db, instance_id)
 
     @staticmethod
     async def get_table_capacity(
@@ -1102,50 +1055,9 @@ class MonitorService:
     ) -> tuple[int, list[dict]]:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
-        latest_at = (
-            await db.execute(
-                select(func.max(MonitorTableCapacitySnapshot.collected_at)).where(
-                    MonitorTableCapacitySnapshot.instance_id == instance_id
-                )
-            )
-        ).scalar_one_or_none()
-        if not latest_at:
-            return 0, []
-        stmt = select(MonitorTableCapacitySnapshot).where(
-            MonitorTableCapacitySnapshot.instance_id == instance_id,
-            MonitorTableCapacitySnapshot.collected_at == latest_at,
+        return await MonitorCapacityService.table_capacity(
+            db, instance_id, db_name=db_name, search=search, page=page, page_size=page_size
         )
-        if db_name:
-            stmt = stmt.where(MonitorTableCapacitySnapshot.db_name == db_name)
-        if search:
-            stmt = stmt.where(MonitorTableCapacitySnapshot.table_name.ilike(f"%{search}%"))
-        total = int(
-            (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
-        )
-        rows = (
-            (
-                await db.execute(
-                    stmt.order_by(MonitorTableCapacitySnapshot.total_size_bytes.desc())
-                    .offset((page - 1) * page_size)
-                    .limit(page_size)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return total, [
-            {
-                "db_name": row.db_name,
-                "table_name": row.table_name,
-                "collected_at": row.collected_at.isoformat(),
-                "data_size_bytes": row.data_size_bytes,
-                "index_size_bytes": row.index_size_bytes,
-                "total_size_bytes": row.total_size_bytes,
-                "row_count": row.row_count,
-                "extra": row.extra or {},
-            }
-            for row in rows
-        ]
 
     @staticmethod
     async def get_native_overview(db: AsyncSession, user: dict) -> dict:
@@ -1192,15 +1104,7 @@ class MonitorService:
 
     @staticmethod
     def _has_capacity_risk(snapshot: dict) -> bool:
-        extra = snapshot.get("extra_metrics") or {}
-        tablespaces = extra.get("tablespaces") or []
-        if any((MonitorService._coerce_float(item.get("used_pct")) or 0) >= 80 for item in tablespaces):
-            return True
-        disks = extra.get("disks") or []
-        if any((MonitorService._coerce_float(item.get("used_pct")) or 0) >= 80 for item in disks):
-            return True
-        fra = extra.get("fra") or {}
-        return (MonitorService._coerce_float(fra.get("used_pct")) or 0) >= 80
+        return MonitorCapacityService.has_capacity_risk(snapshot)
 
     @staticmethod
     async def get_native_health(db: AsyncSession, instance_id: int, user: dict) -> dict:
@@ -1451,47 +1355,7 @@ class MonitorService:
     ) -> dict:
         if not await MonitorService.check_privilege(db, user, instance_id):
             raise AppException("没有该实例的监控查看权限", code=403)
-        since = datetime.now(UTC) - timedelta(days=days)
-        db_rows = (
-            (
-                await db.execute(
-                    select(MonitorDatabaseCapacitySnapshot)
-                    .where(
-                        MonitorDatabaseCapacitySnapshot.instance_id == instance_id,
-                        MonitorDatabaseCapacitySnapshot.collected_at >= since,
-                    )
-                    .order_by(
-                        MonitorDatabaseCapacitySnapshot.db_name,
-                        MonitorDatabaseCapacitySnapshot.collected_at,
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        first_by_db: dict[str, MonitorDatabaseCapacitySnapshot] = {}
-        last_by_db: dict[str, MonitorDatabaseCapacitySnapshot] = {}
-        for row in db_rows:
-            first_by_db.setdefault(row.db_name, row)
-            last_by_db[row.db_name] = row
-        db_growth = [
-            {
-                "db_name": name,
-                "first_size_bytes": first_by_db[name].total_size_bytes,
-                "latest_size_bytes": last.total_size_bytes,
-                "growth_bytes": last.total_size_bytes - first_by_db[name].total_size_bytes,
-                "collected_at": last.collected_at.isoformat(),
-            }
-            for name, last in last_by_db.items()
-        ]
-        db_growth.sort(key=lambda item: item["growth_bytes"], reverse=True)
-        table_total, tables = await MonitorService.get_table_capacity(db, instance_id, user, page_size=20)
-        return {
-            "top_databases": db_growth[:20],
-            "top_tables": tables,
-            "table_total": table_total,
-            "days": days,
-        }
+        return await MonitorCapacityService.capacity_growth(db, instance_id, days=days)
 
     @staticmethod
     async def collect_due_native(db: AsyncSession, limit: int | None = None) -> dict:
@@ -1715,152 +1579,9 @@ class MonitorService:
         cfg: MonitorCollectConfig,
         collected_at: datetime | None = None,
     ) -> None:
-        from app.engines.registry import get_engine
-
-        now = collected_at or datetime.now(UTC)
-        engine = get_engine(inst)
-        db_names = await MonitorService._capacity_database_names(db, engine, inst)
-        instance_total = 0
-        for db_name in db_names:
-            try:
-                metas = await engine.get_tables_metas_data(db_name)
-                table_rows = [
-                    MonitorService._normalize_table_capacity(inst.id, db_name, meta, now)
-                    for meta in metas
-                ]
-                db_total = sum(row.total_size_bytes for row in table_rows)
-                db_data = sum(row.data_size_bytes for row in table_rows)
-                db_index = sum(row.index_size_bytes for row in table_rows)
-                db_row_count = sum(row.row_count for row in table_rows)
-                instance_total += db_total
-                for row in table_rows:
-                    db.add(row)
-                db.add(
-                    MonitorDatabaseCapacitySnapshot(
-                        instance_id=inst.id,
-                        db_name=db_name,
-                        collected_at=now,
-                        table_count=len(table_rows),
-                        data_size_bytes=db_data,
-                        index_size_bytes=db_index,
-                        total_size_bytes=db_total,
-                        row_count=db_row_count,
-                    )
-                )
-            except Exception as exc:
-                db.add(
-                    MonitorDatabaseCapacitySnapshot(
-                        instance_id=inst.id,
-                        db_name=db_name,
-                        collected_at=now,
-                        status="failed",
-                        error=str(exc)[:4000],
-                    )
-                )
-        latest = (
-            await db.execute(
-                select(MonitorMetricSnapshot)
-                .where(MonitorMetricSnapshot.instance_id == inst.id)
-                .order_by(MonitorMetricSnapshot.collected_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if latest:
-            latest.total_size_bytes = instance_total
-        cfg.last_capacity_collect_at = now
-
-    @staticmethod
-    async def _capacity_database_names(db: AsyncSession, engine: Any, inst: Instance) -> list[str]:
-        registered = (
-            (
-                await db.execute(
-                    select(InstanceDatabase.db_name)
-                    .where(
-                        InstanceDatabase.instance_id == inst.id,
-                        InstanceDatabase.is_active.is_(True),
-                    )
-                    .order_by(InstanceDatabase.db_name)
-                )
-            )
-            .scalars()
-            .all()
+        await MonitorCapacityService.collect_instance_capacity(
+            db, inst, cfg, collected_at=collected_at
         )
-        if registered:
-            return list(registered)
-        rs = await engine.get_all_databases()
-        if rs.error:
-            raise AppException(rs.error, code=400)
-        names = [
-            str(
-                row[0]
-                if isinstance(row, (list, tuple))
-                else next(iter(row.values()), "")
-                if isinstance(row, dict)
-                else row
-            )
-            for row in rs.rows
-        ]
-        return [name for name in names if name.lower() not in MonitorService.SYSTEM_DATABASES]
-
-    @staticmethod
-    def _normalize_table_capacity(
-        instance_id: int,
-        db_name: str,
-        meta: dict[str, Any],
-        collected_at: datetime,
-    ) -> MonitorTableCapacitySnapshot:
-        lowered = {str(k).lower(): v for k, v in meta.items()}
-        table_name = str(
-            lowered.get("table_name")
-            or lowered.get("name")
-            or lowered.get("collection")
-            or lowered.get("tablename")
-            or ""
-        )
-        data_size = MonitorService._int_value(
-            lowered.get("data_length")
-            or lowered.get("data_size")
-            or lowered.get("data_bytes")
-            or lowered.get("size")
-            or 0
-        )
-        index_size = MonitorService._int_value(
-            lowered.get("index_length") or lowered.get("index_size") or 0
-        )
-        total_size = MonitorService._int_value(
-            lowered.get("total_size")
-            or lowered.get("total_bytes")
-            or lowered.get("bytes")
-            or lowered.get("storage_size")
-            or data_size + index_size
-        )
-        if not data_size and total_size and index_size:
-            data_size = max(total_size - index_size, 0)
-        row_count = MonitorService._int_value(
-            lowered.get("table_rows")
-            or lowered.get("rows")
-            or lowered.get("count")
-            or lowered.get("row_count")
-            or 0
-        )
-        return MonitorTableCapacitySnapshot(
-            instance_id=instance_id,
-            db_name=db_name,
-            table_name=table_name,
-            collected_at=collected_at,
-            data_size_bytes=data_size,
-            index_size_bytes=index_size,
-            total_size_bytes=total_size or data_size + index_size,
-            row_count=row_count,
-            extra=MonitorService._json_safe(meta),
-        )
-
-    @staticmethod
-    def _int_value(value: Any) -> int:
-        try:
-            return int(float(value or 0))
-        except (TypeError, ValueError):
-            return 0
 
     @staticmethod
     def _json_safe(value: Any) -> Any:

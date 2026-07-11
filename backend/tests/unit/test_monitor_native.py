@@ -10,6 +10,7 @@ from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
 from app.schemas.monitor import UnifiedCollectConfigUpsert
 from app.services.monitor import MonitorService
 from app.services.monitor_alerts import MonitorAlertService
+from app.services.monitor_capacity import MonitorCapacityService
 
 
 def test_normalize_metric_payload_keeps_missing_values_none():
@@ -93,7 +94,7 @@ def test_snapshot_to_dict_exposes_metric_groups():
 
 
 def test_normalize_table_capacity_maps_common_engine_fields():
-    row = MonitorService._normalize_table_capacity(
+    row = MonitorCapacityService._normalize_table_capacity(
         1,
         "app",
         {
