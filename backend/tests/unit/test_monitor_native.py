@@ -11,6 +11,7 @@ from app.schemas.monitor import UnifiedCollectConfigUpsert
 from app.services.monitor import MonitorService
 from app.services.monitor_alerts import MonitorAlertService
 from app.services.monitor_capacity import MonitorCapacityService
+from app.services.monitor_config import MonitorConfigService
 from app.services.monitor_collect import MonitorCollectService
 
 
@@ -538,9 +539,9 @@ async def test_get_top_sql_passes_tidb_custom_time_range(monkeypatch):
 @pytest.mark.asyncio
 async def test_unified_collect_config_list_uses_accessible_instances(monkeypatch):
     instances = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
-    monkeypatch.setattr(MonitorService, "_accessible_instances", AsyncMock(return_value=instances))
+    monkeypatch.setattr(MonitorConfigService, "_accessible_instances", AsyncMock(return_value=instances))
     monkeypatch.setattr(
-        MonitorService,
+        MonitorConfigService,
         "_unified_collect_config_item",
         AsyncMock(side_effect=[
             {"instance_id": 1, "native": {}, "session": {}, "sql": {}},
@@ -581,14 +582,14 @@ async def test_unified_collect_config_updates_all_three_collectors(monkeypatch):
     native_upsert = AsyncMock()
     session_upsert = AsyncMock()
     slow_upsert = AsyncMock()
-    monkeypatch.setattr(MonitorService, "upsert_native_config", native_upsert)
+    monkeypatch.setattr(MonitorConfigService, "upsert_native_config", native_upsert)
     monkeypatch.setattr(
         "app.services.session_diagnostic.SessionDiagnosticService.upsert_config",
         session_upsert,
     )
     monkeypatch.setattr("app.services.slowlog.SlowLogService.upsert_config", slow_upsert)
     monkeypatch.setattr(
-        MonitorService,
+        MonitorConfigService,
         "_unified_collect_config_item",
         AsyncMock(return_value={"instance_id": 3, "native": {}, "session": {}, "sql": {}}),
     )
@@ -612,8 +613,8 @@ async def test_bulk_unified_collect_config_applies_visible_instances(monkeypatch
         SimpleNamespace(id=1, instance_name="mysql-prod"),
         SimpleNamespace(id=2, instance_name="pg-prod"),
     ]
-    monkeypatch.setattr(MonitorService, "_accessible_instances", AsyncMock(return_value=instances))
-    monkeypatch.setattr(MonitorService, "upsert_unified_collect_config", AsyncMock(return_value={}))
+    monkeypatch.setattr(MonitorConfigService, "_accessible_instances", AsyncMock(return_value=instances))
+    monkeypatch.setattr(MonitorConfigService, "upsert_unified_collect_config", AsyncMock(return_value={}))
 
     result = await MonitorService.bulk_upsert_unified_collect_configs(
         SimpleNamespace(),
