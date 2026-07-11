@@ -23,7 +23,11 @@ from app.models.monitor import (
     MonitorTableCapacitySnapshot,
 )
 from app.models.user import ResourceGroup, Users
-from app.schemas.monitor import MonitorConfigCreate, MonitorConfigUpdate
+from app.schemas.monitor import (
+    MonitorConfigCreate,
+    MonitorConfigUpdate,
+    NativeMonitorConfigUpsert,
+)
 from app.services.dashboard import DashboardService
 from app.services.monitor_alerts import MonitorAlertService
 
@@ -403,6 +407,55 @@ class MonitorService:
         await db.commit()
         await db.refresh(cfg)
         return cfg
+
+    @staticmethod
+    async def collect_native_now(db: AsyncSession, instance_id: int, user: dict) -> dict:
+        """手动触发原生监控采集：确保采集配置存在，执行指标与容量采集并回写状态。
+
+        get_native_detail 内部已做实例访问校验；采集失败时记录失败快照并抛出 400。
+        """
+        detail = await MonitorService.get_native_detail(db, instance_id, user)
+        if not detail.get("config"):
+            await MonitorService.upsert_native_config(
+                db, instance_id, NativeMonitorConfigUpsert(), user
+            )
+        cfg = (
+            await db.execute(
+                select(MonitorCollectConfig).where(
+                    MonitorCollectConfig.instance_id == instance_id
+                )
+            )
+        ).scalar_one()
+        inst = (
+            await db.execute(select(Instance).where(Instance.id == instance_id))
+        ).scalar_one()
+        try:
+            snapshot = await MonitorService.collect_instance_metrics(db, inst, cfg)
+            await MonitorService.collect_instance_capacity(db, inst, cfg)
+            cfg.last_collect_status = "success"
+            cfg.last_collect_error = ""
+            await db.commit()
+        except Exception as exc:
+            error = str(exc) or exc.__class__.__name__
+            cfg.last_collect_status = "failed"
+            cfg.last_collect_error = error[:4000]
+            db.add(
+                MonitorMetricSnapshot(
+                    instance_id=inst.id,
+                    collected_at=datetime.now(UTC),
+                    status="failed",
+                    error=error[:4000],
+                    is_up=False,
+                )
+            )
+            await db.commit()
+            logger.warning(
+                "native_monitor_manual_collect_failed: instance_id=%s error=%s",
+                instance_id,
+                error,
+            )
+            raise AppException(f"采集失败：{error}", code=400) from exc
+        return MonitorService._snapshot_to_dict(snapshot)
 
     @staticmethod
     async def _accessible_instances(db: AsyncSession, user: dict) -> list[Instance]:

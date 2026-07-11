@@ -505,14 +505,5 @@ async def toggle_favorite(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models.query import QueryLog
-
-    result = await db.execute(
-        select(QueryLog).where(QueryLog.id == log_id, QueryLog.user_id == user["id"])
-    )
-    log = result.scalar_one_or_none()
-    if not log:
-        raise HTTPException(404, "查询日志不存在")
-    log.is_favorite = not log.is_favorite
-    await db.commit()
-    return {"status": 0, "is_favorite": log.is_favorite}
+    is_favorite = await QueryPrivService.toggle_favorite(db, log_id, user["id"])
+    return {"status": 0, "is_favorite": is_favorite}

@@ -1,19 +1,15 @@
 """观测中心路由（Sprint 5）。"""
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi import Query as QParam
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
-from app.core.exceptions import AppException
-from app.models.instance import Instance
-from app.models.monitor import MonitorCollectConfig, MonitorMetricSnapshot
 from app.schemas.monitor import (
     AuditMonitorPrivRequest,
     MonitorConfigCreate,
@@ -256,43 +252,8 @@ async def collect_native_instance(
     user: dict = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    detail = await MonitorService.get_native_detail(db, instance_id, user)
-    cfg_data = detail.get("config")
-    if not cfg_data:
-        await MonitorService.upsert_native_config(
-            db, instance_id, NativeMonitorConfigUpsert(), user
-        )
-    cfg = (
-        await db.execute(
-            select(MonitorCollectConfig).where(MonitorCollectConfig.instance_id == instance_id)
-        )
-    ).scalar_one()
-    inst = (await db.execute(select(Instance).where(Instance.id == instance_id))).scalar_one()
-    try:
-        now_result = await MonitorService.collect_instance_metrics(db, inst, cfg)
-        await MonitorService.collect_instance_capacity(db, inst, cfg)
-        cfg.last_collect_status = "success"
-        cfg.last_collect_error = ""
-        await db.commit()
-    except Exception as exc:
-        error = str(exc) or exc.__class__.__name__
-        cfg.last_collect_status = "failed"
-        cfg.last_collect_error = error[:4000]
-        db.add(
-            MonitorMetricSnapshot(
-                instance_id=inst.id,
-                collected_at=datetime.now(UTC),
-                status="failed",
-                error=error[:4000],
-                is_up=False,
-            )
-        )
-        await db.commit()
-        logger.warning(
-            "native_monitor_manual_collect_failed: instance_id=%s error=%s", instance_id, error
-        )
-        raise AppException(f"采集失败：{error}", code=400) from exc
-    return {"status": 0, "msg": "采集完成", "data": MonitorService._snapshot_to_dict(now_result)}
+    data = await MonitorService.collect_native_now(db, instance_id, user)
+    return {"status": 0, "msg": "采集完成", "data": data}
 
 
 @router.get("/native/instances/{instance_id}/", summary="原生数据库监控详情")

@@ -1230,6 +1230,22 @@ class QueryPrivService:
         return priv
 
     @staticmethod
+    async def toggle_favorite(db: AsyncSession, log_id: int, user_id: int) -> bool:
+        """收藏/取消收藏当前用户的一条查询日志，返回切换后的收藏状态。"""
+        from app.models.query import QueryLog
+
+        log = (
+            await db.execute(
+                select(QueryLog).where(QueryLog.id == log_id, QueryLog.user_id == user_id)
+            )
+        ).scalar_one_or_none()
+        if not log:
+            raise NotFoundException("查询日志不存在")
+        log.is_favorite = not log.is_favorite
+        await db.commit()
+        return log.is_favorite
+
+    @staticmethod
     async def write_log(
         db: AsyncSession,
         user_id: int | None,

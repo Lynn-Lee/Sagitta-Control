@@ -669,6 +669,48 @@ class UserGroupService:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_members_for_resource_group(
+        db: AsyncSession, resource_group_id: int
+    ) -> list[Users]:
+        """资源组成员通过用户组关联获取（v2 不再直接查 user_resource_group）。"""
+        result = await db.execute(
+            select(Users)
+            .join(user_group_member, Users.id == user_group_member.c.user_id)
+            .join(
+                group_resource_group,
+                user_group_member.c.group_id == group_resource_group.c.group_id,
+            )
+            .where(group_resource_group.c.resource_group_id == resource_group_id)
+            .distinct()
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def update_resource_group_user_groups(
+        db: AsyncSession, resource_group_id: int, user_group_ids: list[int]
+    ) -> None:
+        """重设资源组关联的用户组：清空既有关联后按传入列表重建。"""
+        rg = (
+            await db.execute(
+                select(ResourceGroup).where(ResourceGroup.id == resource_group_id)
+            )
+        ).scalar_one_or_none()
+        if not rg:
+            raise NotFoundException(f"资源组 ID={resource_group_id} 不存在")
+        await db.execute(
+            delete(group_resource_group).where(
+                group_resource_group.c.resource_group_id == resource_group_id
+            )
+        )
+        for gid in user_group_ids:
+            await db.execute(
+                group_resource_group.insert().values(
+                    group_id=gid, resource_group_id=resource_group_id
+                )
+            )
+        await db.commit()
+
+    @staticmethod
     async def export_groups(
         db: AsyncSession,
         search: str | None = None,

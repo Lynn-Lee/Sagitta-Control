@@ -4,7 +4,6 @@ import logging
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -117,21 +116,7 @@ async def list_rg_members(
     _user=Depends(current_user),
 ):
     """v2: 资源组成员通过用户组关联获取，不再直接查 user_resource_group。"""
-
-    from app.models.role import group_resource_group, user_group_member
-    from app.models.user import Users
-
-    result = await db.execute(
-        select(Users)
-        .join(user_group_member, Users.id == user_group_member.c.user_id)
-        .join(
-            group_resource_group,
-            user_group_member.c.group_id == group_resource_group.c.group_id,
-        )
-        .where(group_resource_group.c.resource_group_id == rg_id)
-        .distinct()
-    )
-    members = result.scalars().all()
+    members = await UserGroupService.list_members_for_resource_group(db, rg_id)
     return {
         "items": [
             {"id": u.id, "username": u.username, "display_name": u.display_name, "email": u.email}
@@ -190,24 +175,5 @@ async def update_rg_user_groups(
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_perm("resource_group_manage")),
 ):
-    from sqlalchemy import delete
-
-    from app.models.role import group_resource_group
-    from app.models.user import ResourceGroup
-
-    rg_result = await db.execute(select(ResourceGroup).where(ResourceGroup.id == rg_id))
-    rg = rg_result.scalar_one_or_none()
-    if not rg:
-        from fastapi import HTTPException
-
-        raise HTTPException(404, "资源组不存在")
-
-    await db.execute(
-        delete(group_resource_group).where(group_resource_group.c.resource_group_id == rg_id)
-    )
-    for gid in data.user_group_ids:
-        await db.execute(
-            group_resource_group.insert().values(group_id=gid, resource_group_id=rg_id)
-        )
-    await db.commit()
+    await UserGroupService.update_resource_group_user_groups(db, rg_id, data.user_group_ids)
     return {"status": 0, "msg": f"资源组用户组关联已更新，共 {len(data.user_group_ids)} 个组"}
