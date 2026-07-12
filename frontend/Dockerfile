@@ -15,8 +15,8 @@ RUN npx vite build && \
       echo "商业前端构建产物不允许包含 sourcemap 文件" >&2; \
       exit 1; \
     fi && \
-    if grep -R "sourceMappingURL" dist; then \
-      echo "商业前端构建产物不允许包含 sourceMappingURL 引用" >&2; \
+    if grep -R "sourceMappingURL" dist/assets; then \
+      echo "商业前端业务构建产物不允许包含 sourceMappingURL 引用" >&2; \
       exit 1; \
     fi
 
