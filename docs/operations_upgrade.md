@@ -252,6 +252,7 @@ docker compose logs -f backend celery_worker celery_beat
 | 查询无权限 | 用户角色、用户组、资源组、查询权限有效期。 |
 | 工单卡住 | 审批流程、审批人、通知配置、Worker 任务状态。 |
 | 升级后页面静态资源异常 | 浏览器缓存、前端容器版本、反向代理缓存策略。 |
+| SQL 编辑器一直 Loading | 前端容器是否包含 `/monaco-editor/min/vs/loader.js`，浏览器控制台是否有 Monaco 静态资源 404 或 CSP 错误。 |
 
 ## 9. 安全基线
 
