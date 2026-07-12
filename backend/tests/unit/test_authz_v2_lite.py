@@ -621,7 +621,7 @@ class TestQueryPrivilegeHelpers:
         assert reason == "instance_privilege"
 
     @pytest.mark.asyncio
-    async def test_check_data_dict_access_accepts_table_scope_on_root_entry(self):
+    async def test_check_data_dict_access_accepts_table_scope_on_root_entry(self, monkeypatch):
         instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
         db = AsyncMock()
 
@@ -631,7 +631,7 @@ class TestQueryPrivilegeHelpers:
             return result
 
         db.execute = AsyncMock(side_effect=fake_execute)
-        QueryPrivService._has_any_data_dict_priv = AsyncMock(return_value=True)  # type: ignore[method-assign]
+        monkeypatch.setattr(QueryPrivService, "_has_any_data_dict_priv", AsyncMock(return_value=True))
 
         allowed, reason = await QueryPrivService.check_data_dict_access(
             db=db,
@@ -643,13 +643,13 @@ class TestQueryPrivilegeHelpers:
         assert reason == "scoped_privilege"
 
     @pytest.mark.asyncio
-    async def test_check_data_dict_access_accepts_table_scope_on_database_entry(self):
+    async def test_check_data_dict_access_accepts_table_scope_on_database_entry(self, monkeypatch):
         instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
         db = AsyncMock()
 
-        QueryPrivService._has_instance_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
-        QueryPrivService._has_db_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
-        QueryPrivService._has_any_table_priv_in_db = AsyncMock(return_value=True)  # type: ignore[method-assign]
+        monkeypatch.setattr(QueryPrivService, "_has_instance_priv", AsyncMock(return_value=False))
+        monkeypatch.setattr(QueryPrivService, "_has_db_priv", AsyncMock(return_value=False))
+        monkeypatch.setattr(QueryPrivService, "_has_any_table_priv_in_db", AsyncMock(return_value=True))
 
         allowed, reason = await QueryPrivService.check_data_dict_access(
             db=db,
@@ -662,14 +662,14 @@ class TestQueryPrivilegeHelpers:
         assert reason == "table_privilege_in_database"
 
     @pytest.mark.asyncio
-    async def test_check_data_dict_access_denies_without_matching_scope(self):
+    async def test_check_data_dict_access_denies_without_matching_scope(self, monkeypatch):
         instance = SimpleNamespace(id=1, db_type="mysql", resource_groups=[SimpleNamespace(id=2)])
         empty_result = MagicMock()
         empty_result.scalars.return_value.first.return_value = None
         db = AsyncMock()
         db.execute = AsyncMock(return_value=empty_result)
-        QueryPrivService._has_any_data_dict_priv = AsyncMock(return_value=False)  # type: ignore[method-assign]
-        QueryPrivService._has_any_table_priv_in_db = AsyncMock(return_value=False)  # type: ignore[method-assign]
+        monkeypatch.setattr(QueryPrivService, "_has_any_data_dict_priv", AsyncMock(return_value=False))
+        monkeypatch.setattr(QueryPrivService, "_has_any_table_priv_in_db", AsyncMock(return_value=False))
 
         allowed, reason = await QueryPrivService.check_data_dict_access(
             db=db,
