@@ -16,6 +16,7 @@ import TableEmptyState from '@/components/common/TableEmptyState'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
+import { extractFileName, triggerDownload } from '@/utils/fileDownload'
 
 const { Text } = Typography
 const { Option } = Select
@@ -31,23 +32,6 @@ const EDITOR_OPTIONS = {
   cursorBlinking: 'smooth' as const,
   padding: { top: 12, bottom: 12 },
   automaticLayout: true,
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  window.URL.revokeObjectURL(url)
-}
-
-function extractFileName(contentDisposition?: string, fallback = 'query_result.xlsx') {
-  if (!contentDisposition) return fallback
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
-  const normalMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
-  return normalMatch?.[1] || fallback
 }
 
 function stringifyApiMessage(value: unknown): string | undefined {

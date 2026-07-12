@@ -1,12 +1,12 @@
-// 用户管理页的导入/导出纯工具：失败明细 CSV 生成。
-// 通用的文件名解析 / 下载触发已收敛到 @/utils/fileDownload，这里再导出以兼容既有引用。
-import { extractFileName, triggerDownload } from '@/utils/fileDownload'
+// 用户组管理页的导入/导出纯工具：失败明细 CSV 生成。
+// 通用的文件名解析 / 下载触发收敛到 @/utils/fileDownload，这里再导出以便页面单点引用。
+import { triggerDownload } from '@/utils/fileDownload'
 
 export { extractFileName, triggerDownload } from '@/utils/fileDownload'
 
 export type ImportErrorRow = {
   row: number
-  username: string
+  name: string
   error: string
   row_data?: Record<string, string>
 }
@@ -16,15 +16,12 @@ export type ImportResult = {
   created: number
   updated: number
   failed: number
-  auto_created_user_groups?: number
   import_headers?: string[]
   errors: ImportErrorRow[]
 }
 
-export const IMPORT_DEFAULT_PASSWORD = 'Sagitta@2026A'
-
 export function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: string[]) {
-  const headers = (importHeaders && importHeaders.length ? importHeaders : ['username']).filter(Boolean)
+  const headers = (importHeaders && importHeaders.length ? importHeaders : ['name']).filter(Boolean)
   const lines = [
     ['source_row', ...headers, 'import_error'],
     ...errors.map((item) => [
@@ -39,6 +36,6 @@ export function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: s
   // 前置 UTF-8 BOM，保证 Excel 正确识别中文编码
   triggerDownload(
     new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
-    'users_import_errors.csv',
+    'user_groups_import_errors.csv',
   )
 }

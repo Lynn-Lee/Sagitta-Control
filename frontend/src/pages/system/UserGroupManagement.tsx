@@ -14,62 +14,17 @@ import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
+import {
+  downloadImportErrors,
+  extractFileName,
+  triggerDownload,
+  type ImportErrorRow,
+  type ImportResult,
+} from './userGroupImportExport'
 
 const { Text } = Typography
 const { Dragger } = Upload
 const { useBreakpoint } = Grid
-
-type ImportErrorRow = {
-  row: number
-  name: string
-  error: string
-  row_data?: Record<string, string>
-}
-
-type ImportResult = {
-  total: number
-  created: number
-  updated: number
-  failed: number
-  import_headers?: string[]
-  errors: ImportErrorRow[]
-}
-
-function extractFileName(contentDisposition?: string, fallback = 'user_groups_export.xlsx') {
-  if (!contentDisposition) return fallback
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
-  const normalMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
-  return normalMatch?.[1] || fallback
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  window.URL.revokeObjectURL(url)
-}
-
-function downloadImportErrors(errors: ImportErrorRow[], importHeaders?: string[]) {
-  const headers = (importHeaders && importHeaders.length ? importHeaders : ['name']).filter(Boolean)
-  const lines = [
-    ['source_row', ...headers, 'import_error'],
-    ...errors.map((item) => [
-      String(item.row),
-      ...headers.map((header) => item.row_data?.[header] || ''),
-      item.error || '',
-    ]),
-  ]
-  const csv = lines
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  triggerDownload(
-    new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
-    'user_groups_import_errors.csv',
-  )
-}
 
 const UserGroupManagement: React.FC = () => {
   const screens = useBreakpoint()
