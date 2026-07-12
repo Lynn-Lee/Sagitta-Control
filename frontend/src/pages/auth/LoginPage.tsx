@@ -12,6 +12,7 @@ import { getPostLoginPath } from '@/utils/postLogin'
 import BrandLogo from '@/components/common/BrandLogo'
 import { APP_VERSION } from '@/config/appVersion'
 import { useBranding } from '@/hooks/useBranding'
+import { TwoFactorLoginForm } from './components/TwoFactorLoginForm'
 
 // ── 平台图标（官方矢量图） ─────────────────────────────────────
 const OAUTH_PROVIDER_LABELS: Record<string, string> = {
@@ -694,64 +695,18 @@ export default function LoginPage() {
                 </Form>
               </>
             ) : twoFactorMode ? (
-              <>
-                <Alert
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                  message="需要完成二步验证"
-                  description={`账号 ${pendingUsername || ''} 已开启 TOTP，请输入认证器中的 6 位验证码继续登录。`}
-                />
-                <Form onFinish={handleVerifyLogin2fa} size="large" layout="vertical">
-                  <Form.Item
-                    name="totp_code"
-                    label="验证码"
-                    rules={[
-                      { required: true, message: '请输入 6 位验证码' },
-                      { pattern: /^\d{6}$/, message: '验证码必须为 6 位数字' },
-                    ]}
-                    style={{ marginBottom: 22 }}
-                  >
-                    <Input
-                      prefix={<LockOutlined style={{ color: 'rgba(255,255,255,0.3)' }} />}
-                      placeholder="请输入 6 位验证码"
-                      autoComplete="one-time-code"
-                      inputMode="numeric"
-                      maxLength={6}
-                    />
-                  </Form.Item>
-                  <Form.Item style={{ marginBottom: 10 }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={twoFactorLoading}
-                      block
-                      icon={<LoginOutlined />}
-                      style={{
-                        height: 46, borderRadius: 8,
-                        background: '#165DFF', border: 'none',
-                        fontWeight: 600, fontSize: 15, letterSpacing: '1px',
-                        boxShadow: '0 4px 20px rgba(22,93,255,0.4)',
-                      }}
-                    >
-                      验证并登录
-                    </Button>
-                  </Form.Item>
-                  <Button
-                    block
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => {
-                      setTwoFactorMode(false)
-                      setTwoFactorToken('')
-                      setPendingUsername('')
-                      setPendingAuthProvider('local')
-                      setError('')
-                    }}
-                  >
-                    返回登录
-                  </Button>
-                </Form>
-              </>
+              <TwoFactorLoginForm
+                pendingUsername={pendingUsername}
+                loading={twoFactorLoading}
+                onSubmit={handleVerifyLogin2fa}
+                onBack={() => {
+                  setTwoFactorMode(false)
+                  setTwoFactorToken('')
+                  setPendingUsername('')
+                  setPendingAuthProvider('local')
+                  setError('')
+                }}
+              />
             ) : (
               <Form className="sagitta-auth-form" form={loginForm} onFinish={handleLogin} size="large" layout="vertical">
                 <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}
