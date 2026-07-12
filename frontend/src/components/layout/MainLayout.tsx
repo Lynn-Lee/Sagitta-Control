@@ -240,7 +240,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    key: 'commercial-group', icon: <CustomerServiceOutlined />, label: '商业交付', permission: 'system_config_manage',
+    key: 'commercial-group', icon: <CustomerServiceOutlined />, label: '交付支持', permission: 'system_config_manage',
     children: [
       { key: '/system/license', icon: <SafetyCertificateOutlined />, label: 'License 授权' },
       { key: '/commercial', icon: <CustomerServiceOutlined />, label: '交付与支持' },

@@ -44,7 +44,7 @@ export default function ApprovalFlowPage() {
   const [form] = Form.useForm()
   const [msgApi, msgCtx] = message.useMessage()
 
-  // ── Data queries ────────────────────────────────────────────
+  // ── 数据查询 ────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: ['approval-flows', search, page, pageSize],
     queryFn: () => approvalFlowApi.list({ search: search || undefined, page, page_size: pageSize }),
@@ -56,7 +56,7 @@ export default function ApprovalFlowPage() {
     enabled: drawerOpen,
   })
 
-  // ── Mutations ───────────────────────────────────────────────
+  // ── 数据变更 ────────────────────────────────────────────────
   const createMut = useMutation({
     mutationFn: approvalFlowApi.create,
     onSuccess: () => {
@@ -86,7 +86,7 @@ export default function ApprovalFlowPage() {
     onError: (e: any) => msgApi.error(e.response?.data?.msg || '操作失败'),
   })
 
-  // ── Handlers ────────────────────────────────────────────────
+  // ── 事件处理 ────────────────────────────────────────────────
   const openCreate = () => {
     setEditId(null)
     form.resetFields()
@@ -128,7 +128,7 @@ export default function ApprovalFlowPage() {
     } catch { /* form validation */ }
   }
 
-  // ── Table columns ────────────────────────────────────────────
+  // ── 表格列定义 ──────────────────────────────────────────────
   const columns = [
     {
       title: '审批流名称', key: 'name', width: 260,

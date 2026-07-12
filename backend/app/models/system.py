@@ -110,7 +110,7 @@ class SystemNotification(BaseModel):
 
 
 class LicenseRecord(BaseModel):
-    """商业授权记录。"""
+    """正式授权记录。"""
 
     __tablename__ = "license_record"
 
@@ -158,7 +158,7 @@ class LicenseRecord(BaseModel):
 
 
 class DeliveryAcceptanceRun(BaseModel):
-    """商业交付验收运行记录。"""
+    """交付验收运行记录。"""
 
     __tablename__ = "delivery_acceptance_run"
 
@@ -179,7 +179,7 @@ class DeliveryAcceptanceRun(BaseModel):
 
 
 class DiagnosticBundle(BaseModel):
-    """商业支持诊断包记录。"""
+    """技术支持诊断包记录。"""
 
     __tablename__ = "diagnostic_bundle"
 

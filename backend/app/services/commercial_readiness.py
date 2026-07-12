@@ -1,4 +1,4 @@
-"""商业实施向导和 readiness 静态规则。"""
+"""实施向导和 readiness 静态规则。"""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ ONBOARDING_STEP_GUIDANCE: dict[str, dict[str, Any]] = {
         "required": True,
         "action_label": "初始化模板",
         "suggested_action": "确认资源组、用户组和审批流已经覆盖首个实例和试用管理员。",
-        "fix_hint": "初始化试用环境会幂等创建商业试用资源组、团队和标准审批流。",
+        "fix_hint": "初始化试用环境会幂等创建用户试用资源组、团队和标准审批流。",
         "quick_action": "trial_bootstrap",
         "can_auto_fix": True,
         "done_evidence": "已检测到资源组、用户组和审批流",

@@ -26,7 +26,7 @@ def frontend_version() -> str:
 
 def test_outward_facing_version_copy_matches_frontend_package_version():
     version = frontend_version()
-    stale_version_pattern = re.compile(r"\bv2\.2\b|\b2\.2\.2\b|v2\.2 商业部署版")
+    stale_version_pattern = re.compile(r"\bv2\.2\b|\b2\.2\.2\b|v2\.2 用户部署版")
     failures: list[str] = []
 
     for path in VERSION_COPY_FILES:

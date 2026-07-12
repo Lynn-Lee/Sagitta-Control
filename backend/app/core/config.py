@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     # 该机制假定 backend 仅经可信代理可达（内网隔离），否则需配合网络隔离防止 XFF 伪造。
     TRUSTED_PROXY_COUNT: int = 1
 
-    # ─── 商业授权 ─────────────────────────────────────────────
+    # ─── 正式授权 ─────────────────────────────────────────────
     LICENSE_PUBLIC_KEY: str = "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"
     LICENSE_CUSTOMER_ID: str = ""
     LICENSE_SERVER_URL: str = "https://license.loveai.asia"
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: int = 60
     LICENSE_ALLOW_LEGACY_LICENSE_IMPORT: bool = False
 
-    # ─── 商业版完整性校验 ─────────────────────────────────────
+    # ─── 用户部署版完整性校验 ─────────────────────────────────────
     APP_INTEGRITY_REQUIRED: bool = False
     APP_INTEGRITY_MANIFEST: str = "/app/COMMERCIAL-MANIFEST.json"
     APP_INTEGRITY_ROOT: str = "/app"

@@ -87,6 +87,7 @@ export const ARCHIVE_COLORS = {
   activeStock: CHART_COLORS.purple,
 }
 
+// 构造 Top 排行横向柱状图数据：reverse 让排名最高项显示在图表顶部，并把指标值统一转为数字
 export function buildTopChartData<T extends Record<string, string | number>>(
   items: T[] | undefined,
   valueKey: keyof T,

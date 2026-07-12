@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""用于内部商业运营的轻量 Sagitta Control 授权中心兼容工具。
+"""用于内部运营的轻量 Sagitta Control 授权中心兼容工具。
 
 该工具只适合私有内部环境。它用一个小型 JSON 文件保存激活码和已签发 License，
 使用 LICENSE_PRIVATE_KEY 签名，并提供与 Sagitta Control 在线授权客户端兼容的激活和刷新接口。
-正式商业运营以统一授权中心 License-Server-Center 为准。
+正式运营以统一授权中心 License-Server-Center 为准。
 """
 
 from __future__ import annotations

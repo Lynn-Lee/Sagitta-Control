@@ -255,7 +255,7 @@ class LicenseService:
 
     @staticmethod
     def _normalize_import_document(raw_license: str | dict[str, Any]) -> tuple[str | dict[str, Any], dict[str, Any] | None]:
-        """兼容旧导入格式，并识别商业版 challenge-response 响应文件。"""
+        """兼容旧导入格式，并识别用户部署版 challenge-response 响应文件。"""
         if isinstance(raw_license, str):
             try:
                 doc = json.loads(raw_license)

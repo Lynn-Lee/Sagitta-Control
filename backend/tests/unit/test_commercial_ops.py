@@ -62,7 +62,7 @@ def test_acceptance_markdown_renders_check_results():
 
     markdown = CommercialOpsService.acceptance_markdown(report)
 
-    assert "Sagitta Control 商业交付验收报告" in markdown
+    assert "Sagitta Control 交付验收报告" in markdown
     assert "推广结论：可推广" in markdown
     assert "PASS" in markdown
     assert "WARN" in markdown

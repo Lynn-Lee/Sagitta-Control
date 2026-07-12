@@ -1,4 +1,4 @@
-"""商业版启动完整性校验。"""
+"""用户部署版启动完整性校验。"""
 
 from __future__ import annotations
 
@@ -55,9 +55,9 @@ def _safe_manifest_path(root: Path, relative_path: str) -> Path:
 
 
 def verify_startup_integrity() -> None:
-    """验证商业镜像内关键文件未被替换。
+    """验证用户部署镜像内关键文件未被替换。
 
-    开发环境默认不强制；商业镜像设置 APP_INTEGRITY_REQUIRED=true 后，
+    开发环境默认不强制；用户部署镜像设置 APP_INTEGRITY_REQUIRED=true 后，
     启动时必须存在签名 Manifest，且 Manifest 内列出的文件摘要全部匹配。
     """
 

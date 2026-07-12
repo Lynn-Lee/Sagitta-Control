@@ -292,7 +292,7 @@ if [[ -n "$TOKEN" ]]; then
   about_json="$tmp_dir/about.json"
   code="$(api_request GET /api/v1/system/support/about "$about_json")"
   if [[ "$code" == "200" ]]; then
-    pass "商业支持状态接口可访问"
+    pass "技术支持状态接口可访问"
     check_json_equals "$about_json" project_code sagitta-control "授权项目码为 sagitta-control"
     check_json_equals "$about_json" license.status licensed "License 为正式授权"
     check_json_equals "$about_json" license.is_trial False "License 非试用"
@@ -332,7 +332,7 @@ if [[ -n "$TOKEN" ]]; then
       fail "仍存在推广前待处理项：$action_items"
     fi
   else
-    fail "商业支持状态接口不可访问：HTTP $code $(cat "$about_json")"
+    fail "技术支持状态接口不可访问：HTTP $code $(cat "$about_json")"
   fi
 
   onboarding_json="$tmp_dir/onboarding.json"

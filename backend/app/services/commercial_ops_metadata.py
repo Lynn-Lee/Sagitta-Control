@@ -1,4 +1,4 @@
-"""商业运营服务的静态元数据。"""
+"""运营服务的静态元数据。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 COMMERCIAL_VERSION = "3.0.0"
 DEMO_RESOURCE_GROUP_NAME = "commercial_trial_rg"
 DEMO_USER_GROUP_NAME = "commercial_trial_team"
-DEMO_APPROVAL_FLOW_NAME = "商业试用标准审批流"
+DEMO_APPROVAL_FLOW_NAME = "用户试用标准审批流"
 DEMO_MARKER = "commercial_trial_bootstrap"
 DELIVERY_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "commercial_delivery_manifest.json"
 
@@ -82,8 +82,8 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "key": "commercial_guard_scripts",
-        "label": "商业构建门禁脚本",
-        "name": "商业构建门禁脚本",
+        "label": "用户部署构建门禁脚本",
+        "name": "用户部署构建门禁脚本",
         "blocking": True,
         "kind": "all_executable",
         "paths": [

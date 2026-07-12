@@ -2,7 +2,7 @@
 
 交付边界：连接测试、Keyspace/Table/Column 元数据、表 DDL、主键/索引元数据、
 只读 SELECT 查询和基础健康指标。Cassandra/ScyllaDB 的 CQL 写入、DDL 和批量
-变更语义与关系型工单差异较大，当前商业交付线保持工单执行 fail-close。
+变更语义与关系型工单差异较大，当前交付线保持工单执行 fail-close。
 """
 
 from __future__ import annotations

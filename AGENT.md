@@ -10,8 +10,8 @@
 - 后端目录为 `backend/`，技术栈为 Python 3.12、FastAPI、SQLAlchemy 2 async、Alembic、Celery、Redis、PostgreSQL。
 - 前端目录为 `frontend/`，技术栈为 React 18、Vite、TypeScript、Ant Design 5、TanStack Query、Zustand。
 - 部署目录为 `deploy/`，文档目录为 `docs/`。
-- 商业发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选商业包，正式 `vX.Y.Z` tag 或显式手动发布才同步 `Lynn-Lee/Sagitta-Deploy` 公开交付仓库。
-- 商业部署版、商业交付包和 `Lynn-Lee/Sagitta-Deploy` 不随每次功能或 UI 调整自动更新；只有用户明确下达商业版更新、商业发布或同步公开发布仓库指令时才执行。
+- 用户部署发布机制参考 DataFusionX：`main` 只做源码 CI 和版本记录，`release/**` 生成 RC 候选用户部署包，正式 `vX.Y.Z` tag 或显式手动发布才同步 `Lynn-Lee/Sagitta-Deploy` 公开交付仓库。
+- 用户部署版、用户部署包和 `Lynn-Lee/Sagitta-Deploy` 不随每次功能或 UI 调整自动更新；只有用户明确下达用户部署版更新、用户部署发布或同步公开发布仓库指令时才执行。
 
 ## 语言与文档规则
 
@@ -44,14 +44,14 @@
 每次完成项目新的功能代码或 UI 调整后，必须完成以下收尾动作，除非用户明确要求暂停、只做局部分析或不提交：
 
 - 每次完成任务功能代码或 UI 调整后，必须同时更新对应文档，代码与文档放在同一次提交里，不允许留到后续补文档；随后提交到 git 并同时推送 GitHub 主远端和 Gitee 国内镜像远端，再更新云 ECS 测试环境到最新源码。
-- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；商业部署版、商业部署包、商业镜像和 `Lynn-Lee/Sagitta-Deploy` 后续仅按用户明确指令更新。
+- 上述默认收尾只针对源码仓库和云 ECS 源码测试环境；用户部署版、用户部署包、用户部署镜像和 `Lynn-Lee/Sagitta-Deploy` 后续仅按用户明确指令更新。
 
 1. 同步更新项目相关文档，包括但不限于 `README.md`、`docs/sagitta_control_prd.md`、`docs/user_manual.md`、`docs/installation_deployment.md`、`docs/operations_upgrade.md` 和本文件；凡涉及菜单、导航结构、页面入口路径或功能命名的调整，必须同步更新用户手册的入口路径与 PRD 的对应描述。
 2. 按改动风险执行必要验证；前端改动至少执行 `npm run build`，后端或部署改动至少执行相关测试、迁移或 Docker Compose 校验。
 3. 查看 `git status --short` 和 diff，确认只包含本次任务需要的代码与文档。
 4. 提交代码并推送到 GitHub 主远端 `origin` 和 Gitee 国内镜像远端 `gitee`。
 5. 推送后检查 GitHub Actions 是否出现对应的 `CI` 和 `Release Version Record` 记录；如 workflow 失败或未触发，最终反馈必须说明。
-6. 使用源码方式更新云 ECS 测试环境到刚推送的最新代码；服务器源码拉取优先使用 Gitee 国内镜像，避免 GitHub 直连慢或超时。完成必要的服务重启和健康检查；不再使用商业版更新包或商业发布产物更新测试环境。
+6. 使用源码方式更新云 ECS 测试环境到刚推送的最新代码；服务器源码拉取优先使用 Gitee 国内镜像，避免 GitHub 直连慢或超时。完成必要的服务重启和健康检查；不再使用用户部署版更新包或用户部署发布产物更新测试环境。
 
 如果当前环境缺少运行时、网络、Git 权限、SSH 权限、数据库或其他外部凭据，不能假装完成；必须说明阻塞点，并列出已经完成的本地变更和验证结果。
 
@@ -71,7 +71,7 @@
 ## 云 ECS 测试环境规则
 
 - 每次完成新功能代码、同步文档并推送 GitHub 与 Gitee 后，必须同步更新云 ECS 服务器上的测试环境到最新代码。
-- 云 ECS 测试环境必须使用源码方式更新和运行，不再使用商业版更新包、`dist-commercial/` 产物或公开交付仓库商业部署包更新。
+- 云 ECS 测试环境必须使用源码方式更新和运行，不再使用用户部署版更新包、`dist-commercial/` 产物或公开交付仓库用户部署包更新。
 - 云 ECS 登录方式统一使用：
 
 ```bash
@@ -94,14 +94,14 @@ git@gitee.com:lynn-lee/sagitta-control.git
 ```
 
 并在服务器上单独配置 Gitee SSH 公钥，避免复用个人开发机私钥。
-- 旧商业部署测试环境已经废弃；需要重建测试环境时，可以清理旧商业 compose project、商业部署包目录和旧数据卷，再使用源码重新部署。
+- 旧用户部署测试环境已经废弃；需要重建测试环境时，可以清理旧用户部署 compose project、用户部署包目录和旧数据卷，再使用源码重新部署。
 - 源码测试环境 Compose project 固定为：
 
 ```bash
 COMPOSE_PROJECT_NAME=sagitta-control-source-test
 ```
 
-- 源码测试环境不得强制启用商业镜像完整性 Manifest；如果从商业部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
+- 源码测试环境不得强制启用用户部署镜像完整性 Manifest；如果从用户部署包迁移 `.env`，必须确保测试环境中 `APP_INTEGRITY_REQUIRED=false`，避免源码镜像因缺少 `COMMERCIAL-MANIFEST.json` 启动失败。
 - 因源码 Compose 文件位于 `deploy/docker-compose.yml`，Docker Compose 做变量插值时需要能在 `deploy/` 目录读取 `.env`；ECS 源码环境必须保留以下软链接，避免 PostgreSQL、Redis 等基础服务误用默认密码：
 
 ```bash

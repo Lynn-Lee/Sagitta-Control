@@ -1,3 +1,4 @@
+// 按菜单权限优先级返回登录后落地页：命中第一个有权限的入口即返回，全部无权限时回退到个人中心
 export function getPostLoginPath(permissions: string[] = []) {
   if (permissions.includes('menu_dashboard')) return '/dashboard'
   if (permissions.includes('menu_query')) return '/query'

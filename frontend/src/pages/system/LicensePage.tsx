@@ -44,7 +44,7 @@ async function copyTextToClipboard(value: string) {
       await navigator.clipboard.writeText(value)
       return true
     } catch {
-      // Fall back for HTTP deployments where Clipboard API is often blocked.
+      // HTTP 部署下 Clipboard API 常被浏览器禁用，回退到兼容复制方式。
     }
   }
 

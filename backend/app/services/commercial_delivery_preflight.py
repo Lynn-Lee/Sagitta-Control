@@ -1,4 +1,4 @@
-"""商业交付材料自检。"""
+"""交付支持材料自检。"""
 
 from __future__ import annotations
 

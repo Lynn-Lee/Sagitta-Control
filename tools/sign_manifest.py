@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成并签名商业镜像完整性 Manifest。"""
+"""生成并签名用户部署镜像完整性 Manifest。"""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def load_private_key() -> Ed25519PrivateKey:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="签名 Sagitta Control 商业镜像完整性 Manifest")
+    parser = argparse.ArgumentParser(description="签名 Sagitta Control 用户部署镜像完整性 Manifest")
     parser.add_argument("--root", default="backend", help="Manifest root directory")
     parser.add_argument("--version", required=True)
     parser.add_argument("--out", required=True)

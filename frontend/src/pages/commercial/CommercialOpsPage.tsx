@@ -122,7 +122,7 @@ export default function CommercialOpsPage() {
       if (result.acceptance_run?.id) {
         setAcceptanceRunId(result.acceptance_run.id)
       }
-      message.success('商业试用环境已初始化')
+      message.success('用户试用环境已初始化')
       await loadAll()
     } finally {
       setBootstrapping(false)
@@ -325,7 +325,7 @@ export default function CommercialOpsPage() {
                 percent={about?.readiness?.score || 0}
                 status={about?.readiness?.status === 'blocked' ? 'exception' : 'normal'}
               />
-              <Text type="secondary">{about?.readiness?.summary || '正在读取商业交付状态'}</Text>
+              <Text type="secondary">{about?.readiness?.summary || '正在读取交付支持状态'}</Text>
             </Space>
           </Card>
         </Col>

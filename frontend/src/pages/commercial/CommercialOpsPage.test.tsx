@@ -122,7 +122,7 @@ vi.mock('@/api/commercial', () => ({
     }),
     bootstrapTrial: vi.fn().mockResolvedValue({
       status: 'success',
-      created: ['商业试用资源组'],
+      created: ['用户试用资源组'],
       updated: [],
       skipped: [],
       acceptance_run: { id: 88 },

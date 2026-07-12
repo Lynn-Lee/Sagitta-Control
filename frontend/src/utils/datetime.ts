@@ -14,10 +14,12 @@ function isValidDateTime(year: number, month: number, day: number, hour: number,
   )
 }
 
+// 将后端多种来源的日期时间统一格式化为全站口径 YYYY-MM-DD HH:mm:ss；无法解析时回退占位符
 export function formatDateTime(value?: string | null, fallback = '—') {
   const rawValue = String(value || '').trim()
   if (!rawValue) return fallback
 
+  // 归一化：斜杠转连字符、ISO 的 T 转空格、去掉小数秒和时区后缀（Z 或 ±HH:mm），只保留本地日期时间
   const normalized = rawValue
     .replace(/\//g, '-')
     .replace('T', ' ')

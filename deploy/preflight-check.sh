@@ -195,12 +195,12 @@ fi
 if [[ "$integrity_required" == "true" ]]; then
   pass "APP_INTEGRITY_REQUIRED 已启用"
   if compose exec -T backend test -f "${integrity_manifest:-/app/COMMERCIAL-MANIFEST.json}" >/dev/null 2>&1; then
-    pass "商业完整性 Manifest 存在"
+    pass "用户部署完整性 Manifest 存在"
   else
-    fail "商业完整性 Manifest 不存在: ${integrity_manifest:-/app/COMMERCIAL-MANIFEST.json}"
+    fail "用户部署完整性 Manifest 不存在: ${integrity_manifest:-/app/COMMERCIAL-MANIFEST.json}"
   fi
 else
-  warn "APP_INTEGRITY_REQUIRED 未启用；商业镜像防篡改启动校验未强制执行"
+  warn "APP_INTEGRITY_REQUIRED 未启用；用户部署镜像防篡改启动校验未强制执行"
 fi
 
 check_port_not_public 5432 PostgreSQL

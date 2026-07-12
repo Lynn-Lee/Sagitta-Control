@@ -1,4 +1,4 @@
-"""商业化运营、交付验收、合规报表和支持矩阵服务。"""
+"""运营、交付验收、合规报表和支持矩阵服务。"""
 
 from __future__ import annotations
 
@@ -194,7 +194,7 @@ class CommercialOpsService:
         if failed_blockers:
             status = "blocked"
             conclusion = "阻塞"
-            summary = "核心交付条件未完成，暂不建议进入商业推广或客户验收。"
+            summary = "核心交付条件未完成，暂不建议进入推广或客户验收。"
         elif failed_optional:
             status = "needs_configuration"
             conclusion = "需补配置"
@@ -311,7 +311,7 @@ class CommercialOpsService:
                     config_key="commercial_onboarding_completed_steps",
                     config_value=value,
                     is_encrypted=False,
-                    description="商业化实施向导已完成步骤",
+                    description="实施交付向导已完成步骤",
                     group="basic",
                 )
             )
@@ -393,7 +393,7 @@ class CommercialOpsService:
 
     @staticmethod
     async def bootstrap_trial_environment(db: AsyncSession, user: dict[str, Any]) -> dict[str, Any]:
-        """幂等初始化商业试用/演示环境。
+        """幂等初始化用户试用/演示环境。
 
         该流程只创建治理模板和可解释的样例记录；不会伪造活跃数据库实例或写入真实密码。
         如果客户现场已经接入活跃实例，则补充基于该实例的演示链路数据。
@@ -430,17 +430,17 @@ class CommercialOpsService:
         if not rg:
             rg = ResourceGroup(
                 group_name=DEMO_RESOURCE_GROUP_NAME,
-                group_name_cn="商业试用资源组",
+                group_name_cn="用户试用资源组",
                 is_active=True,
             )
             db.add(rg)
             await db.flush()
-            created.append("商业试用资源组")
+            created.append("用户试用资源组")
         elif not rg.is_active:
             rg.is_active = True
-            updated.append("商业试用资源组已重新启用")
+            updated.append("用户试用资源组已重新启用")
         else:
-            skipped.append("商业试用资源组已存在")
+            skipped.append("用户试用资源组已存在")
 
         ug = (
             await db.execute(select(UserGroup).where(UserGroup.name == DEMO_USER_GROUP_NAME))
@@ -448,14 +448,14 @@ class CommercialOpsService:
         if not ug:
             ug = UserGroup(
                 name=DEMO_USER_GROUP_NAME,
-                name_cn="商业试用团队",
-                description="用于商业试用、销售演示和客户现场验收的默认团队",
+                name_cn="用户试用团队",
+                description="用于用户试用、销售演示和客户现场验收的默认团队",
                 leader_id=actor_id or None,
                 is_active=True,
             )
             db.add(ug)
             await db.flush()
-            created.append("商业试用团队")
+            created.append("用户试用团队")
         else:
             changed_ug = False
             if not ug.is_active:
@@ -465,7 +465,7 @@ class CommercialOpsService:
                 ug.leader_id = actor_id
                 changed_ug = True
             (updated if changed_ug else skipped).append(
-                "商业试用团队已更新" if changed_ug else "商业试用团队已存在"
+                "用户试用团队已更新" if changed_ug else "用户试用团队已存在"
             )
 
         if not await CommercialOpsService._association_exists(
@@ -477,9 +477,9 @@ class CommercialOpsService:
             await db.execute(
                 group_resource_group.insert().values(group_id=ug.id, resource_group_id=rg.id)
             )
-            created.append("商业试用团队已关联资源组")
+            created.append("用户试用团队已关联资源组")
         else:
-            skipped.append("商业试用团队资源范围已存在")
+            skipped.append("用户试用团队资源范围已存在")
 
         if actor_id and not await CommercialOpsService._association_exists(
             db,
@@ -488,9 +488,9 @@ class CommercialOpsService:
             group_id=ug.id,
         ):
             await db.execute(user_group_member.insert().values(user_id=actor_id, group_id=ug.id))
-            created.append("当前管理员已加入商业试用团队")
+            created.append("当前管理员已加入用户试用团队")
         elif actor_id:
-            skipped.append("当前管理员已在商业试用团队")
+            skipped.append("当前管理员已在用户试用团队")
 
         flow = (
             await db.execute(
@@ -503,7 +503,7 @@ class CommercialOpsService:
         if not flow:
             flow = ApprovalFlow(
                 name=DEMO_APPROVAL_FLOW_NAME,
-                description="商业试用默认审批流：任一具备 SQL 审核权限的人员可处理",
+                description="用户试用默认审批流：任一具备 SQL 审核权限的人员可处理",
                 is_active=True,
                 created_by=actor_username,
                 created_by_id=actor_id or None,
@@ -519,12 +519,12 @@ class CommercialOpsService:
                     approver_ids="[]",
                 )
             )
-            created.append("商业试用标准审批流")
+            created.append("用户试用标准审批流")
         elif not flow.is_active:
             flow.is_active = True
-            updated.append("商业试用标准审批流已重新启用")
+            updated.append("用户试用标准审批流已重新启用")
         else:
-            skipped.append("商业试用标准审批流已存在")
+            skipped.append("用户试用标准审批流已存在")
 
         instance = await CommercialOpsService._first_active_instance(db)
         db_name = (instance.db_name if instance and instance.db_name else "demo") if instance else ""
@@ -541,15 +541,15 @@ class CommercialOpsService:
                         resource_group_id=rg.id,
                     )
                 )
-                created.append(f"实例 {instance.instance_name} 已关联商业试用资源组")
+                created.append(f"实例 {instance.instance_name} 已关联用户试用资源组")
             else:
-                skipped.append(f"实例 {instance.instance_name} 已在商业试用资源组")
+                skipped.append(f"实例 {instance.instance_name} 已在用户试用资源组")
 
             if not (
                 await db.execute(
                     select(SqlWorkflow)
                     .where(
-                        SqlWorkflow.workflow_name == "商业试用 SQL 上线演示",
+                        SqlWorkflow.workflow_name == "用户试用 SQL 上线演示",
                         SqlWorkflow.engineer == actor_username,
                     )
                     .order_by(SqlWorkflow.id)
@@ -557,7 +557,7 @@ class CommercialOpsService:
                 )
             ).scalar_one_or_none():
                 workflow = SqlWorkflow(
-                    workflow_name="商业试用 SQL 上线演示",
+                    workflow_name="用户试用 SQL 上线演示",
                     group_id=rg.id,
                     group_name=rg.group_name_cn or rg.group_name,
                     instance_id=instance.id,
@@ -585,7 +585,7 @@ class CommercialOpsService:
                             {"rollback": "使用备份表或 binlog 恢复受影响订单状态"},
                             ensure_ascii=False,
                         ),
-                        risk_remark="商业试用样例，不会自动执行。",
+                        risk_remark="用户试用样例，不会自动执行。",
                     )
                 )
                 created.append("SQL 工单演示记录")
@@ -596,7 +596,7 @@ class CommercialOpsService:
                 await db.execute(
                     select(QueryPrivilegeApply)
                     .where(
-                        QueryPrivilegeApply.title == "商业试用查询权限申请",
+                        QueryPrivilegeApply.title == "用户试用查询权限申请",
                         QueryPrivilegeApply.user_id == actor_id,
                     )
                     .order_by(QueryPrivilegeApply.id)
@@ -605,7 +605,7 @@ class CommercialOpsService:
             ).scalar_one_or_none():
                 db.add(
                     QueryPrivilegeApply(
-                        title="商业试用查询权限申请",
+                        title="用户试用查询权限申请",
                         user_id=actor_id,
                         instance_id=instance.id,
                         resource_group_id=rg.id,
@@ -614,7 +614,7 @@ class CommercialOpsService:
                         db_name=db_name,
                         valid_date=date.today() + timedelta(days=30),
                         limit_num=100,
-                        apply_reason="商业试用演示：研发申请临时查询订单库。",
+                        apply_reason="用户试用演示：研发申请临时查询订单库。",
                         risk_level="low",
                         risk_summary="只读查询，限制返回行数。",
                         status=0,
@@ -679,7 +679,7 @@ class CommercialOpsService:
                         condition="created_at < '2025-01-01'",
                         batch_size=1000,
                         estimated_rows=12000,
-                        apply_reason="商业试用演示：历史订单归档清理。",
+                        apply_reason="用户试用演示：历史订单归档清理。",
                         risk_plan=json.dumps(
                             {"backup": "执行前导出影响范围，保留 7 天恢复窗口"},
                             ensure_ascii=False,
@@ -749,7 +749,7 @@ class CommercialOpsService:
                     username=actor_username,
                     action="commercial_trial_bootstrap_sample",
                     module="delivery",
-                    detail="商业试用环境初始化样例审计记录",
+                    detail="用户试用环境初始化样例审计记录",
                     result="success",
                 )
             )
@@ -785,9 +785,9 @@ class CommercialOpsService:
                     "db_name": db_name,
                 },
             )
-            created.append("商业试用验收报告")
+            created.append("用户试用验收报告")
         else:
-            skipped.append("商业试用验收报告已存在")
+            skipped.append("用户试用验收报告已存在")
 
         return {
             "status": "success",
@@ -929,7 +929,7 @@ class CommercialOpsService:
     def acceptance_markdown(report: dict[str, Any]) -> str:
         project_name = report.get("project") or LICENSE_PROJECT_NAME
         lines = [
-            f"# {project_name} 商业交付验收报告",
+            f"# {project_name} 交付验收报告",
             "",
             f"- 项目：{project_name}（{report.get('project_code')}）",
             f"- 生成时间：{report.get('generated_at')}",

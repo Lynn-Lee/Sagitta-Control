@@ -77,7 +77,7 @@ async def _refresh_online_license_with_db(db: AsyncSession) -> dict[str, Any]:
                 "event_type": "license_renewal_warning",
                 "subject_type": "license",
                 "subject_id": 0,
-                "app_type": "商业授权",
+                "app_type": "正式授权",
                 "title": state.get("company_name") or state.get("license_id") or "Sagitta Control License",
                 "applicant_name": "系统",
                 "permissions": ["system_config_manage"],

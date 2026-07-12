@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 # ═══════════════════════════════════════════════════════════
-# 商业化实施、交付验收、诊断包和支持矩阵
+# 实施交付、交付验收、诊断包和支持矩阵
 # ═══════════════════════════════════════════════════════════
 
 
@@ -56,7 +56,7 @@ async def complete_onboarding_step(
     return data
 
 
-@router.post("/onboarding/trial-bootstrap", summary="一键初始化商业试用环境")
+@router.post("/onboarding/trial-bootstrap", summary="一键初始化用户试用环境")
 async def bootstrap_trial_environment(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -70,13 +70,13 @@ async def bootstrap_trial_environment(
         user,
         action="bootstrap_trial_environment",
         module="delivery",
-        detail=f"初始化商业试用环境：新增 {created_count} 项，更新 {updated_count} 项",
+        detail=f"初始化用户试用环境：新增 {created_count} 项，更新 {updated_count} 项",
         request=request,
     )
     return result
 
 
-@router.post("/delivery/acceptance-runs", summary="创建商业交付验收报告")
+@router.post("/delivery/acceptance-runs", summary="创建交付验收报告")
 async def create_acceptance_run(
     data: AcceptanceRunRequest,
     request: Request,
@@ -99,7 +99,7 @@ async def create_acceptance_run(
     return CommercialOpsService.run_to_dict(run)
 
 
-@router.get("/delivery/acceptance-runs/{run_id}", summary="查看商业交付验收记录")
+@router.get("/delivery/acceptance-runs/{run_id}", summary="查看交付验收记录")
 async def get_acceptance_run(
     run_id: int,
     db: AsyncSession = Depends(get_db),
@@ -151,7 +151,7 @@ async def download_acceptance_json(
     return StreamingResponse(iter([content]), media_type="application/json; charset=utf-8", headers=headers)
 
 
-@router.post("/delivery/diagnostic-bundles", summary="生成商业支持诊断包")
+@router.post("/delivery/diagnostic-bundles", summary="生成技术支持诊断包")
 async def create_diagnostic_bundle(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -174,7 +174,7 @@ async def create_diagnostic_bundle(
     }
 
 
-@router.get("/delivery/diagnostic-bundles/{bundle_id}/download", summary="下载商业支持诊断包")
+@router.get("/delivery/diagnostic-bundles/{bundle_id}/download", summary="下载技术支持诊断包")
 async def download_diagnostic_bundle(
     bundle_id: int,
     db: AsyncSession = Depends(get_db),
@@ -199,7 +199,7 @@ async def engine_support_matrix(_user: dict[str, Any]=Depends(current_user)) -> 
     return CommercialOpsService.engine_matrix()
 
 
-@router.get("/support/about", summary="商业支持与关于信息")
+@router.get("/support/about", summary="技术支持与关于信息")
 async def support_about(
     db: AsyncSession = Depends(get_db),
     _user: dict[str, Any]=Depends(require_perm("system_config_manage")),

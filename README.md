@@ -1,6 +1,6 @@
 # Sagitta Control 矢准数据库安全管控平台
 
-Sagitta Control 是面向企业数据库安全管控场景的独立平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。当前正式版定位为 **v3.0.0 商业部署版 + v2-lite 授权体系**。
+Sagitta Control 是面向企业数据库安全管控场景的独立平台，覆盖数据库实例管理、SQL 工单审批上线、在线查询、数据字典、数据脱敏、SQL 洞察、运行态诊断、数据归档、审计追踪和主动通知等核心能力。当前正式版定位为 **v3.0.0 用户部署版 + v2-lite 授权体系**。
 
 ## 核心能力
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 | 文档 | 用途 |
 |---|---|
 | [README](README.md) | 项目入口、快速启动、研发命令和发布说明。 |
-| [产品设计文档](docs/sagitta_control_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和商业化边界。 |
+| [产品设计文档](docs/sagitta_control_prd.md) | 产品定位、角色、业务流程、模块设计、权限模型和产品化边界。 |
 | [用户使用手册](docs/user_manual.md) | 面向 DBA、研发、管理员、审计员的页面操作指南。 |
 | [安装部署手册](docs/installation_deployment.md) | 首次部署、服务器准备、Docker Compose / Helm 部署、授权激活和上线检查。 |
 | [运维升级手册](docs/operations_upgrade.md) | 日常巡检、备份、升级、回滚、日志诊断和安全基线。 |
@@ -169,10 +169,10 @@ npm audit --audit-level=high
 npm run build
 ```
 
-## 商业交付
+## 交付支持
 
-当前源码版本对应商业部署版本 `3.0.0`。Sagitta Control 的商业部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
+当前源码版本对应用户部署版本 `3.0.0`。Sagitta Control 的用户部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
 
-商业交付包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与商业发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；商业部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
+用户部署包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与用户部署发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；用户部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
 
 客户安装、升级和使用入口见 [Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy)，源码仓库内以 [安装部署手册](docs/installation_deployment.md)、[产品使用手册](docs/user_manual.md) 和 [运维升级手册](docs/operations_upgrade.md) 为准。
