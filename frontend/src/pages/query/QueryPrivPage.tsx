@@ -7,7 +7,7 @@ import { queryApi } from '@/api/query'
 import type { RiskPlan } from '@/api/workflow'
 import { approvalFlowApi } from '@/api/approvalFlow'
 import { instanceApi } from '@/api/instance'
-import DateTimeCell from '@/components/common/DateTimeCell'
+import { renderDateTimeCell } from '@/components/common/renderDateTimeCell'
 import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
@@ -23,8 +23,6 @@ import dayjs from 'dayjs'
 const { Text } = Typography
 const { Option } = Select
 const { useBreakpoint } = Grid
-
-const renderDateTimeCell = (value?: string | null) => <DateTimeCell value={value} />
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
   0: { label: '待审核', color: 'processing' },

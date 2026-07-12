@@ -12,6 +12,7 @@ import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import SectionCard from '@/components/common/SectionCard'
 import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { useAuthStore } from '@/store/auth'
+import { normalizeTemplateText } from './templateText'
 import apiClient from '@/api/client'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -39,12 +40,6 @@ type SubmitTemplateFormValues = {
   visibility: 'public' | 'private'
   is_active: boolean
 }
-
-const normalizeTemplateText = (value?: string | null) =>
-  (value || '')
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
 
 export default function WorkflowSubmit() {
   const navigate = useNavigate()

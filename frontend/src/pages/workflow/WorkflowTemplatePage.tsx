@@ -35,6 +35,7 @@ import {
   type WorkflowTemplatePayload,
   workflowTemplateApi,
 } from '@/api/workflowTemplate'
+import { normalizeTemplateText } from './templateText'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
@@ -47,12 +48,6 @@ import { getTablePaginationConfig } from '@/utils/tablePagination'
 const { Title, Text, Paragraph } = Typography
 
 type TemplateFormValues = WorkflowTemplatePayload
-
-const normalizeTemplateText = (value?: string | null) =>
-  (value || '')
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
 
 const syntaxTypeOptions = [
   { value: 0, label: '未知' },

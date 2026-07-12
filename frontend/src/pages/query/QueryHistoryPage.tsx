@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { instanceApi } from '@/api/instance'
 import { queryApi, type QueryLogItem } from '@/api/query'
-import DateTimeCell from '@/components/common/DateTimeCell'
+import { renderDateTimeCell } from '@/components/common/renderDateTimeCell'
 import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
@@ -18,8 +18,6 @@ const { Text } = Typography
 const { Option } = Select
 const { RangePicker } = DatePicker
 const { useBreakpoint } = Grid
-
-const renderDateTimeCell = (value?: string | null) => <DateTimeCell value={value} />
 
 const OPERATION_LABEL: Record<string, string> = {
   execute: '查询',
