@@ -10,8 +10,7 @@ import pytest
 
 from app.core.exceptions import AppException, ConflictException, NotFoundException
 from app.core.security import hash_password
-from app.services.user import ResourceGroupService as RGS
-from app.services.user import UserService as US
+from app.services.user import ResourceGroupService, UserService
 
 
 def _make_db() -> AsyncMock:
@@ -50,7 +49,7 @@ def _user(**over) -> SimpleNamespace:
 async def test_get_by_id_username_phone():
     u = _user()
     for method, args in [
-        (US.get_by_id, (1,)), (US.get_by_username, ("alice",)), (US.get_by_phone, ("139",)),
+        (UserService.get_by_id, (1,)), (UserService.get_by_username, ("alice",)), (UserService.get_by_phone, ("139",)),
     ]:
         db = _make_db()
         db.execute.return_value = _one(u)
@@ -63,13 +62,13 @@ async def test_get_by_id_username_phone():
 async def test_delete_user_found_and_missing():
     db = _make_db()
     db.execute.return_value = _one(_user())
-    await US.delete_user(db, 1)
+    await UserService.delete_user(db, 1)
     db.delete.assert_awaited_once()
 
     db2 = _make_db()
     db2.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await US.delete_user(db2, 404)
+        await UserService.delete_user(db2, 404)
 
 
 # ── change_password ─────────────────────────────────────────
@@ -79,7 +78,7 @@ async def test_change_password_success():
     user = _user()
     db = _make_db()
     db.execute.return_value = _one(user)
-    await US.change_password(db, 1, "OldPass@1", "NewPass@2")
+    await UserService.change_password(db, 1, "OldPass@1", "NewPass@2")
     # 新密码已写入且与旧哈希不同
     assert user.password != hash_password("OldPass@1") or True
     db.commit.assert_awaited_once()
@@ -90,7 +89,7 @@ async def test_change_password_wrong_old():
     db = _make_db()
     db.execute.return_value = _one(_user())
     with pytest.raises(AppException):
-        await US.change_password(db, 1, "WrongOld", "NewPass@2")
+        await UserService.change_password(db, 1, "WrongOld", "NewPass@2")
 
 
 @pytest.mark.asyncio
@@ -98,7 +97,7 @@ async def test_change_password_same_as_current():
     db = _make_db()
     db.execute.return_value = _one(_user())
     with pytest.raises(AppException):
-        await US.change_password(db, 1, "OldPass@1", "OldPass@1")
+        await UserService.change_password(db, 1, "OldPass@1", "OldPass@1")
 
 
 @pytest.mark.asyncio
@@ -106,7 +105,7 @@ async def test_change_password_user_missing():
     db = _make_db()
     db.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await US.change_password(db, 404, "a", "b")
+        await UserService.change_password(db, 404, "a", "b")
 
 
 # ── permissions ─────────────────────────────────────────────
@@ -115,28 +114,28 @@ async def test_change_password_user_missing():
 async def test_get_permissions_no_role_returns_empty():
     db = _make_db()
     db.execute.return_value = _one(_user(role_id=None))
-    assert await US.get_permissions(db, 1) == []
+    assert await UserService.get_permissions(db, 1) == []
 
 
 @pytest.mark.asyncio
 async def test_get_permissions_with_role():
     db = _make_db()
     db.execute.side_effect = [_one(_user()), _scalars(["query_submit", "sql_submit"])]
-    assert await US.get_permissions(db, 1) == ["query_submit", "sql_submit"]
+    assert await UserService.get_permissions(db, 1) == ["query_submit", "sql_submit"]
 
 
 @pytest.mark.asyncio
 async def test_get_merged_permissions_sorted_with_prefetched_user():
     db = _make_db()
     db.execute.return_value = _scalars(["b_perm", "a_perm"])
-    out = await US.get_merged_permissions(db, 1, db_user=_user())
+    out = await UserService.get_merged_permissions(db, 1, db_user=_user())
     assert out == ["a_perm", "b_perm"]
 
 
 @pytest.mark.asyncio
 async def test_get_merged_permissions_no_role():
     db = _make_db()
-    out = await US.get_merged_permissions(db, 1, db_user=_user(role_id=None))
+    out = await UserService.get_merged_permissions(db, 1, db_user=_user(role_id=None))
     assert out == []
 
 
@@ -144,7 +143,7 @@ async def test_get_merged_permissions_no_role():
 async def test_revoke_permissions_noop_when_no_perms():
     db = _make_db()
     db.execute.return_value = _scalars([])  # 无匹配权限码
-    await US.revoke_permissions(db, 1, ["x"])
+    await UserService.revoke_permissions(db, 1, ["x"])
     db.commit.assert_not_awaited()
 
 
@@ -156,7 +155,7 @@ async def test_revoke_permissions_success():
         _one(_user()),  # get_by_id
         MagicMock(),  # delete 执行
     ]
-    await US.revoke_permissions(db, 1, ["p1", "p2"])
+    await UserService.revoke_permissions(db, 1, ["p1", "p2"])
     db.commit.assert_awaited_once()
 
 
@@ -165,19 +164,19 @@ async def test_revoke_permissions_success():
 @pytest.mark.asyncio
 async def test_rg_get_by_ids_empty_and_populated():
     db = _make_db()
-    assert await RGS.get_by_ids(db, []) == []
+    assert await ResourceGroupService.get_by_ids(db, []) == []
     db.execute.assert_not_called()
 
     db2 = _make_db()
     db2.execute.return_value = _scalars([SimpleNamespace(id=1)])
-    assert len(await RGS.get_by_ids(db2, [1])) == 1
+    assert len(await ResourceGroupService.get_by_ids(db2, [1])) == 1
 
 
 @pytest.mark.asyncio
 async def test_rg_list_groups():
     db = _make_db()
     db.execute.side_effect = [_scalar_one(2), _scalars([SimpleNamespace(id=1), SimpleNamespace(id=2)])]
-    total, rows = await RGS.list_groups(db, search="prod")
+    total, rows = await ResourceGroupService.list_groups(db, search="prod")
     assert total == 2
     assert len(rows) == 2
 
@@ -188,7 +187,7 @@ async def test_rg_create_conflict():
     db.execute.return_value = _one(SimpleNamespace(id=9))
     data = SimpleNamespace(group_name="dup", instance_ids=[], user_group_ids=[])
     with pytest.raises(ConflictException):
-        await RGS.create(db, data)
+        await ResourceGroupService.create(db, data)
 
 
 @pytest.mark.asyncio
@@ -200,7 +199,7 @@ async def test_rg_update_metadata_only():
         model_dump=lambda **kw: {"description": "new"},
         instance_ids=None, user_group_ids=None,
     )
-    out = await RGS.update(db, 5, data)
+    out = await ResourceGroupService.update(db, 5, data)
     assert out.description == "new"
     db.commit.assert_awaited_once()
 
@@ -211,17 +210,17 @@ async def test_rg_update_missing():
     db.execute.return_value = _one(None)
     data = SimpleNamespace(model_dump=lambda **kw: {}, instance_ids=None, user_group_ids=None)
     with pytest.raises(NotFoundException):
-        await RGS.update(db, 404, data)
+        await ResourceGroupService.update(db, 404, data)
 
 
 @pytest.mark.asyncio
 async def test_rg_delete_found_and_missing():
     db = _make_db()
     db.execute.return_value = _one(SimpleNamespace(id=5))
-    await RGS.delete(db, 5)
+    await ResourceGroupService.delete(db, 5)
     db.delete.assert_awaited_once()
 
     db2 = _make_db()
     db2.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await RGS.delete(db2, 404)
+        await ResourceGroupService.delete(db2, 404)

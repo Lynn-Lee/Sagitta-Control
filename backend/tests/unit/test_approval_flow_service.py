@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.exceptions import AppException, NotFoundException
-from app.services.approval_flow import ApprovalFlowService as AFS
+from app.services.approval_flow import ApprovalFlowService
 
 
 def _node(nid: int = 1) -> SimpleNamespace:
@@ -52,7 +52,7 @@ def _make_db() -> AsyncMock:
 async def test_list_flows_serializes_nodes():
     db = _make_db()
     db.execute.return_value = _scalars_all([_flow()])
-    out = await AFS.list_flows(db)
+    out = await ApprovalFlowService.list_flows(db)
     assert len(out) == 1
     assert out[0]["node_count"] == 1
     assert out[0]["nodes"][0]["approver_ids"] == [3, 7]
@@ -62,7 +62,7 @@ async def test_list_flows_serializes_nodes():
 async def test_list_flows_include_inactive_branch():
     db = _make_db()
     db.execute.return_value = _scalars_all([])
-    assert await AFS.list_flows(db, include_inactive=True) == []
+    assert await ApprovalFlowService.list_flows(db, include_inactive=True) == []
 
 
 @pytest.mark.asyncio
@@ -72,7 +72,7 @@ async def test_get_flow_found_and_optional_fields():
     node.approver_role_id = 9
     db = _make_db()
     db.execute.return_value = _one(_flow(nodes=[node]))
-    out = await AFS.get_flow(db, 5)
+    out = await ApprovalFlowService.get_flow(db, 5)
     assert out["nodes"][0]["approver_group_id"] == 3
     assert out["nodes"][0]["approver_role_id"] == 9
 
@@ -82,7 +82,7 @@ async def test_get_flow_missing_raises():
     db = _make_db()
     db.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await AFS.get_flow(db, 404)
+        await ApprovalFlowService.get_flow(db, 404)
 
 
 # ── create_flow ─────────────────────────────────────────────
@@ -98,7 +98,7 @@ async def test_create_flow_persists_and_reloads():
     # create_flow 末尾 get_flow 重新加载
     db.execute.return_value = _one(_flow())
 
-    out = await AFS.create_flow(db, data, {"username": "admin", "id": 1})
+    out = await ApprovalFlowService.create_flow(db, data, {"username": "admin", "id": 1})
 
     assert out["name"] == "流程A"
     db.flush.assert_awaited()
@@ -116,7 +116,7 @@ async def test_update_flow_metadata_only():
     db.execute.side_effect = [_one(flow), _one(flow)]  # 加载 + 末尾 get_flow
     data = SimpleNamespace(name="新名", description="新描述", is_active=False, nodes=None)
 
-    await AFS.update_flow(db, 5, data)
+    await ApprovalFlowService.update_flow(db, 5, data)
 
     assert flow.name == "新名"
     assert flow.description == "新描述"
@@ -135,7 +135,7 @@ async def test_update_flow_replaces_nodes():
     db.execute.side_effect = [_one(flow), _one(_flow())]
     data = SimpleNamespace(name=None, description=None, is_active=None, nodes=[node_data])
 
-    await AFS.update_flow(db, 5, data)
+    await ApprovalFlowService.update_flow(db, 5, data)
 
     # 旧 2 节点删除，新增 1 节点
     assert db.delete.await_count == 2
@@ -148,7 +148,7 @@ async def test_update_flow_missing_raises():
     db.execute.return_value = _one(None)
     data = SimpleNamespace(name="x", description=None, is_active=None, nodes=None)
     with pytest.raises(NotFoundException):
-        await AFS.update_flow(db, 404, data)
+        await ApprovalFlowService.update_flow(db, 404, data)
 
 
 # ── deactivate_flow ─────────────────────────────────────────
@@ -158,7 +158,7 @@ async def test_deactivate_flow_sets_inactive():
     flow = _flow()
     db = _make_db()
     db.execute.return_value = _one(flow)
-    await AFS.deactivate_flow(db, 5)
+    await ApprovalFlowService.deactivate_flow(db, 5)
     assert flow.is_active is False
     db.commit.assert_awaited_once()
 
@@ -168,7 +168,7 @@ async def test_deactivate_flow_missing_raises():
     db = _make_db()
     db.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await AFS.deactivate_flow(db, 404)
+        await ApprovalFlowService.deactivate_flow(db, 404)
 
 
 # ── snapshot_for_workflow ───────────────────────────────────
@@ -177,7 +177,7 @@ async def test_deactivate_flow_missing_raises():
 async def test_snapshot_returns_pending_nodes():
     db = _make_db()
     db.execute.return_value = _one(_flow())
-    snap = await AFS.snapshot_for_workflow(db, 5)
+    snap = await ApprovalFlowService.snapshot_for_workflow(db, 5)
     assert snap[0]["status"] == 0
     assert snap[0]["operator"] is None
     assert snap[0]["approver_ids"] == [3, 7]
@@ -188,7 +188,7 @@ async def test_snapshot_inactive_flow_raises():
     db = _make_db()
     db.execute.return_value = _one(_flow(active=False))
     with pytest.raises(AppException):
-        await AFS.snapshot_for_workflow(db, 5)
+        await ApprovalFlowService.snapshot_for_workflow(db, 5)
 
 
 @pytest.mark.asyncio
@@ -196,7 +196,7 @@ async def test_snapshot_no_nodes_raises():
     db = _make_db()
     db.execute.return_value = _one(_flow(nodes=[]))
     with pytest.raises(AppException):
-        await AFS.snapshot_for_workflow(db, 5)
+        await ApprovalFlowService.snapshot_for_workflow(db, 5)
 
 
 @pytest.mark.asyncio
@@ -204,4 +204,4 @@ async def test_snapshot_missing_flow_raises():
     db = _make_db()
     db.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await AFS.snapshot_for_workflow(db, 404)
+        await ApprovalFlowService.snapshot_for_workflow(db, 404)

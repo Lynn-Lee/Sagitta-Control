@@ -155,7 +155,7 @@ jobs:
 
       - name: 后端单元测试
         working-directory: backend
-        run: pytest tests/unit/ -v --cov=app --cov-fail-under=55
+        run: pytest tests/unit/ -v --cov=app --cov-fail-under=58
 
       - name: 引擎矩阵契约校验
         run: python3 scripts/validate-engine-matrix-contract.py
