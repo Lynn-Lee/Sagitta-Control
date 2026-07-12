@@ -12,15 +12,15 @@ def test_backend_ci_enforces_higher_unit_coverage_threshold():
     match = re.search(r"--cov-fail-under=(\d+)", ci)
 
     assert match is not None
-    assert int(match.group(1)) >= 45
+    assert int(match.group(1)) >= 58
 
 
-def test_backend_mypy_baseline_covers_split_quality_modules():
-    targets = set((ROOT / "backend" / "mypy-baseline.txt").read_text(encoding="utf-8").splitlines())
+def test_backend_ci_enforces_full_strict_mypy_gate():
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert "app/engines/oracle_capacity.py" in targets
-    assert "app/services/commercial_readiness.py" in targets
-    assert "app/services/dashboard_metrics.py" in targets
+    assert "mypy app" in ci
+    assert "mypy-baseline.txt" not in ci
+    assert not (ROOT / "backend" / "mypy-baseline.txt").exists()
 
 
 def test_large_module_split_has_dedicated_helpers():
