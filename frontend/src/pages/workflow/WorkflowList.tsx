@@ -16,6 +16,7 @@ import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { renderRiskTag as renderRisk } from '@/components/common/renderRiskTag'
+import { STATUS_COLOR } from './workflowStatus'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -25,10 +26,6 @@ const { Option } = Select
 const { RangePicker } = DatePicker
 const { useBreakpoint } = Grid
 
-const STATUS_COLOR: Record<number, string> = {
-  0: 'processing', 1: 'error', 2: 'success', 3: 'warning',
-  4: 'default', 5: 'processing', 6: 'success', 7: 'error', 8: 'default',
-}
 
 const renderWorkflowName = (navigate: ReturnType<typeof useNavigate>, maxWidth = 350) =>
   (name: string, r: any) => (

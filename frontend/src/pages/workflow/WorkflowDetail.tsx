@@ -12,14 +12,11 @@ import SectionLoading from '@/components/common/SectionLoading'
 import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
 import { useAuthStore } from '@/store/auth'
 import { formatDateTime } from '@/utils/datetime'
+import { STATUS_COLOR } from './workflowStatus'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
 
-const STATUS_COLOR: Record<number, string> = {
-  0: 'processing', 1: 'error', 2: 'success', 3: 'warning',
-  4: 'default', 5: 'processing', 6: 'success', 7: 'error', 8: 'default',
-}
 
 export default function WorkflowDetail() {
   const { id } = useParams<{ id: string }>()
