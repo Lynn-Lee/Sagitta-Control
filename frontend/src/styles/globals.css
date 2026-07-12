@@ -231,6 +231,55 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   max-width: 100%;
 }
 
+.sagitta-filter-toolbar,
+.sagitta-filter-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.sagitta-filter-search-input {
+  flex: 0 1 360px;
+  min-width: 240px;
+}
+
+.sagitta-filter-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.sagitta-filter-actions .ant-btn {
+  flex: 0 0 auto;
+}
+
+.sagitta-workflow-filter-tabs {
+  width: 100%;
+}
+
+.sagitta-workflow-filter-tabs .ant-tabs {
+  width: 100%;
+}
+
+.sagitta-workflow-filter-tabs .ant-tabs-nav {
+  margin-bottom: 10px;
+}
+
+.sagitta-workflow-filter-toolbar {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .sagitta-filter-search-input,
+  .sagitta-filter-actions,
+  .sagitta-filter-actions .ant-btn {
+    flex: 1 1 100%;
+  }
+}
+
 .sagitta-table-empty {
   padding: 10px 0;
 }
@@ -530,10 +579,46 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
   min-width: 132px;
 }
 
+.sagitta-user-group-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.sagitta-user-group-filter-search {
+  grid-column: span 2;
+  min-width: 280px;
+}
+
+.sagitta-user-group-filter-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.sagitta-user-group-filter-export-scope {
+  flex: 0 0 280px;
+  min-width: 240px;
+}
+
+.sagitta-user-group-filter-search-button,
+.sagitta-user-group-filter-reset {
+  flex: 0 0 auto;
+  min-width: 132px;
+}
+
 @media (max-width: 900px) {
   .sagitta-user-filter-grid,
   .sagitta-user-filter-search,
-  .sagitta-user-filter-actions {
+  .sagitta-user-filter-actions,
+  .sagitta-user-group-filter-grid,
+  .sagitta-user-group-filter-search,
+  .sagitta-user-group-filter-actions {
     grid-template-columns: 1fr;
     grid-column: auto;
     min-width: 0;
@@ -541,7 +626,10 @@ code, kbd, pre, .font-mono { font-family: var(--font-mono) !important; }
 
   .sagitta-user-filter-export-scope,
   .sagitta-user-filter-search-button,
-  .sagitta-user-filter-reset {
+  .sagitta-user-filter-reset,
+  .sagitta-user-group-filter-export-scope,
+  .sagitta-user-group-filter-search-button,
+  .sagitta-user-group-filter-reset {
     flex: 1 1 100%;
   }
 }

@@ -19,6 +19,7 @@ const RoleManagement: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [form] = Form.useForm()
   const [messageApi, contextHolder] = message.useMessage()
   const qc = useQueryClient()
@@ -163,13 +164,26 @@ const RoleManagement: React.FC = () => {
       />
 
       <FilterCard marginBottom={16}>
-        <Input.Search
-          placeholder="搜索角色标识或中文名"
-          allowClear
-          enterButton={<><SearchOutlined />搜索</>}
-          onSearch={setSearch}
-          style={{ width: isMobile ? '100%' : 400, maxWidth: '100%' }}
-        />
+        <div className="sagitta-filter-search-row">
+          <Input
+            className="sagitta-filter-search-input"
+            placeholder="搜索角色标识或中文名"
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
+            style={{ width: isMobile ? '100%' : undefined }}
+            value={searchDraft}
+            onPressEnter={() => setSearch(searchDraft)}
+            onChange={e => {
+              setSearchDraft(e.target.value)
+              if (!e.target.value) setSearch('')
+            }}
+          />
+          <div className="sagitta-filter-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => setSearch(searchDraft)}>
+              搜索
+            </Button>
+          </div>
+        </div>
       </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>

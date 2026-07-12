@@ -458,10 +458,10 @@ export default function DataDictPage() {
                 tables.length ? (
                   <>
                     <div style={{ padding: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                      <Input.Search
+                      <Input
                         allowClear
                         placeholder="搜索表名关键字"
-                        enterButton={<><SearchOutlined />搜索</>}
+                        prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
                         value={tableKeyword}
                         onChange={(e) => setTableKeyword(e.target.value)}
                       />

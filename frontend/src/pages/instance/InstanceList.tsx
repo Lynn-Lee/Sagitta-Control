@@ -209,6 +209,7 @@ export default function InstanceList() {
   const [selectedInstance, setSelectedInstance] = useState<InstanceItem | null>(null)
   const [editRecord, setEditRecord] = useState<InstanceItem | null>(null)
   const [search, setSearch] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [testResults, setTestResults] = useState<Record<number, any>>({})
@@ -362,10 +363,26 @@ export default function InstanceList() {
       />
 
       <FilterCard title="筛选实例">
-        <Input.Search placeholder="搜索实例名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
-          enterButton={<><SearchOutlined />搜索</>}
-          onSearch={(value) => { setSearch(value); setPage(1) }}
-          onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
+        <div className="sagitta-filter-search-row">
+          <Input
+            className="sagitta-filter-search-input"
+            placeholder="搜索实例名称"
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
+            style={{ width: isMobile ? '100%' : undefined }}
+            value={searchDraft}
+            onPressEnter={() => { setSearch(searchDraft); setPage(1) }}
+            onChange={e => {
+              setSearchDraft(e.target.value)
+              if (!e.target.value) { setSearch(''); setPage(1) }
+            }}
+          />
+          <div className="sagitta-filter-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => { setSearch(searchDraft); setPage(1) }}>
+              搜索
+            </Button>
+          </div>
+        </div>
       </FilterCard>
 
       <SectionCard title="实例列表" extra={<Text type="secondary">共 {data?.total ?? 0} 个实例</Text>} bodyPadding={0} marginBottom={0}>

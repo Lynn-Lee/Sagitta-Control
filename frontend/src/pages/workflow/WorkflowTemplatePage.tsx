@@ -62,6 +62,7 @@ export default function WorkflowTemplatePage() {
   const canManageGlobal = Boolean(user?.is_superuser || user?.permissions?.some((p) => p === 'sql_review' || p === 'sql_execute'))
 
   const [search, setSearch] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewData, setPreviewData] = useState<WorkflowTemplateItem | null>(null)
@@ -374,14 +375,25 @@ export default function WorkflowTemplatePage() {
       />
 
       <FilterCard>
-        <Input.Search
-          placeholder="搜索模板名称或描述"
-          allowClear
-          enterButton={<><SearchOutlined />搜索</>}
-          style={{ width: 320 }}
-          onSearch={(value) => { setSearch(value); setPage(1) }}
-          onChange={(e) => { if (!e.target.value) { setSearch(''); setPage(1) } }}
-        />
+        <div className="sagitta-filter-search-row">
+          <Input
+            className="sagitta-filter-search-input"
+            placeholder="搜索模板名称或描述"
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
+            value={searchDraft}
+            onPressEnter={() => { setSearch(searchDraft); setPage(1) }}
+            onChange={(e) => {
+              setSearchDraft(e.target.value)
+              if (!e.target.value) { setSearch(''); setPage(1) }
+            }}
+          />
+          <div className="sagitta-filter-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => { setSearch(searchDraft); setPage(1) }}>
+              搜索
+            </Button>
+          </div>
+        </div>
       </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>

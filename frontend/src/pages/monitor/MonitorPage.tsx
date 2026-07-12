@@ -805,7 +805,7 @@ export default function MonitorPage() {
                             <Select allowClear placeholder="库/Schema" style={{ width: 220 }} value={tableDb} onChange={(value) => { setTableDb(value); setTablePage(1) }}>
                               {dbItems.map((item: any) => <Option key={item.db_name} value={item.db_name}>{item.db_name}</Option>)}
                             </Select>
-                            <Input.Search allowClear enterButton={<><SearchOutlined />搜索</>} placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} onSearch={(value) => { setTableSearch(value); setTablePage(1) }} />
+                            <Input allowClear prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />} placeholder="搜索表名" style={{ width: 260 }} value={tableSearch} onChange={(event) => { setTableSearch(event.target.value); setTablePage(1) }} />
                           </Space>
                           <Table dataSource={tableCapacity?.items || []} columns={tableColumns} rowKey={(row: any) => `${row.db_name}.${row.table_name}`} loading={tableLoading} scroll={{ x: 1180 }} pagination={getTablePaginationConfig({
                             total: tableCapacity?.total,

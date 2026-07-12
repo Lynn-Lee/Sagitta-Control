@@ -484,10 +484,10 @@ export default function WorkflowSubmit() {
         width={980}
       >
         <Space direction="vertical" style={{ width: '100%' }} size={16}>
-          <Input.Search
+          <Input
             allowClear
             placeholder="搜索模板名称或描述"
-            enterButton={<><SearchOutlined />搜索</>}
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
           />

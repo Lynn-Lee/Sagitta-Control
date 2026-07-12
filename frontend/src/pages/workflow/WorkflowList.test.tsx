@@ -68,6 +68,15 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 describe('WorkflowList', () => {
+  it('separates workflow scope tabs from the filter toolbar', () => {
+    const { container } = render(<WorkflowList />)
+
+    expect(container.querySelector('.sagitta-workflow-filter-tabs')).toBeInTheDocument()
+    expect(container.querySelector('.sagitta-workflow-filter-toolbar')).toBeInTheDocument()
+    expect(screen.getByRole('tablist').closest('.sagitta-workflow-filter-tabs')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('工单名称').closest('.sagitta-workflow-filter-toolbar')).toBeInTheDocument()
+  })
+
   it('renders workflow names with compact table button styling', () => {
     render(<WorkflowList />)
 

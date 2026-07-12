@@ -29,6 +29,7 @@ export default function ResourceGroupManagement() {
   const [editRecord, setEditRecord] = useState<any>(null)
   const [currentRg, setCurrentRg] = useState<any>(null)
   const [search, setSearch] = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [ugTargetKeys, setUgTargetKeys] = useState<string[]>([])
@@ -237,10 +238,26 @@ export default function ResourceGroupManagement() {
       />
 
       <FilterCard>
-        <Input.Search placeholder="搜索资源组名称" allowClear style={{ width: isMobile ? '100%' : 260 }}
-          enterButton={<><SearchOutlined />搜索</>}
-          onSearch={(value) => { setSearch(value); setPage(1) }}
-          onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }} />
+        <div className="sagitta-filter-search-row">
+          <Input
+            className="sagitta-filter-search-input"
+            placeholder="搜索资源组名称"
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
+            style={{ width: isMobile ? '100%' : undefined }}
+            value={searchDraft}
+            onPressEnter={() => { setSearch(searchDraft); setPage(1) }}
+            onChange={e => {
+              setSearchDraft(e.target.value)
+              if (!e.target.value) { setSearch(''); setPage(1) }
+            }}
+          />
+          <div className="sagitta-filter-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => { setSearch(searchDraft); setPage(1) }}>
+              搜索
+            </Button>
+          </div>
+        </div>
       </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>

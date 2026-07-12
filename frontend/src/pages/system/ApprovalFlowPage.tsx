@@ -10,6 +10,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { approvalFlowApi, type ApprovalFlowNode } from '@/api/approvalFlow'
 import { userApi } from '@/api/system'
+import FilterCard from '@/components/common/FilterCard'
 import PageHeader from '@/components/common/PageHeader'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { formatDateTime } from '@/utils/datetime'
@@ -37,6 +38,7 @@ export default function ApprovalFlowPage() {
   const [drawerOpen, setDrawerOpen]   = useState(false)
   const [editId, setEditId]           = useState<number | null>(null)
   const [search, setSearch]           = useState('')
+  const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage]               = useState(1)
   const [pageSize, setPageSize]       = useState(20)
   const [form] = Form.useForm()
@@ -200,22 +202,35 @@ export default function ApprovalFlowPage() {
       <PageHeader
         title="审批流管理"
         actions={(
-          <Space wrap size={[8, 8]} style={isMobile ? { display: 'flex', width: '100%' } : undefined}>
-            <Input.Search
-              placeholder="搜索审批流名称"
-              allowClear
-              enterButton={<><SearchOutlined />搜索</>}
-              style={{ width: isMobile ? '100%' : 220 }}
-              onSearch={v => { setSearch(v); setPage(1) }}
-              onChange={e => { if (!e.target.value) { setSearch(''); setPage(1) } }}
-            />
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
-              style={isMobile ? { width: '100%' } : undefined}>
-              新建审批流
-            </Button>
-          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
+            style={isMobile ? { width: '100%' } : undefined}>
+            新建审批流
+          </Button>
         )}
       />
+
+      <FilterCard marginBottom={16}>
+        <div className="sagitta-filter-search-row">
+          <Input
+            className="sagitta-filter-search-input"
+            placeholder="搜索审批流名称"
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
+            style={{ width: isMobile ? '100%' : undefined }}
+            value={searchDraft}
+            onPressEnter={() => { setSearch(searchDraft); setPage(1) }}
+            onChange={e => {
+              setSearchDraft(e.target.value)
+              if (!e.target.value) { setSearch(''); setPage(1) }
+            }}
+          />
+          <div className="sagitta-filter-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => { setSearch(searchDraft); setPage(1) }}>
+              搜索
+            </Button>
+          </div>
+        </div>
+      </FilterCard>
 
       <Card style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}>
         <Table

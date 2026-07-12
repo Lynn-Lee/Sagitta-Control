@@ -423,21 +423,22 @@ const UserGroupManagement: React.FC = () => {
       />
 
       <FilterCard marginBottom={16}>
-        <Space wrap size={[12, 12]} style={{ display: 'flex' }}>
-          <Input.Search
+        <div className="sagitta-user-group-filter-grid">
+          <Input
+            className="sagitta-user-group-filter-search"
             placeholder="搜索用户组标识或中文名"
             allowClear
-            enterButton={<><SearchOutlined />搜索</>}
+            prefix={<SearchOutlined style={{ color: '#AEAEB2' }} />}
             value={search}
-            onSearch={(value) => { setSearch(value); setPage(1) }}
+            onPressEnter={() => setPage(1)}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            style={{ width: isMobile ? '100%' : 400, maxWidth: '100%' }}
+            style={{ width: '100%' }}
           />
           <Select
             mode="multiple"
             allowClear
             placeholder="组长"
-            style={{ width: isMobile ? '100%' : 240 }}
+            style={{ width: '100%' }}
             options={leaderOptions}
             value={leaderIds}
             onChange={(value) => handleFilterChange(setLeaderIds, value)}
@@ -448,7 +449,7 @@ const UserGroupManagement: React.FC = () => {
             mode="multiple"
             allowClear
             placeholder="上级组"
-            style={{ width: isMobile ? '100%' : 220 }}
+            style={{ width: '100%' }}
             options={parentOptions}
             value={parentIds}
             onChange={(value) => handleFilterChange(setParentIds, value)}
@@ -459,7 +460,7 @@ const UserGroupManagement: React.FC = () => {
             mode="multiple"
             allowClear
             placeholder="关联资源组"
-            style={{ width: isMobile ? '100%' : 240 }}
+            style={{ width: '100%' }}
             options={allRgItems.map((rg: any) => ({
               value: rg.id,
               label: rg.group_name_cn || rg.group_name,
@@ -473,24 +474,36 @@ const UserGroupManagement: React.FC = () => {
             mode="multiple"
             allowClear
             placeholder="状态"
-            style={{ width: isMobile ? '100%' : 180 }}
+            style={{ width: '100%' }}
             options={statusOptions}
             value={statuses}
             onChange={(value) => handleFilterChange(setStatuses, value)}
           />
-          <Select
-            style={{ width: isMobile ? '100%' : 220 }}
-            options={[
-              { value: 'filtered', label: '导出当前筛选结果' },
-              { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
-            ]}
-            value={exportScope}
-            onChange={setExportScope}
-          />
-          <Button className="sagitta-action-btn sagitta-action-btn--refresh" icon={<ReloadOutlined />} onClick={resetFilters} style={isMobile ? { width: '100%' } : undefined}>
-            重置筛选
-          </Button>
-        </Space>
+          <div className="sagitta-user-group-filter-actions">
+            <div className="sagitta-user-group-filter-export-scope">
+              <Select
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'filtered', label: '导出当前筛选结果' },
+                  { value: 'selected', label: `导出当前勾选结果${selectedRowKeys.length ? `（${selectedRowKeys.length}）` : ''}` },
+                ]}
+                value={exportScope}
+                onChange={setExportScope}
+              />
+            </div>
+            <Button
+              type="primary"
+              className="sagitta-user-group-filter-search-button"
+              icon={<SearchOutlined />}
+              onClick={() => setPage(1)}
+            >
+              搜索
+            </Button>
+            <Button className="sagitta-action-btn sagitta-action-btn--refresh sagitta-user-group-filter-reset" icon={<ReloadOutlined />} onClick={resetFilters}>
+              重置筛选
+            </Button>
+          </div>
+        </div>
         <div style={{ marginTop: 12 }}>
           <Space wrap size={[8, 8]} style={{
             display: 'flex',

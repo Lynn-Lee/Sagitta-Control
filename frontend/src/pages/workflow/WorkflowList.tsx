@@ -305,21 +305,22 @@ export default function WorkflowList() {
 
       {/* 查询条件 */}
       <FilterCard title="筛选工单">
-        <Tabs
-          activeKey={activeTab}
-          onChange={(key) => {
-            setActiveTab(key as 'mine' | 'audit' | 'execute' | 'scope')
-            setPage(1)
-          }}
-          items={[
-            { key: 'mine', label: '我的工单' },
-            { key: 'audit', label: '审批记录' },
-            { key: 'execute', label: '执行记录' },
-            ...(showScopeTab ? [{ key: 'scope', label: `工单视图（${scopePreview?.scope?.label || '统一视角'}）` }] : []),
-          ]}
-          style={{ marginBottom: 8 }}
-        />
-        <Space wrap size={[8, 8]} style={{ display: 'flex' }}>
+        <div className="sagitta-workflow-filter-tabs">
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key as 'mine' | 'audit' | 'execute' | 'scope')
+              setPage(1)
+            }}
+            items={[
+              { key: 'mine', label: '我的工单' },
+              { key: 'audit', label: '审批记录' },
+              { key: 'execute', label: '执行记录' },
+              ...(showScopeTab ? [{ key: 'scope', label: `工单视图（${scopePreview?.scope?.label || '统一视角'}）` }] : []),
+            ]}
+          />
+        </div>
+        <Space wrap size={[8, 8]} className="sagitta-workflow-filter-toolbar" style={{ display: 'flex' }}>
           <Input
             placeholder="工单名称"
             allowClear
