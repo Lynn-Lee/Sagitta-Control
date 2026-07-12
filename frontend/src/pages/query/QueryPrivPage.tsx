@@ -12,6 +12,8 @@ import PageHeader from '@/components/common/PageHeader'
 import RiskPlanAlert from '@/components/common/RiskPlanAlert'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
+import { renderRiskTag } from '@/components/common/renderRiskTag'
+import { RISK_LEVEL_META, type RiskMeta } from '@/utils/riskLevel'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
@@ -37,18 +39,9 @@ const SCOPE_META: Record<string, { label: string; color: string }> = {
   table: { label: '表级', color: 'purple' },
 }
 
-const RISK_META: Record<string, { label: string; color: string; alertType: 'success' | 'warning' | 'error' | 'info' }> = {
-  low: { label: '低风险', color: 'success', alertType: 'success' },
-  medium: { label: '中风险', color: 'warning', alertType: 'warning' },
-  high: { label: '高风险', color: 'error', alertType: 'error' },
-}
-
-const renderRiskTag = (level?: string, summary?: string) => {
-  if (!level) return <Text type="secondary">—</Text>
-  const meta = RISK_META[level] || { label: level, color: 'default', alertType: 'info' as const }
-  const tag = <Tag color={meta.color}>{meta.label}</Tag>
-  return summary ? <Tooltip title={summary}>{tag}</Tooltip> : tag
-}
+// 查询权限页保留自身回落语义：未知等级显示原始 level 文本、default 色。
+const resolveQueryRiskMeta = (level: string): RiskMeta =>
+  RISK_LEVEL_META[level as keyof typeof RISK_LEVEL_META] || { label: level, color: 'default', alertType: 'info' }
 
 export default function QueryPrivPage() {
   const { user } = useAuthStore()
@@ -419,7 +412,7 @@ export default function QueryPrivPage() {
       title: '风险',
       dataIndex: 'risk_level',
       width: 100,
-      render: (v: string, r: any) => renderRiskTag(v, r.risk_summary),
+      render: (v: string, r: any) => renderRiskTag(v, r.risk_summary, resolveQueryRiskMeta),
     },
     { title: '当前节点', dataIndex: 'current_node_name', width: 150, ellipsis: { showTitle: false }, render: renderTruncatedCell },
     {
@@ -639,7 +632,7 @@ export default function QueryPrivPage() {
             <Descriptions.Item label="状态">
               <Tag color={STATUS_MAP[detailTarget.status]?.color || 'default'}>{STATUS_MAP[detailTarget.status]?.label || '—'}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="风险">{renderRiskTag(detailTarget.risk_level, detailTarget.risk_summary)}</Descriptions.Item>
+            <Descriptions.Item label="风险">{renderRiskTag(detailTarget.risk_level, detailTarget.risk_summary, resolveQueryRiskMeta)}</Descriptions.Item>
             <Descriptions.Item label="当前节点">{detailTarget.current_node_name || '—'}</Descriptions.Item>
             <Descriptions.Item label="提交时间" span={2}>{formatDateTime(detailTarget.created_at)}</Descriptions.Item>
             <Descriptions.Item label="申请理由" span={2}>{detailTarget.apply_reason || '—'}</Descriptions.Item>
@@ -760,8 +753,8 @@ export default function QueryPrivPage() {
         {auditTarget?.risk_level && (
           <Alert
             showIcon
-            type={RISK_META[auditTarget.risk_level]?.alertType || 'info'}
-            message={auditTarget.risk_level === 'high' ? '高风险查询权限申请' : `${RISK_META[auditTarget.risk_level]?.label || auditTarget.risk_level}提示`}
+            type={RISK_LEVEL_META[auditTarget.risk_level as keyof typeof RISK_LEVEL_META]?.alertType || 'info'}
+            message={auditTarget.risk_level === 'high' ? '高风险查询权限申请' : `${RISK_LEVEL_META[auditTarget.risk_level as keyof typeof RISK_LEVEL_META]?.label || auditTarget.risk_level}提示`}
             description={
               <Space direction="vertical" size={6} style={{ width: '100%' }}>
                 {auditTarget.risk_summary && <Text>{auditTarget.risk_summary}</Text>}

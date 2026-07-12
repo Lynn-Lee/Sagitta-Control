@@ -29,6 +29,7 @@ import SectionCard from '@/components/common/SectionCard'
 import SectionLoading from '@/components/common/SectionLoading'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
 import { renderTruncatedCell } from '@/components/common/renderTruncatedCell'
+import { renderRiskTag } from '@/components/common/renderRiskTag'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { formatDateTime } from '@/utils/datetime'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -55,17 +56,6 @@ const displayJobNo = (job?: ArchiveJob) => job?.workflow_id || job?.id
 const progressPercent = (job?: ArchiveJob) => {
   if (!job || !job.estimated_rows) return 0
   return Math.min(100, Math.round((job.processed_rows / job.estimated_rows) * 100))
-}
-
-const renderRiskTag = (level?: string, summary?: string) => {
-  if (!level) return <Text type="secondary">—</Text>
-  const meta = level === 'high'
-    ? { color: 'error', label: '高风险' }
-    : level === 'medium'
-      ? { color: 'warning', label: '中风险' }
-      : { color: 'success', label: '低风险' }
-  const tag = <Tag color={meta.color}>{meta.label}</Tag>
-  return summary ? <Tooltip title={summary}>{tag}</Tooltip> : tag
 }
 
 export default function ArchivePage() {

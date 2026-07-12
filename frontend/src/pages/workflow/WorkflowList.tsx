@@ -15,6 +15,7 @@ import PageHeader from '@/components/common/PageHeader'
 import SectionCard from '@/components/common/SectionCard'
 import TableEmptyState from '@/components/common/TableEmptyState'
 import { TruncatedCell } from '@/components/common/TruncatedCell'
+import { renderRiskTag as renderRisk } from '@/components/common/renderRiskTag'
 import { useAuthStore } from '@/store/auth'
 import { formatDbTypeLabel } from '@/utils/dbType'
 import { getTablePaginationConfig } from '@/utils/tablePagination'
@@ -100,17 +101,6 @@ const renderStatus = (s: number, r: any) => (
     {r.status_desc}
   </Tag>
 )
-
-const renderRisk = (level?: string, summary?: string) => {
-  if (!level) return <Text type="secondary">—</Text>
-  const meta = level === 'high'
-    ? { color: 'error', label: '高风险' }
-    : level === 'medium'
-      ? { color: 'warning', label: '中风险' }
-      : { color: 'success', label: '低风险' }
-  const tag = <Tag color={meta.color}>{meta.label}</Tag>
-  return summary ? <Tooltip title={summary}>{tag}</Tooltip> : tag
-}
 
 const renderWorkflowType = (label?: string) => {
   const text = label || 'SQL 工单'
