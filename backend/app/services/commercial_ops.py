@@ -1266,11 +1266,6 @@ class CommercialOpsService:
             "usage": usage,
             "runtime": runtime,
             "readiness": readiness,
-            "docs": [
-                {"label": "用户使用手册", "path": "/docs/user_manual.md"},
-                {"label": "安装部署手册", "path": "/docs/installation_deployment.md"},
-                {"label": "运维升级手册", "path": "/docs/operations_upgrade.md"},
-            ],
             "support": {
                 "email": "support@loveai.asia",
                 "license_server": settings.LICENSE_SERVER_URL or "https://license.loveai.asia",

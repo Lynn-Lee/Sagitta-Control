@@ -624,11 +624,6 @@ export default function CommercialOpsPage() {
                       </Space>
                     </Descriptions.Item>
                   </Descriptions>
-                  <Space wrap style={{ marginTop: 12 }}>
-                    {(about?.docs || []).map((doc: any) => (
-                      <Typography.Link key={doc.path} href={doc.path} target="_blank">{doc.label}</Typography.Link>
-                    ))}
-                  </Space>
                 </Card>
                 <Card title="引擎支持矩阵">
                   <Table
