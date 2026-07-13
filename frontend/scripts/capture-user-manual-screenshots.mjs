@@ -23,9 +23,9 @@ const pages = [
   ['09-query-workbench.png', '/query', '在线查询工作台'],
   ['10-query-privileges.png', '/query/privileges', '查询权限申请页'],
   ['11-query-history.png', '/query/history', '查询历史页面'],
-  ['12-monitor.png', '/monitor', '运行诊断页面'],
-  ['12-monitor-sql-analysis.png', '/monitor?view=sql', 'SQL 分析页面'],
-  ['12-monitor-sql-insight.png', '/monitor?view=sql', 'SQL 洞察页面'],
+  ['12-monitor.png', '/monitor', '观测中心实例总览'],
+  ['12-monitor-diagnostics.png', '/monitor/diagnostics', '实例诊断概览'],
+  ['12-monitor-sql-insight.png', '/monitor/diagnostics?view=sql', 'SQL 洞察页面'],
   ['13-archive.png', '/archive', '数据归档页面'],
   ['14-data-dictionary.png', '/schema', '数据字典页面'],
   ['15-instance-management.png', '/instance', '实例管理页面'],
@@ -61,6 +61,7 @@ async function login(page) {
   await page.getByPlaceholder('密码').fill(password)
   const submitButton = page.locator('.sagitta-auth-form button[type="submit"]')
   await submitButton.click()
+  await page.waitForURL((u) => !u.pathname.endsWith('/login'), { timeout: 15000 }).catch(() => {})
   await waitForStablePage(page)
   const current = page.url()
   if (current.includes('/login')) {
@@ -69,12 +70,43 @@ async function login(page) {
   return true
 }
 
+async function applyOverviewRange(page) {
+  // 概览类页面的时间范围默认 7 天，统一改为 60 天以展示更完整的趋势数据。
+  const inputs = page.locator('.overview-range-days-input input')
+  const count = await inputs.count().catch(() => 0)
+  for (let i = 0; i < count; i += 1) {
+    await inputs.nth(i).fill('60').catch(() => {})
+    await inputs.nth(i).press('Enter').catch(() => {})
+  }
+  if (count) {
+    await page.waitForTimeout(800)
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+  }
+}
+
+async function dismissPasswordBanner(page) {
+  // 移除账号相关的“密码即将到期”提醒，避免污染产品截图。
+  await page
+    .evaluate(() => {
+      document.querySelectorAll('.ant-alert').forEach((el) => {
+        if (el.textContent && el.textContent.includes('密码即将到期')) el.remove()
+      })
+    })
+    .catch(() => {})
+}
+
 async function capture(page, fileName, path, label) {
   await page.goto(url(path))
   await waitForStablePage(page)
   const title = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '')
   if (!title.trim()) throw new Error(`${label} rendered empty body`)
-  if (!smokeOnly) await page.screenshot({ path: resolve(outputDir, fileName), fullPage: true })
+  if (!smokeOnly) {
+    await applyOverviewRange(page)
+    await dismissPasswordBanner(page)
+    await page.mouse.move(0, 0) // 清除图表 hover tooltip，避免污染截图
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: resolve(outputDir, fileName), fullPage: true })
+  }
   console.log(`[PASS] ${label}: ${path}`)
 }
 
