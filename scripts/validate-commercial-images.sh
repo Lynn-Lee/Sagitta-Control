@@ -143,8 +143,9 @@ validate_frontend() {
     echo "Commercial frontend image contains sourcemap files." >&2
     exit 1
   fi
-  if grep -R "sourceMappingURL" "${rootfs}/usr/share/nginx/html" >/dev/null; then
-    echo "Commercial frontend image contains sourceMappingURL references." >&2
+  if grep -RInE '^[[:space:]]*(//|/\*)[#@][[:space:]]*sourceMappingURL=' \
+    "${rootfs}/usr/share/nginx/html" >/dev/null; then
+    echo "Commercial frontend image contains sourcemap directive references." >&2
     exit 1
   fi
 }

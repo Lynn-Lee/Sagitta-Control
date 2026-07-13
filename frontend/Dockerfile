@@ -11,14 +11,12 @@ COPY . .
 
 # 跳过 tsc 类型检查，直接 vite build（类型错误不阻断构建）
 RUN npx vite build && \
+    node scripts/scrub-sourcemap-directives.mjs dist && \
     if find dist -type f -name '*.map' | grep -q .; then \
       echo "用户部署前端构建产物不允许包含 sourcemap 文件" >&2; \
       exit 1; \
     fi && \
-    if grep -R "sourceMappingURL" dist/assets; then \
-      echo "用户部署前端业务构建产物不允许包含 sourceMappingURL 引用" >&2; \
-      exit 1; \
-    fi
+    node scripts/scrub-sourcemap-directives.mjs --check dist
 
 # ─── 第二阶段：Nginx 静态文件服务 ────────────────────────────
 FROM nginx:1.25-alpine

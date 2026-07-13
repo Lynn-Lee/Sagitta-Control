@@ -323,7 +323,7 @@ v2.1 用户部署版重点补强 Oracle 可观测性：实时会话支持 RAC �
 用户部署版增强边界：
 
 - 后端用户部署镜像通过 Nuitka 默认编译应用模块，并通过构建门禁阻止非白名单 Python 源码或字节码缓存进入镜像。
-- 前端仅交付生产 build 产物，构建阶段禁止 sourcemap 文件，业务构建产物禁止 `sourceMappingURL`，并启用生产压缩/混淆配置；SQL 编辑器使用自托管 Monaco 静态运行时，不依赖外部 CDN。
+- 前端仅交付生产 build 产物，构建阶段禁止 sourcemap 文件，并移除 `sourceMappingURL` sourcemap directive；SQL 编辑器使用自托管 Monaco 静态运行时，不依赖外部 CDN。
 - 在线授权使用短期本地缓存，默认 7 天内必须成功回源刷新；长期离线客户使用 challenge-response 离线授权。
 - 用户部署发布产物包含镜像 SBOM 和签名材料，支持客户侧供应链验收。
 - 发布机制参考 DataFusionX：源码 `main` 提交只跑 CI 和版本记录，`release/**` 生成 RC 候选用户部署包，正式 `vX.Y.Z` 标签或显式手动发布才同步 `Lynn-Lee/Sagitta-Deploy` 公开交付仓库。
