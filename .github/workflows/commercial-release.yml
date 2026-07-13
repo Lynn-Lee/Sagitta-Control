@@ -1,4 +1,4 @@
-name: 商业部署发布
+name: 用户部署发布
 
 on:
   push:
@@ -13,12 +13,12 @@ on:
         required: false
         type: string
       publish_public_repo:
-        description: "是否将渲染后的商业部署包发布到 Sagitta-Deploy 公开仓库。正式 tag 始终发布。"
+        description: "是否将渲染后的用户部署包发布到 Sagitta-Deploy 公开仓库。正式 tag 始终发布。"
         required: false
         default: false
         type: boolean
       rebuild_images:
-        description: "即使当前版本商业镜像已存在，也强制重新构建并推送镜像。"
+        description: "即使当前版本用户部署镜像已存在，也强制重新构建并推送镜像。"
         required: false
         default: false
         type: boolean
@@ -46,7 +46,7 @@ concurrency:
 
 jobs:
   package:
-    name: 构建并发布商业部署包
+    name: 构建并发布用户部署包
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -99,11 +99,11 @@ jobs:
             [dns]
               nameservers = ["223.5.5.5", "114.114.114.114", "8.8.8.8"]
 
-      - name: 校验商业构建上下文
+      - name: 校验用户部署构建上下文
         shell: bash
         run: scripts/validate-commercial-build-context.sh
 
-      - name: 检查商业镜像是否已存在
+      - name: 检查用户部署镜像是否已存在
         id: existing-images
         shell: bash
         run: |
@@ -115,7 +115,7 @@ jobs:
           frontend_image="${PUBLIC_IMAGE_REPOSITORY}-frontend:${version}"
 
           if [[ "${rebuild_images}" == "true" ]]; then
-            echo "已要求强制重建商业镜像。"
+            echo "已要求强制重建用户部署镜像。"
             echo "images_exist=false" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
@@ -171,14 +171,14 @@ jobs:
 
           if image_has_required_platform "${backend_image}" \
             && image_has_required_platform "${frontend_image}"; then
-            echo "商业镜像已存在，跳过重复构建：${backend_image}, ${frontend_image}"
+            echo "用户部署镜像已存在，跳过重复构建：${backend_image}, ${frontend_image}"
             echo "images_exist=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "商业镜像不存在、不可检查或平台不完整，将执行构建。"
+            echo "用户部署镜像不存在、不可检查或平台不完整，将执行构建。"
             echo "images_exist=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: 构建并推送商业后端镜像
+      - name: 构建并推送用户部署后端镜像
         if: ${{ steps.existing-images.outputs.images_exist != 'true' }}
         id: backend-image
         uses: docker/build-push-action@v5
@@ -201,7 +201,7 @@ jobs:
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: 构建并推送商业前端镜像
+      - name: 构建并推送用户部署前端镜像
         if: ${{ steps.existing-images.outputs.images_exist != 'true' }}
         id: frontend-image
         uses: docker/build-push-action@v5
@@ -223,7 +223,7 @@ jobs:
       - name: 安装 Syft
         uses: anchore/sbom-action/download-syft@v0
 
-      - name: 校验商业镜像内容
+      - name: 校验用户部署镜像内容
         shell: bash
         run: |
           set -euo pipefail
@@ -242,7 +242,7 @@ jobs:
           SBOM_OUTPUT_DIR="dist-commercial/sbom" \
           scripts/generate-commercial-sbom.sh
 
-      - name: 渲染客户部署包
+      - name: 渲染用户部署包
         shell: bash
         run: |
           set -euo pipefail
@@ -260,7 +260,7 @@ jobs:
             sha256sum --check "${package_name}.zip.sha256"
           )
 
-      - name: 签名商业发布产物
+      - name: 签名用户部署发布产物
         shell: bash
         env:
           COSIGN_EXPERIMENTAL: "true"
@@ -273,7 +273,7 @@ jobs:
           SBOM_DIR="dist-commercial/sbom" \
           scripts/sign-commercial-artifacts.sh
 
-      - name: 校验商业发布材料
+      - name: 校验用户部署发布材料
         shell: bash
         run: |
           set -euo pipefail
@@ -283,11 +283,11 @@ jobs:
           SBOM_DIR="dist-commercial/sbom" \
           scripts/validate-commercial-release-materials.sh
 
-      - name: 上传商业部署包
+      - name: 上传用户部署包
         if: ${{ vars.ENABLE_COMMERCIAL_RELEASE_ARTIFACT == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: sagitta-control-commercial-deployment
+          name: sagitta-control-user-deployment
           path: |
             dist-commercial/*.zip
             dist-commercial/*.zip.sha256
@@ -532,7 +532,7 @@ jobs:
 
           ## 安全说明
 
-          本部署包只包含部署文件，不包含 Sagitta Control 源码、私钥、客户 License、激活码或镜像仓库凭据。Release 同时提供客户包签名文件、前后端镜像 CycloneDX SBOM 及其校验/签名材料。
+          本部署包只包含部署文件，不包含 Sagitta Control 源码、私钥、客户 License、激活码或镜像仓库凭据。Release 同时提供用户部署包签名文件、前后端镜像 CycloneDX SBOM 及其校验/签名材料。
           EOF
 
           assets=(

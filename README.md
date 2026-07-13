@@ -85,7 +85,7 @@ curl -X POST http://localhost:8000/api/v1/system/init/
 | [安装部署手册](docs/installation_deployment.md) | 首次部署、服务器准备、Docker Compose / Helm 部署、授权激活和上线检查。 |
 | [运维升级手册](docs/operations_upgrade.md) | 日常巡检、备份、升级、回滚、日志诊断和安全基线。 |
 
-源码仓库只保留以上长期维护文档；历史计划、一次性验证报告、阶段性测试记录、发布模板和已完成优化手册不再作为正式文档维护。用户部署仓库文档由这些标准文档和 `deploy/customer/` 下的部署脚本生成。
+源码仓库只保留以上长期维护文档；历史计划、一次性验证报告、阶段性测试记录、发布模板和已完成优化手册不再作为正式文档维护。用户部署仓库文档由这些标准文档和 `deploy/customer/` 下的用户部署脚本生成。
 
 ## 内部源码发布
 
@@ -173,6 +173,6 @@ npm run build
 
 当前源码版本对应用户部署版本 `3.0.0`。Sagitta Control 的用户部署包由本源码仓库的发布流程生成，并同步到 [Lynn-Lee/Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy) 公开部署仓库。
 
-用户部署包含固定版本 Docker/Helm 部署包、License 授权、客户包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与用户部署发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；用户部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
+用户部署包含固定版本 Docker/Helm 部署包、License 授权、用户部署包签名、SBOM、上线验收、升级回滚和运维文档。源码 `main` 分支只触发源码 CI 和版本记录；`release/**` 分支生成 RC 候选包；正式 `vX.Y.Z` 标签或显式手动发布才同步公开部署仓库。CI 与用户部署发布 workflow 均使用 `ubuntu-latest` GitHub-hosted runner；用户部署包默认不上传为 Actions artifact，避免大包占用制品存储配额。
 
 客户安装、升级和使用入口见 [Sagitta-Deploy](https://github.com/Lynn-Lee/Sagitta-Deploy)，源码仓库内以 [安装部署手册](docs/installation_deployment.md)、[产品使用手册](docs/user_manual.md) 和 [运维升级手册](docs/operations_upgrade.md) 为准。

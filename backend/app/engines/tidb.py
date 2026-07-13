@@ -19,7 +19,7 @@ class TidbEngine(MysqlEngine):
     db_type = "tidb"
 
     async def explain_query(self, db_name: str, sql: str) -> ResultSet:
-        """TiDB 8.x does not support MySQL's EXPLAIN FORMAT=JSON."""
+        """TiDB 8.x 不支持 MySQL 的 EXPLAIN FORMAT=JSON。"""
         explain_sql = f"EXPLAIN {sql.strip().rstrip(';')}"
         return await self.query(db_name=db_name, sql=explain_sql, limit_num=1000)
 

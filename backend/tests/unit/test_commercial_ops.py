@@ -55,7 +55,7 @@ def test_acceptance_markdown_renders_check_results():
         "summary": {"passed": 1, "failed": 0, "skipped": 1},
         "checks": [
             {"name": "健康检查", "ok": True, "detail": "ok"},
-            {"name": "客户包签名", "ok": False, "detail": "未生成", "required": False},
+            {"name": "用户部署包签名", "ok": False, "detail": "未生成", "required": False},
             {"name": "实例链路检查", "ok": True, "detail": "跳过", "skipped": True},
         ],
     }

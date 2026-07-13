@@ -96,8 +96,8 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "key": "customer_package_checksum",
-        "label": "客户包 sha256",
-        "name": "客户包 sha256",
+        "label": "用户部署包 sha256",
+        "name": "用户部署包 sha256",
         "blocking": False,
         "kind": "file",
         "paths": [f"dist-commercial/Sagitta-Control-v{COMMERCIAL_VERSION}.zip.sha256"],
@@ -105,8 +105,8 @@ DELIVERY_PREFLIGHT_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "key": "customer_package_signature",
-        "label": "客户包签名",
-        "name": "客户包签名",
+        "label": "用户部署包签名",
+        "name": "用户部署包签名",
         "blocking": False,
         "kind": "file",
         "paths": [

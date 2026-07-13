@@ -89,4 +89,4 @@ if doc.get("bomFormat") != "CycloneDX":
 PY
 done
 
-echo "Commercial release materials validated for ${PACKAGE_NAME}"
+echo "用户部署发布材料已通过校验：${PACKAGE_NAME}"

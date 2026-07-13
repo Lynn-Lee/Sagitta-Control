@@ -133,7 +133,7 @@ def _basic_syntax_reason(sql: str) -> str:
 
 
 def _manual_write_syntax_reason(prefix: str, sql: str) -> tuple[bool, str]:
-    """Cover write statements sqlglot parses loosely or does not parse by dialect."""
+    """补齐 sqlglot 解析宽松或当前方言不解析的写语句检查。"""
     body = _statement_body(prefix, sql)
     if prefix == "replace":
         if not body or re.fullmatch(r"into", body, re.I):

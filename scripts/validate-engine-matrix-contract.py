@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Validate that engine support metadata stays aligned with implementation.
+"""校验引擎支持矩阵与实际实现保持一致。
 
-This is a CI-friendly contract check. Real database validation still happens
-with scripts/customer-engine-validation.py against customer-like environments.
+该脚本用于 CI 合同检查；真实数据库验证仍由
+scripts/customer-engine-validation.py 在客户同构环境中执行。
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def load_customer_validation_types() -> set[str]:
     spec.loader.exec_module(module)
     supported = getattr(module, "SUPPORTED_ENGINE_TYPES", None)
     if not isinstance(supported, set):
-        fail("customer-engine-validation.py must expose SUPPORTED_ENGINE_TYPES")
+        fail("customer-engine-validation.py 必须暴露 SUPPORTED_ENGINE_TYPES")
     return {str(item).lower() for item in supported}
 
 
@@ -60,49 +60,49 @@ def main() -> int:
 
     duplicates = {db_type for db_type in matrix_types if matrix_types.count(db_type) > 1}
     if duplicates:
-        fail(f"Duplicate ENGINE_MATRIX db_type entries: {sorted(duplicates)}")
+        fail(f"ENGINE_MATRIX 存在重复 db_type：{sorted(duplicates)}")
 
     missing = registry_types - set(matrix_types)
     extra = set(matrix_types) - registry_types
     if missing:
-        fail(f"ENGINE_MATRIX missing registered engines: {sorted(missing)}")
+        fail(f"ENGINE_MATRIX 缺少已注册引擎：{sorted(missing)}")
     if extra:
-        fail(f"ENGINE_MATRIX contains unregistered engines: {sorted(extra)}")
+        fail(f"ENGINE_MATRIX 包含未注册引擎：{sorted(extra)}")
 
     for entry in matrix_entries:
         db_type = str(entry.get("db_type", "")).lower()
         support_level = str(entry.get("support_level", ""))
         if support_level not in SUPPORTED_LEVELS:
-            fail(f"{db_type} has unsupported support_level: {support_level}")
+            fail(f"{db_type} 使用了不支持的 support_level：{support_level}")
 
         capabilities = entry.get("capabilities")
         if not isinstance(capabilities, dict):
-            fail(f"{db_type} capabilities must be a dict")
+            fail(f"{db_type} capabilities 必须是 dict")
         capability_keys = set(capabilities.keys())
         if capability_keys != EXPECTED_CAPABILITIES:
             fail(
-                f"{db_type} capability keys mismatch. "
+                f"{db_type} capability keys 不匹配。"
                 f"missing={sorted(EXPECTED_CAPABILITIES - capability_keys)} "
                 f"extra={sorted(capability_keys - EXPECTED_CAPABILITIES)}"
             )
         non_boolean = [key for key, value in capabilities.items() if not isinstance(value, bool)]
         if non_boolean:
-            fail(f"{db_type} capabilities must be boolean: {non_boolean}")
+            fail(f"{db_type} capabilities 必须是布尔值：{non_boolean}")
 
         validation_required = str(entry.get("validation_required", "")).strip()
         if not validation_required:
-            fail(f"{db_type} must describe validation_required")
+            fail(f"{db_type} 必须填写 validation_required")
 
         if support_level == "validated_minimal" and db_type not in customer_validation_types:
-            fail(f"{db_type} validated_minimal engine is missing from customer validation script")
+            fail(f"{db_type} validated_minimal 引擎未出现在客户同构验证脚本中")
 
     unused_validation_types = customer_validation_types - set(matrix_types)
     if unused_validation_types:
-        fail(f"customer validation script contains unknown engines: {sorted(unused_validation_types)}")
+        fail(f"客户同构验证脚本包含未知引擎：{sorted(unused_validation_types)}")
 
     print(
-        "Engine matrix contract passed: "
-        f"{len(matrix_entries)} matrix entries, {len(registry_types)} registered engines."
+        "引擎支持矩阵合同校验通过："
+        f"{len(matrix_entries)} 个矩阵条目，{len(registry_types)} 个已注册引擎。"
     )
     return 0
 

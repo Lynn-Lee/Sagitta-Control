@@ -136,7 +136,7 @@ async def _load_ai_config(db: AsyncSession) -> AIConfig:
 
 
 def _resolve_provider_value(configured: str, preset: str, known_presets: set[str]) -> str:
-    """Use the provider preset when the stored value is empty or another provider's preset."""
+    """配置为空或误存为其他 provider 预设时，使用当前 provider 的预设值。"""
     if not configured:
         return preset
     if preset and configured in known_presets and configured != preset:

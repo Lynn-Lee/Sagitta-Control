@@ -235,7 +235,7 @@ class RedisEngine:
         return rs
 
     async def processlist(self, command_type: str = "ALL", **kwargs: Any) -> ResultSet:
-        """Use Redis CLIENT LIST as the session view."""
+        """使用 Redis CLIENT LIST 作为会话视图。"""
         rs = ResultSet()
         try:
             r = await self._get_client()

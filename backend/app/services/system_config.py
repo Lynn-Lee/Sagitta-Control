@@ -185,7 +185,7 @@ def _runtime_ai_provider() -> str:
 
 
 def _runtime_default_for_key(key: str, default: str) -> str:
-    """Resolve deployment-time AI_* defaults used only when a config row is first created."""
+    """解析创建配置行时才使用的部署期 AI_* 默认值。"""
     if key == "ai_provider":
         return _runtime_ai_provider()
     if key == "ai_api_key":

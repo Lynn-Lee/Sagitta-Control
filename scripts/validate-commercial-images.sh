@@ -158,4 +158,4 @@ validate_manifest_platforms "${frontend_image}"
 validate_backend "${backend_image}"
 validate_frontend "${frontend_image}"
 
-echo "Commercial image validation passed for ${IMAGE_REPOSITORY}: ${VERSION}"
+echo "用户部署镜像已通过校验：${IMAGE_REPOSITORY}: ${VERSION}"

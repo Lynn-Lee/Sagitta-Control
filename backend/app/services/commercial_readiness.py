@@ -23,11 +23,11 @@ ONBOARDING_STEP_GUIDANCE: dict[str, dict[str, Any]] = {
         "category": "上线前置",
         "required": True,
         "action_label": "处理授权",
-        "suggested_action": "导入正式 License，或复制正式部署指纹到授权中心签发。",
+        "suggested_action": "导入用户授权 License，或复制用户授权部署指纹到授权中心签发。",
         "fix_hint": "试用阶段可继续推进；正式上线前必须完成授权激活并复核客户 ID。",
         "quick_action": "navigate",
         "can_auto_fix": False,
-        "done_evidence": "已检测到正式授权",
+        "done_evidence": "已检测到用户授权",
         "todo_evidence": "当前仍为试用或授权未完成",
     },
     "auth": {
@@ -98,7 +98,7 @@ def build_onboarding_steps(completed: set[str], system_hints: dict[str, Any]) ->
         required = bool(guidance.get("required", False))
         reason = {
             "branding": "已配置平台品牌" if auto_detected else "请确认平台名称、Logo 与客户现场展示口径",
-            "license": "已完成正式授权" if auto_detected else "试用可继续，但转正式前需完成在线或离线授权",
+            "license": "已完成用户授权" if auto_detected else "试用可继续，但转正式前需完成在线或离线授权",
             "auth": "已配置企业认证入口" if auto_detected else "建议启用 LDAP、CAS、OIDC 或企业应用登录",
             "notification": "已配置通知渠道" if auto_detected else "建议至少打通邮件、飞书、钉钉或企微中的一种",
             "first_instance": "已接入数据库实例" if auto_detected else "请接入一个生产同构测试实例",

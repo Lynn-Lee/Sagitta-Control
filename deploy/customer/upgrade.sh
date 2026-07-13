@@ -33,7 +33,7 @@ wait_for_url() {
   return 1
 }
 
-[[ -f docker-compose.yml ]] || die "未找到 docker-compose.yml，请在客户部署包目录中运行本脚本。"
+[[ -f docker-compose.yml ]] || die "未找到 docker-compose.yml，请在用户部署包目录中运行本脚本。"
 [[ -f .env ]] || die "未找到 .env，请先复制 .env.example 为 .env 并完成配置。"
 
 mkdir -p "${BACKUP_DIR}"

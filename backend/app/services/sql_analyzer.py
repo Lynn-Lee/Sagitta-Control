@@ -1,7 +1,6 @@
-"""Shared SQL analysis primitives.
+"""共享 SQL 分析基础能力。
 
-This module extracts SQL facts only. It intentionally avoids product decisions
-such as whether to block, warn, or require an approval remark.
+本模块只提取 SQL 事实，刻意不判断是否阻断、告警或要求审批备注。
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# Sagitta Control 客户部署包。
+# Sagitta Control 用户部署包。
 # 该文件由 CI 按具体用户部署版本渲染生成。
 
 services:

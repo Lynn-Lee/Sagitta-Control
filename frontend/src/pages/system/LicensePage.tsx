@@ -376,7 +376,7 @@ export default function LicensePage() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={18}>
-                  <Form.Item label="正式激活部署指纹" validateStatus={fingerprintError ? 'error' : undefined} help={fingerprintError || undefined}>
+                  <Form.Item label="用户授权部署指纹" validateStatus={fingerprintError ? 'error' : undefined} help={fingerprintError || undefined}>
                     <div style={{ display: 'flex', gap: 8, width: '100%' }}>
                       <Input
                         value={activationFingerprint}
@@ -388,7 +388,7 @@ export default function LicensePage() {
                         className="sagitta-action-btn sagitta-action-btn--copy"
                         icon={<CopyOutlined />}
                         disabled={!activationFingerprint}
-                        onClick={() => handleCopyText(activationFingerprint, '正式激活部署指纹已复制')}
+                        onClick={() => handleCopyText(activationFingerprint, '用户授权部署指纹已复制')}
                         style={{ flex: '0 0 auto', boxShadow: 'none' }}
                       >
                         复制

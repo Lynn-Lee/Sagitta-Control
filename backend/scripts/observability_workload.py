@@ -1,8 +1,7 @@
-"""Generate repeatable observability workload for the ECS test engines.
+"""为 ECS 测试引擎生成可重复的观测负载。
 
-The script reads active Sagitta Control instances from the platform database and
-generates small DML/query workloads against the dedicated test objects below.
-It is intended to be run from the backend container by cron.
+脚本从平台数据库读取活跃 Sagitta Control 实例，并对下面的专用测试对象
+生成小批量 DML/查询负载；预期由后端容器中的 cron 调用。
 """
 
 from __future__ import annotations

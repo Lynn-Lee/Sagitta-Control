@@ -16,19 +16,18 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 usage() {
   cat <<'EOF'
-Usage: ./go-live-check.sh [options]
+用法：./go-live-check.sh [选项]
 
-Options:
-  --api-base-url <url>   Backend base URL, default http://127.0.0.1:8000
-  --frontend-url <url>   Frontend URL, default http://127.0.0.1
-  --env-file <path>      Environment file, default .env
-  --token <token>        Admin access token with system_config_manage permission
-  --username <name>      Admin username, used when --token is not provided
-  --password <password>  Admin password, used when --token is not provided
+选项：
+  --api-base-url <url>   后端基础 URL，默认 http://127.0.0.1:8000
+  --frontend-url <url>   前端 URL，默认 http://127.0.0.1
+  --env-file <path>      环境变量文件，默认 .env
+  --token <token>        具备 system_config_manage 权限的管理员访问令牌
+  --username <name>      管理员用户名；未提供 --token 时使用
+  --password <password>  管理员密码；未提供 --token 时使用
 
-The check is intentionally strict for production go-live: trial License,
-missing customer ID, missing active instance, incomplete onboarding, failed
-monitor collection, or any readiness action item will fail.
+此检查会严格按生产上线门禁执行：试用 License、缺少客户 ID、
+缺少活跃实例、交付向导未完成、监控采集失败或存在待处理项都会失败。
 EOF
 }
 
@@ -63,7 +62,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown argument: $1" >&2
+      echo "未知参数：$1" >&2
       usage >&2
       exit 2
       ;;
@@ -80,7 +79,7 @@ require_python() {
   elif command -v python >/dev/null 2>&1; then
     PYTHON_BIN=python
   else
-    echo "python3 or python is required" >&2
+    echo "需要安装 python3 或 python" >&2
     exit 1
   fi
 }
@@ -294,10 +293,10 @@ if [[ -n "$TOKEN" ]]; then
   if [[ "$code" == "200" ]]; then
     pass "技术支持状态接口可访问"
     check_json_equals "$about_json" project_code sagitta-control "授权项目码为 sagitta-control"
-    check_json_equals "$about_json" license.status licensed "License 为正式授权"
+    check_json_equals "$about_json" license.status licensed "License 为用户授权"
     check_json_equals "$about_json" license.is_trial False "License 非试用"
     check_json_nonempty "$about_json" license.activation_customer_id "正式激活客户 ID 已生成"
-    check_json_nonempty "$about_json" license.activation_deployment_fingerprint "正式激活部署指纹已生成"
+    check_json_nonempty "$about_json" license.activation_deployment_fingerprint "用户授权部署指纹已生成"
     check_json_equals "$about_json" readiness.status ready "推广就绪度为 ready"
     check_json_equals "$about_json" readiness.conclusion 可推广 "推广结论为可推广"
     check_json_equals "$about_json" runtime.health ok "运行状态健康"

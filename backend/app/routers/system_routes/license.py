@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 # ═══════════════════════════════════════════════════════════
-# 正式授权
+# 用户授权
 # ═══════════════════════════════════════════════════════════
 
 
@@ -30,7 +30,7 @@ async def get_license_status(
     return await LicenseService.status(db)
 
 
-@router.get("/license/deployment-fingerprint", summary="预览正式激活部署指纹")
+@router.get("/license/deployment-fingerprint", summary="预览用户授权部署指纹")
 async def get_license_deployment_fingerprint(
     customer_id: str = Query("", max_length=128),
     customer_id_legacy: str = Query("", max_length=128, alias="customerId"),

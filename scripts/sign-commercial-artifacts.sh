@@ -10,7 +10,7 @@ PYTHON_BIN="${PYTHON:-}"
 COSIGN_TIMEOUT="${COSIGN_TIMEOUT:-10m}"
 
 # cosign 用于签名已推送镜像的 digest；下面生成的 JSON 签名用于保护
-# 会在镜像仓库之外流转的客户部署包。
+# 会在镜像仓库之外流转的用户部署包。
 if ! command -v cosign >/dev/null 2>&1; then
   echo "cosign is required for image signing" >&2
   exit 1

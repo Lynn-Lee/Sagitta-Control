@@ -1,4 +1,4 @@
-"""Create masking rule table
+"""创建脱敏规则表
 
 Revision ID: 0036_create_masking_rule
 Revises: 0035_license_deployment_fingerprint

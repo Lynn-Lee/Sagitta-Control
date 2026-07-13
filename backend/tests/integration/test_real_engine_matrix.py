@@ -1,7 +1,7 @@
-"""Optional real-service integration matrix for database engines.
+"""数据库引擎可选真实服务集成矩阵。
 
-These tests are skipped by default. Set SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG to a
-JSON file path to run them against customer-like database services.
+这些测试默认跳过。设置 SAGITTA_CONTROL_REAL_ENGINE_MATRIX_CONFIG 为 JSON
+文件路径后，可在客户同构数据库服务上运行。
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def _instance_from_case(case: dict[str, Any]) -> SimpleNamespace:
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.get("name", case["db_type"]))
 @pytest.mark.asyncio
 async def test_real_engine_core_contract(case: dict[str, Any]) -> None:
-    """Validate the common engine contract against a real database service."""
+    """在真实数据库服务上验证通用引擎合同。"""
     instance = _instance_from_case(case)
     engine = get_engine(instance)
     db_name = case.get("db_name") or instance.db_name
@@ -101,7 +101,7 @@ async def test_real_engine_core_contract(case: dict[str, Any]) -> None:
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.get("name", case["db_type"]))
 @pytest.mark.asyncio
 async def test_real_engine_write_boundary(case: dict[str, Any]) -> None:
-    """Validate write execution boundaries when a case declares a write probe."""
+    """当用例声明写探针时，验证写执行边界。"""
     write_probe = case.get("write_probe")
     if not write_probe:
         pytest.skip("case does not declare write_probe")

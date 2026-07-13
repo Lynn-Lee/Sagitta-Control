@@ -1,4 +1,4 @@
-"""System notification inbox
+"""站内通知收件箱
 
 Revision ID: 0038_system_notification
 Revises: 0037_commercial_operations

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""渲染并校验 Sagitta Control 客户部署包。"""
+"""渲染并校验 Sagitta Control 用户部署包。"""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ FORBIDDEN_PATH_PATTERNS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="渲染客户部署包，并在固定版本、占位符或私钥材料校验失败时退出。",
+        description="渲染用户部署包，并在固定版本、占位符或私钥材料校验失败时退出。",
     )
     parser.add_argument("--version", required=True, help="发布版本，例如 1.0.0")
     parser.add_argument(
@@ -65,11 +65,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         default="dist-commercial",
-        help="客户包目录和压缩包输出位置。",
+        help="用户部署包目录和压缩包输出位置。",
     )
     parser.add_argument(
         "--package-name",
-        help="可选客户包目录/压缩包名称，默认 Sagitta-Control-v<version>。",
+        help="可选用户部署包目录/压缩包名称，默认 Sagitta-Control-v<version>。",
     )
     return parser.parse_args()
 
@@ -94,7 +94,7 @@ def copy_package_files(repo_root: Path, package_dir: Path) -> None:
 
 def write_customer_readme(package_dir: Path) -> None:
     (package_dir / "README.md").write_text(
-        """# Sagitta Control 客户部署包
+        """# Sagitta Control 用户部署包
 
 Sagitta Control 是面向企业数据库安全管控场景的统一平台。此部署包包含固定版本 Docker Compose、Helm Chart、上线检查脚本、升级脚本、产品截图和标准文档，不包含后端或前端源码。
 
@@ -166,7 +166,7 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
     expected = sorted([Path("README.md"), *(Path(dest) for dest in PACKAGE_FILES.values())])
     actual = sorted(path.relative_to(package_dir) for path in package_dir.iterdir() if path.is_file())
     if actual != expected:
-        errors.append(f"客户包文件不匹配：应为 {expected}，实际为 {actual}")
+        errors.append(f"用户部署包文件不匹配：应为 {expected}，实际为 {actual}")
 
     combined_text = ""
     for path in package_dir.rglob("*"):
@@ -175,12 +175,12 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
             combined_text += path.read_text(encoding="utf-8")
 
     if "__SAGITTA_CONTROL_VERSION__" in combined_text or "__IMAGE_REPOSITORY__" in combined_text:
-        errors.append("客户包中仍存在未渲染占位符")
+        errors.append("用户部署包中仍存在未渲染占位符")
 
     screenshot_dir = package_dir / "screenshots"
     screenshots = sorted(screenshot_dir.glob("*.png"))
     if len(screenshots) < 10:
-        errors.append("客户包截图数量不足，README 和产品手册需要可展示的产品截图")
+        errors.append("用户部署包截图数量不足，README 和产品手册需要可展示的产品截图")
 
     readme_path = package_dir / "README.md"
     installation_path = package_dir / "docs" / "installation_deployment.md"
@@ -210,7 +210,7 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
     }
     for path, snippets in required_doc_snippets.items():
         if not path.exists():
-            errors.append(f"客户包缺少关键文档：{path.relative_to(package_dir)}")
+            errors.append(f"用户部署包缺少关键文档：{path.relative_to(package_dir)}")
             continue
         text = path.read_text(encoding="utf-8")
         for snippet in snippets:
@@ -232,19 +232,19 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
             try:
                 linked_path.relative_to(package_dir.resolve())
             except ValueError:
-                errors.append(f"{path.relative_to(package_dir)} 的链接越过客户包目录：{target}")
+                errors.append(f"{path.relative_to(package_dir)} 的链接越过用户部署包目录：{target}")
                 continue
             if not linked_path.exists():
                 errors.append(f"{path.relative_to(package_dir)} 的链接不存在：{target}")
 
     if re.search(r":latest\b", combined_text):
-        errors.append("客户包禁止引用 :latest 镜像")
+        errors.append("用户部署包禁止引用 :latest 镜像")
 
     if re.search(r"\bbuild\s*:", combined_text):
-        errors.append("客户包禁止包含本地源码 build 配置")
+        errors.append("用户部署包禁止包含本地源码 build 配置")
 
     if "sourceMappingURL" in combined_text:
-        errors.append("客户包禁止包含 sourceMappingURL 引用")
+        errors.append("用户部署包禁止包含 sourceMappingURL 引用")
 
     if not re.search(rf"-backend:{re.escape(version)}\b", combined_text):
         errors.append("后端镜像未使用指定固定版本")
@@ -254,15 +254,15 @@ def validate_package(package_dir: Path, version: str) -> list[str]:
 
     for pattern in SECRET_PATTERNS:
         if pattern.search(combined_text):
-            errors.append(f"客户包疑似包含 License 私钥材料：{pattern.pattern}")
+            errors.append(f"用户部署包疑似包含 License 私钥材料：{pattern.pattern}")
 
     for path in package_dir.rglob("*"):
         relative = path.relative_to(package_dir).as_posix()
         if path.is_file() and path.suffix in {".py", ".pyc", ".pyo", ".map", ".ts", ".tsx"}:
-            errors.append(f"客户包禁止包含源码或 sourcemap 文件：{relative}")
+            errors.append(f"用户部署包禁止包含源码或 sourcemap 文件：{relative}")
         for pattern in FORBIDDEN_PATH_PATTERNS:
             if pattern.search(relative):
-                errors.append(f"客户包禁止包含内部源码/构建路径：{relative}")
+                errors.append(f"用户部署包禁止包含内部源码/构建路径：{relative}")
                 break
 
     return errors
@@ -307,7 +307,7 @@ def main() -> int:
     zip_path = make_zip(package_dir, output_dir, package_name)
     checksum_path = write_sha256(zip_path)
 
-    print(f"客户包目录：{package_dir}")
+    print(f"用户部署包目录：{package_dir}")
     print(f"压缩包：{zip_path}")
     print(f"SHA256: {checksum_path}")
     return 0

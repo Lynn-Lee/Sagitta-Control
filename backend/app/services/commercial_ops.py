@@ -134,10 +134,10 @@ class CommercialOpsService:
             },
             {
                 "key": "license_activation_ready",
-                "label": "正式授权材料",
+                "label": "用户授权材料",
                 "ok": bool(license_state.get("activation_customer_id") and license_state.get("activation_deployment_fingerprint")),
                 "blocking": False,
-                "detail": "客户 ID 与正式激活部署指纹可用于授权中心签发",
+                "detail": "客户 ID 与用户授权部署指纹可用于授权中心签发",
                 "path": "/system/license",
             },
             {
@@ -198,7 +198,7 @@ class CommercialOpsService:
         elif failed_optional:
             status = "needs_configuration"
             conclusion = "需补配置"
-            summary = "核心链路已具备，建议补齐通知、正式授权材料或验收报告后推广。"
+            summary = "核心链路已具备，建议补齐通知、用户授权材料或验收报告后推广。"
         else:
             status = "ready"
             conclusion = "可推广"
@@ -826,7 +826,7 @@ class CommercialOpsService:
         license_state = await LicenseService.status(db)
         await add("License 状态", license_state["status"] in {"trial", "licensed"}, license_state["reason"])
         await add(
-            "正式授权材料",
+            "用户授权材料",
             bool(license_state.get("activation_customer_id") and license_state.get("activation_deployment_fingerprint")),
             f"customer_id={license_state.get('activation_customer_id') or '-'}",
         )
@@ -894,7 +894,7 @@ class CommercialOpsService:
         elif warnings:
             readiness["status"] = "needs_configuration"
             readiness["conclusion"] = "需补配置"
-            readiness["summary"] = "核心链路可验收，建议补齐发布签名、SBOM 或客户包材料后再推广。"
+            readiness["summary"] = "核心链路可验收，建议补齐发布签名、SBOM 或用户部署包材料后再推广。"
         report = {
             "project": LICENSE_PROJECT_NAME,
             "project_code": LICENSE_PROJECT_CODE,

@@ -314,9 +314,9 @@ Sagitta Control 对外投放时建议提供以下交付件：
 - 产品设计文档。
 - 用户使用手册。
 - 运维管理手册。
-- 固定版本 Docker/Helm 客户部署包和 License 激活信息。
+- 固定版本 Docker/Helm 用户部署包和 License 激活信息。
 
-当前用户部署版本为 `3.0.0`。正式授权统一接入 `License-Server-Center`，客户包模板默认授权服务地址为 `https://license.loveai.asia`。Sagitta Control 使用授权项目码 `sagitta-control`，展示名称为 `Sagitta Control`。在线激活和联网刷新由后端自动提交 `project=sagitta-control` 与兼容字段 `product=sagitta-control`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览正式激活部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
+当前用户部署版本为 `3.0.0`。用户授权统一接入 `License-Server-Center`，用户部署包模板默认授权服务地址为 `https://license.loveai.asia`。Sagitta Control 使用授权项目码 `sagitta-control`，展示名称为 `Sagitta Control`。在线激活和联网刷新由后端自动提交 `project=sagitta-control` 与兼容字段 `product=sagitta-control`，客户无需在页面手工填写项目名。授权管理页支持根据客户 ID 预览用户授权部署指纹，运营侧应使用该指纹在用户授权中心生成激活码；复制指纹时兼容 HTTPS 剪贴板能力和 HTTP 试用部署降级复制。
 
 v2.1 用户部署版重点补强 Oracle 可观测性：实时会话支持 RAC 实例号、OS 进程、module/action、client identifier、等待分类、阻塞实例、PGA 和 SQL child 信息；SQL 洞察新增 `oracle_sql_monitor`、`oracle_awr_sqlstat`、`oracle_cursor_cache` 来源，并按 SQL Monitor、AWR、游标缓存、当前会话顺序自动降级。Oracle 监控保持只读诊断边界，权限不足时返回 warning，不引入破坏性诊断动作。
 
@@ -324,11 +324,11 @@ v2.1 用户部署版重点补强 Oracle 可观测性：实时会话支持 RAC �
 
 - 后端用户部署镜像通过 Nuitka 默认编译应用模块，并通过构建门禁阻止非白名单 Python 源码或字节码缓存进入镜像。
 - 前端仅交付生产 build 产物，构建阶段禁止 sourcemap 文件，并移除 `sourceMappingURL` sourcemap directive；SQL 编辑器使用自托管 Monaco 静态运行时，不依赖外部 CDN。
-- 在线授权使用短期本地缓存，默认 7 天内必须成功回源刷新；长期离线客户使用 challenge-response 离线授权。
+- 用户授权使用短期本地缓存，默认 7 天内必须成功回源刷新；长期离线客户使用 challenge-response 离线授权。
 - 用户部署发布产物包含镜像 SBOM 和签名材料，支持客户侧供应链验收。
 - 发布机制参考 DataFusionX：源码 `main` 提交只跑 CI 和版本记录，`release/**` 生成 RC 候选用户部署包，正式 `vX.Y.Z` 标签或显式手动发布才同步 `Lynn-Lee/Sagitta-Deploy` 公开交付仓库。
 - 离线授权采用 challenge-response：客户生成 Challenge，运营侧按 Challenge 签发绑定部署指纹的响应文件。
-- 用户部署镜像启动时校验 Ed25519 签名 Manifest 和关键文件摘要；发布侧需保留镜像签名、客户包签名和 sha256 记录。
+- 用户部署镜像启动时校验 Ed25519 签名 Manifest 和关键文件摘要；发布侧需保留镜像签名、用户部署包签名和 sha256 记录。
 - 合同、订单或授权函需明确禁止逆向、篡改、绕过授权和二次分发。
 
 正式上线前建议完成以下验收：
@@ -336,7 +336,7 @@ v2.1 用户部署版重点补强 Oracle 可观测性：实时会话支持 RAC �
 - 至少接入一个生产同构测试实例。
 - 完成用户、角色、用户组、资源组、审批流配置。
 - 验证 SQL 工单、查询权限、在线查询、数据字典、归档、通知链路。
-- 验证授权管理页展示 `授权项目：Sagitta Control（sagitta-control）`，客户 ID 可生成正式激活部署指纹，并完成在线激活、联网刷新和离线 challenge-response 导入。
-- 验证 `交付支持` → `交付与支持` 页展示推广就绪度、试用/授权状态、客户 ID、正式激活部署指纹、活跃用户/实例用量、监控采集失败数和推广前待处理项；实施交付 checklist 需覆盖首个实例接入、通知连通、授权激活、验收报告和风险项处理，并展示自动检测依据、修复建议和快捷动作；`初始化试用环境` 可幂等创建用户试用资源组、用户组、标准审批流和演示链路数据，未接入实例时不得伪造活跃实例或保存真实数据库密码；验收报告需输出 `可推广`、`需补配置` 或 `阻塞` 结论。
+- 验证授权管理页展示 `授权项目：Sagitta Control（sagitta-control）`，客户 ID 可生成用户授权部署指纹，并完成在线激活、联网刷新和离线 challenge-response 导入。
+- 验证 `交付支持` → `交付与支持` 页展示推广就绪度、试用/授权状态、客户 ID、用户授权部署指纹、活跃用户/实例用量、监控采集失败数和推广前待处理项；实施交付 checklist 需覆盖首个实例接入、通知连通、授权激活、验收报告和风险项处理，并展示自动检测依据、修复建议和快捷动作；`初始化试用环境` 可幂等创建用户试用资源组、用户组、标准审批流和演示链路数据，未接入实例时不得伪造活跃实例或保存真实数据库密码；验收报告需输出 `可推广`、`需补配置` 或 `阻塞` 结论。
 - 验证备份恢复和升级回滚。
 - 验证审计日志、查询历史和操作追踪可用。
