@@ -29,7 +29,16 @@ def test_customer_readme_does_not_render_explanatory_blockquotes(tmp_path):
     assert "\n> " not in readme
     assert "版本：" not in readme
     assert "镜像仓库：" not in readme
-    assert "screenshots/23-commercial-support.png" in readme
+    for screenshot in (
+        "screenshots/02-dashboard-query.png",
+        "screenshots/06-workflow-list.png",
+        "screenshots/07-workflow-submit.png",
+        "screenshots/09-query-workbench.png",
+        "screenshots/12-monitor.png",
+        "screenshots/12-monitor-sql-insight.png",
+        "screenshots/23-commercial-support.png",
+    ):
+        assert screenshot in readme
 
 
 def test_public_release_validation_uses_current_customer_doc_paths():
@@ -50,4 +59,4 @@ def test_public_release_validation_uses_current_customer_doc_paths():
     ):
         assert stale_path not in workflow
     assert "../screenshots/23-commercial-support.png" in workflow
-    assert "../screenshots/02-dashboard-query.png" not in workflow
+    assert "../screenshots/02-dashboard-query.png" in workflow

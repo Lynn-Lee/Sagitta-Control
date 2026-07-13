@@ -1,10 +1,25 @@
 # Sagitta Control 用户使用手册
 
-本文截图来自演示环境，实际页面可能因版本、角色权限和客户配置略有差异。
+本文从安装部署成功后的初始化配置开始，指导用户完成账号、实例、权限、审批、查询、工单、观测、归档和审计的基础配置，并逐步进入日常使用。截图来自演示环境，实际页面可能因版本、角色权限和客户配置略有差异。
 
 ## 1. 使用前准备
 
 用户需要由系统管理员创建账号并分配角色、用户组和资源范围。若使用 LDAP、OIDC、短信验证码、钉钉、飞书、企业微信或 CAS 登录，请确认企业身份或手机号已完成绑定。
+
+安装部署成功后，建议按以下顺序让平台进入可用状态：
+
+1. 使用初始化管理员账号登录。
+2. 在 `系统管理` -> `系统配置` 中确认平台访问地址、通知渠道、认证入口和安全策略。
+3. 在 `系统管理` 中创建用户、角色、资源组、用户组和审批流。
+4. 在 `实例管理` 中接入至少一个数据库实例，并将实例关联到资源组。
+5. 在 `SQL 工单` 中提交并审批一条测试工单，确认审批流和通知链路正常。
+6. 在 `在线查询` 和 `查询权限` 中完成一次授权申请、审批和查询验证。
+7. 在 `观测中心` 中确认实例健康、采集状态和 SQL 洞察可用。
+8. 在 `交付支持` -> `交付与支持` 中生成验收报告，确认阻塞项已经处理。
+
+![系统配置入口](screenshots/user-manual/21-system-config.png)
+
+![交付与支持入口](screenshots/user-manual/23-commercial-support.png)
 
 常见角色：
 
@@ -19,6 +34,8 @@
 
 适用角色：所有用户
 入口路径：登录页、右上角个人中心
+
+![登录页](screenshots/user-manual/01-login.png)
 
 操作步骤：
 
@@ -61,6 +78,12 @@
 适用角色：所有用户
 入口路径：侧边栏 `Dashboard`
 
+![Dashboard 查询概览](screenshots/user-manual/02-dashboard-query.png)
+
+![Dashboard 工单概览](screenshots/user-manual/03-dashboard-workflow.png)
+
+![Dashboard 归档概览](screenshots/user-manual/04-dashboard-archive.png)
+
 Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 - 在线查询概览。
@@ -79,6 +102,10 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：DBA、系统管理员
 入口路径：侧边栏 `实例管理`
+
+![实例管理](screenshots/user-manual/15-instance-management.png)
+
+![Dashboard 实例概览](screenshots/user-manual/05-dashboard-instance.png)
 
 ### 4.0 引擎支持边界
 
@@ -130,9 +157,13 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA
 入口路径：侧边栏 `SQL 工单`
 
+![SQL 工单列表](screenshots/user-manual/06-workflow-list.png)
+
 ### 5.1 提交 SQL 工单
 
 操作步骤：
+
+![提交 SQL 工单](screenshots/user-manual/07-workflow-submit.png)
 
 1. 进入 `SQL 工单`，点击提交工单。
 2. 填写工单名称。
@@ -150,6 +181,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 ### 5.2 查看工单列表
 
 列表视角：
+
+![SQL 工单模板](screenshots/user-manual/08-workflow-templates.png)
 
 | 标签 | 用途 |
 |---|---|
@@ -197,6 +230,10 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA
 入口路径：侧边栏 `在线查询`
 
+![在线查询工作台](screenshots/user-manual/09-query-workbench.png)
+
+![查询历史](screenshots/user-manual/11-query-history.png)
+
 操作步骤：
 
 1. 选择实例和数据库。
@@ -219,6 +256,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：研发工程师、审批人
 入口路径：侧边栏 `在线查询 → 查询权限`
+
+![查询权限](screenshots/user-manual/10-query-privileges.png)
 
 ### 7.1 提交申请
 
@@ -252,6 +291,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA
 入口路径：侧边栏 `实用工具 → 数据字典`
 
+![数据字典](screenshots/user-manual/14-data-dictionary.png)
+
 操作步骤：
 
 1. 选择实例和数据库。
@@ -270,6 +311,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：DBA、系统管理员、安全审计员
 入口路径：侧边栏 `系统管理 → 数据脱敏规则`
 
+![数据脱敏规则](screenshots/user-manual/22-masking-rules.png)
+
 操作步骤：
 
 1. 进入脱敏规则页面。
@@ -286,6 +329,12 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 适用角色：DBA、运维工程师
 入口路径：侧边栏 `观测中心 → 实例总览`、`观测中心 → 实例诊断`
+
+![观测中心实例总览](screenshots/user-manual/12-monitor.png)
+
+![实例诊断](screenshots/user-manual/12-monitor-diagnostics.png)
+
+![SQL 洞察](screenshots/user-manual/12-monitor-sql-insight.png)
 
 常用功能：
 
@@ -321,6 +370,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：研发工程师、DBA
 入口路径：侧边栏 `实用工具 → 数据归档`
 
+![数据归档](screenshots/user-manual/13-archive.png)
+
 操作步骤：
 
 1. 新建归档申请。
@@ -341,9 +392,13 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：系统管理员
 入口路径：侧边栏 `系统管理`
 
+![系统配置](screenshots/user-manual/21-system-config.png)
+
 ### 12.1 用户管理
 
 可执行操作：
+
+![用户管理](screenshots/user-manual/16-user-management.png)
 
 - 创建、编辑、禁用用户。
 - 分配角色。
@@ -361,6 +416,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 
 可执行操作：
 
+![角色管理](screenshots/user-manual/18-role-management.png)
+
 - 查看内置角色。
 - 创建业务角色。
 - 为角色分配权限码。
@@ -369,6 +426,10 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 ### 12.3 用户组与资源组
 
 配置顺序建议：
+
+![资源组管理](screenshots/user-manual/17-resource-groups.png)
+
+![用户组管理](screenshots/user-manual/19-user-groups.png)
 
 1. 创建资源组并关联实例。
 2. 创建用户组并关联资源组。
@@ -383,6 +444,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 ### 12.4 审批流管理
 
 审批人类型：
+
+![审批流管理](screenshots/user-manual/20-approval-flows.png)
 
 | 类型 | 说明 |
 |---|---|
@@ -414,6 +477,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：安全审计员、系统管理员
 入口路径：侧边栏 `系统管理 → 审计日志`
 
+![审计日志](screenshots/user-manual/24-audit-log.png)
+
 可查看内容：
 
 - 登录和退出。
@@ -433,6 +498,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：系统管理员
 
 入口路径：侧边栏 `交付支持` → `License 授权`
+
+授权页面包含客户 ID、部署指纹和授权状态等现场敏感信息，不作为公开截图素材。实际操作时请在客户现场环境中查看页面内容。
 
 可执行操作：
 
@@ -458,6 +525,8 @@ Dashboard 展示当前登录用户权限范围内的统计信息，包括：
 适用角色：系统管理员、实施工程师、安全审计员
 
 入口路径：侧边栏 `交付支持` → `交付与支持`
+
+![交付与支持](screenshots/user-manual/23-commercial-support.png)
 
 可执行操作：
 
