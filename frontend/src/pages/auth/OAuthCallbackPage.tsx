@@ -34,12 +34,19 @@ export default function OAuthCallbackPage() {
 
     authApi
       .exchangeOAuthLoginCode(loginCode)
-      .then(() => {
+      .then(res => {
+        // 账号已启用 TOTP：跳转登录页完成二步验证（与本地登录一致）。
+        if (res.requires_2fa) {
+          if (!res.two_fa_token) throw new Error('缺少二步验证凭证')
+          navigate('/login', { replace: true, state: { twoFaToken: res.two_fa_token, provider } })
+          return null
+        }
         setTokens()
         setAuthProvider(provider)
         return authApi.me()
       })
       .then(meRes => {
+        if (!meRes) return // 已跳转二步验证
         setUser(meRes)
         navigate(getPostLoginPath(meRes.permissions || []), { replace: true })
       })

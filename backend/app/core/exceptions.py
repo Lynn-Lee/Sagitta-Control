@@ -63,6 +63,18 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        # 标准 logging 用位置参数，不用关键字参数
-        logger.error("unhandled_exception: %s path=%s", str(exc), request.url.path)
-        return _err(500, "服务器内部错误", str(exc))
+        import uuid
+
+        from app.core.config import settings
+
+        # 完整异常仅写日志；响应只给通用消息 + 关联 ID，避免泄露内部实现细节（SAG-018）。
+        error_id = uuid.uuid4().hex[:12]
+        logger.error(
+            "unhandled_exception id=%s: %s path=%s",
+            error_id,
+            str(exc),
+            request.url.path,
+        )
+        if settings.DEBUG:
+            return _err(500, "服务器内部错误", f"[{error_id}] {exc}")
+        return _err(500, "服务器内部错误", f"关联ID：{error_id}")

@@ -57,7 +57,18 @@ celeryBeat:
 
 # ─── Flower（Celery 监控）──────────────────────────────────────────────────────
 flower:
-  enabled: true
+  # 默认关闭：Flower 会暴露任务参数与 Worker 状态，仅在需要时开启并配置认证（SAG-019）。
+  enabled: false
+  # basicAuth 形如 "user:password"，开启 Flower 时强烈建议配置；留空则不加认证。
+  basicAuth: ""
+  # NetworkPolicy：仅允许带此标签的 Pod 访问 Flower（留空则不下发策略）。
+  networkPolicy:
+    enabled: true
+    # 允许访问的同命名空间 Pod 标签选择器（默认仅运维 Pod）。
+    allowedPodLabels:
+      sagitta-control.io/flower-access: "true"
+    # 可选：额外允许访问的命名空间标签选择器。
+    allowedNamespaceLabels: {}
   resources:
     requests:
       cpu: 50m

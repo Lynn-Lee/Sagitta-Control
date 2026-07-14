@@ -132,10 +132,9 @@ def is_initial_password_state(
 
 def create_access_token(data: dict[str, Any]) -> str:
     payload = data.copy()
-    expire = datetime.now(UTC) + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-    payload.update({"exp": expire, "type": "access"})
+    now = datetime.now(UTC)
+    expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload.update({"exp": expire, "iat": now, "type": "access"})
     if "tenant_id" not in payload:
         payload["tenant_id"] = settings.TENANT_ID
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -143,10 +142,9 @@ def create_access_token(data: dict[str, Any]) -> str:
 
 def create_refresh_token(data: dict[str, Any]) -> str:
     payload = data.copy()
-    expire = datetime.now(UTC) + timedelta(
-        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-    )
-    payload.update({"exp": expire, "type": "refresh"})
+    now = datetime.now(UTC)
+    expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    payload.update({"exp": expire, "iat": now, "type": "refresh"})
     if "tenant_id" not in payload:
         payload["tenant_id"] = settings.TENANT_ID
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -165,14 +163,44 @@ def decode_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
 
+def is_token_revoked_by_password_change(
+    token_iat: int | float | None,
+    password_changed_at: datetime | None,
+) -> bool:
+    """token 是否在最近一次改密之前签发——是则应视为已撤销（改密撤销全部旧会话）。"""
+    if token_iat is None or password_changed_at is None:
+        return False
+    if password_changed_at.tzinfo is None:
+        password_changed_at = password_changed_at.replace(tzinfo=UTC)
+    # 预留 2 秒时钟/流程偏差，避免改密流程内刚签发的新 token 被误撤销。
+    return float(token_iat) < password_changed_at.timestamp() - 2
+
+
 # ─── 字段级加密（用于 Instance.password 等敏感字段）──────────
 
 from cryptography.fernet import Fernet  # noqa: E402
 
 
-def _get_fernet() -> Fernet:
-    key = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+def _fernet_from_secret(secret: str) -> Fernet:
+    """从任意字符串派生 Fernet 密钥（旧方案：与 JWT 共用 SECRET_KEY）。"""
+    key = hashlib.sha256(secret.encode()).digest()
     return Fernet(base64.urlsafe_b64encode(key))
+
+
+def _get_fernet() -> Fernet:
+    """当前加密使用的 Fernet：优先专用 FERNET_KEY，未配置时回退 SECRET_KEY 派生。"""
+    if settings.FERNET_KEY:
+        return Fernet(settings.FERNET_KEY.encode())
+    return _fernet_from_secret(settings.SECRET_KEY)
+
+
+def _decrypt_fernets() -> list[Fernet]:
+    """解密时依次尝试的密钥：当前密钥 + 旧的 SECRET_KEY 派生密钥（兼容历史数据）。"""
+    fernets = [_get_fernet()]
+    if settings.FERNET_KEY:
+        # 旧数据可能是用 SECRET_KEY 派生密钥加密的，保留回退以支持渐进式重新加密。
+        fernets.append(_fernet_from_secret(settings.SECRET_KEY))
+    return fernets
 
 
 def encrypt_field(value: str) -> str:
@@ -183,10 +211,12 @@ def encrypt_field(value: str) -> str:
 
 
 def decrypt_field(value: str) -> str:
-    """解密敏感字段，兼容未加密的旧数据。"""
+    """解密敏感字段，兼容旧密钥加密的数据与未加密的旧明文。"""
     if not value:
         return value
-    try:
-        return _get_fernet().decrypt(value.encode()).decode()
-    except Exception:
-        return value
+    for fernet in _decrypt_fernets():
+        try:
+            return fernet.decrypt(value.encode()).decode()
+        except Exception:
+            continue
+    return value

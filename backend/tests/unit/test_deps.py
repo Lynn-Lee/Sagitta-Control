@@ -41,6 +41,7 @@ class FakeDbUser:
     role_id = 3
     manager_id = 2
     tenant_id = 1
+    password_changed_at = None
     role = FakeRole("engineer", [FakePermission("query:read"), FakePermission("audit:view")])
     user_groups = [FakeUserGroup(5, [FakeResourceGroup(10), FakeResourceGroup(20)])]
 

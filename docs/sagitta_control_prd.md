@@ -261,7 +261,7 @@ SQL 洞察按引擎能力选择采集来源。MySQL 使用 `performance_schema` 
 | 机制 | 设计 |
 |---|---|
 | 密码哈希 | `SHA-256(password)` -> `base64` -> `bcrypt(rounds=12)`，规避 bcrypt 72 字节限制。 |
-| 敏感字段加密 | Fernet，加密密钥由 `base64(SHA-256(SECRET_KEY))` 派生。 |
+| 敏感字段加密 | Fernet，生产环境使用独立 `FERNET_KEY` 加密实例密码、SSH 私钥和 TOTP 密钥；解密保留旧 `SECRET_KEY` 派生密钥回退以兼容历史数据。 |
 | Token 黑名单 | 用户登出后写入 Redis；请求时检查黑名单，Redis 不可用时 fail-close。 |
 | 密码策略 | 强制复杂度、默认密码改密、过期改密和到期提醒。 |
 | 账号安全设置 | 右上角用户菜单提供独立的个人设置和修改密码入口；个人设置负责显示名称、邮箱和 2FA 管理，修改密码弹窗仅处理当前密码更新。 |
@@ -273,7 +273,7 @@ SQL 洞察按引擎能力选择采集来源。MySQL 使用 `performance_schema` 
 | 数据脱敏 | 查询结果根据规则脱敏，降低敏感数据暴露面。 |
 | 权限收敛 | 功能权限、资源范围、数据授权分层控制，避免单一权限过大。 |
 
-生产环境必须保持 `SECRET_KEY` 长期稳定。修改 `SECRET_KEY` 会导致实例密码、SSH 密钥和敏感配置无法解密。
+生产环境必须保持 `SECRET_KEY` 和 `FERNET_KEY` 长期稳定。`SECRET_KEY` 用于 JWT 签名，`FERNET_KEY` 用于字段级加密；修改 `FERNET_KEY` 会导致实例密码、SSH 密钥和敏感配置无法解密。
 
 ## 7. 非功能要求
 

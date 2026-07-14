@@ -25,7 +25,15 @@ spec:
         - name: flower
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
+          command:
+            - celery
+            - -A
+            - app.celery_app
+            - flower
+            - --port=5555
+            {{- if .Values.flower.basicAuth }}
+            - --basic_auth={{ .Values.flower.basicAuth }}
+            {{- end }}
           ports:
             - name: flower
               containerPort: 5555

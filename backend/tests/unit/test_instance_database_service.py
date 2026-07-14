@@ -101,30 +101,31 @@ async def test_update_database_sets_fields():
     idb = _idb("shop")
     db = _make_db()
     db.execute.return_value = _one(idb)
-    out = await InstanceDatabaseService.update_database(db, 1, remark="新", is_active=False)
+    out = await InstanceDatabaseService.update_database(db, 1, 1, remark="新", is_active=False)
     assert out.remark == "新"
     assert out.is_active is False
 
 
 @pytest.mark.asyncio
 async def test_update_database_missing():
+    # 子记录不属于该实例（或不存在）时按 404 处理（SAG-009）。
     db = _make_db()
     db.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await InstanceDatabaseService.update_database(db, 404)
+        await InstanceDatabaseService.update_database(db, 1, 404)
 
 
 @pytest.mark.asyncio
 async def test_delete_database_found_and_missing():
     db = _make_db()
     db.execute.return_value = _one(_idb("shop"))
-    await InstanceDatabaseService.delete_database(db, 1)
+    await InstanceDatabaseService.delete_database(db, 1, 1)
     db.delete.assert_awaited_once()
 
     db2 = _make_db()
     db2.execute.return_value = _one(None)
     with pytest.raises(NotFoundException):
-        await InstanceDatabaseService.delete_database(db2, 404)
+        await InstanceDatabaseService.delete_database(db2, 1, 404)
 
 
 # ── sync_from_engine ────────────────────────────────────────

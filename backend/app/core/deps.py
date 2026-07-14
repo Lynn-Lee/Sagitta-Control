@@ -30,7 +30,11 @@ async def current_user(
     db: AsyncSession = Depends(get_db),
 ) -> CurrentUser:
     """获取当前登录用户，返回含 permissions + role + user_groups 的完整字典。"""
-    token = token or get_access_token(request)
+    return await load_user_context(token or get_access_token(request), db)
+
+
+async def load_user_context(token: str | None, db: AsyncSession) -> CurrentUser:
+    """从 access token 还原完整用户上下文（供 HTTP 依赖与 WebSocket 认证复用）。"""
     if not token:
         raise _401
 
@@ -83,6 +87,12 @@ async def current_user(
     if not db_user or not db_user.is_active:
         raise _401
 
+    # 改密后撤销全部旧会话：token 若在最近一次改密前签发则失效（SAG-012）。
+    from app.core.security import is_token_revoked_by_password_change
+
+    if is_token_revoked_by_password_change(payload.get("iat"), db_user.password_changed_at):
+        raise _401
+
     if payload.get("requires_2fa") and not payload.get("2fa_verified"):
         raise HTTPException(status_code=403, detail="请先完成二步验证")
 
@@ -130,3 +140,14 @@ def require_perm(perm: str) -> Callable[[CurrentUser], Awaitable[CurrentUser]]:
         return user
 
     return _checker
+
+
+async def authenticate_websocket(websocket: Any, db: AsyncSession) -> CurrentUser | None:
+    """WebSocket 握手认证：从 access_token Cookie 或 token 查询参数还原用户，失败返回 None。"""
+    from app.core.auth_cookies import ACCESS_COOKIE_NAME
+
+    token = websocket.cookies.get(ACCESS_COOKIE_NAME) or websocket.query_params.get("token")
+    try:
+        return await load_user_context(token, db)
+    except HTTPException:
+        return None

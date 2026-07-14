@@ -4,7 +4,7 @@ import {
   UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowLeftOutlined, LoginOutlined, SaveOutlined,
   GlobalOutlined, KeyOutlined,
 } from '@ant-design/icons'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore, type AuthProvider } from '@/store/auth'
 import apiClient from '@/api/client'
 import { authApi } from '@/api/auth'
@@ -67,6 +67,7 @@ const OAuthBtn = ({
 // ── 主组件 ────────────────────────────────────────────────────
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [loginForm] = Form.useForm()
   const [smsForm] = Form.useForm()
@@ -99,6 +100,19 @@ export default function LoginPage() {
     () => authMethods ? (Object.keys(authMethods) as LoginMethod[]).filter((key) => authMethods[key]) : [],
     [authMethods],
   )
+
+  // 第三方登录（OAuth/CAS/OIDC）若账号启用 TOTP，回调页会携带 2FA 凭证跳转至此，进入二步验证。
+  useEffect(() => {
+    const st = location.state as { twoFaToken?: string; provider?: AuthProvider } | null
+    if (st?.twoFaToken) {
+      setTwoFactorToken(st.twoFaToken)
+      setPendingAuthProvider(st.provider || 'oidc')
+      setTwoFactorMode(true)
+      // 清除 history state，避免刷新后重复进入。
+      navigate(location.pathname, { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let active = true

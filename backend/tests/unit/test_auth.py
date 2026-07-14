@@ -4,10 +4,10 @@ Sprint 1 认证与用户服务单元测试。
 
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
-from fastapi import Response
+from fastapi import HTTPException, Response
 from pydantic import ValidationError
 
 from app.core.security import (
@@ -42,16 +42,39 @@ class FakeRedis:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
         self.setex_calls: list[tuple[str, int, str]] = []
+        self.set_calls: list[tuple[str, str, int | None, bool]] = []
 
     async def get(self, key: str) -> str | None:
         return self.store.get(key)
 
+    async def getdel(self, key: str) -> str | None:
+        return self.store.pop(key, None)
+
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
+
+    async def exists(self, key: str) -> int:
+        return 1 if key in self.store else 0
 
     async def setex(self, key: str, ttl: int, value: str) -> None:
         self.setex_calls.append((key, ttl, value))
         self.store[key] = value
+
+    async def set(self, key: str, value: str, *, ex: int | None = None, nx: bool = False) -> bool | None:
+        self.set_calls.append((key, value, ex, nx))
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+
+class FakeRequest:
+    """最小请求替身：满足 resolve_client_ip 与 cookie 读取。"""
+
+    def __init__(self, cookies: dict[str, str] | None = None) -> None:
+        self.cookies = cookies or {}
+        self.client = SimpleNamespace(host="203.0.113.7")
+        self.headers: dict[str, str] = {}
 
 
 class FakeAuthRole:
@@ -185,7 +208,7 @@ class TestAuthRouterFlows:
         response = Response()
 
         result = await auth_router.logout(
-            request=object(),  # type: ignore[arg-type]
+            request=FakeRequest(),  # type: ignore[arg-type]
             response=response,
             token=token,
             redis=redis,
@@ -255,14 +278,43 @@ class TestAuthRouterFlows:
 
         result = await auth_router.refresh_token(
             RefreshRequest(refresh_token=refresh),
-            request=object(),  # type: ignore[arg-type]
+            request=FakeRequest(),  # type: ignore[arg-type]
             response=response,
             db=object(),  # type: ignore[arg-type]
+            redis=FakeRedis(),
         )
 
         assert result.access_token
         assert result.refresh_token
         assert "access_token=" in response.headers["set-cookie"]
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_consumes_old_token_atomically(self, monkeypatch):
+        """SAG-012：refresh token 轮换必须用 Redis 原子 SET NX 消费旧 token。"""
+        db_user = FakeAuthUser()
+
+        async def get_by_id(db_arg, user_id):
+            assert user_id == db_user.id
+            return db_user
+
+        monkeypatch.setattr(auth_router.UserService, "get_by_id", get_by_id)
+        refresh = create_refresh_token({"sub": str(db_user.id), "tenant_id": db_user.tenant_id})
+        redis = FakeRedis()
+
+        await auth_router.refresh_token(
+            RefreshRequest(refresh_token=refresh),
+            request=FakeRequest(),  # type: ignore[arg-type]
+            response=Response(),
+            db=object(),  # type: ignore[arg-type]
+            redis=redis,
+        )
+
+        assert redis.set_calls
+        key, value, ttl, nx = redis.set_calls[0]
+        assert key == f"blacklist:{refresh}"
+        assert value == "1"
+        assert ttl and ttl > 0
+        assert nx is True
 
     @pytest.mark.asyncio
     async def test_sms_send_code_delegates_to_service(self, monkeypatch):
@@ -301,8 +353,10 @@ class TestAuthRouterFlows:
 
         result = await auth_router.sms_login(
             SmsLoginRequest(phone="13800000000", code="123456"),
+            request=FakeRequest(),  # type: ignore[arg-type]
             response=response,
             db=object(),  # type: ignore[arg-type]
+            redis=FakeRedis(),
         )
 
         assert result.access_token
@@ -331,6 +385,81 @@ class TestFieldEncryption:
         plain = "old_plain_password"
         result = decrypt_field(plain)
         assert result == plain
+
+    def test_fernet_key_separation_with_legacy_fallback(self, monkeypatch):
+        """SAG-001：字段加密用独立 FERNET_KEY，且旧的 SECRET_KEY 派生密文仍可解密。"""
+        from app.core import security
+        from app.core.config import settings
+
+        valid_fernet_key = "dhVcBCzIxLepnTAaF1FUvGO-jDBLgjcOBsPDRgZNVdA="
+
+        # 旧方案：未配置 FERNET_KEY，从 SECRET_KEY 派生。
+        monkeypatch.setattr(settings, "FERNET_KEY", "")
+        legacy_ct = security.encrypt_field("s3cret")
+
+        # 新方案：配置独立 FERNET_KEY。
+        monkeypatch.setattr(settings, "FERNET_KEY", valid_fernet_key)
+        new_ct = security.encrypt_field("s3cret")
+
+        assert new_ct != legacy_ct
+        assert security.decrypt_field(new_ct) == "s3cret"
+        # 旧密文通过回退密钥仍能解密。
+        assert security.decrypt_field(legacy_ct) == "s3cret"
+
+
+class TestPasswordChangeRevocation:
+    def test_token_before_password_change_is_revoked(self):
+        """SAG-012：改密前签发的 token 视为已撤销。"""
+        from app.core.security import is_token_revoked_by_password_change
+
+        changed_at = datetime.now(UTC)
+        old_iat = changed_at.timestamp() - 60
+        new_iat = changed_at.timestamp() + 60
+        assert is_token_revoked_by_password_change(old_iat, changed_at) is True
+        assert is_token_revoked_by_password_change(new_iat, changed_at) is False
+        assert is_token_revoked_by_password_change(None, changed_at) is False
+        assert is_token_revoked_by_password_change(old_iat, None) is False
+
+    @pytest.mark.asyncio
+    async def test_oauth_exchange_requires_2fa_when_totp_enabled(self):
+        """SAG-003：第三方登录已启用 TOTP 时，兑换登录码返回 2FA 挑战而非完整令牌。"""
+        redis = FakeRedis()
+        login_code = "b" * 64
+        redis.store[_oauth_login_code_key(login_code)] = json.dumps({
+            "sub": "42",
+            "username": "oauth_user",
+            "tenant_id": 1,
+            "provider": "oidc",
+            "totp_enabled": True,
+        })
+
+        result = await exchange_oauth_login_code(
+            OAuthExchangeRequest(login_code=login_code),
+            response=Response(),
+            redis=redis,
+        )
+        assert result.requires_2fa is True
+        assert result.two_fa_token
+        assert result.access_token is None
+        assert result.refresh_token is None
+
+    @pytest.mark.asyncio
+    async def test_logout_blacklists_both_access_and_refresh(self):
+        """SAG-012：登出同时拉黑 access 与 refresh token。"""
+        access = create_access_token({"sub": "7", "username": "alice", "tenant_id": 1})
+        refresh = create_refresh_token({"sub": "7", "tenant_id": 1})
+        redis = FakeRedis()
+
+        await auth_router.logout(
+            request=FakeRequest(cookies={"refresh_token": refresh}),  # type: ignore[arg-type]
+            response=Response(),
+            token=access,
+            redis=redis,
+        )
+
+        blacklisted = {call[0] for call in redis.setex_calls}
+        assert f"blacklist:{access}" in blacklisted
+        assert f"blacklist:{refresh}" in blacklisted
 
 
 class TestUserCreateSchema:

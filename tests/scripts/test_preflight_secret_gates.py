@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -78,3 +80,42 @@ exit 1
 
     assert result.returncode == 1
     assert "[FAIL] GRAFANA_CLIENT_SECRET 仍使用默认值" in result.stdout
+
+
+def test_prepare_go_live_env_generates_fernet_key(tmp_path: Path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "POSTGRES_PASSWORD=CHANGE_ME",
+                "REDIS_PASSWORD=CHANGE_ME",
+                "SECRET_KEY=CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS",
+                "LICENSE_DEPLOYMENT_ID=CHANGE_ME",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "deploy/customer/prepare-go-live-env.sh"),
+            "--env-file",
+            str(env_file),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    values = dict(
+        line.split("=", 1)
+        for line in env_file.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    )
+    assert "FERNET_KEY" in values
+    assert values["FERNET_KEY"] != values["SECRET_KEY"]
+    Fernet(values["FERNET_KEY"].encode())

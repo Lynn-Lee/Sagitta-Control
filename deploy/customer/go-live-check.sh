@@ -123,6 +123,20 @@ secret_key_is_weak() {
   return 1
 }
 
+fernet_key_is_valid() {
+  local value="$1"
+  "$PYTHON_BIN" - "$value" <<'PY' >/dev/null 2>&1
+import base64
+import sys
+
+try:
+    raw = base64.urlsafe_b64decode(sys.argv[1].encode())
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if len(raw) == 32 else 1)
+PY
+}
+
 http_code() {
   local url="$1"
   curl -k -sS --max-time "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true
@@ -252,7 +266,7 @@ printf '[INFO] ENV_FILE=%s\n' "$ENV_FILE"
 
 [[ -f "$ENV_FILE" ]] && pass "环境文件存在" || fail "环境文件不存在: $ENV_FILE"
 
-for key in POSTGRES_PASSWORD REDIS_PASSWORD SECRET_KEY LICENSE_PUBLIC_KEY LICENSE_CUSTOMER_ID LICENSE_SERVER_URL LICENSE_DEPLOYMENT_ID MANIFEST_PUBLIC_KEY; do
+for key in POSTGRES_PASSWORD REDIS_PASSWORD SECRET_KEY FERNET_KEY LICENSE_PUBLIC_KEY LICENSE_CUSTOMER_ID LICENSE_SERVER_URL LICENSE_DEPLOYMENT_ID MANIFEST_PUBLIC_KEY; do
   check_required_env "$key"
 done
 check_exact_env APP_ENV production
@@ -270,6 +284,19 @@ elif secret_key_is_weak "$secret_key"; then
   fail "SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式）"
 else
   pass "SECRET_KEY 长度和弱模式检查通过"
+fi
+
+fernet_key="$(env_value FERNET_KEY || true)"
+if [[ -z "$fernet_key" ]]; then
+  fail "FERNET_KEY 未配置"
+elif [[ "$fernet_key" == CHANGE_ME* ]]; then
+  fail "FERNET_KEY 仍为占位符"
+elif [[ "$fernet_key" == "$secret_key" ]]; then
+  fail "FERNET_KEY 不得与 SECRET_KEY 相同"
+elif ! fernet_key_is_valid "$fernet_key"; then
+  fail "FERNET_KEY 不是合法的 Fernet 密钥"
+else
+  pass "FERNET_KEY 格式和分离检查通过"
 fi
 
 grace_days="$(env_value LICENSE_ONLINE_GRACE_DAYS || true)"

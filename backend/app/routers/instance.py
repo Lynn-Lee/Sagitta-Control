@@ -1,17 +1,18 @@
 """实例管理路由。"""
 
 from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import current_user, require_perm
+from app.models.instance import Instance
 from app.schemas.instance import (
     InstanceCreate,
     InstanceUpdate,
     TunnelCreate,
 )
-from app.models.instance import Instance
 from app.services.instance import InstanceService, TunnelService
 from app.services.instance_database import InstanceDatabaseService
 from app.services.license import LicenseService
@@ -320,6 +321,7 @@ async def update_database(
     await _ensure_instance_access(db, user, instance_id)
     idb = await InstanceDatabaseService.update_database(
         db,
+        instance_id,
         idb_id,
         remark=data.get("remark"),
         is_active=data.get("is_active"),
@@ -339,16 +341,21 @@ async def delete_database(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     await _ensure_instance_access(db, user, instance_id)
-    await InstanceDatabaseService.delete_database(db, idb_id)
+    await InstanceDatabaseService.delete_database(db, instance_id, idb_id)
     return {"status": 0, "msg": "已删除"}
 
 
-@router.post("/{instance_id}/db-list/sync/", summary="从引擎自动同步数据库列表")
+@router.post(
+    "/{instance_id}/db-list/sync/",
+    summary="从引擎自动同步数据库列表",
+    dependencies=[Depends(require_perm("instance_manage"))],
+)
 async def sync_databases(
     instance_id: int,
     user: dict[str, Any] = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    # 同步会新增/更新/删除库注册记录，需 instance_manage（SAG-010）。
     await _ensure_instance_access(db, user, instance_id)
     result = await InstanceDatabaseService.sync_from_engine(db, instance_id)
     return result

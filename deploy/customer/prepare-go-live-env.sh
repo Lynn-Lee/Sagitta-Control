@@ -72,6 +72,7 @@ random_values = {
     "POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(36),
     "REDIS_PASSWORD": lambda: secrets.token_urlsafe(36),
     "SECRET_KEY": lambda: base64.urlsafe_b64encode(secrets.token_bytes(48)).decode().rstrip("="),
+    "FERNET_KEY": lambda: base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
     "LICENSE_DEPLOYMENT_ID": lambda: "sagitta-control-" + secrets.token_hex(16),
 }
 
@@ -116,4 +117,4 @@ else:
 PY
 
 echo "Environment prepared: $ENV_FILE"
-echo "Keep SECRET_KEY and LICENSE_DEPLOYMENT_ID stable across upgrades."
+echo "Keep SECRET_KEY, FERNET_KEY and LICENSE_DEPLOYMENT_ID stable across upgrades."

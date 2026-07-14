@@ -5,10 +5,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,11 +102,18 @@ class InstanceDatabaseService:
     @staticmethod
     async def update_database(
         db: AsyncSession,
+        instance_id: int,
         idb_id: int,
         remark: str | None = None,
         is_active: bool | None = None,
     ) -> InstanceDatabase:
-        result = await db.execute(select(InstanceDatabase).where(InstanceDatabase.id == idb_id))
+        # 子资源查询同时限定 instance_id，防止跨实例越权（SAG-009）。
+        result = await db.execute(
+            select(InstanceDatabase).where(
+                InstanceDatabase.id == idb_id,
+                InstanceDatabase.instance_id == instance_id,
+            )
+        )
         idb = result.scalar_one_or_none()
         if not idb:
             raise NotFoundException(f"记录 ID={idb_id} 不存在")
@@ -120,8 +126,14 @@ class InstanceDatabaseService:
         return idb
 
     @staticmethod
-    async def delete_database(db: AsyncSession, idb_id: int) -> None:
-        result = await db.execute(select(InstanceDatabase).where(InstanceDatabase.id == idb_id))
+    async def delete_database(db: AsyncSession, instance_id: int, idb_id: int) -> None:
+        # 子资源查询同时限定 instance_id，防止跨实例越权（SAG-009）。
+        result = await db.execute(
+            select(InstanceDatabase).where(
+                InstanceDatabase.id == idb_id,
+                InstanceDatabase.instance_id == instance_id,
+            )
+        )
         idb = result.scalar_one_or_none()
         if not idb:
             raise NotFoundException(f"记录 ID={idb_id} 不存在")

@@ -420,6 +420,7 @@ class TestWorkflowListingAndDetail:
             db_name="ump_testdb",
             syntax_type=2,
             is_backup=True,
+            engineer_id=7,
             engineer="00311624",
             engineer_display="刘洋",
             status=WorkflowStatus.PENDING_REVIEW,
@@ -494,6 +495,10 @@ class TestWorkflowListingAndDetail:
             "app.services.audit.AuditService.get_audit_logs", AsyncMock(return_value=[])
         ), patch(
             "app.services.audit.AuditService._check_approver_permission", AsyncMock(return_value=None)
+        ), patch(
+            "app.services.audit.AuditService.get_pending_workflow_ids_for_user", AsyncMock(return_value={5})
+        ), patch(
+            "app.services.audit.AuditService.get_audited_workflow_ids_for_user", AsyncMock(return_value=set())
         ):
             detail = await WorkflowService.get_detail(
                 db,

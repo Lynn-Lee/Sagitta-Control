@@ -3,11 +3,10 @@ SQL 工单业务逻辑服务（Sprint 3）。
 """
 from __future__ import annotations
 
-from typing import Any, cast
-
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -499,6 +498,30 @@ class WorkflowService:
         # ── 工单详情 ──────────────────────────────────────────────
 
     @staticmethod
+    async def can_view_workflow(
+        db: AsyncSession, wf: SqlWorkflow, user: dict[str, Any]
+    ) -> bool:
+        """对象级授权：判断用户是否有权查看该工单（提交人/审批人/治理范围）。"""
+        if user.get("is_superuser"):
+            return True
+        if wf.engineer_id == user.get("id"):
+            return True
+
+        from app.services.audit import AuditService
+
+        pending_ids = await AuditService.get_pending_workflow_ids_for_user(db, user)
+        audited_ids = await AuditService.get_audited_workflow_ids_for_user(db, user)
+        if wf.id in (pending_ids | audited_ids):
+            return True
+
+        scope = await GovernanceScopeService.resolve(db, user, "workflow")
+        if scope["mode"] == "global":
+            return True
+        if scope["mode"] == "instance_scope":
+            return wf.instance_id in (scope.get("instance_ids") or [])
+        return False
+
+    @staticmethod
     async def get_detail(db: AsyncSession, workflow_id: int, user: dict[str, Any]) -> dict[str, Any]:
         result = await db.execute(
             select(SqlWorkflow, Instance.instance_name)
@@ -510,6 +533,10 @@ class WorkflowService:
         if not row:
             raise NotFoundException(f"工单 ID={workflow_id} 不存在")
         wf, inst_name = row
+
+        # 对象级授权：无权访问统一按 404 处理，避免枚举（SAG-005）。
+        if not await WorkflowService.can_view_workflow(db, wf, user):
+            raise NotFoundException(f"工单 ID={workflow_id} 不存在")
 
         detail = WorkflowService._fmt_workflow(wf, inst_name or "")
         if wf.content:
@@ -578,10 +605,12 @@ class WorkflowService:
         if data is None:
             data = WorkflowExecuteRequest(mode=mode or "immediate")
 
+        # 行锁：串行化“校验状态 + 迁移状态”，防止并发请求重复执行同一工单（SAG-008）。
         result = await db.execute(
             select(SqlWorkflow)
             .options(selectinload(SqlWorkflow.content))
             .where(SqlWorkflow.id == workflow_id)
+            .with_for_update()
         )
         wf = result.scalar_one_or_none()
         if not wf:

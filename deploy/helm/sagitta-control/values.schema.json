@@ -10,6 +10,9 @@
         },
         "secretKey": {
           "type": "string"
+        },
+        "fernetKey": {
+          "type": "string"
         }
       }
     },
@@ -88,10 +91,22 @@
                   ]
                 },
                 "pattern": "^(?!(.)\\1+$)(?!(0123456789|abcdefgh|password|changeme)).+"
+              },
+              "fernetKey": {
+                "minLength": 44,
+                "not": {
+                  "enum": [
+                    "CHANGE_ME_GENERATE_WITH_cryptography_fernet",
+                    "CHANGE_ME_USE_RANDOM_32_CHARS_IN_PRODUCTION",
+                    "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS"
+                  ]
+                },
+                "pattern": "^[A-Za-z0-9_-]{43}=$"
               }
             },
             "required": [
-              "secretKey"
+              "secretKey",
+              "fernetKey"
             ]
           }
         }

@@ -1,16 +1,16 @@
 """
 SQL 工单路由（Sprint 3）。
 """
-from typing import Any
 import contextlib
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi import Query as QParam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import current_user, require_perm
+from app.core.deps import authenticate_websocket, current_user, require_perm
 from app.models.instance import Instance
 from app.schemas.workflow import (
     WorkflowAuditRequest,
@@ -180,7 +180,8 @@ async def get_workflow_status(
     from app.services.workflow import STATUS_DESC
     result = await db.execute(select(SqlWorkflow).where(SqlWorkflow.id == workflow_id))
     wf = result.scalar_one_or_none()
-    if not wf:
+    # 对象级授权：无权访问统一按 404，避免枚举工单存在性（SAG-005）。
+    if not wf or not await WorkflowService.can_view_workflow(db, wf, user):
         from fastapi import HTTPException
         raise HTTPException(404, "工单不存在")
     return {
@@ -201,9 +202,8 @@ async def workflow_progress_ws(
 ) -> None:
     """
     WebSocket：实时推送工单执行进度。
-    每秒查询一次状态，直到终态（finish/exception/abort）或客户端断开。
+    握手前完成认证与对象授权；每秒查询一次状态，直到终态或达到最大时长。
     """
-    await websocket.accept()
     import asyncio
 
     from sqlalchemy import select
@@ -211,9 +211,23 @@ async def workflow_progress_ws(
     from app.models.workflow import SqlWorkflow
     from app.services.workflow import STATUS_DESC
 
+    # 认证 + 对象授权：均在 accept 之前完成，未通过直接拒绝握手（SAG-006）。
+    user = await authenticate_websocket(websocket, db)
+    if user is None:
+        await websocket.close(code=1008)  # policy violation
+        return
+    result = await db.execute(select(SqlWorkflow).where(SqlWorkflow.id == workflow_id))
+    wf = result.scalar_one_or_none()
+    if not wf or not await WorkflowService.can_view_workflow(db, wf, user):
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+
     terminal_states = {6, 7, 8}  # FINISH, EXCEPTION, ABORT
+    max_iterations = 1800  # 单连接最长约 30 分钟，防止长期占用连接与查询资源
     try:
-        while True:
+        for _ in range(max_iterations):
             result = await db.execute(
                 select(SqlWorkflow).where(SqlWorkflow.id == workflow_id)
             )

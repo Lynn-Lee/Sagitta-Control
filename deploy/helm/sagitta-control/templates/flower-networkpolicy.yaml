@@ -1,0 +1,30 @@
+{{- if and .Values.flower.enabled .Values.flower.networkPolicy.enabled }}
+# 限制 Flower 访问来源：默认仅允许带运维访问标签的 Pod，避免集群内任意工作负载读取任务信息（SAG-019）。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "sagitta-control.fullname" . }}-flower
+  labels:
+    {{- include "sagitta-control.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "sagitta-control.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: flower
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.flower.networkPolicy.allowedPodLabels | nindent 14 }}
+        {{- with .Values.flower.networkPolicy.allowedNamespaceLabels }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.flower.service.port }}
+{{- end }}

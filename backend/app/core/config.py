@@ -13,8 +13,16 @@ from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 已知占位/默认密钥：任何部署渠道（后端默认、Helm values 等）曾使用过的公开串。
+_KNOWN_DEFAULT_SECRETS = {
+    "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS",
+    "CHANGE_ME_USE_RANDOM_32_CHARS_IN_PRODUCTION",
+    "CHANGE_ME_GENERATE_WITH_cryptography_fernet",
+}
+# 弱密钥模式：占位串/常见弱口令在任意位置出现即判定为弱（不再只匹配前缀）。
 _WEAK_SECRET_PATTERNS = re.compile(
-    r"^(.)\1*$|^(0123456789|abcdefgh|password|changeme).*",
+    r"^(.)\1*$"  # 全部相同字符
+    r"|(0123456789|abcdefgh|password|change[_-]?me|changeme|placeholder|your[_-]?secret)",
     re.IGNORECASE,
 )
 
@@ -44,6 +52,10 @@ class Settings(BaseSettings):
 
     # ─── 安全 ─────────────────────────────────────────────────
     SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS"
+    # 字段级加密（实例密码/SSH 私钥/TOTP 密钥）专用密钥，与 JWT 签名的 SECRET_KEY 分离。
+    # 生成命令：python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # 留空时回退为从 SECRET_KEY 派生（仅兼容旧部署，生产环境强制要求单独配置）。
+    FERNET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -82,6 +94,11 @@ class Settings(BaseSettings):
     # ─── CORS ─────────────────────────────────────────────────
     CORS_ORIGINS: list[str] = ["http://localhost", "http://localhost:5173", "http://localhost:3000"]
 
+    # ─── 审计 ─────────────────────────────────────────────────
+    # 审计日志写入失败时是否阻断业务（fail-closed）。
+    # None：按环境自动——生产环境 fail-closed，其它环境 fail-open；显式 true/false 可强制覆盖。
+    AUDIT_FAIL_CLOSED: bool | None = None
+
     # ─── 观测中心 ────────────────────────────────────────────
     PROMETHEUS_URL: str = "http://localhost:9090"
     ALERTMANAGER_URL: str = "http://localhost:9093"
@@ -106,25 +123,42 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        _default_key = "CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS"
-        if _default_key == self.SECRET_KEY:
-            if self.APP_ENV == "production":
+        is_default = self.SECRET_KEY in _KNOWN_DEFAULT_SECRETS
+        if self.APP_ENV == "production":
+            if is_default:
                 raise ValueError(
-                    "生产环境禁止使用默认 SECRET_KEY，"
+                    "生产环境禁止使用占位/默认 SECRET_KEY，"
                     "请设置环境变量 SECRET_KEY 为至少 32 字符的随机字符串。\n"
                     '生成命令：python -c "import secrets; print(secrets.token_hex(32))"'
                 )
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("生产环境 SECRET_KEY 长度不足 32 字符。")
+            if _WEAK_SECRET_PATTERNS.search(self.SECRET_KEY):
+                raise ValueError("生产环境 SECRET_KEY 疑似弱密钥（重复字符/占位串/常见弱口令），请更换为随机字符串。")
+
+            # 字段加密密钥必须与 SECRET_KEY 分离，且为合法 Fernet 密钥。
+            if not self.FERNET_KEY or self.FERNET_KEY in _KNOWN_DEFAULT_SECRETS:
+                raise ValueError(
+                    "生产环境必须单独配置 FERNET_KEY（不得留空或使用占位值）。\n"
+                    '生成命令：python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+                )
+            if self.FERNET_KEY == self.SECRET_KEY:
+                raise ValueError("FERNET_KEY 不得与 SECRET_KEY 相同，字段加密密钥必须与签名密钥分离。")
+            from cryptography.fernet import Fernet
+
+            try:
+                Fernet(self.FERNET_KEY.encode())
+            except Exception as exc:
+                raise ValueError(
+                    "FERNET_KEY 不是合法的 Fernet 密钥（需为 base64 编码的 32 字节密钥）。"
+                ) from exc
+        elif is_default:
             import warnings
 
             warnings.warn(
                 "SECRET_KEY 使用默认值，请在生产环境中替换！",
                 stacklevel=2,
             )
-        elif self.APP_ENV == "production":
-            if len(self.SECRET_KEY) < 32:
-                raise ValueError("生产环境 SECRET_KEY 长度不足 32 字符。")
-            if _WEAK_SECRET_PATTERNS.match(self.SECRET_KEY):
-                raise ValueError("生产环境 SECRET_KEY 疑似弱密钥（重复字符/常见弱口令模式），请更换为随机字符串。")
         return self
 
     @model_validator(mode="after")
@@ -142,6 +176,13 @@ class Settings(BaseSettings):
         ):
             raise ValueError("生产环境必须设置 AUTH_COOKIE_SECURE=true；仅源码 HTTP 测试环境可显式开启豁免。")
         return self
+
+    @property
+    def audit_fail_closed(self) -> bool:
+        """审计写入失败是否阻断业务：显式配置优先，否则生产环境默认阻断。"""
+        if self.AUDIT_FAIL_CLOSED is not None:
+            return self.AUDIT_FAIL_CLOSED
+        return self.APP_ENV == "production"
 
     @property
     def celery_broker_url(self) -> str:

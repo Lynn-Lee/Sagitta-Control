@@ -3,11 +3,11 @@
 完整实现：执行查询、权限校验、数据脱敏、查询日志。
 """
 
-from typing import Any
 import csv
 import logging
 from datetime import datetime
 from io import BytesIO, StringIO
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -18,8 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import current_user
+from app.core.exceptions import AppException
 from app.core.net import resolve_client_ip
 from app.engines.registry import get_engine
 from app.models.instance import Instance, InstanceDatabase
@@ -155,6 +157,12 @@ async def _run_query_with_permissions(
         query_log_id = query_log.id
     except Exception as e:
         logger.warning("write_query_log failed: %s", str(e))
+        # 审计不可用时按配置阻断（生产默认 fail-closed），避免敏感查询无留痕执行（SAG-014）。
+        if settings.audit_fail_closed:
+            raise AppException(
+                "审计日志写入失败，出于合规要求已阻止本次操作，请稍后重试或联系管理员",
+                code=503,
+            ) from e
         query_log_id = None
 
     rows_as_list = []
@@ -224,6 +232,17 @@ async def _write_failed_query_log(
         logger.warning("write_failed_query_log failed: %s", str(e))
 
 
+# 以这些字符开头的单元格可能被 Excel/WPS 解释为公式，导出前需中和（SAG-011）。
+_FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _neutralize_formula(value: Any) -> Any:
+    """中和 CSV/XLSX 公式注入：危险前缀的字符串单元格加单引号前缀。"""
+    if isinstance(value, str) and value and value[0] in _FORMULA_TRIGGER_CHARS:
+        return "'" + value
+    return value
+
+
 def _build_query_export_file(
     result: dict[str, Any],
     export_format: str,
@@ -232,7 +251,7 @@ def _build_query_export_file(
     metadata = metadata or {}
     headers = ["row_num", *(result.get("column_list") or [])]
     rows = [
-        [idx + 1, *row]
+        [idx + 1, *(_neutralize_formula(v) for v in row)]
         for idx, row in enumerate(result.get("rows") or [])
     ]
 
@@ -241,7 +260,7 @@ def _build_query_export_file(
         output = StringIO()
         writer = csv.writer(output)
         for key, value in metadata.items():
-            writer.writerow([f"# {key}", value])
+            writer.writerow([f"# {key}", _neutralize_formula(value)])
         if metadata:
             writer.writerow([])
         writer.writerow(headers)
@@ -262,7 +281,7 @@ def _build_query_export_file(
         meta = wb.create_sheet("Export Metadata")
         meta.append(["key", "value"])
         for key, value in metadata.items():
-            meta.append([key, value])
+            meta.append([key, _neutralize_formula(value)])
     content = BytesIO()
     wb.save(content)
     return (

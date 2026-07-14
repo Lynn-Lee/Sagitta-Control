@@ -104,6 +104,7 @@ COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --re
 
 - 将 `.env` 中 `APP_ENV` 设置为 `production`。
 - 替换 `SECRET_KEY`，长度不少于 32 位；生产环境严禁使用默认值。
+- 配置独立 `FERNET_KEY`，用于实例密码、SSH 私钥、TOTP 密钥等敏感字段加密；必须与 `SECRET_KEY` 不同。
 - 将 `CORS_ORIGINS` 配置为可信前端域名列表；生产环境禁止使用通配符 `*`。
 - 公网 HTTPS 生产环境必须设置 `AUTH_COOKIE_SECURE=true` 且保持 `ALLOW_INSECURE_AUTH_COOKIE=false`；仅 HTTP 源码测试环境可显式设置 `ALLOW_INSECURE_AUTH_COOKIE=true` 作为临时豁免。
 - 替换 PostgreSQL、Redis、Grafana 等所有默认密码。
@@ -111,7 +112,7 @@ COMPOSE_PROJECT_NAME=sagitta-control-source-test bash deploy/update-prod.sh --re
 - 仅通过 HTTPS 暴露前端入口，禁止直接向公网暴露 PostgreSQL、Redis、Flower 和后端调试接口。
 - 前端 Nginx 必须保留生产 CSP 响应头，限制脚本来源、禁止被第三方 frame 嵌入；浏览器登录态由 HttpOnly Cookie 承载，并通过 `X-CSRF-Token` 做写操作 CSRF 校验。
 - 在迁移、升级和发布前执行数据库备份。
-- 保持 `SECRET_KEY` 稳定；修改后会导致已加密的实例密码、SSH 密钥和敏感配置无法解密。
+- 保持 `SECRET_KEY` 和 `FERNET_KEY` 稳定；修改 `FERNET_KEY` 会导致已加密的实例密码、SSH 密钥和敏感配置无法解密。
 
 ## 目录结构
 

@@ -61,7 +61,7 @@ gzip -t "backups/sagitta_control_${timestamp}.sql.gz"
 
 ### 2.2 同步备份这些材料
 
-- `.env`，尤其是 `SECRET_KEY` 和 `LICENSE_DEPLOYMENT_ID`。
+- `.env`，尤其是 `SECRET_KEY`、`FERNET_KEY` 和 `LICENSE_DEPLOYMENT_ID`。
 - License 文件目录，对应 Docker volume 为 `licenses`。
 - 当前部署包目录。
 - 客户侧反向代理配置。
@@ -83,7 +83,7 @@ gzip -t "backups/sagitta_control_${timestamp}.sql.gz"
 - 已确认当前系统没有正在执行的 SQL 工单、归档任务或关键审批。
 - 已确认新版本镜像可拉取；离线环境已导入新版本镜像 tar 包。
 
-升级时最重要的原则：复用旧 `.env`，不要重新生成 `SECRET_KEY` 和 `LICENSE_DEPLOYMENT_ID`。
+升级时最重要的原则：复用旧 `.env`，不要重新生成 `SECRET_KEY`、`FERNET_KEY` 和 `LICENSE_DEPLOYMENT_ID`。
 
 ## 4. 标准升级流程
 
@@ -101,7 +101,7 @@ cp /opt/sagitta-control/Sagitta-Control-v<old_version>/.env .env
 确认关键配置已继承：
 
 ```bash
-grep -E '^(SECRET_KEY|LICENSE_CUSTOMER_ID|LICENSE_DEPLOYMENT_ID|BACKEND_PORT|FRONTEND_PORT)=' .env
+grep -E '^(SECRET_KEY|FERNET_KEY|LICENSE_CUSTOMER_ID|LICENSE_DEPLOYMENT_ID|BACKEND_PORT|FRONTEND_PORT)=' .env
 ```
 
 执行升级：
@@ -264,7 +264,7 @@ docker compose logs -f backend celery_worker celery_beat
 - 定期轮换数据库接入账号。
 - 定期下载并归档审计日志。
 - 只使用固定版本镜像，不使用浮动镜像标签。
-- 不修改 `SECRET_KEY` 和 `LICENSE_DEPLOYMENT_ID`，除非明确执行全新部署。
+- 不修改 `SECRET_KEY`、`FERNET_KEY` 和 `LICENSE_DEPLOYMENT_ID`，除非明确执行全新部署。
 - 不把部署包、截图、日志和诊断包直接公开到互联网。
 - 对包含客户业务信息的审计导出和诊断包执行内部审批。
 

@@ -26,6 +26,7 @@ from app.core.auth_cookies import (
 )
 from app.core.database import get_db
 from app.core.deps import CurrentUser, current_user, oauth2_scheme
+from app.core.rate_limit import enforce_auth_rate_limit
 from app.core.security import (
     INITIAL_PASSWORD_GRACE_SECONDS,
     create_access_token,
@@ -39,6 +40,7 @@ from app.core.security import (
     hash_password,
     is_initial_password_state,
     is_password_expiring_soon,
+    is_token_revoked_by_password_change,
     verify_password,
 )
 from app.schemas.auth import (
@@ -137,9 +139,12 @@ async def get_redis() -> AsyncIterator[Any]:
 @router.post("/login/", response_model=TokenResponse, summary="用户名密码登录")
 async def login(
     data: LoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
+    await enforce_auth_rate_limit(redis, request, data.username, scope="login")
     user = await UserService.get_by_username(db, data.username)
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
@@ -177,19 +182,30 @@ async def login(
 
 @router.post("/login/form/", response_model=TokenResponse, include_in_schema=False)
 async def login_form(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
-    return await login(LoginRequest(username=form_data.username, password=form_data.password), response, db)
+    return await login(
+        LoginRequest(username=form_data.username, password=form_data.password),
+        request,
+        response,
+        db,
+        redis,
+    )
 
 
 @router.post("/ldap/", response_model=TokenResponse, summary="LDAP 登录")
 async def ldap_login(
     data: LdapLoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
+    await enforce_auth_rate_limit(redis, request, data.username, scope="ldap")
     try:
         user = await LdapAuthService.authenticate(db, data.username, data.password)
     except ValueError as e:
@@ -212,6 +228,7 @@ async def refresh_token(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
     refresh_value = data.refresh_token or get_refresh_token(request)
     if not refresh_value:
@@ -223,9 +240,21 @@ async def refresh_token(
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="非法的 token 类型")
 
+    # 复用检测：以 Redis SET NX 原子消费旧 refresh token，避免并发双刷新（SAG-012）。
+    ttl = int(payload.get("exp", 0)) - int(time.time())
+    if ttl <= 0:
+        raise HTTPException(status_code=401, detail="refresh_token 无效或已过期")
+    consumed = await redis.set(f"blacklist:{refresh_value}", "1", ex=ttl, nx=True)
+    if not consumed:
+        raise HTTPException(status_code=401, detail="refresh_token 已失效，请重新登录")
+
     user = await UserService.get_by_id(db, int(payload["sub"]))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+
+    # 改密后签发的旧 refresh token 一并失效。
+    if is_token_revoked_by_password_change(payload.get("iat"), user.password_changed_at):
+        raise HTTPException(status_code=401, detail="refresh_token 已失效，请重新登录")
 
     verified_2fa = bool(payload.get("2fa_verified"))
     return _issue_login_response(response, user, verified_2fa=verified_2fa)
@@ -238,15 +267,18 @@ async def logout(
     token: str | None = Depends(oauth2_scheme),
     redis: Any = Depends(get_redis),
 ) -> dict[str, Any]:
-    token = token or get_access_token(request)
-    try:
-        if token:
-            payload = decode_token(token)
-            ttl = int(payload.get("exp", 0)) - int(time.time())
-            if ttl > 0:
-                await redis.setex(f"blacklist:{token}", ttl, "1")
-    except JWTError:
-        pass
+    # access 与 refresh token 都拉黑，避免退出后仍可用 refresh 续期（SAG-012）。
+    tokens_to_revoke = [token or get_access_token(request), get_refresh_token(request)]
+    for value in tokens_to_revoke:
+        if not value:
+            continue
+        try:
+            payload = decode_token(value)
+        except JWTError:
+            continue
+        ttl = int(payload.get("exp", 0)) - int(time.time())
+        if ttl > 0:
+            await redis.setex(f"blacklist:{value}", ttl, "1")
     clear_auth_cookies(response)
     return {"status": 0, "msg": "已退出登录"}
 
@@ -307,8 +339,10 @@ async def verify_2fa(
 @router.post("/2fa/login/verify/", response_model=TokenResponse, summary="登录二步验证")
 async def verify_login_2fa(
     data: LoginTwoFAVerifyRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
     import pyotp
 
@@ -319,6 +353,11 @@ async def verify_login_2fa(
 
     if payload.get("type") != "access" or not payload.get("requires_2fa"):
         raise HTTPException(status_code=401, detail="非法的二步验证凭证")
+
+    # TOTP 猜测限速：按 IP 与账号双维度（SAG-013）。
+    await enforce_auth_rate_limit(
+        redis, request, str(payload.get("sub") or ""), scope="2fa", id_limit=5, id_window=300
+    )
 
     user = await UserService.get_by_id(db, int(payload["sub"]))
     if not user or not user.is_active:
@@ -440,12 +479,19 @@ async def sms_send_code(
 @router.post("/sms/login/", response_model=TokenResponse, summary="短信验证码登录")
 async def sms_login(
     data: SmsLoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    redis: Any = Depends(get_redis),
 ) -> TokenResponse:
     """用手机号 + 验证码登录。验证码一次性使用，验证成功后自动删除。"""
     from app.services.sms_auth import verify_sms_code
     from app.services.user import UserService
+
+    # 验证码猜测限速：按 IP 与手机号双维度（SAG-013）。
+    await enforce_auth_rate_limit(
+        redis, request, data.phone, scope="sms", id_limit=5, id_window=300
+    )
 
     if not await verify_sms_code(data.phone, data.code):
         raise HTTPException(status_code=401, detail="验证码错误或已过期")
@@ -548,8 +594,9 @@ async def oauth_callback(
     try:
         user = await oauth_auth.handle_callback(provider, db, auth_code, callback_url)
     except Exception as e:
+        # 底层异常仅写日志，跳转页只显示通用提示，避免泄露内部细节（SAG-018）。
         logger.warning("oauth_callback_error: provider=%s error=%s", provider, str(e))
-        return _redirect_error(str(e))
+        return _redirect_error("第三方登录失败，请重试或联系管理员")
 
     if not user.is_active:
         return _redirect_error("账号已被禁用，请联系管理员")
@@ -565,6 +612,7 @@ async def oauth_callback(
                 "username": user.username,
                 "tenant_id": user.tenant_id,
                 "provider": provider,
+                "totp_enabled": bool(user.totp_enabled),
             },
             ensure_ascii=False,
         ),
@@ -581,10 +629,10 @@ async def exchange_oauth_login_code(
     response: Response,
     redis: Any = Depends(get_redis),
 ) -> TokenResponse:
-    raw = await redis.get(_oauth_login_code_key(data.login_code))
+    # 原子读取并删除，避免并发下同一登录码被兑换两次（SAG-004）。
+    raw = await redis.getdel(_oauth_login_code_key(data.login_code))
     if not raw:
         raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
-    await redis.delete(_oauth_login_code_key(data.login_code))
 
     try:
         payload = json.loads(raw)
@@ -596,6 +644,21 @@ async def exchange_oauth_login_code(
     username = str(payload.get("username") or "")
     if not user_id or not username:
         raise HTTPException(status_code=401, detail="登录码无效或已过期，请重新登录")
+
+    # 第三方登录同样强制 TOTP 二次验证：已开启 TOTP 的账号先返回 2FA 挑战（SAG-003）。
+    if payload.get("totp_enabled"):
+        logger.info("oauth_login_2fa_required: %s", username)
+        return TokenResponse(
+            requires_2fa=True,
+            two_fa_token=create_access_token(
+                {
+                    "sub": user_id,
+                    "username": username,
+                    "tenant_id": tenant_id,
+                    "requires_2fa": True,
+                }
+            ),
+        )
 
     tokens = TokenResponse(
         access_token=create_access_token(

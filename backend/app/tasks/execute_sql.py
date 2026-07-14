@@ -70,11 +70,12 @@ async def _execute_async(workflow_id: int, operator_id: int) -> None:
         async_session_local = async_sessionmaker(engine, expire_on_commit=False)
 
         async with async_session_local() as db:
-            # 加载工单
+            # 加载工单（行锁串行化状态迁移，防止多 Worker 重复执行同一工单，SAG-008）
             result = await db.execute(
                 select(SqlWorkflow)
                 .options(selectinload(SqlWorkflow.content))
                 .where(SqlWorkflow.id == workflow_id)
+                .with_for_update()
             )
             wf = result.scalar_one_or_none()
             if not wf:

@@ -108,6 +108,37 @@ check_secret_key() {
   fi
 }
 
+fernet_key_is_valid() {
+  local value="$1"
+  python3 - "$value" <<'PY' >/dev/null 2>&1
+import base64
+import sys
+
+try:
+    raw = base64.urlsafe_b64decode(sys.argv[1].encode())
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if len(raw) == 32 else 1)
+PY
+}
+
+check_fernet_key() {
+  local value secret_value
+  value="$(env_value FERNET_KEY || true)"
+  secret_value="$(env_value SECRET_KEY || true)"
+  if [[ -z "$value" ]]; then
+    fail "FERNET_KEY 未在 $ENV_FILE 中显式配置"
+  elif [[ "$value" == CHANGE_ME* ]]; then
+    fail "FERNET_KEY 仍使用默认值"
+  elif [[ "$value" == "$secret_value" ]]; then
+    fail "FERNET_KEY 不得与 SECRET_KEY 相同"
+  elif ! fernet_key_is_valid "$value"; then
+    fail "FERNET_KEY 不是合法的 Fernet 密钥"
+  else
+    pass "FERNET_KEY 格式和分离检查通过"
+  fi
+}
+
 check_port_not_public() {
   local port="$1"
   local name="$2"
@@ -168,6 +199,7 @@ else
 fi
 
 check_secret_key CHANGE_ME_IN_PRODUCTION_USE_RANDOM_32_CHARS
+check_fernet_key
 check_env_secret POSTGRES_PASSWORD sagitta123
 check_env_secret REDIS_PASSWORD redis123
 check_env_secret GRAFANA_CLIENT_SECRET changeme
