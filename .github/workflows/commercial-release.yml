@@ -82,6 +82,38 @@ jobs:
           echo "package_name=${package_name}" >> "${GITHUB_OUTPUT}"
           echo "release_dir=v${version}" >> "${GITHUB_OUTPUT}"
 
+      # 公开仓推送在流水线最后一步，令牌失效会让前面的镜像编译白跑，故在此前置校验。
+      - name: 预检公开发布令牌
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_public_repo) }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN}" || {
+            echo "::error::缺少 PUBLIC_RELEASES_TOKEN，无法写入 ${PUBLIC_RELEASE_REPOSITORY}。"
+            exit 1
+          }
+
+          if ! response="$(gh api "repos/${PUBLIC_RELEASE_REPOSITORY}" --include 2>&1)"; then
+            echo "::error::PUBLIC_RELEASES_TOKEN 无法访问 ${PUBLIC_RELEASE_REPOSITORY}，通常是令牌已过期或被吊销，请重新签发后更新仓库 Secret。"
+            echo "${response}" | tail -5
+            exit 1
+          fi
+
+          # 公开仓匿名也能读，必须显式确认写权限，否则问题会拖到最后的 push 才暴露。
+          if [ "$(gh api "repos/${PUBLIC_RELEASE_REPOSITORY}" --jq '.permissions.push // false')" != "true" ]; then
+            echo "::error::PUBLIC_RELEASES_TOKEN 对 ${PUBLIC_RELEASE_REPOSITORY} 没有写权限，请授予 Contents: Read and write。"
+            exit 1
+          fi
+
+          expiry="$(printf '%s' "${response}" | tr -d '\r' | awk -F': ' 'tolower($1)=="github-authentication-token-expiration"{print $2}')"
+          if [ -n "${expiry}" ]; then
+            echo "::notice::PUBLIC_RELEASES_TOKEN 有效，将于 ${expiry} 过期。"
+          else
+            echo "::notice::PUBLIC_RELEASES_TOKEN 有效，未声明过期时间。"
+          fi
+
       - name: 登录 GHCR
         uses: docker/login-action@v3
         with:
