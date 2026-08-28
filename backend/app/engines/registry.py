@@ -5,6 +5,8 @@
 import logging
 from typing import TYPE_CHECKING, cast
 
+from app.core.exceptions import ForbiddenException
+
 if TYPE_CHECKING:
     from app.engines.protocol import EngineProtocol
     from app.models.instance import Instance
@@ -36,6 +38,12 @@ def get_engine(instance: "Instance") -> "EngineProtocol":
     typing.Protocol 的 runtime_checkable 只检查方法名存在，
     不检查方法签名，会误判正确实现的引擎。
     """
+    if getattr(instance, "license_suspended", False):
+        raise ForbiddenException(
+            f"实例 {instance.instance_name} 已超出当前 License 实例额度并被挂起，"
+            "请升级正式授权或在实例管理中调整启用范围"
+        )
+
     db_type = instance.db_type.lower()
     engine_path = _REGISTRY.get(db_type)
 

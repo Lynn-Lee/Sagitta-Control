@@ -70,6 +70,8 @@ async def _refresh_online_license_with_db(db: AsyncSession) -> dict[str, Any]:
             error = str(exc)
             logger.warning("license_auto_refresh_failed: %s", error)
 
+    suspension = await LicenseService.sync_instance_suspension(db)
+
     days_remaining = state.get("days_remaining")
     if isinstance(days_remaining, int) and days_remaining in _renewal_days():
         NotifyService.enqueue_event(
@@ -93,6 +95,8 @@ async def _refresh_online_license_with_db(db: AsyncSession) -> dict[str, Any]:
         "refreshed": refreshed,
         "error": error,
         "days_remaining": days_remaining,
+        "instances_suspended": suspension["suspended"],
+        "instances_restored": suspension["restored"],
     }
 
 

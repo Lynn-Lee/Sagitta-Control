@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Col,
   Descriptions,
   Form,
@@ -10,6 +11,7 @@ import {
   Row,
   Space,
   Statistic,
+  Table,
   Tag,
   Typography,
   message,
@@ -18,7 +20,12 @@ import {
   CopyOutlined, ReloadOutlined, SafetyCertificateOutlined,
   UploadOutlined, ThunderboltOutlined, FileSyncOutlined,
 } from '@ant-design/icons'
-import { licenseApi, type LicenseFingerprintPreview, type LicenseStatus } from '@/api/license'
+import {
+  licenseApi,
+  type LicenseFingerprintPreview,
+  type LicenseInstanceAllocation,
+  type LicenseStatus,
+} from '@/api/license'
 import { formatDateTime } from '@/utils/datetime'
 
 const { TextArea } = Input
@@ -27,6 +34,7 @@ const { Text } = Typography
 const statusColor: Record<string, string> = {
   trial: 'gold',
   licensed: 'green',
+  community: 'orange',
   expired: 'red',
   invalid: 'red',
 }
@@ -34,6 +42,7 @@ const statusColor: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   trial: '试用中',
   licensed: '正式授权',
+  community: '社区版',
   expired: '已过期',
   invalid: '无效',
 }
@@ -75,6 +84,19 @@ export default function LicensePage() {
   const [licenseText, setLicenseText] = useState('')
   const [challengeText, setChallengeText] = useState('')
   const [activationCode, setActivationCode] = useState('')
+  const [claimingTrial, setClaimingTrial] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [codeSent, setCodeSent] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [allocation, setAllocation] = useState<LicenseInstanceAllocation | null>(null)
+  const [selectedInstances, setSelectedInstances] = useState<number[]>([])
+  const [savingAllocation, setSavingAllocation] = useState(false)
+  const [trialForm, setTrialForm] = useState({
+    company_name: '',
+    contact_name: '',
+    contact_email: '',
+    contact_phone: '',
+  })
   const [customerId, setCustomerId] = useState('')
   const [fingerprintPreview, setFingerprintPreview] = useState<LicenseFingerprintPreview | null>(null)
   const [fingerprintLoading, setFingerprintLoading] = useState(false)
@@ -93,9 +115,20 @@ export default function LicensePage() {
     }
   }, [])
 
+  const loadAllocation = useCallback(async () => {
+    try {
+      const data = await licenseApi.instanceAllocation()
+      setAllocation(data)
+      setSelectedInstances(data.instances.filter(i => !i.license_suspended).map(i => i.id))
+    } catch {
+      setAllocation(null)
+    }
+  }, [])
+
   useEffect(() => {
     loadStatus()
-  }, [loadStatus])
+    loadAllocation()
+  }, [loadStatus, loadAllocation])
 
   useEffect(() => {
     const nextCustomerId = customerId.trim()
@@ -173,6 +206,64 @@ export default function LicensePage() {
       message.error(error?.response?.data?.detail || 'License 导入失败')
     } finally {
       setImporting(false)
+    }
+  }
+
+  const handleSendCode = async () => {
+    if (!trialForm.contact_email.trim()) {
+      message.warning('请先填写联系邮箱')
+      return
+    }
+    setSendingCode(true)
+    try {
+      await licenseApi.sendTrialCode({
+        contact_email: trialForm.contact_email.trim(),
+        contact_phone: trialForm.contact_phone.trim() || undefined,
+      })
+      setCodeSent(true)
+      message.success('验证码已发送，请查收邮件')
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '验证码发送失败')
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  const handleSaveAllocation = async () => {
+    setSavingAllocation(true)
+    try {
+      const data = await licenseApi.updateInstanceAllocation(selectedInstances)
+      setAllocation(data)
+      message.success('实例额度已更新')
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '更新失败')
+    } finally {
+      setSavingAllocation(false)
+    }
+  }
+
+  const handleClaimTrial = async () => {
+    if (!trialForm.company_name.trim() || !trialForm.contact_name.trim() || !trialForm.contact_email.trim()) {
+      message.warning('请填写企业名称、联系人与联系邮箱')
+      return
+    }
+    setClaimingTrial(true)
+    try {
+      await licenseApi.requestTrial({
+        company_name: trialForm.company_name.trim(),
+        contact_name: trialForm.contact_name.trim(),
+        contact_email: trialForm.contact_email.trim(),
+        contact_phone: trialForm.contact_phone.trim() || undefined,
+        verification_code: verificationCode.trim(),
+      })
+      message.success('完整试用授权已开通')
+      setCodeSent(false)
+      setVerificationCode('')
+      await loadStatus()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '试用登记失败，请确认当前部署可访问授权服务器')
+    } finally {
+      setClaimingTrial(false)
     }
   }
 
@@ -335,6 +426,147 @@ export default function LicensePage() {
             </Card>
           </div>
         </Col>
+
+        {status?.source === 'trial' && (
+          <Col xs={24}>
+            <Card title="领取完整试用授权">
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`当前为未登记试用，剩余 ${status.days_remaining ?? 0} 天`}
+                description="登记企业与联系人信息即可联网领取完整试用授权：全功能、不限实例数与用户数。未登记则到期后降级为社区版（5 个实例、工单不可执行）。"
+              />
+              <Form layout="vertical">
+                <Row gutter={[12, 12]}>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="企业名称" required>
+                      <Input
+                        value={trialForm.company_name}
+                        onChange={(e) => setTrialForm({ ...trialForm, company_name: e.target.value })}
+                        placeholder="请输入企业全称"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="联系人" required>
+                      <Input
+                        value={trialForm.contact_name}
+                        onChange={(e) => setTrialForm({ ...trialForm, contact_name: e.target.value })}
+                        placeholder="请输入联系人姓名"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="联系邮箱" required>
+                      <Input
+                        value={trialForm.contact_email}
+                        onChange={(e) => setTrialForm({ ...trialForm, contact_email: e.target.value })}
+                        placeholder="用于接收到期提醒与授权文件"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="联系电话" help="国内手机号或固话，选填">
+                      <Input
+                        value={trialForm.contact_phone}
+                        onChange={(e) => setTrialForm({ ...trialForm, contact_phone: e.target.value })}
+                        placeholder="如 13800000000 或 010-12345678"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="邮箱验证码" required>
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Input
+                          value={verificationCode}
+                          onChange={(e) => setVerificationCode(e.target.value)}
+                          placeholder="6 位验证码"
+                          maxLength={6}
+                        />
+                        <Button loading={sendingCode} onClick={handleSendCode}>
+                          {codeSent ? '重新发送' : '获取验证码'}
+                        </Button>
+                      </Space.Compact>
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button
+                    type="primary"
+                    icon={<ThunderboltOutlined />}
+                    loading={claimingTrial}
+                    disabled={!verificationCode.trim()}
+                    onClick={handleClaimTrial}
+                  >
+                    登记并领取
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Card>
+          </Col>
+        )}
+
+        {allocation?.selectable && (
+          <Col xs={24}>
+            <Card title="实例额度分配">
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`当前授权最多启用 ${allocation.max_instances} 个实例，实际已配置 ${allocation.active_total} 个`}
+                description="未选中的实例会被挂起：配置与历史完整保留，仅无法连接执行。升级授权后可全部恢复。"
+              />
+              <Checkbox.Group
+                value={selectedInstances}
+                onChange={(values) => setSelectedInstances(values as number[])}
+                style={{ width: '100%' }}
+              >
+                <Table
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                  scroll={{ y: 320 }}
+                  dataSource={allocation.instances}
+                  columns={[
+                    {
+                      title: '启用',
+                      width: 72,
+                      render: (_: unknown, record) => (
+                        <Checkbox
+                          value={record.id}
+                          disabled={
+                            !selectedInstances.includes(record.id) &&
+                            selectedInstances.length >= allocation.max_instances
+                          }
+                        />
+                      ),
+                    },
+                    { title: '实例名称', dataIndex: 'instance_name' },
+                    { title: '类型', dataIndex: 'db_type', width: 140 },
+                    {
+                      title: '当前状态',
+                      width: 120,
+                      render: (_: unknown, record) =>
+                        record.license_suspended ? <Tag color="orange">已挂起</Tag> : <Tag color="green">已启用</Tag>,
+                    },
+                  ]}
+                />
+              </Checkbox.Group>
+              <Space style={{ marginTop: 16 }}>
+                <Button
+                  type="primary"
+                  loading={savingAllocation}
+                  disabled={!selectedInstances.length}
+                  onClick={handleSaveAllocation}
+                >
+                  保存（已选 {selectedInstances.length}/{allocation.max_instances}）
+                </Button>
+                <Text type="secondary">未选中的实例不会被删除，随时可以切换。</Text>
+              </Space>
+            </Card>
+          </Col>
+        )}
 
         <Col xs={24}>
           <Card title="在线激活与续期">

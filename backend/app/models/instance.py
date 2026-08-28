@@ -96,6 +96,9 @@ class Instance(BaseModel):
 
     remark: Mapped[str] = mapped_column(String(500), default="", comment="备注")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")
+    license_suspended: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="是否因超出 License 额度被挂起"
+    )
 
     # SSH 隧道（可选）
     tunnel_id: Mapped[int | None] = mapped_column(
