@@ -154,10 +154,9 @@ license:
   serverUrl: "https://license.loveai.asia"
   autoRefreshEnabled: true
   onlineGraceDays: 7
-  renewalNotifyDays: "30,7"
-  trialDays: 60
+  renewalNotifyDays: "30,21,14,7,1"
   deploymentId: "CHANGE_ME_STABLE_RANDOM_DEPLOYMENT_ID"
-  offlineChallengeTtlMinutes: 60
+  offlineChallengeTtlMinutes: 1440
   allowLegacyLicenseImport: false
 
 integrity:

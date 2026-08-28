@@ -25,7 +25,6 @@ data:
   LICENSE_AUTO_REFRESH_ENABLED: {{ .Values.license.autoRefreshEnabled | quote }}
   LICENSE_ONLINE_GRACE_DAYS: {{ .Values.license.onlineGraceDays | quote }}
   LICENSE_RENEWAL_NOTIFY_DAYS: {{ .Values.license.renewalNotifyDays | quote }}
-  LICENSE_TRIAL_DAYS: {{ .Values.license.trialDays | quote }}
   LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: {{ .Values.license.offlineChallengeTtlMinutes | quote }}
   LICENSE_ALLOW_LEGACY_LICENSE_IMPORT: {{ .Values.license.allowLegacyLicenseImport | quote }}
   APP_INTEGRITY_REQUIRED: {{ .Values.integrity.required | quote }}

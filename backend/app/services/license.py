@@ -27,6 +27,22 @@ LICENSE_FEATURES = {"workflow", "query", "archive", "monitor", "ai", "masking", 
 LICENSE_PROJECT_CODE = "sagitta-control"
 LICENSE_PROJECT_NAME = "Sagitta Control"
 TRIAL_FEATURES = sorted(LICENSE_FEATURES)
+COMMUNITY_STATUS = "community"
+# 未登记部署的本地宽限期。刻意不做成配置项：客户可改的 .env 等于没有约束，
+# 完整试用期必须由授权中心签发。
+# 联网部署：本地只自签一小段宽限，其余试用期必须登记后由授权中心签发。
+UNREGISTERED_TRIAL_DAYS = 7
+# 内网部署：够不到授权中心，登记与联网签发都走不通，只能靠离线导入。
+# 给足搬运 Challenge、走完签发审批的时间，否则客户第一周就被降级。
+OFFLINE_TRIAL_DAYS = 30
+# 社区版为本地兜底常量，不随 License 下发，保证客户断网到期后仍可降级运行。
+COMMUNITY_FEATURES = sorted({"workflow", "query", "instance"})
+COMMUNITY_MAX_INSTANCES = 5
+COMMUNITY_LIMITS: dict[str, int] = {"max_users": 0, "max_instances": COMMUNITY_MAX_INSTANCES}
+# 社区版保留工单提交与查看，仅关闭执行动作。
+COMMUNITY_BLOCKED_PATHS: tuple[tuple[str, str], ...] = (
+    ("/api/v1/workflow", "/execute"),
+)
 LICENSE_PROTECTED_FEATURE_BY_PREFIX: tuple[tuple[str, str], ...] = (
     ("/api/v1/workflow", "workflow"),
     ("/api/v1/query", "query"),
@@ -330,6 +346,11 @@ class LicenseService:
         return result.scalars().first()
 
     @staticmethod
+    def local_trial_days() -> int:
+        """未配置授权服务器即视为内网部署，放宽本地自签窗口。"""
+        return UNREGISTERED_TRIAL_DAYS if settings.LICENSE_SERVER_URL.strip() else OFFLINE_TRIAL_DAYS
+
+    @staticmethod
     async def ensure_trial(db: AsyncSession) -> LicenseRecord:
         current = await LicenseService._current_record(db)
         if current:
@@ -340,7 +361,7 @@ class LicenseService:
                     issued_at = issued_at.replace(tzinfo=UTC)
                 if expires_at and expires_at.tzinfo is None:
                     expires_at = expires_at.replace(tzinfo=UTC)
-                configured_expires_at = issued_at + timedelta(days=settings.LICENSE_TRIAL_DAYS)
+                configured_expires_at = issued_at + timedelta(days=LicenseService.local_trial_days())
                 if not expires_at or expires_at < configured_expires_at:
                     current.expires_at = configured_expires_at
                     current.last_check_status = "ok"
@@ -355,15 +376,15 @@ class LicenseService:
             is_current=True,
             license_id="trial",
             customer_id=settings.LICENSE_CUSTOMER_ID or "trial",
-            company_name="试用版",
+            company_name="未登记试用",
             edition="trial",
             features=TRIAL_FEATURES,
             limits={},
             issued_at=now,
             not_before=now,
-            expires_at=now + timedelta(days=settings.LICENSE_TRIAL_DAYS),
+            expires_at=now + timedelta(days=LicenseService.local_trial_days()),
             last_check_status="ok",
-            last_check_reason="试用期内",
+            last_check_reason="未登记试用期内",
         )
         db.add(trial)
         await db.commit()
@@ -385,7 +406,7 @@ class LicenseService:
         if not_before and now < not_before:
             return "invalid", "License 尚未生效"
         if expires_at and now > expires_at:
-            return "expired", "License 已过期"
+            return COMMUNITY_STATUS, "试用/授权已到期，已降级为社区版"
         if record.status == "invalid":
             return "invalid", record.last_check_reason or "License 无效"
         if record.source == "online" and settings.LICENSE_ONLINE_GRACE_DAYS > 0:
@@ -395,7 +416,7 @@ class LicenseService:
             if not grace_anchor:
                 return "invalid", "在线 License 尚未完成联网校验"
             if now - grace_anchor > timedelta(days=settings.LICENSE_ONLINE_GRACE_DAYS):
-                return "invalid", "在线 License 超过联网校验宽限期，请刷新授权"
+                return COMMUNITY_STATUS, "超过联网校验宽限期，已降级为社区版，请恢复联网或刷新授权"
         return ("trial", "试用期内") if record.source == "trial" else ("licensed", "License 有效")
 
     @staticmethod
@@ -418,11 +439,19 @@ class LicenseService:
             record.last_check_reason = reason
             await db.commit()
         warning_level = ""
-        if status in {"trial", "licensed"} and days_remaining is not None:
+        if status == COMMUNITY_STATUS:
+            warning_level = "critical"
+        elif status in {"trial", "licensed"} and days_remaining is not None:
             if days_remaining <= 7:
                 warning_level = "critical"
             elif days_remaining <= 30:
                 warning_level = "warning"
+        if status == COMMUNITY_STATUS:
+            features: list[str] = list(COMMUNITY_FEATURES)
+            limits: dict[str, Any] = dict(COMMUNITY_LIMITS)
+        else:
+            features = list(record.features or [])
+            limits = dict(record.limits or {})
         return {
             "status": status,
             "reason": reason,
@@ -435,9 +464,9 @@ class LicenseService:
             "activation_customer_id": activation_customer_id,
             "configured_customer_id": configured_customer_id,
             "company_name": record.company_name,
-            "edition": record.edition,
-            "features": record.features or [],
-            "limits": record.limits or {},
+            "edition": COMMUNITY_STATUS if status == COMMUNITY_STATUS else record.edition,
+            "features": features,
+            "limits": limits,
             "activation_id": record.activation_id,
             "remote_status": record.remote_status,
             "deployment_fingerprint": record.deployment_fingerprint
@@ -501,6 +530,7 @@ class LicenseService:
             record.last_check_status = status
             record.last_check_reason = reason
             await db.commit()
+        await LicenseService.sync_instance_suspension(db)
         return await LicenseService.status(db)
 
     @staticmethod
@@ -517,6 +547,72 @@ class LicenseService:
             license_doc,
             source="offline" if challenge_payload else "import",
             challenge_payload=challenge_payload,
+        )
+
+    @staticmethod
+    def trial_customer_id() -> str:
+        """未登记部署的稳定客户标识，保证登记前后指纹一致。"""
+        configured = settings.LICENSE_CUSTOMER_ID.strip()
+        if configured:
+            return configured
+        seed = settings.LICENSE_DEPLOYMENT_ID.strip() or settings.SECRET_KEY.strip()
+        digest = hashlib.sha256(f"sagitta-control-trial:{seed}".encode()).hexdigest()
+        return f"TRIAL-{digest[:16].upper()}"
+
+    @staticmethod
+    async def send_trial_code(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:
+        """自助试用第一步：让授权中心向登记邮箱发送验证码。"""
+        contact_email = str(data.get("contact_email") or "").strip()
+        if not contact_email:
+            raise HTTPException(status_code=400, detail="请填写联系邮箱")
+        customer_id = LicenseService.trial_customer_id()
+        return await LicenseService._call_license_server(
+            "/api/v1/licenses/trial/send-code",
+            {
+                "customer_id": customer_id,
+                "contact_email": contact_email,
+                "contact_phone": str(data.get("contact_phone") or "").strip(),
+                **LicenseService._license_server_project_payload(),
+            },
+        )
+
+    @staticmethod
+    async def request_trial(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:
+        """登记企业与联系人信息，向授权中心换取完整试用 License。"""
+        from app.services.commercial_ops import CommercialOpsService
+
+        company_name = str(data.get("company_name") or "").strip()
+        contact_name = str(data.get("contact_name") or "").strip()
+        contact_email = str(data.get("contact_email") or "").strip()
+        contact_phone = str(data.get("contact_phone") or "").strip()
+        if not company_name or not contact_name or not contact_email:
+            raise HTTPException(status_code=400, detail="请填写企业名称、联系人与联系邮箱")
+        customer_id = LicenseService.trial_customer_id()
+        server_data = await LicenseService._call_license_server(
+            "/api/v1/licenses/trial",
+            {
+                "customer_id": customer_id,
+                "company_name": company_name,
+                "contact_name": contact_name,
+                "contact_email": contact_email,
+                "contact_phone": contact_phone,
+                "verification_code": str(data.get("verification_code") or "").strip(),
+                "deployment_fingerprint": LicenseService.deployment_fingerprint(customer_id),
+                "usage": await CommercialOpsService.usage_payload(db),
+                "runtime": await CommercialOpsService.runtime_payload(db, "trial"),
+                **LicenseService._license_server_project_payload(),
+            },
+        )
+        license_doc = server_data.get("license")
+        if not license_doc:
+            raise HTTPException(status_code=502, detail="授权服务器未返回 License")
+        return await LicenseService._store_license(
+            db,
+            license_doc,
+            source="online",
+            activation_id=str(server_data.get("activation_id") or ""),
+            remote_status=str(server_data.get("status") or "active"),
+            server_url=LicenseService._license_server_url(),
         )
 
     @staticmethod
@@ -603,6 +699,13 @@ class LicenseService:
             return LicenseCheck(True, "unprotected")
         state = await LicenseService.status(db)
         status = state["status"]
+        if status == COMMUNITY_STATUS:
+            blocked = LicenseService.community_block_reason(path)
+            if blocked:
+                return LicenseCheck(False, status, blocked, feature or "system")
+            if feature and feature not in COMMUNITY_FEATURES:
+                return LicenseCheck(False, status, f"社区版未包含该功能：{feature}，升级正式授权后可用", feature)
+            return LicenseCheck(True, status, feature=feature or "system")
         if status in {"trial", "licensed"}:
             if status == "licensed" and feature:
                 features = set(state.get("features") or [])
@@ -610,6 +713,14 @@ class LicenseService:
                     return LicenseCheck(False, status, f"当前 License 未授权功能：{feature}", feature)
             return LicenseCheck(True, status, feature=feature or "system")
         return LicenseCheck(False, status, state.get("reason") or "License 无效", feature or "system")
+
+    @staticmethod
+    def community_block_reason(path: str) -> str:
+        """社区版下被关闭的动作，返回空串表示放行。"""
+        for prefix, marker in COMMUNITY_BLOCKED_PATHS:
+            if path.startswith(prefix) and marker in path:
+                return "社区版不支持工单执行，升级正式授权后可用"
+        return ""
 
     @staticmethod
     def feature_for_path(path: str) -> str:
@@ -621,7 +732,7 @@ class LicenseService:
     @staticmethod
     async def enforce_limit(db: AsyncSession, limit_name: str, query: Select[Any], label: str) -> None:
         state = await LicenseService.status(db)
-        if state["status"] not in {"trial", "licensed"}:
+        if state["status"] not in {"trial", "licensed", COMMUNITY_STATUS}:
             raise HTTPException(status_code=403, detail=state.get("reason") or "License 无效")
         limits = state.get("limits") or {}
         limit = limits.get(limit_name)
@@ -644,6 +755,120 @@ class LicenseService:
             select(func.count()).select_from(Users).where(Users.is_active.is_(True)),
             "用户",
         )
+
+    @staticmethod
+    def _max_instances(state: dict[str, Any]) -> int:
+        limits = state.get("limits") or {}
+        try:
+            return int(limits.get("max_instances") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    async def sync_instance_suspension(db: AsyncSession) -> dict[str, int]:
+        """按当前额度同步实例挂起状态：超额实例挂起，额度恢复后自动解挂。
+
+        只标记不删除，升级正式授权后原样恢复，客户无需重新配置。
+        """
+        state = await LicenseService.status(db)
+        if state["status"] not in {"trial", "licensed", COMMUNITY_STATUS}:
+            return {"suspended": 0, "restored": 0}
+        max_instances = LicenseService._max_instances(state)
+        result = await db.execute(
+            select(Instance.id, Instance.license_suspended)
+            .where(Instance.is_active.is_(True))
+            .order_by(Instance.created_at.asc(), Instance.id.asc())
+        )
+        rows = [(int(row[0]), bool(row[1])) for row in result.all()]
+        instance_ids = [item for item, _ in rows]
+        kept = [item for item, suspended in rows if not suspended]
+        if max_instances <= 0 or len(instance_ids) <= max_instances:
+            keep_ids = instance_ids
+        elif len(kept) > max_instances:
+            # 首次降级或额度收紧：按创建时间保留最早的若干个。
+            keep_ids = kept[:max_instances]
+        else:
+            # 已在额度内，尊重现有选择，不把用户手动挂起的实例重新拉回来。
+            keep_ids = kept
+        suspend_ids = [item for item in instance_ids if item not in set(keep_ids)]
+        restored = 0
+        suspended = 0
+        if keep_ids:
+            outcome = await db.execute(
+                update(Instance)
+                .where(Instance.id.in_(keep_ids), Instance.license_suspended.is_(True))
+                .values(license_suspended=False)
+            )
+            restored = int(getattr(outcome, "rowcount", 0) or 0)
+        if suspend_ids:
+            outcome = await db.execute(
+                update(Instance)
+                .where(Instance.id.in_(suspend_ids), Instance.license_suspended.is_(False))
+                .values(license_suspended=True)
+            )
+            suspended = int(getattr(outcome, "rowcount", 0) or 0)
+        if restored or suspended:
+            await db.commit()
+        return {"suspended": suspended, "restored": restored}
+
+    @staticmethod
+    async def instance_allocation(db: AsyncSession) -> dict[str, Any]:
+        """额度分配视图：当前额度、已启用与被挂起的实例。"""
+        state = await LicenseService.status(db)
+        max_instances = LicenseService._max_instances(state)
+        result = await db.execute(
+            select(Instance.id, Instance.instance_name, Instance.db_type, Instance.license_suspended)
+            .where(Instance.is_active.is_(True))
+            .order_by(Instance.created_at.asc(), Instance.id.asc())
+        )
+        items = [
+            {
+                "id": int(row[0]),
+                "instance_name": row[1],
+                "db_type": row[2],
+                "license_suspended": bool(row[3]),
+            }
+            for row in result.all()
+        ]
+        return {
+            "status": state["status"],
+            "max_instances": max_instances,
+            "active_total": len(items),
+            "enabled_total": sum(1 for item in items if not item["license_suspended"]),
+            "selectable": max_instances > 0 and len(items) > max_instances,
+            "instances": items,
+        }
+
+    @staticmethod
+    async def select_active_instances(db: AsyncSession, instance_ids: list[int]) -> dict[str, Any]:
+        """手动指定额度内启用哪些实例，未选中的挂起但保留配置。"""
+        state = await LicenseService.status(db)
+        max_instances = LicenseService._max_instances(state)
+        if max_instances <= 0:
+            raise HTTPException(status_code=400, detail="当前授权不限实例数，无需手动选择")
+        selected = list(dict.fromkeys(int(item) for item in instance_ids))
+        if not selected:
+            raise HTTPException(status_code=400, detail="请至少选择一个实例")
+        if len(selected) > max_instances:
+            raise HTTPException(status_code=400, detail=f"当前授权最多启用 {max_instances} 个实例")
+        result = await db.execute(select(Instance.id).where(Instance.is_active.is_(True)))
+        active_ids = {int(row[0]) for row in result.all()}
+        if not set(selected).issubset(active_ids):
+            raise HTTPException(status_code=400, detail="选择中包含不存在或已停用的实例")
+        await db.execute(
+            update(Instance)
+            .where(Instance.id.in_(selected), Instance.license_suspended.is_(True))
+            .values(license_suspended=False)
+        )
+        rest = [item for item in active_ids if item not in set(selected)]
+        if rest:
+            await db.execute(
+                update(Instance)
+                .where(Instance.id.in_(rest), Instance.license_suspended.is_(False))
+                .values(license_suspended=True)
+            )
+        await db.commit()
+        return await LicenseService.instance_allocation(db)
 
     @staticmethod
     async def enforce_max_instances(db: AsyncSession) -> None:

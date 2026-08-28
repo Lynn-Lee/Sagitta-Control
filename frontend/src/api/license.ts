@@ -1,7 +1,7 @@
 import apiClient from './client'
 
 export type LicenseStatus = {
-  status: 'trial' | 'licensed' | 'expired' | 'invalid' | string
+  status: 'trial' | 'licensed' | 'community' | 'expired' | 'invalid' | string
   reason: string
   source: string
   is_trial: boolean
@@ -26,6 +26,20 @@ export type LicenseStatus = {
   days_remaining?: number | null
   needs_renewal?: boolean
   warning_level?: 'warning' | 'critical' | string
+}
+
+export type LicenseInstanceAllocation = {
+  status: string
+  max_instances: number
+  active_total: number
+  enabled_total: number
+  selectable: boolean
+  instances: Array<{
+    id: number
+    instance_name: string
+    db_type: string
+    license_suspended: boolean
+  }>
 }
 
 export type LicenseChallenge = {
@@ -54,6 +68,33 @@ export const licenseApi = {
 
   import: (license: string | Record<string, unknown>) =>
     apiClient.post('/system/license/import', { license }).then(r => r.data),
+
+  sendTrialCode: (data: { contact_email: string; contact_phone?: string }) =>
+    apiClient
+      .post<{ status: number; msg: string; data: { sent: boolean; expires_in?: number } }>(
+        '/system/license/trial/send-code',
+        data,
+      )
+      .then(r => r.data.data),
+
+  requestTrial: (data: {
+    company_name: string
+    contact_name: string
+    contact_email: string
+    contact_phone?: string
+    verification_code: string
+  }) => apiClient.post('/system/license/trial', data).then(r => r.data),
+
+  instanceAllocation: () =>
+    apiClient.get<LicenseInstanceAllocation>('/system/license/instance-allocation').then(r => r.data),
+
+  updateInstanceAllocation: (instanceIds: number[]) =>
+    apiClient
+      .put<{ status: number; msg: string; data: LicenseInstanceAllocation }>(
+        '/system/license/instance-allocation',
+        { instance_ids: instanceIds },
+      )
+      .then(r => r.data.data),
 
   activate: (data: { activation_code: string; customer_id?: string }) =>
     apiClient.post('/system/license/activate', data).then(r => r.data),

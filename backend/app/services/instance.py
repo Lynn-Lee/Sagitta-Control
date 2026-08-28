@@ -813,6 +813,7 @@ class InstanceService:
             "show_db_name_regex": inst.show_db_name_regex,
             "remark": inst.remark,
             "is_active": inst.is_active,
+            "license_suspended": inst.license_suspended,
             "tunnel_id": inst.tunnel_id,
             "resource_group_ids": [rg.id for rg in inst.resource_groups],
             "tags": {t.tag_key: t.tag_value for t in inst.instance_tags},

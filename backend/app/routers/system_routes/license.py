@@ -11,7 +11,14 @@ from app.core.deps import current_superuser, current_user
 from app.services.audit_log import AuditLogService
 from app.services.license import LicenseService
 
-from .schemas import LicenseActivateRequest, LicenseChallengeRequest, LicenseImportRequest
+from .schemas import (
+    LicenseActivateRequest,
+    LicenseChallengeRequest,
+    LicenseImportRequest,
+    LicenseInstanceSelectionRequest,
+    LicenseTrialCodeRequest,
+    LicenseTrialRequest,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -75,6 +82,62 @@ async def create_license_challenge(
         request=request,
     )
     return {"status": 0, "msg": "License Challenge 生成成功", "data": challenge}
+
+
+@router.get("/license/instance-allocation", summary="实例额度分配")
+async def get_instance_allocation(
+    db: AsyncSession = Depends(get_db),
+    user: dict[str, Any] = Depends(current_superuser),
+) -> dict[str, Any]:
+    return await LicenseService.instance_allocation(db)
+
+
+@router.put("/license/instance-allocation", summary="指定额度内启用的实例")
+async def update_instance_allocation(
+    data: LicenseInstanceSelectionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: dict[str, Any] = Depends(current_superuser),
+) -> dict[str, Any]:
+    result = await LicenseService.select_active_instances(db, data.instance_ids)
+    await AuditLogService.write(
+        db,
+        user,
+        action="update_license_instance_allocation",
+        module="system",
+        detail=f"调整额度内启用实例：{len(data.instance_ids)} 个",
+        request=request,
+    )
+    return {"status": 0, "msg": "实例额度已更新", "data": result}
+
+
+@router.post("/license/trial/send-code", summary="发送试用登记邮箱验证码")
+async def send_trial_code(
+    data: LicenseTrialCodeRequest,
+    db: AsyncSession = Depends(get_db),
+    user: dict[str, Any] = Depends(current_superuser),
+) -> dict[str, Any]:
+    result = await LicenseService.send_trial_code(db, data.model_dump())
+    return {"status": 0, "msg": "验证码已发送", "data": result}
+
+
+@router.post("/license/trial", summary="登记并领取完整试用授权")
+async def request_trial_license(
+    data: LicenseTrialRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: dict[str, Any] = Depends(current_superuser),
+) -> dict[str, Any]:
+    status_data = await LicenseService.request_trial(db, data.model_dump())
+    await AuditLogService.write(
+        db,
+        user,
+        action="request_trial_license",
+        module="system",
+        detail=f"登记试用授权：{data.company_name or '-'}",
+        request=request,
+    )
+    return {"status": 0, "msg": "试用授权已开通", "data": status_data}
 
 
 @router.post("/license/activate", summary="在线激活 License")

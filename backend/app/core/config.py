@@ -75,10 +75,10 @@ class Settings(BaseSettings):
     LICENSE_SERVER_TOKEN: str = ""
     LICENSE_AUTO_REFRESH_ENABLED: bool = True
     LICENSE_ONLINE_GRACE_DAYS: int = 7
-    LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,7"
-    LICENSE_TRIAL_DAYS: int = 60
+    LICENSE_RENEWAL_NOTIFY_DAYS: str = "30,21,14,7,1"
     LICENSE_DEPLOYMENT_ID: str = ""
-    LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: int = 60
+    # 内网离线签发要把 Challenge 带出网再带回，60 分钟不够用，默认给一天。
+    LICENSE_OFFLINE_CHALLENGE_TTL_MINUTES: int = 1440
     LICENSE_ALLOW_LEGACY_LICENSE_IMPORT: bool = False
 
     # ─── 用户部署版完整性校验 ─────────────────────────────────────

@@ -55,6 +55,11 @@ async def test_refresh_online_license_notifies_renewal_window(monkeypatch):
     monkeypatch.setattr(license_task.settings, "LICENSE_RENEWAL_NOTIFY_DAYS", "30,7")
     monkeypatch.setattr(license_task.LicenseService, "status", fake_status)
     monkeypatch.setattr(license_task.LicenseService, "refresh", fake_refresh)
+    monkeypatch.setattr(
+        license_task.LicenseService,
+        "sync_instance_suspension",
+        AsyncMock(return_value={"suspended": 0, "restored": 0}),
+    )
     monkeypatch.setattr(license_task.NotifyService, "enqueue_event", events.append)
 
     result = await license_task._refresh_online_license_with_db(MagicMock())

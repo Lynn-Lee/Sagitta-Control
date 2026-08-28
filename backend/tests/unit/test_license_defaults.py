@@ -11,7 +11,6 @@ PRODUCT_VERSION = "2.2.2"
 IMAGE_REPOSITORY = "ghcr.io/lynn-lee/sagitta-control"
 LICENSE_SERVER_URL = "https://license.loveai.asia"
 LICENSE_PUBLIC_KEY = "3Jz3SK-mTWZwGy6VX8gUBUWJ-kisvGnO3c_x18Fk_Ms"
-LICENSE_TRIAL_DAYS = "60"
 
 
 def _env_values(path: Path) -> dict[str, str]:
@@ -30,7 +29,6 @@ def test_settings_default_online_license_config():
 
     assert settings.LICENSE_PUBLIC_KEY == LICENSE_PUBLIC_KEY
     assert settings.LICENSE_SERVER_URL == LICENSE_SERVER_URL
-    assert settings.LICENSE_TRIAL_DAYS == 60
 
 
 def _render_customer_package(tmp_path: Path) -> Path:
@@ -65,12 +63,10 @@ def test_source_and_commercial_env_templates_share_license_defaults(tmp_path):
 
         assert values["LICENSE_PUBLIC_KEY"] == LICENSE_PUBLIC_KEY
         assert values["LICENSE_SERVER_URL"] == LICENSE_SERVER_URL
-        assert values["LICENSE_TRIAL_DAYS"] == LICENSE_TRIAL_DAYS
 
     values = _env_values(package_dir / ".env.example")
     assert values["LICENSE_PUBLIC_KEY"] == LICENSE_PUBLIC_KEY
     assert values["LICENSE_SERVER_URL"] == LICENSE_SERVER_URL
-    assert values["LICENSE_TRIAL_DAYS"] == LICENSE_TRIAL_DAYS
 
 
 def test_helm_values_share_license_defaults(tmp_path):
@@ -82,9 +78,7 @@ def test_helm_values_share_license_defaults(tmp_path):
 
         assert values["license"]["publicKey"] == LICENSE_PUBLIC_KEY
         assert values["license"]["serverUrl"] == LICENSE_SERVER_URL
-        assert values["license"]["trialDays"] == 60
 
     values = yaml.safe_load((package_dir / "helm/sagitta-control/values.yaml").read_text(encoding="utf-8"))
     assert values["license"]["publicKey"] == LICENSE_PUBLIC_KEY
     assert values["license"]["serverUrl"] == LICENSE_SERVER_URL
-    assert values["license"]["trialDays"] == 60

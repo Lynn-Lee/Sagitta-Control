@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { notificationApi, type SystemNotification } from '@/api/system'
+import { licenseApi } from '@/api/license'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal'
 import ProfileSettingsModal from '@/components/auth/ProfileSettingsModal'
 import { useAuthStore } from '@/store/auth'
@@ -302,6 +303,13 @@ export default function MainLayout() {
     queryFn: () => notificationApi.list({ page: 1, page_size: 8 }),
     enabled: Boolean(user),
     refetchInterval: 30_000,
+  })
+  const { data: licenseStatus } = useQuery({
+    queryKey: ['license-status-banner'],
+    queryFn: licenseApi.status,
+    enabled: Boolean(user),
+    staleTime: 5 * 60_000,
+    retry: false,
   })
   const markReadMutation = useMutation({
     mutationFn: notificationApi.markRead,
@@ -670,6 +678,34 @@ export default function MainLayout() {
           minHeight: 'calc(100vh - 56px)',
           background: 'transparent',
         }}>
+          {licenseStatus?.source === 'trial' && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16, borderRadius: 10 }}
+              message={`未登记试用，剩余 ${licenseStatus.days_remaining ?? 0} 天`}
+              description="登记企业与联系人信息即可领取完整试用授权（全功能、不限实例与用户数）。未登记到期后将降级为社区版。"
+              action={
+                <Button type="primary" onClick={() => navigate('/system/license')}>
+                  领取完整试用
+                </Button>
+              }
+            />
+          )}
+          {licenseStatus?.status === 'community' && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16, borderRadius: 10 }}
+              message="当前为社区版"
+              description={`授权已到期并降级为社区版：最多 ${licenseStatus.limits?.max_instances ?? 5} 个实例，工单可提交与查看但不可执行。超额实例已挂起但配置完整保留，升级正式授权后自动恢复。`}
+              action={
+                <Button type="primary" onClick={() => navigate('/system/license')}>
+                  升级授权
+                </Button>
+              }
+            />
+          )}
           {user?.password_expiring_soon && (
             <Alert
               type="warning"
